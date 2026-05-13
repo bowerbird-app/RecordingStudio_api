@@ -1,0 +1,15 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "Recordings tree",
+    subtitle: "Active dummy-app recordings shown as a nested parent/child outline.",
+    variant: :h1
+  ) %>
+
+  <% if @recording_tree.any? %>
+    <ul class="list-disc pl-5 text-sm text-[var(--surface-content-color)]">
+      <%= render partial: "recording_tree_node", collection: @recording_tree, as: :node %>
+    </ul>
+  <% else %>
+    <p class="text-sm text-[var(--surface-muted-content-color)]">No active recordings found.</p>
+  <% end %>
+</div>

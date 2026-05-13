@@ -1,0 +1,9 @@
+<li>
+  <span><%= node[:label] %></span>
+
+  <% if node[:children].any? %>
+    <ul class="mt-2 list-disc pl-5">
+      <%= render partial: "recording_tree_node", collection: node[:children], as: :node %>
+    </ul>
+  <% end %>
+</li>
