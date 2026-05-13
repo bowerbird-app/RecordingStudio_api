@@ -7,8 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
+### Breaking
 - Renamed the live engine surfaces from `gem_template` to `recording_studio_api`
+
+### Changed
 - Replaced placeholder README and dummy-app docs content with the RecordingStudio API architecture handoff
 
 
