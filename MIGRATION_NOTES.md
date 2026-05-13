@@ -1,4 +1,7 @@
-# Migration Notes - Private Gems to Public Gems
+# Historical Note: Migration Notes - Private Gems to Public Gems
+
+> This file is retained as historical context from earlier template migration work. It is not part of the current RecordingStudio API handoff; use `README.md` and `test/dummy/` for the current project narrative.
+
 
 ## Changes Made
 

@@ -4,7 +4,7 @@ require "test_helper"
 
 class HooksTest < Minitest::Test
   def setup
-    @hooks = GemTemplate::Hooks.new
+    @hooks = RecordingStudioApi::Hooks.new
   end
 
   def teardown
@@ -275,7 +275,7 @@ class HooksTest < Minitest::Test
     @hooks.raise_on_error = true
     @hooks.after_initialize { raise "test error" }
 
-    assert_raises(GemTemplate::Hooks::HookError) do
+    assert_raises(RecordingStudioApi::Hooks::HookError) do
       @hooks.run(:after_initialize)
     end
   end
@@ -332,36 +332,36 @@ class HooksTest < Minitest::Test
   # === Class Method Tests ===
 
   def test_class_run_delegates_to_configuration
-    GemTemplate.configuration.hooks
+    RecordingStudioApi.configuration.hooks
     called = false
 
-    GemTemplate.configuration.hooks.after_initialize { called = true }
-    GemTemplate::Hooks.run(:after_initialize)
+    RecordingStudioApi.configuration.hooks.after_initialize { called = true }
+    RecordingStudioApi::Hooks.run(:after_initialize)
 
     assert called
   ensure
-    GemTemplate.configuration.hooks.clear!
+    RecordingStudioApi.configuration.hooks.clear!
   end
 
   def test_class_trigger_is_alias_for_run
     called = false
-    GemTemplate.configuration.hooks.on(:custom_event) { called = true }
+    RecordingStudioApi.configuration.hooks.on(:custom_event) { called = true }
 
-    GemTemplate::Hooks.trigger(:custom_event)
+    RecordingStudioApi::Hooks.trigger(:custom_event)
 
     assert called
   ensure
-    GemTemplate.configuration.hooks.clear!
+    RecordingStudioApi.configuration.hooks.clear!
   end
 
   def test_class_run_around_delegates_to_configuration
     events = []
-    GemTemplate.configuration.hooks.around_service do |_context, block|
+    RecordingStudioApi.configuration.hooks.around_service do |_context, block|
       events << :around
       block.call
     end
 
-    result = GemTemplate::Hooks.run_around(:around_service, :service) do
+    result = RecordingStudioApi::Hooks.run_around(:around_service, :service) do
       events << :core
       :ok
     end
@@ -369,6 +369,6 @@ class HooksTest < Minitest::Test
     assert_equal %i[around core], events
     assert_equal :ok, result
   ensure
-    GemTemplate.configuration.hooks.clear!
+    RecordingStudioApi.configuration.hooks.clear!
   end
 end

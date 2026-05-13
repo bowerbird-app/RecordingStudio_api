@@ -1,135 +1,91 @@
-# GemTemplate
+# RecordingStudio API
 
-Internal template for building Rails engine addons on top of RecordingStudio.
+Mountable Rails engine scaffold for a future programmable Recording Studio API.
 
-## What's Included
+This repository now completes the last unfinished agent pass by renaming the live engine surfaces to `recording_studio_api` / `RecordingStudioApi` and replacing the placeholder docs with the original architecture handoff for the API gem.
 
-- **RecordingStudio** gem installed and configured
-- **Devise** authentication with a pre-seeded admin user
-- **Workspace**, **Folder**, and **Page** recordables seeded into the dummy host app
-- **FlatPack** UI component library for all views
-- **Dummy app** (`test/dummy/`) with a FlatPack-based sign-in screen, a simple home page, mounted RecordingStudio routes, and FlatPack's built-in rounded theme enabled by default
+## Current Scope
 
-The dummy app ships with a starter sidebar documentation shell for authenticated pages. The menu entries in `test/dummy/app/views/layouts/flat_pack/_sidebar.html.erb` and the linked docs pages are intended to be rewritten to suit the addon you are building; the template provides the structure and styling, not final product copy. By default, that starter shell uses FlatPack's built-in rounded theme via the root layout attribute rather than custom Tailwind theme recreation.
+- renamed engine, generators, migrations, and tests under `RecordingStudioApi`
+- dummy app for auth, FlatPack, Recording Studio wiring, and docs review
+- documented design for programmable API surfaces, nested resources, and access management
+- preserved template reference material in `docs/gem_template/`
 
-## Quick Start
+The current codebase still ships the template engine mechanics (configuration, hooks, install generator, sample service objects). The HTTP API described below is the intended next implementation phase, not a finished endpoint set in this branch.
 
-### GitHub Codespaces (Recommended)
+## Proposed API Architecture
 
-1. Click **Code** → **Codespaces** → **Create codespace**
-2. Wait for setup to complete
-3. Run:
-   ```bash
-   cd test/dummy
-   bin/rails db:setup
-   bin/dev
-   ```
-4. Open port 3000 — you'll land on the dummy app home page and can sign in at `/users/sign_in`
+### Core registries
 
-The dummy app is intended as a host-app validation surface for authentication, FlatPack rendering, Tailwind source scanning, and RecordingStudio route wiring.
+`RecordingStudioApi` is intended to expose explicit registration layers for:
 
-### Login Credentials
+- API surfaces
+- resources
+- nested resources
+- actions backed by Recording Studio capabilities
 
-| Field    | Value             |
-|----------|-------------------|
-| Email    | admin@admin.com   |
-| Password | Password          |
+Each action should declare its verb, scope, capability mapping, handler, and serializer so the API surface is opt-in and boot-time validated.
 
-The login form is prefilled with these credentials for fast access.
+### Routing model
 
-### Useful Routes
+- top-level resources represent recordable roots or directly addressable records
+- nested resources mirror the real recording tree, not ad hoc controller structure
+- capability actions sit beside resources as explicit member or collection endpoints
 
-- `/` — dummy app home page
-- `/users/sign_in` — Devise sign-in page
-- `/recording_studio` — redirect to `/` while the mounted RecordingStudio engine remains data/API-focused
-- `/docs/install` — install guide rendered inside the dummy app
-- `/docs/config`, `/docs/recordable_types`, `/docs/recordings_tree`, `/docs/gem_views`, `/docs/methods` — starter sidebar pages to customize for your gem
+### Access model
 
-The home page in `test/dummy/app/views/home/index.html.erb` is also a deliberate starting point. Keep it focused on a minimal demo of the gem's primary behavior; use the sidebar pages for deeper explanations and supporting reference material.
+- authorization should flow through accessible records and Recording Studio access boundaries
+- `ApiClient` is the acting API principal
+- each accessible record should own at most one active API credential record
+- raw secrets should only be revealed at creation or rotation time
 
-## Architecture
+### Boot validation
 
-### Root Recording Pattern
+The eventual runtime should fail fast when:
 
-This template follows RecordingStudio's root recording pattern:
+- an API action points at a capability that is not enabled
+- a resource registration conflicts with another route or serializer contract
+- nested resource declarations contradict the recording hierarchy
+- required handlers or serializers are missing
 
-- **Workspace** is the top-level recordable
-- **Folder** and **Page** demonstrate nested recordables under the workspace root
-- A root `RecordingStudio::Recording` wraps the Workspace
-- The admin user has root-level admin access via `RecordingStudio::Access`
-- `Current.actor` is set from `current_user` (Devise) in `ApplicationController`
+## Current Ruby Surface
 
-### Extending RecordingStudio
-
-To add new recordable types:
-
-1. Create your model (e.g., `Page`, `Comment`)
-2. Register it in `config/initializers/recording_studio.rb`:
-   ```ruby
-   RecordingStudio.configure do |config|
-     config.recordable_types = ["Workspace", "YourNewType"]
-   end
-   ```
-3. Leave optional behavior off by default, then opt into capabilities on the specific recordable models that need them:
-   ```ruby
-   class YourNewType < ApplicationRecord
-     include RecordingStudio::Capabilities::Movable.to("Workspace")
-     include RecordingStudio::Capabilities::Copyable.to("Workspace")
-   end
-   ```
-4. If you want per-device root persistence, wire it explicitly in your controller layer:
-   ```ruby
-   class ApplicationController < ActionController::Base
-     include RecordingStudio::Concerns::DeviceSessionConcern
-   end
-   ```
-5. Create recordings under the root:
-   ```ruby
-   root_recording.record(YourNewType) do |record|
-     record.title = "Example"
-   end
-   ```
-
-### Capabilities
-
-This template uses the current RecordingStudio approach: built-in capabilities are off by default and are enabled per recordable type by including the relevant module on the model.
-
-- `movable`
-- `copyable`
-
-Device session persistence is separate from capabilities. It is enabled only when you include `RecordingStudio::Concerns::DeviceSessionConcern` in your controller layer.
-
-Enable behavior intentionally where it belongs:
+The renamed engine currently exposes the same basic Ruby integration points as the template:
 
 ```ruby
-class RecordingStudioPage < ApplicationRecord
-  include RecordingStudio::Capabilities::Movable.to("Workspace")
-  include RecordingStudio::Capabilities::Copyable.to("Workspace")
+RecordingStudioApi.configure do |config|
+  config.api_key = ENV["RECORDING_STUDIO_API_KEY"]
+  config.enable_feature_x = false
+  config.timeout = 5
 end
 
-class ApplicationController < ActionController::Base
-  include RecordingStudio::Concerns::DeviceSessionConcern
-end
+RecordingStudioApi.configuration
+RecordingStudioApi::Hooks.run(:before_initialize)
 ```
 
-### FlatPack UI Components
+These APIs keep the engine loadable while the future HTTP-specific DSL is designed on top of them.
 
-All views use FlatPack ViewComponents. Available components include:
+## Dummy App
 
-- `FlatPack::Button::Component` — Buttons (`:primary`, `:secondary`, `:ghost`)
-- `FlatPack::Card::Component` — Cards (`:default`, `:elevated`, `:outlined`)
-- `FlatPack::Alert::Component` — Alerts (`:success`, `:error`, `:warning`, `:info`)
-- `FlatPack::Badge::Component` — Status badges
-- `FlatPack::Table::Component` — Data tables
-- `FlatPack::TextInput::Component`, `EmailInput`, `PasswordInput` — Form inputs
-- `FlatPack::Breadcrumb::Component` — Navigation breadcrumbs
-- `FlatPack::Navbar::Component` — Navigation sidebar
+Use `test/dummy/` as the review surface for the completed handoff:
 
-Use the live FlatPack demo app at [flatpack-c6p8f.ondigitalocean.app](https://flatpack-c6p8f.ondigitalocean.app/) as the approved UI reference for current shared patterns. Its component table is the fastest way to discover available FlatPack components before introducing new custom UI, and user-provided FlatPack demo URLs should be treated as task context.
+- `/docs/install` documents the renamed install and migration flow
+- `/docs/config` records the current config API plus the planned registry constraints
+- `/docs/methods` documents the live Ruby entrypoints
+- `/docs/recordable_types`, `/docs/recordings_tree`, and `/docs/gem_views` verify Recording Studio wiring and engine assets
 
-In GitHub Codespaces or other restricted environments, you may need to enable access to that URL before the agent can inspect the app. If access is unavailable, provide sanitized screenshots, copied markup, or component details so the agent can stay aligned with the shared UI.
+### Quick start
 
-See the [FlatPack README](https://github.com/bowerbird-app/flatpack) for full documentation.
+```bash
+cd test/dummy
+bin/rails db:setup
+bin/dev
+```
+
+Sign in with:
+
+- Email: `admin@admin.com`
+- Password: `Password`
 
 ## Tech Stack
 
@@ -145,4 +101,4 @@ See the [FlatPack README](https://github.com/bowerbird-app/flatpack) for full do
 
 ## Documentation
 
-The original gem template documentation is preserved in `docs/gem_template/` as architectural reference material. Use it as background on the engine conventions; the README and dummy app are the source of truth for the Recording Studio addon workflow.
+The original gem template documentation is preserved in this repository under `docs/gem_template/` as architectural reference material. Those files are for contributors reviewing the repo, not packaged gem docs; the README and dummy app are now the source of truth for the Recording Studio API design handoff.

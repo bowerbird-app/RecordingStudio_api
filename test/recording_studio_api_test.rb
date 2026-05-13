@@ -2,13 +2,13 @@
 
 require "test_helper"
 
-class GemTemplateTest < Minitest::Test
+class RecordingStudioApiTest < Minitest::Test
   def test_version_exists
-    refute_nil ::GemTemplate::VERSION
+    refute_nil ::RecordingStudioApi::VERSION
   end
 
   def test_engine_exists
-    assert_kind_of Class, ::GemTemplate::Engine
+    assert_kind_of Class, ::RecordingStudioApi::Engine
   end
 
   def test_dummy_app_uses_flatpack_sidebar_layout
@@ -48,22 +48,29 @@ class GemTemplateTest < Minitest::Test
     refute_includes initializer_source, "config.features."
   end
 
+  def test_readme_marks_preserved_template_docs_as_repo_only
+    readme_source = File.read(File.expand_path("../README.md", __dir__))
+
+    assert_includes readme_source, "preserved in this repository under `docs/gem_template/`"
+    assert_includes readme_source, "not packaged gem docs"
+  end
+
   def test_dummy_readme_explains_dummy_app_purpose
     readme_path = File.expand_path("dummy/README.md", __dir__)
     readme_source = File.read(readme_path)
 
-    assert_includes readme_source, "This Rails app exists to validate the Recording Studio addon template"
+    assert_includes readme_source, "This Rails app exists to validate the RecordingStudio API engine shell"
     assert_includes readme_source, "/recording_studio"
-    assert_includes readme_source, "redirects to `/`"
+    assert_includes readme_source, "architecture handoff"
   end
 
-  def test_dummy_home_page_uses_demo_title_only
+  def test_dummy_home_page_uses_recording_studio_api_title
     view_path = File.expand_path("dummy/app/views/home/index.html.erb", __dir__)
     view_source = File.read(view_path)
 
-    assert_includes view_source, 'title: "Demo"'
-    assert_includes view_source, 'subtitle: "Provide a simple demo below"'
-    refute_includes view_source, "Template workflow"
+    assert_includes view_source, 'title: "RecordingStudio API"'
+    assert_includes view_source, "install flow, config surface, and design notes"
+    refute_includes view_source, 'title: "Demo"'
   end
 
   def test_dummy_docs_pages_use_minimal_flatpack_documentation_components
@@ -110,12 +117,13 @@ class GemTemplateTest < Minitest::Test
     sidebar_path = File.expand_path("dummy/app/views/layouts/flat_pack/_sidebar.html.erb", __dir__)
     sidebar_source = File.read(sidebar_path)
 
+    assert_includes sidebar_source, 'title: "RecordingStudio API"'
+    assert_includes sidebar_source, 'subtitle: "Host app guide"'
     assert_includes sidebar_source, 'label: "Recordable types"'
     assert_includes sidebar_source, "docs_recordable_types_path"
     assert_includes sidebar_source, 'label: "Recordings tree"'
     assert_includes sidebar_source, "docs_recordings_tree_path"
-    refute_includes sidebar_source, 'label: "Recording Studio"'
-    refute_includes sidebar_source, 'href: "/recording_studio"'
+    refute_includes sidebar_source, 'title: "Addon Template"'
   end
 
   def test_dummy_sidebar_uses_supported_icons_for_install_and_methods
@@ -138,8 +146,15 @@ class GemTemplateTest < Minitest::Test
     assert_includes top_nav_source, 'aria-hidden="true"'
   end
 
+  def test_engine_home_page_describes_access_boundaries_without_bad_module_name
+    view_source = File.read(File.expand_path("../app/views/recording_studio_api/home/index.html.erb", __dir__))
+
+    assert_includes view_source, "accessible records and Recording Studio access boundaries"
+    refute_includes view_source, "RecordingStudio_accessible"
+  end
+
   def test_engine_home_page_uses_flatpack_components
-    view_path = File.expand_path("../app/views/gem_template/home/index.html.erb", __dir__)
+    view_path = File.expand_path("../app/views/recording_studio_api/home/index.html.erb", __dir__)
     view_source = File.read(view_path)
 
     assert_includes view_source, "FlatPack::PageTitle::Component"

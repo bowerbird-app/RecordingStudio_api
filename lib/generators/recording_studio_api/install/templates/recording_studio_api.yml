@@ -4,6 +4,6 @@ development:
   timeout: 5
 
 production:
-  api_key: <%= ENV["GEM_TEMPLATE_API_KEY"] %>
+  api_key: <%= ENV["RECORDING_STUDIO_API_KEY"] %>
   enable_feature_x: false
   timeout: 5

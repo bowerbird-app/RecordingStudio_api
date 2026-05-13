@@ -1,30 +1,40 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
   <%= render FlatPack::PageTitle::Component.new(
     title: "Methods",
-    subtitle: "Document the public methods your addon exposes.",
+    subtitle: "Current public Ruby surface for configuration and engine orchestration.",
     variant: :h1
   ) %>
 
   <%= render FlatPack::SectionTitle::Component.new(
-    title: "Example method",
-    subtitle: "recordingstudio_addon.example_method",
+    title: "RecordingStudioApi.configure",
+    subtitle: "Provide configuration overrides from the host app.",
   ) %>
 
   <%= render FlatPack::CodeBlock::Component.new(
     language: :ruby,
     code: <<~'CODE'
-      # Explain what this method does before the example.
-      result = RecordingstudioAddon.example_method(
-        # Replace with the real arguments this method accepts.
-        input: "demo value"
-      )
+      RecordingStudioApi.configure do |config|
+        config.api_key = ENV.fetch("RECORDING_STUDIO_API_KEY")
+        config.timeout = 10
+      end
+    CODE
+  ) %>
 
-      # Show what the method returns or what side effect it creates.
-      puts result
+  <%= render FlatPack::SectionTitle::Component.new(
+    title: "RecordingStudioApi.configuration",
+    subtitle: "Read the current config object or reuse it inside host-app hooks.",
+  ) %>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    language: :ruby,
+    code: <<~'CODE'
+      configuration = RecordingStudioApi.configuration
+      configuration.timeout
+      RecordingStudioApi::Hooks.run(:before_initialize)
     CODE
   ) %>
 
   <p class="text-sm text-(--body-muted-content-color)">
-    Provide one section title and codeblock for each method
+    The future HTTP DSL should build on this object with explicit API-surface, resource, and action registrations.
   </p>
 </div>

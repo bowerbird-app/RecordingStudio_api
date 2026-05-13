@@ -4,7 +4,7 @@ require "test_helper"
 
 class ConfigurationTest < Minitest::Test
   def setup
-    @configuration = GemTemplate::Configuration.new
+    @configuration = RecordingStudioApi::Configuration.new
   end
 
   def test_merge_updates_known_attributes
@@ -34,17 +34,17 @@ class ConfigurationTest < Minitest::Test
   end
 
   def test_initialize_uses_environment_api_key_and_defaults
-    previous_value = ENV.fetch("GEM_TEMPLATE_API_KEY", nil)
-    ENV["GEM_TEMPLATE_API_KEY"] = "env-token"
+    previous_value = ENV.fetch("RECORDING_STUDIO_API_KEY", nil)
+    ENV["RECORDING_STUDIO_API_KEY"] = "env-token"
 
-    configuration = GemTemplate::Configuration.new
+    configuration = RecordingStudioApi::Configuration.new
 
     assert_equal "env-token", configuration.api_key
     assert_equal false, configuration.enable_feature_x
     assert_equal 5, configuration.timeout
-    assert_instance_of GemTemplate::Hooks, configuration.hooks
+    assert_instance_of RecordingStudioApi::Hooks, configuration.hooks
   ensure
-    ENV["GEM_TEMPLATE_API_KEY"] = previous_value
+    ENV["RECORDING_STUDIO_API_KEY"] = previous_value
   end
 
   def test_merge_accepts_string_keys
@@ -66,8 +66,8 @@ class ConfigurationTest < Minitest::Test
   end
 
   def test_configure_without_block_is_safe
-    GemTemplate.configure
+    RecordingStudioApi.configure
 
-    assert_kind_of GemTemplate::Configuration, GemTemplate.configuration
+    assert_kind_of RecordingStudioApi::Configuration, RecordingStudioApi.configuration
   end
 end

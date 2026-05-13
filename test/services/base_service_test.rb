@@ -2,7 +2,7 @@
 
 require "test_helper"
 
-module GemTemplate
+module RecordingStudioApi
   module Services
     class BaseServiceTest < Minitest::Test
       # Test subclass for testing BaseService
@@ -192,10 +192,10 @@ module GemTemplate
         before_calls = []
         after_calls = []
 
-        GemTemplate.configuration.hooks.before_service do |service_class, args|
+        RecordingStudioApi.configuration.hooks.before_service do |service_class, args|
           before_calls << [service_class, args]
         end
-        GemTemplate.configuration.hooks.after_service do |service_class, result|
+        RecordingStudioApi.configuration.hooks.after_service do |service_class, result|
           after_calls << [service_class, result.value]
         end
 
@@ -204,12 +204,12 @@ module GemTemplate
         assert_equal [[HookedService, { input: "hello" }]], before_calls
         assert_equal [[HookedService, "HELLO"]], after_calls
       ensure
-        GemTemplate.configuration.hooks.clear!
+        RecordingStudioApi.configuration.hooks.clear!
       end
 
       def test_around_hook_wraps_service_execution
         events = []
-        GemTemplate.configuration.hooks.around_service do |service, block|
+        RecordingStudioApi.configuration.hooks.around_service do |service, block|
           events << [:around, service.class]
           result = block.call
           events << [:result, result.value]
@@ -221,13 +221,13 @@ module GemTemplate
         assert_equal "HOOKED", result.value
         assert_equal [[:around, HookedService], [:result, "HOOKED"]], events
       ensure
-        GemTemplate.configuration.hooks.clear!
+        RecordingStudioApi.configuration.hooks.clear!
       end
 
       def test_hooks_are_skipped_when_configuration_has_no_hooks
         configuration = Object.new
 
-        GemTemplate.stub(:configuration, configuration) do
+        RecordingStudioApi.stub(:configuration, configuration) do
           result = HookedService.call(input: "plain")
 
           assert result.success?
@@ -237,7 +237,7 @@ module GemTemplate
 
       def test_default_service_args_are_empty_hash
         received_args = nil
-        GemTemplate.configuration.hooks.before_service do |_service_class, args|
+        RecordingStudioApi.configuration.hooks.before_service do |_service_class, args|
           received_args = args
         end
 
@@ -245,7 +245,7 @@ module GemTemplate
 
         assert_equal({}, received_args)
       ensure
-        GemTemplate.configuration.hooks.clear!
+        RecordingStudioApi.configuration.hooks.clear!
       end
     end
   end

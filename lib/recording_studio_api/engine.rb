@@ -1,16 +1,16 @@
 # frozen_string_literal: true
 
-module GemTemplate
+module RecordingStudioApi
   class Engine < ::Rails::Engine
-    isolate_namespace GemTemplate
+    isolate_namespace RecordingStudioApi
 
     class << self
       def apply_model_extensions(target)
-        apply_extensions(target, GemTemplate.configuration.hooks.model_extensions_for(extension_keys_for(target)))
+        apply_extensions(target, RecordingStudioApi.configuration.hooks.model_extensions_for(extension_keys_for(target)))
       end
 
       def apply_controller_extensions(target)
-        apply_extensions(target, GemTemplate.configuration.hooks.controller_extensions_for(extension_keys_for(target)))
+        apply_extensions(target, RecordingStudioApi.configuration.hooks.controller_extensions_for(extension_keys_for(target)))
       end
 
       private
@@ -18,7 +18,7 @@ module GemTemplate
       def apply_extensions(target, extensions)
         return unless target
 
-        applied = target.instance_variable_get(:@gem_template_applied_extensions) || identity_hash
+        applied = target.instance_variable_get(:@recording_studio_api_applied_extensions) || identity_hash
 
         extensions.flatten.compact.each do |extension|
           next if applied[extension]
@@ -27,7 +27,7 @@ module GemTemplate
           applied[extension] = true
         end
 
-        target.instance_variable_set(:@gem_template_applied_extensions, applied)
+        target.instance_variable_set(:@recording_studio_api_applied_extensions, applied)
       end
 
       def extension_keys_for(target)
@@ -41,36 +41,36 @@ module GemTemplate
     end
 
     # Run before_initialize hooks
-    initializer "gem_template.before_initialize", before: "gem_template.load_config" do |_app|
-      GemTemplate::Hooks.run(:before_initialize, self)
+    initializer "recording_studio_api.before_initialize", before: "recording_studio_api.load_config" do |_app|
+      RecordingStudioApi::Hooks.run(:before_initialize, self)
     end
 
-    initializer "gem_template.load_config" do |app|
-      # Load config/gem_template.yml via Rails config_for if present
+    initializer "recording_studio_api.load_config" do |app|
+      # Load config/recording_studio_api.yml via Rails config_for if present
       if app.respond_to?(:config_for)
         begin
           yaml = begin
-            app.config_for(:gem_template)
+            app.config_for(:recording_studio_api)
           rescue StandardError
             nil
           end
-          GemTemplate.configuration.merge!(yaml) if yaml.respond_to?(:each)
+          RecordingStudioApi.configuration.merge!(yaml) if yaml.respond_to?(:each)
         rescue StandardError => _e
           # ignore load errors; host app can provide initializer overrides
         end
       end
 
-      # Merge Rails.application.config.x.gem_template if present
-      if app.config.respond_to?(:x) && app.config.x.respond_to?(:gem_template)
-        xcfg = app.config.x.gem_template
+      # Merge Rails.application.config.x.recording_studio_api if present
+      if app.config.respond_to?(:x) && app.config.x.respond_to?(:recording_studio_api)
+        xcfg = app.config.x.recording_studio_api
         if xcfg.respond_to?(:to_h)
-          GemTemplate.configuration.merge!(xcfg.to_h)
+          RecordingStudioApi.configuration.merge!(xcfg.to_h)
         else
           begin
             # try converting OrderedOptions
             hash = {}
             xcfg.each_pair { |k, v| hash[k] = v } if xcfg.respond_to?(:each_pair)
-            GemTemplate.configuration.merge!(hash) if hash&.any?
+            RecordingStudioApi.configuration.merge!(hash) if hash&.any?
           rescue StandardError => _e
             # ignore
           end
@@ -78,34 +78,34 @@ module GemTemplate
       end
 
       # Run on_configuration hooks after config is loaded
-      GemTemplate::Hooks.run(:on_configuration, GemTemplate.configuration)
+      RecordingStudioApi::Hooks.run(:on_configuration, RecordingStudioApi.configuration)
     end
 
     # Run after_initialize hooks
-    initializer "gem_template.after_initialize", after: "gem_template.load_config" do |_app|
-      GemTemplate::Hooks.run(:after_initialize, self)
+    initializer "recording_studio_api.after_initialize", after: "recording_studio_api.load_config" do |_app|
+      RecordingStudioApi::Hooks.run(:after_initialize, self)
     end
 
     # Apply model extensions when models are loaded
-    initializer "gem_template.apply_model_extensions" do
+    initializer "recording_studio_api.apply_model_extensions" do
       config.to_prepare do
         next unless defined?(ActiveRecord::Base)
 
         ActiveRecord::Base.descendants.each do |model|
           next if model.abstract_class?
 
-          GemTemplate::Engine.apply_model_extensions(model)
+          RecordingStudioApi::Engine.apply_model_extensions(model)
         end
       end
     end
 
     # Apply controller extensions
-    initializer "gem_template.apply_controller_extensions" do
+    initializer "recording_studio_api.apply_controller_extensions" do
       config.to_prepare do
         next unless defined?(ActionController::Base)
 
         ActionController::Base.descendants.each do |controller|
-          GemTemplate::Engine.apply_controller_extensions(controller)
+          RecordingStudioApi::Engine.apply_controller_extensions(controller)
         end
       end
     end

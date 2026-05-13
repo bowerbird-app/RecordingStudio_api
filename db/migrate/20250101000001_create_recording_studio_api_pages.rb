@@ -6,9 +6,9 @@
 # point for addon-specific data that hangs off the host application's root
 # Workspace recordable.
 #
-class CreateGemTemplatePages < ActiveRecord::Migration[8.1]
+class CreateRecordingStudioApiPages < ActiveRecord::Migration[8.1]
   def change
-    create_table :gem_template_pages, id: :uuid do |t|
+    create_table :recording_studio_api_pages, id: :uuid do |t|
       t.uuid :workspace_id, null: false
       t.string :title, null: false
       t.string :slug, null: false
@@ -24,8 +24,8 @@ class CreateGemTemplatePages < ActiveRecord::Migration[8.1]
   private
 
   def add_page_indexes
-    add_index :gem_template_pages, :workspace_id
-    add_index :gem_template_pages, %i[workspace_id slug], unique: true
-    add_index :gem_template_pages, :published
+    add_index :recording_studio_api_pages, :workspace_id
+    add_index :recording_studio_api_pages, %i[workspace_id slug], unique: true
+    add_index :recording_studio_api_pages, :published
   end
 end

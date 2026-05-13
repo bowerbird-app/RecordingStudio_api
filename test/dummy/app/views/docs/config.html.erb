@@ -1,14 +1,24 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
   <%= render FlatPack::PageTitle::Component.new(
     title: "Config",
-    subtitle: "Replace this placeholder with the configuration settings your generated gem exposes.",
+    subtitle: "Current config keys plus the constraints for the future HTTP API registries.",
     variant: :h1
   ) %>
 
   <%= render FlatPack::CodeBlock::Component.new(
     language: :ruby,
     code: <<~'CODE'
-      # Add the config settings for the gem here.
+      RecordingStudioApi.configure do |config|
+        config.api_key = ENV["RECORDING_STUDIO_API_KEY"]
+        config.enable_feature_x = false
+        config.timeout = 5
+      end
     CODE
   ) %>
+
+  <ul class="list-disc space-y-2 pl-5 text-sm text-(--surface-content-color)">
+    <li>Future API surfaces should be registered explicitly rather than inferred from Ruby constants.</li>
+    <li>Nested resource declarations should mirror the recording tree so route semantics stay consistent.</li>
+    <li>Boot should fail fast when an action points at a capability that is not enabled for the target recordable type.</li>
+  </ul>
 </div>

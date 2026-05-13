@@ -1,0 +1,108 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-12">
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "RecordingStudio API",
+    subtitle: "Renamed engine shell and architecture handoff for programmable Recording Studio access.",
+    variant: :h1
+  ) %>
+
+  <div class="flex flex-wrap gap-2">
+    <%= render FlatPack::Badge::Component.new(text: "Namespace renamed", style: :success, size: :sm) %>
+    <%= render FlatPack::Badge::Component.new(text: "Dummy docs updated", style: :info, size: :sm) %>
+    <%= render FlatPack::Badge::Component.new(text: "API design captured", style: :warning, size: :sm) %>
+  </div>
+
+  <div class="grid gap-6 lg:grid-cols-2">
+    <%= render FlatPack::Card::Component.new(style: :default) do |card| %>
+      <% card.header do %>
+        <%= render FlatPack::PageTitle::Component.new(
+          title: "Completion status",
+          subtitle: "What this repository now delivers after finishing the previous agent's work.",
+          variant: :h3,
+          class: "mb-0 pb-0"
+        ) %>
+      <% end %>
+
+      <% card.body do %>
+        <ul class="space-y-3 text-sm leading-6">
+          <li>The gem, engine, generators, migrations, and tests now use the <code>RecordingStudioApi</code> namespace.</li>
+          <li>The dummy app now presents RecordingStudio API-specific install, config, and method documentation.</li>
+          <li>The preserved template reference docs remain isolated under <code>docs/gem_template/</code>.</li>
+        </ul>
+      <% end %>
+    <% end %>
+
+    <%= render FlatPack::Card::Component.new(style: :outlined) do |card| %>
+      <% card.header do %>
+        <%= render FlatPack::PageTitle::Component.new(
+          title: "Planned HTTP architecture",
+          subtitle: "The original design deliverables now captured in the repo.",
+          variant: :h3,
+          class: "mb-0 pb-0"
+        ) %>
+      <% end %>
+
+      <% card.body do %>
+        <ul class="space-y-3 text-sm leading-6">
+          <li>Expose explicit API surface, resource, nested-resource, and action registries.</li>
+          <li>Map actions to Recording Studio capabilities and validate those mappings at boot.</li>
+          <li>Keep route nesting aligned with the real recording tree.</li>
+          <li>Use serializers and handlers as explicit per-action contracts.</li>
+        </ul>
+      <% end %>
+    <% end %>
+
+    <%= render FlatPack::Card::Component.new(style: :outlined) do |card| %>
+      <% card.header do %>
+        <%= render FlatPack::PageTitle::Component.new(
+          title: "Access model",
+          subtitle: "How the future API surface should authenticate and authorize requests.",
+          variant: :h3,
+          class: "mb-0 pb-0"
+        ) %>
+      <% end %>
+
+      <% card.body do %>
+        <ul class="space-y-3 text-sm leading-6">
+          <li><code>ApiClient</code> acts as the API principal beneath an accessible record.</li>
+          <li>Each accessible record should own at most one active API credential record.</li>
+          <li>Authorization should remain delegated to accessible records and Recording Studio access boundaries.</li>
+          <li>Secrets should only be revealed at create or rotate time.</li>
+        </ul>
+      <% end %>
+
+      <% card.footer do %>
+        <%= link_to "View FlatPack documentation",
+                    "https://github.com/bowerbird-app/flatpack",
+                    target: "_blank",
+                    rel: "noopener noreferrer",
+                    class: "inline-flex" do %>
+          <%= render FlatPack::Button::Component.new(
+            text: "View FlatPack documentation",
+            style: :primary,
+            size: :md
+          ) %>
+        <% end %>
+      <% end %>
+    <% end %>
+
+    <%= render FlatPack::Card::Component.new(style: :default) do |card| %>
+      <% card.header do %>
+        <%= render FlatPack::PageTitle::Component.new(
+          title: "Host-app workflow",
+          subtitle: "The practical path that the renamed engine supports today.",
+          variant: :h3,
+          class: "mb-0 pb-0"
+        ) %>
+      <% end %>
+
+      <% card.body do %>
+        <ul class="space-y-3 text-sm leading-6">
+          <li>Install the gem and run <code>rails generate recording_studio_api:install</code>.</li>
+          <li>Copy the sample migration with <code>rails generate recording_studio_api:migrations</code>.</li>
+          <li>Use the dummy app docs pages to review config, install, and method expectations.</li>
+          <li>Implement the HTTP API layer as a follow-up on top of the renamed engine shell.</li>
+        </ul>
+      <% end %>
+    <% end %>
+  </div>
+</div>

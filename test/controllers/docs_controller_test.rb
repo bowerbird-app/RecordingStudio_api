@@ -25,19 +25,22 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     get docs_install_path
     assert_response :success
     assert_select "h1", text: "Install"
-    assert_includes response.body, "Step 1"
-    assert_includes response.body, "Provide one section title for each step"
-    assert_includes response.body, "# Put the step instruction here."
+    assert_includes response.body, "1. Add the gem"
+    assert_includes response.body, "bundle add recording_studio_api"
+    assert_includes response.body, "generate recording_studio_api:migrations"
+    assert_includes response.body, "tailwindcss:build"
   end
 
   test "config page renders successfully" do
     get docs_config_path
     assert_response :success
     assert_select "h1", text: "Config"
-    expected_placeholder = "Replace this placeholder with the configuration settings your generated gem exposes."
+    expected_copy = "Current config keys plus the constraints for the future HTTP API registries."
 
-    assert_includes response.body, expected_placeholder
-    assert_includes response.body, "# Add the config settings for the gem here."
+    assert_includes response.body, expected_copy
+    assert_includes response.body, "RecordingStudioApi.configure do |config|"
+    assert_includes response.body, "ENV[\"RECORDING_STUDIO_API_KEY\"]"
+    assert_includes response.body, "Nested resource declarations should mirror the recording tree"
   end
 
   test "recordable types page renders configured recordables dynamically" do
@@ -102,18 +105,17 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     get docs_gem_views_path
     assert_response :success
     assert_select "h1", text: "Gem Views"
-    assert_includes response.body, "app/views/gem_template/home/index.html.erb"
+    assert_includes response.body, "app/views/recording_studio_api/home/index.html.erb"
   end
 
   test "methods page renders successfully" do
     get docs_methods_path
     assert_response :success
     assert_select "h1", text: "Methods"
-    assert_includes response.body, "Document the public methods your addon exposes."
-    assert_includes response.body, "Example method"
-    assert_includes response.body, "recordingstudio_addon.example_method"
-    assert_includes response.body, "# Explain what this method does before the example."
-    assert_includes response.body, "Provide one section title and codeblock for each method"
+    assert_includes response.body, "Current public Ruby surface for configuration and engine orchestration."
+    assert_includes response.body, "RecordingStudioApi.configure"
+    assert_includes response.body, "RecordingStudioApi.configuration"
+    assert_includes response.body, "The future HTTP DSL should build on this object"
   end
 
   test "sidebar includes documentation links" do

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module GemTemplate
+module RecordingStudioApi
   # Hook system for extending engine behavior from host applications.
   #
   # This module provides a registry for lifecycle hooks, service hooks,
@@ -8,12 +8,12 @@ module GemTemplate
   # engine behavior without modifying source code.
   #
   # @example Registering hooks
-  #   GemTemplate.configuration.hooks.after_initialize do
-  #     Rails.logger.info "GemTemplate initialized!"
+  #   RecordingStudioApi.configuration.hooks.after_initialize do
+  #     Rails.logger.info "RecordingStudioApi initialized!"
   #   end
   #
   # @example Running hooks
-  #   GemTemplate::Hooks.run(:after_initialize)
+  #   RecordingStudioApi::Hooks.run(:after_initialize)
   #
   class Hooks
     # Error raised when a hook fails and raise_on_error is enabled
@@ -237,7 +237,7 @@ module GemTemplate
     def log_hook_error(error, event_name, _hook)
       return unless defined?(Rails) && Rails.respond_to?(:logger) && Rails.logger
 
-      Rails.logger.error "[GemTemplate::Hooks] Error in #{event_name} hook: #{error.message}"
+      Rails.logger.error "[RecordingStudioApi::Hooks] Error in #{event_name} hook: #{error.message}"
       Rails.logger.error error.backtrace.first(5).join("\n") if error.backtrace
     end
 
@@ -248,7 +248,7 @@ module GemTemplate
       # @param args [Array] Arguments to pass to hooks
       # @return [Array] Results from all hooks
       def run(event_name, *)
-        GemTemplate.configuration.hooks.run(event_name, *)
+        RecordingStudioApi.configuration.hooks.run(event_name, *)
       end
 
       # Run around hooks on the global configuration
@@ -258,7 +258,7 @@ module GemTemplate
       # @yield The block to wrap
       # @return [Object] Result of the wrapped block
       def run_around(event_name, context, &)
-        GemTemplate.configuration.hooks.run_around(event_name, context, &)
+        RecordingStudioApi.configuration.hooks.run_around(event_name, context, &)
       end
 
       # Trigger a custom event
