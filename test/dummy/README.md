@@ -31,6 +31,7 @@ Then open the app and sign in with:
 
 - `/` - dummy app home page and RecordingStudio API design guidance
 - `/recording_studio` - redirects to `/` while the mounted Recording Studio engine stays available under that prefix for non-root routes
+- `/recording_studio_api` - mounted RecordingStudio API engine home rendered with FlatPack components
 - `/users/sign_in` - Devise sign-in page
 - `/docs/install`, `/docs/config`, `/docs/recordable_types`, `/docs/recordings_tree`, `/docs/gem_views`, `/docs/methods` - sidebar pages that capture the completed architecture handoff
 - `/up` - Rails health check

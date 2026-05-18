@@ -1,9 +1,13 @@
-<li>
-  <span><%= node[:label] %></span>
+<%= render FlatPack::List::Item.new(icon: :folder) do %>
+  <div class="flex flex-col gap-2">
+    <span><%= node[:label] %></span>
 
-  <% if node[:children].any? %>
-    <ul class="mt-2 list-disc pl-5">
-      <%= render partial: "recording_tree_node", collection: node[:children], as: :node %>
-    </ul>
-  <% end %>
-</li>
+    <% if node[:children].any? %>
+      <div class="pl-4">
+        <%= render FlatPack::List::Component.new(divider: true) do %>
+          <%= render partial: "recording_tree_node", collection: node[:children], as: :node %>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+<% end %>

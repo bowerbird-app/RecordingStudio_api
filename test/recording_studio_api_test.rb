@@ -90,6 +90,10 @@ class RecordingStudioApiTest < Minitest::Test
     assert_includes methods_view, "FlatPack::SectionTitle::Component"
     assert_includes methods_view, "FlatPack::CodeBlock::Component"
 
+    config_view = File.read(File.expand_path("dummy/app/views/docs/config.html.erb", __dir__))
+    assert_includes config_view, "FlatPack::List::Component"
+    assert_includes config_view, "FlatPack::List::Item"
+
     gem_views_view = File.read(File.expand_path("dummy/app/views/docs/gem_views.html.erb", __dir__))
     assert_includes gem_views_view, "FlatPack::List::Component"
 
@@ -97,7 +101,7 @@ class RecordingStudioApiTest < Minitest::Test
     assert_includes recordable_types_view, "FlatPack::List::Component"
 
     recordings_tree_view = File.read(File.expand_path("dummy/app/views/docs/recordings_tree.html.erb", __dir__))
-    assert_includes recordings_tree_view, '<ul class="list-disc'
+    assert_includes recordings_tree_view, "FlatPack::List::Component"
     refute_includes recordings_tree_view, "Current structure"
     refute_includes recordings_tree_view, "This tree is generated from RecordingStudio::Recording records"
   end
@@ -106,9 +110,9 @@ class RecordingStudioApiTest < Minitest::Test
     recordings_tree_view = File.read(File.expand_path("dummy/app/views/docs/recordings_tree.html.erb", __dir__))
 
     assert_includes recordings_tree_view, 'title: "Recordings tree"'
-    assert_includes recordings_tree_view, '<ul class="list-disc'
+    assert_includes recordings_tree_view, "FlatPack::List::Component"
     recording_tree_partial = File.read(File.expand_path("dummy/app/views/docs/_recording_tree_node.html.erb", __dir__))
-    assert_includes recording_tree_partial, "<li>"
+    assert_includes recording_tree_partial, "FlatPack::List::Item"
     refute_includes recordings_tree_view, "Current structure"
     refute_includes recordings_tree_view, "This tree is generated from RecordingStudio::Recording records"
   end
@@ -161,5 +165,21 @@ class RecordingStudioApiTest < Minitest::Test
     assert_includes view_source, "FlatPack::Card::Component"
     assert_includes view_source, "FlatPack::Button::Component"
     assert_includes view_source, "FlatPack::Badge::Component"
+    assert_includes view_source, "FlatPack::List::Component"
+    assert_includes view_source, "FlatPack::List::Item"
+    refute_includes view_source, "<ul class="
+  end
+
+  def test_dummy_layouts_do_not_render_legacy_icon_sprite
+    application_layout = File.read(File.expand_path("dummy/app/views/layouts/application.html.erb", __dir__))
+    sidebar_layout = File.read(File.expand_path("dummy/app/views/layouts/flat_pack_sidebar.html.erb", __dir__))
+
+    refute_includes application_layout, 'render "layouts/icon_sprite"'
+    refute_includes sidebar_layout, 'render "layouts/icon_sprite"'
+    refute File.exist?(File.expand_path("dummy/app/views/layouts/_icon_sprite.html.erb", __dir__))
+  end
+
+  def test_dummy_views_no_longer_include_legacy_makeup_artist_namespace
+    refute Dir.exist?(File.expand_path("dummy/app/views/makeup_artist", __dir__))
   end
 end

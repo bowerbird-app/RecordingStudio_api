@@ -4,6 +4,8 @@ RecordingStudioApi has been installed successfully!
 
 The engine has been mounted at /recording_studio_api in your application.
 
+Before visiting the engine UI, make sure the host app already loads the shared `flat_pack` gem and styles used by the engine views.
+
 If you use Tailwind CSS:
 1. Run 'bin/rails tailwindcss:build' to rebuild your CSS with RecordingStudioApi styles
 

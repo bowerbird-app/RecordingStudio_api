@@ -16,9 +16,15 @@
     CODE
   ) %>
 
-  <ul class="list-disc space-y-2 pl-5 text-sm text-(--surface-content-color)">
-    <li>Future API surfaces should be registered explicitly rather than inferred from Ruby constants.</li>
-    <li>Nested resource declarations should mirror the recording tree so route semantics stay consistent.</li>
-    <li>Boot should fail fast when an action points at a capability that is not enabled for the target recordable type.</li>
-  </ul>
+  <%= render FlatPack::List::Component.new(divider: true) do %>
+    <%= render FlatPack::List::Item.new(icon: :settings) do %>
+      <span>Future API surfaces should be registered explicitly rather than inferred from Ruby constants.</span>
+    <% end %>
+    <%= render FlatPack::List::Item.new(icon: :queue_list) do %>
+      <span>Nested resource declarations should mirror the recording tree so route semantics stay consistent.</span>
+    <% end %>
+    <%= render FlatPack::List::Item.new(icon: :lock) do %>
+      <span>Boot should fail fast when an action points at a capability that is not enabled for the target recordable type.</span>
+    <% end %>
+  <% end %>
 </div>

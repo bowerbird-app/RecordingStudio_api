@@ -27,6 +27,7 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_select "h1", text: "Install"
     assert_includes response.body, "1. Add the gem"
     assert_includes response.body, "bundle add recording_studio_api"
+    assert_includes response.body, "flat_pack"
     assert_includes response.body, "generate recording_studio_api:migrations"
     assert_includes response.body, "tailwindcss:build"
   end
@@ -96,7 +97,6 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Page: API"
     assert_includes response.body, "Access boundary: Edit"
     assert_includes response.body, "Access: Admin for #{@user.email}"
-    assert_select "ul.list-disc", minimum: 2
     refute_includes response.body, "Current structure"
     refute_includes response.body, "This tree is generated from RecordingStudio::Recording records"
   end
@@ -116,6 +116,15 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "RecordingStudioApi.configure"
     assert_includes response.body, "RecordingStudioApi.configuration"
     assert_includes response.body, "The future HTTP DSL should build on this object"
+  end
+
+  test "mounted recording_studio_api engine renders successfully" do
+    get "/recording_studio_api"
+
+    assert_response :success
+    assert_select "h1", text: "RecordingStudio API"
+    assert_includes response.body, "Namespace renamed"
+    assert_includes response.body, "FlatPack"
   end
 
   test "sidebar includes documentation links" do

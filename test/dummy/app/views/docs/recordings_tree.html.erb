@@ -6,9 +6,9 @@
   ) %>
 
   <% if @recording_tree.any? %>
-    <ul class="list-disc pl-5 text-sm text-[var(--surface-content-color)]">
+    <%= render FlatPack::List::Component.new(divider: true) do %>
       <%= render partial: "recording_tree_node", collection: @recording_tree, as: :node %>
-    </ul>
+    <% end %>
   <% else %>
     <p class="text-sm text-[var(--surface-muted-content-color)]">No active recordings found.</p>
   <% end %>

@@ -65,6 +65,8 @@ RecordingStudioApi::Hooks.run(:before_initialize)
 
 These APIs keep the engine loadable while the future HTTP-specific DSL is designed on top of them.
 
+Engine-facing views use FlatPack components, so host apps should load the shared `flat_pack` gem and styles before mounting the engine UI.
+
 ## Dummy App
 
 Use `test/dummy/` as the review surface for the completed handoff:
