@@ -67,6 +67,16 @@ class ConfigurationTest < Minitest::Test
     assert_equal 1, result.fetch(:hooks_registered).fetch(:after_service)
   end
 
+  def test_register_capability_action_tracks_registry_entries
+    @configuration.action_registry.register(
+      :echo,
+      capability: :echoable,
+      handler: ->(_context) { :ok }
+    )
+
+    assert_equal :echoable, @configuration.to_h.fetch(:action_registrations).fetch("echo").fetch(:capability)
+  end
+
   def test_configure_without_block_is_safe
     RecordingStudioApi.configure
 

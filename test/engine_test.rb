@@ -282,6 +282,19 @@ class EngineTest < Minitest::Test
     assert_equal [:ReportsController], RecordingStudioApi::Engine.send(:extension_keys_for, plain)
   end
 
+  def test_register_default_capability_actions_adds_move_when_moveable_addon_is_loaded
+    moveable_module = Module.new
+
+    with_temporary_nested_constant(:RecordingStudio, :Moveable, Module.new) do
+      RecordingStudio::Moveable.const_set(:Capabilities, Module.new)
+      RecordingStudio::Moveable::Capabilities.const_set(:Moveable, moveable_module)
+
+      RecordingStudioApi.register_default_capability_actions!
+    end
+
+    assert_equal :movable, RecordingStudioApi.capability_action(:move).capability
+  end
+
   private
 
   def with_temporary_nested_constant(parent_name, child_name, value)

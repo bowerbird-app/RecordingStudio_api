@@ -1,17 +1,17 @@
 # RecordingStudio API
 
-Mountable Rails engine scaffold for a future programmable Recording Studio API.
+ Mountable Rails engine for a programmable Recording Studio API.
 
 This repository now completes the last unfinished agent pass by renaming the live engine surfaces to `recording_studio_api` / `RecordingStudioApi` and replacing the placeholder docs with the original architecture handoff for the API gem.
 
 ## Current Scope
 
-- renamed engine, generators, migrations, and tests under `RecordingStudioApi`
-- dummy app for auth, FlatPack, Recording Studio wiring, and docs review
-- documented design for programmable API surfaces, nested resources, and access management
+- bearer-token API authentication backed by `RecordingStudioApi::ApiClient` and `ApiCredential`
+- API client recordables stored beneath `RecordingStudio::Access` recordings in the Recording Studio tree
+- capability-backed action registry with automatic action exposure when a recordable type enables that capability
 - preserved template reference material in `docs/gem_template/`
 
-The current codebase still ships the template engine mechanics (configuration, hooks, install generator, sample service objects). The HTTP API described below is the intended next implementation phase, not a finished endpoint set in this branch.
+The current codebase still ships the template engine mechanics (configuration, hooks, install generator, sample service objects), but the engine now also exposes a real JSON API surface for authenticated resource lookup and capability-backed member actions.
 
 ## Proposed API Architecture
 
@@ -19,12 +19,11 @@ The current codebase still ships the template engine mechanics (configuration, h
 
 `RecordingStudioApi` is intended to expose explicit registration layers for:
 
-- API surfaces
-- resources
-- nested resources
+- authenticated API resources resolved from `RecordingStudio.configuration.recordable_types`
 - actions backed by Recording Studio capabilities
+- addon-owned handlers and serializers registered against those actions
 
-Each action should declare its verb, scope, capability mapping, handler, and serializer so the API surface is opt-in and boot-time validated.
+Each action declares its verb, capability mapping, handler, and serializer so addon gems can register an API action once and let the API expose it automatically for any recordable type that enables the capability.
 
 ### Routing model
 
@@ -36,16 +35,17 @@ Each action should declare its verb, scope, capability mapping, handler, and ser
 
 - authorization should flow through accessible records and Recording Studio access boundaries
 - `ApiClient` is the acting API principal
-- each accessible record should own at most one active API credential record
+- each access recording owns at most one active API credential record
 - raw secrets should only be revealed at creation or rotation time
+
+`ApiClient` is an immutable Recording Studio recordable. It is recorded as a child of a `RecordingStudio::Access` recording, while the mutable bearer-token state lives in `ApiCredential` with a digest, rotation, revocation, and last-used tracking.
 
 ### Boot validation
 
 The eventual runtime should fail fast when:
 
 - an API action points at a capability that is not enabled
-- a resource registration conflicts with another route or serializer contract
-- nested resource declarations contradict the recording hierarchy
+- duplicate action names are registered
 - required handlers or serializers are missing
 
 ## Current Ruby Surface
@@ -64,16 +64,56 @@ RecordingStudioApi.configuration
 RecordingStudioApi::Hooks.run(:before_initialize)
 ```
 
-`api_key` is currently a reserved configuration value. The engine stores it, but does not use it unless your host app adds an external integration that needs a credential.
+`api_key` remains available for host-managed outbound integrations, but inbound API authentication now uses provisioned bearer tokens stored in `ApiCredential`.
 
-These APIs keep the engine loadable while the future HTTP-specific DSL is designed on top of them.
+### Provisioning and authentication
+
+Provision a token from an existing `RecordingStudio::Access` recording:
+
+```ruby
+result = RecordingStudioApi::Services::ProvisionApiClient.call(
+  access_recording: access_recording,
+  name: "Primary token"
+)
+
+token = result.value.fetch(:token)
+```
+
+Authenticate requests with:
+
+```http
+Authorization: Bearer rsapi_<public_id>.<secret>
+```
+
+### Capability-backed actions
+
+Addon gems register actions once:
+
+```ruby
+RecordingStudioApi.register_capability_action(
+  :move,
+  capability: :movable,
+  http_verb: :post,
+  handler: RecordingStudioApi::Services::MoveRecording
+)
+```
+
+If a recordable type enables `:movable`, the API automatically exposes the `move` action for that resource.
+
+### API endpoints
+
+- `GET /recording_studio_api/api/v1` — list available API resources
+- `GET /recording_studio_api/api/v1/:resource` — list recordings of a resource type inside the authenticated root
+- `GET /recording_studio_api/api/v1/:resource/:id` — show one recording
+- `GET /recording_studio_api/api/v1/:resource/:id/actions` — list enabled capability actions
+- `POST /recording_studio_api/api/v1/:resource/:id/actions/:action_name` — execute a capability-backed action
 
 ## Dummy App
 
 Use `test/dummy/` as the review surface for the completed handoff:
 
 - `/docs/install` documents the renamed install and migration flow
-- `/docs/config` records the current config API plus the planned registry constraints
+- `/docs/config` records the current config API plus the capability action registry
 - `/docs/methods` documents the live Ruby entrypoints
 - `/docs/recordable_types`, `/docs/recordings_tree`, and `/docs/gem_views` verify Recording Studio wiring and the current gem view footprint
 

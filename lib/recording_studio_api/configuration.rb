@@ -1,17 +1,20 @@
 # frozen_string_literal: true
 
 require_relative "hooks"
+require_relative "action_registry"
 
 module RecordingStudioApi
   class Configuration
-    attr_accessor :api_key, :enable_feature_x, :timeout
-    attr_reader :hooks
+    attr_accessor :api_key, :enable_feature_x, :timeout, :token_ttl
+    attr_reader :hooks, :action_registry
 
     def initialize
       @api_key = ENV.fetch("RECORDING_STUDIO_API_KEY", nil)
       @enable_feature_x = false
       @timeout = 5
+      @token_ttl = 30.days
       @hooks = Hooks.new
+      @action_registry = ActionRegistry.new
     end
 
     def to_h
@@ -19,6 +22,8 @@ module RecordingStudioApi
         api_key: api_key,
         enable_feature_x: enable_feature_x,
         timeout: timeout,
+        token_ttl: token_ttl,
+        action_registrations: action_registry.to_h,
         hooks_registered: hooks.instance_variable_get(:@registry).transform_values(&:size)
       }
     end
@@ -36,6 +41,10 @@ module RecordingStudioApi
     def []=(key, value)
       setter = "#{key}="
       public_send(setter, value) if respond_to?(setter)
+    end
+
+    def validate!
+      action_registry.validate!
     end
   end
 end

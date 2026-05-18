@@ -7,9 +7,9 @@ Gem::Specification.new do |spec|
   spec.version     = RecordingStudioApi::VERSION
   spec.authors     = ["Bowerbird"]
   spec.homepage    = "https://github.com/bowerbird-app/RecordingStudio_api"
-  spec.summary     = "Recording Studio programmable API engine scaffold"
-  spec.description = "A renamed Rails engine shell that documents and stages the Recording Studio API " \
-                     "architecture, install flow, and host-app validation surfaces"
+  spec.summary     = "Recording Studio programmable API engine"
+  spec.description = "Rails engine providing bearer-token API authentication, Recording Studio-backed API " \
+                     "clients, and capability-driven API actions for Recording Studio addons"
   spec.license     = "MIT"
   spec.required_ruby_version = ">= 3.3.0"
 
