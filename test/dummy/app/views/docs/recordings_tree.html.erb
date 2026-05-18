@@ -6,10 +6,10 @@
   ) %>
 
   <% if @recording_tree.any? %>
-    <%= render FlatPack::List::Component.new(divider: true) do %>
-      <%= render partial: "recording_tree_node", collection: @recording_tree, as: :node %>
+    <%= render FlatPack::Tree::Component.new(compact: true, class: "max-w-3xl") do |tree| %>
+      <% render_recording_tree_nodes(tree, @recording_tree) %>
     <% end %>
   <% else %>
-    <p class="text-sm text-[var(--surface-muted-content-color)]">No active recordings found.</p>
+    <p class="text-sm text-(--surface-muted-content-color)">No active recordings found.</p>
   <% end %>
 </div>

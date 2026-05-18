@@ -41,6 +41,8 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, expected_copy
     assert_includes response.body, "RecordingStudioApi.configure do |config|"
     assert_includes response.body, "ENV[\"RECORDING_STUDIO_API_KEY\"]"
+    assert_includes response.body,
+                    "The engine does not use it unless the host app adds an external integration that needs one"
     assert_includes response.body, "Nested resource declarations should mirror the recording tree"
   end
 
@@ -97,15 +99,15 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Page: API"
     assert_includes response.body, "Access boundary: Edit"
     assert_includes response.body, "Access: Admin for #{@user.email}"
-    refute_includes response.body, "Current structure"
-    refute_includes response.body, "This tree is generated from RecordingStudio::Recording records"
+    assert_not_includes response.body, "Current structure"
+    assert_not_includes response.body, "This tree is generated from RecordingStudio::Recording records"
   end
 
   test "gem_views page renders successfully" do
     get docs_gem_views_path
     assert_response :success
     assert_select "h1", text: "Gem Views"
-    assert_includes response.body, "app/views/recording_studio_api/home/index.html.erb"
+    assert_includes response.body, "No gem views were found."
   end
 
   test "methods page renders successfully" do
@@ -118,13 +120,10 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "The future HTTP DSL should build on this object"
   end
 
-  test "mounted recording_studio_api engine renders successfully" do
+  test "mounted recording_studio_api engine has no browser root page" do
     get "/recording_studio_api"
 
-    assert_response :success
-    assert_select "h1", text: "RecordingStudio API"
-    assert_includes response.body, "Namespace renamed"
-    assert_includes response.body, "FlatPack"
+    assert_response :not_found
   end
 
   test "sidebar includes documentation links" do

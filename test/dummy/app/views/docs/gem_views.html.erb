@@ -1,15 +1,18 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
   <%= render FlatPack::PageTitle::Component.new(
     title: "Gem Views",
-    subtitle: "These are the view templates currently shipped by the gem.",
+    subtitle: "All ERB views currently shipped by the gem, shown as a FlatPack table.",
     variant: :h1
   ) %>
 
-  <%= render FlatPack::List::Component.new(divider: true) do %>
-    <% Array(@engine_views).each do |view_path| %>
-      <%= render FlatPack::List::Item.new(icon: :eye) do %>
-        <span><%= view_path %></span>
-      <% end %>
+  <% if @engine_views.any? %>
+    <%= render FlatPack::Table::Component.new(data: @engine_views) do |table| %>
+      <% table.column(title: "Template", html: ->(view) { view.fetch(:template) }) %>
+      <% table.column(title: "Directory", html: ->(view) { view.fetch(:directory) }) %>
+      <% table.column(title: "Type", html: ->(view) { view.fetch(:partial) ? "Partial" : "Page" }) %>
+      <% table.column(title: "Path", html: ->(view) { view.fetch(:relative_path) }) %>
     <% end %>
+  <% else %>
+    <p class="text-sm text-(--surface-muted-content-color)">No gem views were found.</p>
   <% end %>
 </div>

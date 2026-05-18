@@ -8,6 +8,7 @@
   <%= render FlatPack::SectionTitle::Component.new(
     title: "1. Add the gem",
     subtitle: "Point the host app at the renamed engine and make sure FlatPack is already available for shared UI components.",
+    anchor_link: true,
   ) %>
 
   <%= render FlatPack::CodeBlock::Component.new(
@@ -19,12 +20,13 @@
   ) %>
 
   <p class="text-sm text-(--surface-muted-content-color)">
-    The mounted engine UI expects the host app to load the shared <code>flat_pack</code> gem and styles before these pages render.
+    The dummy-app review surface expects the host app to load the shared <code>flat_pack</code> gem and styles before these pages render.
   </p>
 
   <%= render FlatPack::SectionTitle::Component.new(
     title: "2. Install the engine",
     subtitle: "Mount the engine and add the starter initializer and optional YAML config.",
+    anchor_link: true,
   ) %>
 
   <%= render FlatPack::CodeBlock::Component.new(
@@ -38,6 +40,7 @@
   <%= render FlatPack::SectionTitle::Component.new(
     title: "3. Prepare the host app",
     subtitle: "Apply migrations and rebuild Tailwind when the host app uses the FlatPack UI shell.",
+    anchor_link: true,
   ) %>
 
   <%= render FlatPack::CodeBlock::Component.new(

@@ -211,7 +211,7 @@ module RecordingStudioApi
         @registry[event_name] << {
           handler: callable,
           priority: priority,
-          registered_at: Time.respond_to?(:current) ? Time.current : Time.now
+          registered_at: Time.respond_to?(:current) ? Time.current : Time.zone.now
         }
       end
     end

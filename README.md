@@ -54,7 +54,8 @@ The renamed engine currently exposes the same basic Ruby integration points as t
 
 ```ruby
 RecordingStudioApi.configure do |config|
-  config.api_key = ENV["RECORDING_STUDIO_API_KEY"]
+  # Optional placeholder for an outbound API integration you add later.
+  # config.api_key = ENV["RECORDING_STUDIO_API_KEY"]
   config.enable_feature_x = false
   config.timeout = 5
 end
@@ -63,9 +64,9 @@ RecordingStudioApi.configuration
 RecordingStudioApi::Hooks.run(:before_initialize)
 ```
 
-These APIs keep the engine loadable while the future HTTP-specific DSL is designed on top of them.
+`api_key` is currently a reserved configuration value. The engine stores it, but does not use it unless your host app adds an external integration that needs a credential.
 
-Engine-facing views use FlatPack components, so host apps should load the shared `flat_pack` gem and styles before mounting the engine UI.
+These APIs keep the engine loadable while the future HTTP-specific DSL is designed on top of them.
 
 ## Dummy App
 
@@ -74,7 +75,7 @@ Use `test/dummy/` as the review surface for the completed handoff:
 - `/docs/install` documents the renamed install and migration flow
 - `/docs/config` records the current config API plus the planned registry constraints
 - `/docs/methods` documents the live Ruby entrypoints
-- `/docs/recordable_types`, `/docs/recordings_tree`, and `/docs/gem_views` verify Recording Studio wiring and engine assets
+- `/docs/recordable_types`, `/docs/recordings_tree`, and `/docs/gem_views` verify Recording Studio wiring and the current gem view footprint
 
 ### Quick start
 

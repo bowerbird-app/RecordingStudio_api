@@ -1,6 +1,6 @@
 # Dummy App
 
-This Rails app exists to validate the RecordingStudio API engine shell and docs handoff in a real host application.
+This Rails app exists to validate the RecordingStudio API integration surface and docs handoff in a real host application.
 
 ## What It Covers
 
@@ -31,14 +31,14 @@ Then open the app and sign in with:
 
 - `/` - dummy app home page and RecordingStudio API design guidance
 - `/recording_studio` - redirects to `/` while the mounted Recording Studio engine stays available under that prefix for non-root routes
-- `/recording_studio_api` - mounted RecordingStudio API engine home rendered with FlatPack components
+- `/recording_studio_api` - mounted RecordingStudio API engine prefix reserved for future API routes; no browser root page is shipped
 - `/users/sign_in` - Devise sign-in page
 - `/docs/install`, `/docs/config`, `/docs/recordable_types`, `/docs/recordings_tree`, `/docs/gem_views`, `/docs/methods` - sidebar pages that capture the completed architecture handoff
 - `/up` - Rails health check
 
 ## Why This App Exists
 
-Use this app to verify the renamed engine experience before implementing the HTTP API layer. If a layout, route, asset source, or Recording Studio initializer change breaks here, the RecordingStudio API scaffold needs adjustment before deeper feature work.
+Use this app to verify the renamed engine integration before implementing the HTTP API layer. If a layout, route, asset source, or Recording Studio initializer change breaks here, the RecordingStudio API scaffold needs adjustment before deeper feature work.
 
 The authenticated layout in `app/views/layouts/flat_pack_sidebar.html.erb` and sidebar menu in `app/views/layouts/flat_pack/_sidebar.html.erb` now document the RecordingStudio API concepts that were missing from the previous agent's work. Extend them only when the real HTTP surface exists.
 

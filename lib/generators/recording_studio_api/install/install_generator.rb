@@ -25,7 +25,9 @@ module RecordingStudioApi
       end
 
       def add_yaml_config
-        return unless yes?("Would you like to add `config/recording_studio_api.yml` for environment-specific settings? [y/N]")
+        unless yes?("Would you like to add `config/recording_studio_api.yml` for environment-specific settings? [y/N]")
+          return
+        end
 
         template "recording_studio_api.yml", "config/recording_studio_api.yml"
       end
@@ -96,7 +98,8 @@ module RecordingStudioApi
       def tailwind_source_lines
         [
           '@source "../../vendor/bundle/**/recording_studio_api/app/views/**/*.erb";',
-          '@source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/recording_studio_api-*/app/views/**/*.erb";',
+          '@source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/' \
+          'recording_studio_api-*/app/views/**/*.erb";',
           '@source "../../vendor/bundle/**/flatpack/app/components/**/*.{rb,erb}";',
           '@source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/flatpack-*/app/components/**/*.{rb,erb}";'
         ]

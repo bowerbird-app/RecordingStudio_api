@@ -137,7 +137,8 @@ class InstallGeneratorTest < Minitest::Test
   end
 
   def test_migrations_generator_exists_under_renamed_namespace
-    generator_path = File.expand_path("../lib/generators/recording_studio_api/migrations/migrations_generator.rb", __dir__)
+    generator_path = File.expand_path("../lib/generators/recording_studio_api/migrations/migrations_generator.rb",
+                                      __dir__)
 
     assert File.exist?(generator_path)
     assert_equal RecordingStudioApi::Generators::MigrationsGenerator, RecordingStudioApi::Generators::MigrationsGenerator

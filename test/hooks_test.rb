@@ -105,7 +105,7 @@ class HooksTest < Minitest::Test
   def test_registration_without_handler_or_block_is_noop
     @hooks.after_initialize
 
-    refute @hooks.registered?(:after_initialize)
+    assert_not @hooks.registered?(:after_initialize)
   end
 
   def test_handler_with_to_proc_only_executes
@@ -314,8 +314,8 @@ class HooksTest < Minitest::Test
 
     @hooks.clear!
 
-    refute @hooks.registered?(:after_initialize)
-    refute @hooks.registered?(:before_service)
+    assert_not @hooks.registered?(:after_initialize)
+    assert_not @hooks.registered?(:before_service)
     assert_empty @hooks.model_extensions_for(:Example)
   end
 
@@ -325,7 +325,7 @@ class HooksTest < Minitest::Test
 
     @hooks.clear(:after_initialize)
 
-    refute @hooks.registered?(:after_initialize)
+    assert_not @hooks.registered?(:after_initialize)
     assert @hooks.registered?(:before_service)
   end
 

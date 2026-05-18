@@ -9,7 +9,8 @@
     language: :ruby,
     code: <<~'CODE'
       RecordingStudioApi.configure do |config|
-        config.api_key = ENV["RECORDING_STUDIO_API_KEY"]
+        # Optional placeholder for an outbound API integration you add later.
+        # config.api_key = ENV["RECORDING_STUDIO_API_KEY"]
         config.enable_feature_x = false
         config.timeout = 5
       end
@@ -17,6 +18,9 @@
   ) %>
 
   <%= render FlatPack::List::Component.new(divider: true) do %>
+    <%= render FlatPack::List::Item.new(icon: :key) do %>
+      <span><code>api_key</code> is currently just stored on the configuration object. The engine does not use it unless the host app adds an external integration that needs one.</span>
+    <% end %>
     <%= render FlatPack::List::Item.new(icon: :settings) do %>
       <span>Future API surfaces should be registered explicitly rather than inferred from Ruby constants.</span>
     <% end %>

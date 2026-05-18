@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+# rubocop:disable Lint/EmptyBlock
 RecordingStudioApi::Engine.routes.draw do
-  root "home#index"
 end
+# rubocop:enable Lint/EmptyBlock

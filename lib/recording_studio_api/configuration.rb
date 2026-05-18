@@ -32,5 +32,10 @@ module RecordingStudioApi
         public_send(setter, v) if respond_to?(setter)
       end
     end
+
+    def []=(key, value)
+      setter = "#{key}="
+      public_send(setter, value) if respond_to?(setter)
+    end
   end
 end

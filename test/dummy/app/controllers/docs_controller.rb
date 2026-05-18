@@ -28,7 +28,19 @@ class DocsController < ApplicationController
 
     @engine_views = Dir.glob(RecordingStudioApi::Engine.root.join("app/views/recording_studio_api/**/*.erb").to_s)
       .sort
-      .map { |path| path.delete_prefix(prefix) }
+      .map do |path|
+        relative_path = path.delete_prefix(prefix)
+        logical_path = relative_path.delete_prefix("app/views/").delete_suffix(".html.erb")
+        segments = logical_path.split("/")
+
+        {
+          logical_path: logical_path,
+          directory: segments[0...-1].join("/"),
+          template: segments.last,
+          partial: segments.last.start_with?("_"),
+          relative_path: relative_path
+        }
+      end
   end
 
   def methods

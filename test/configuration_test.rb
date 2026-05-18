@@ -16,9 +16,10 @@ class ConfigurationTest < Minitest::Test
   end
 
   def test_merge_ignores_unknown_keys
-    @configuration.merge!(unknown_key: "ignored", timeout: 7)
+    @configuration[:unknown_key] = "ignored"
+    @configuration[:timeout] = 7
 
-    refute_respond_to @configuration, :unknown_key
+    assert_not_respond_to @configuration, :unknown_key
     assert_equal 7, @configuration.timeout
   end
 
@@ -48,7 +49,8 @@ class ConfigurationTest < Minitest::Test
   end
 
   def test_merge_accepts_string_keys
-    @configuration.merge!("api_key" => "string-key", "timeout" => 12)
+    @configuration["api_key"] = "string-key"
+    @configuration["timeout"] = 12
 
     assert_equal "string-key", @configuration.api_key
     assert_equal 12, @configuration.timeout

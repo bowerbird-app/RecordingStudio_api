@@ -8,13 +8,15 @@
   <%= render FlatPack::SectionTitle::Component.new(
     title: "RecordingStudioApi.configure",
     subtitle: "Provide configuration overrides from the host app.",
+    anchor_link: true,
   ) %>
 
   <%= render FlatPack::CodeBlock::Component.new(
     language: :ruby,
     code: <<~'CODE'
       RecordingStudioApi.configure do |config|
-        config.api_key = ENV.fetch("RECORDING_STUDIO_API_KEY")
+        # Optional placeholder; not used by the engine today.
+        # config.api_key = ENV.fetch("RECORDING_STUDIO_API_KEY")
         config.timeout = 10
       end
     CODE
@@ -23,6 +25,7 @@
   <%= render FlatPack::SectionTitle::Component.new(
     title: "RecordingStudioApi.configuration",
     subtitle: "Read the current config object or reuse it inside host-app hooks.",
+    anchor_link: true,
   ) %>
 
   <%= render FlatPack::CodeBlock::Component.new(
