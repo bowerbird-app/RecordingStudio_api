@@ -34,9 +34,10 @@ module RecordingStudioApi
         destination_id = context.params[:destination_id].presence || context.params[:new_parent_id].presence
         raise UnsupportedActionError, "destination_id is required for move" if destination_id.blank?
 
-        destination = RecordingStudio::Recording.unscoped.where(
-          id: [context.scope_recording, *context.scope_recording.descendants].compact.map(&:id)
-        ).find_by(id: destination_id)
+        destination = RecordingStudioApi::AccessibleRecordingScope.new(
+          scope_recording: context.scope_recording,
+          access_recording: context.access_recording
+        ).relation.find_by(id: destination_id)
         raise NotFoundError, "Destination recording was not found in this API scope" if destination.nil?
 
         destination

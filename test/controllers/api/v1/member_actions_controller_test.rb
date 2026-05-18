@@ -67,6 +67,31 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
+  test "rejects a capability action for a resource behind a stricter nested boundary" do
+    restricted_root_recording, restricted_access_recording = create_access_recording_for(
+      user: create_user(email: "restricted-member-actions@example.com"),
+      role: :edit
+    )
+    restricted_boundary = create_access_boundary_recording(
+      parent_recording: restricted_root_recording,
+      minimum_role: :admin
+    )
+    hidden_page = create_page_recording(
+      root_recording: restricted_root_recording,
+      parent_recording: restricted_boundary
+    )
+    restricted_token = RecordingStudioApi::Services::ProvisionApiClient.call(
+      access_recording: restricted_access_recording,
+      name: "Restricted token"
+    ).value.fetch(:token)
+
+    post "/recording_studio_api/api/v1/pages/#{hidden_page.id}/actions/echo",
+         headers: { "Authorization" => "Bearer #{restricted_token}" }
+
+    assert_response :not_found
+    assert_equal "Resource was not found in this API scope", JSON.parse(response.body).fetch("error")
+  end
+
   test "rejects requests without a bearer token" do
     post "/recording_studio_api/api/v1/pages/#{@page_recording.id}/actions/echo"
 

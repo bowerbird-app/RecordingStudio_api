@@ -50,11 +50,10 @@ module RecordingStudioApi
         end
 
         def scoped_recordings
-          @scoped_recordings ||= RecordingStudio::Recording.unscoped.where(id: scoped_recording_ids)
-        end
-
-        def scoped_recording_ids
-          @scoped_recording_ids ||= [current_scope_recording, *current_scope_recording.descendants].compact.map(&:id)
+          @scoped_recordings ||= RecordingStudioApi::AccessibleRecordingScope.new(
+            scope_recording: current_scope_recording,
+            access_recording: current_access_recording
+          ).relation
         end
 
         def resolve_recordable_type!
