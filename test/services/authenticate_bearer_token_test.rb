@@ -44,4 +44,22 @@ class AuthenticateBearerTokenTest < ActiveSupport::TestCase
     assert result.failure?
     assert_equal "Bearer token is inactive", result.error
   end
+
+  test "rejects a token when its parent boundary recording is trashed" do
+    user = create_user(email: "scoped-auth@example.com")
+    _root_recording, boundary_recording, access_recording = create_access_recording_under_boundary_for(user: user)
+    payload = RecordingStudioApi::Services::ProvisionApiClient.call(
+      access_recording: access_recording,
+      name: "Boundary token"
+    ).value
+
+    boundary_recording.update!(trashed_at: Time.current)
+
+    result = RecordingStudioApi::Services::AuthenticateBearerToken.call(
+      authorization_header: "Bearer #{payload.fetch(:token)}"
+    )
+
+    assert result.failure?
+    assert_equal "Bearer token scope is invalid", result.error
+  end
 end

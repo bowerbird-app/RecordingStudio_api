@@ -9,7 +9,7 @@ RecordingStudioApi::Engine.routes.draw do
       get "/:resource/:id/actions", to: "resources#actions", as: :resource_actions
       match "/:resource/:id/actions/:action_name",
             to: "member_actions#create",
-            via: %i[get post patch put delete],
+            via: %i[post patch put delete],
             as: :resource_action
     end
   end

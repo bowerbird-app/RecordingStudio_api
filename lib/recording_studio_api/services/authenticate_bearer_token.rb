@@ -21,9 +21,16 @@ module RecordingStudioApi
         credential = ApiCredential.find_by(token_public_id: parsed.fetch(:public_id))
         return failure(AuthenticationError.new("Bearer token is invalid")) if credential.nil?
         return failure(AuthenticationError.new("Bearer token is inactive")) unless credential.active_for_authentication?
+        return failure(AuthenticationError.new("Bearer token is inactive")) unless access_recording_active?(credential)
 
         provided_digest = Token.digest(parsed.fetch(:token))
         return failure(AuthenticationError.new("Bearer token is invalid")) unless secure_compare(credential.token_digest, provided_digest)
+
+        scope_recording = resolve_scope_recording(credential)
+        return failure(AuthenticationError.new("Bearer token scope is invalid")) if scope_recording.nil?
+
+        root_recording = resolve_root_recording(credential)
+        return failure(AuthenticationError.new("Bearer token scope is invalid")) if root_recording.nil?
 
         credential.update_column(:last_used_at, Time.current)
 
@@ -32,7 +39,8 @@ module RecordingStudioApi
             api_client: credential.api_client,
             credential: credential,
             access_recording: credential.access_recording,
-            root_recording: credential.access_recording.root_recording
+            scope_recording: scope_recording,
+            root_recording: root_recording
           )
         )
       end
@@ -51,6 +59,33 @@ module RecordingStudioApi
         return false unless left.bytesize == right.bytesize
 
         ActiveSupport::SecurityUtils.secure_compare(left, right)
+      end
+
+      def access_recording_active?(credential)
+        credential.access_recording.present? && credential.access_recording.trashed_at.nil?
+      end
+
+      def resolve_scope_recording(credential)
+        access_recording = RecordingStudio::Recording.unscoped.find_by(id: credential.access_recording_id)
+        return if access_recording.nil? || access_recording.trashed_at.present?
+
+        return resolve_root_recording(credential) if access_recording.parent_recording_id.nil?
+
+        parent_recording = RecordingStudio::Recording.unscoped.find_by(id: access_recording.parent_recording_id)
+        return if parent_recording.nil? || parent_recording.trashed_at.present?
+
+        parent_recording
+      end
+
+      def resolve_root_recording(credential)
+        access_recording = RecordingStudio::Recording.unscoped.find_by(id: credential.access_recording_id)
+        return if access_recording.nil?
+
+        root_id = access_recording.root_recording_id.presence || access_recording.id
+        root_recording = RecordingStudio::Recording.unscoped.find_by(id: root_id)
+        return if root_recording.nil? || root_recording.trashed_at.present?
+
+        root_recording
       end
 
       def service_args

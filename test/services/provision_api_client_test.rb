@@ -52,4 +52,18 @@ class ProvisionApiClientTest < ActiveSupport::TestCase
     assert_not_nil first.fetch(:credential).reload.revoked_at
     assert_nil second_result.value.fetch(:credential).reload.revoked_at
   end
+
+  test "applies the configured token ttl when expires_at is omitted" do
+    travel_to Time.zone.parse("2026-05-18 12:00:00 UTC") do
+      RecordingStudioApi.configuration.token_ttl = 2.hours
+
+      result = RecordingStudioApi::Services::ProvisionApiClient.call(
+        access_recording: @access_recording,
+        name: "TTL token"
+      )
+
+      assert result.success?, result.error
+      assert_equal 2.hours.from_now, result.value.fetch(:credential).expires_at
+    end
+  end
 end

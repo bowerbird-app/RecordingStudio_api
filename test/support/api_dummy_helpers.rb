@@ -35,9 +35,22 @@ module ApiDummyHelpers
     [root_recording, access_recording]
   end
 
-  def create_page_recording(root_recording:, folder_name: "Folder #{SecureRandom.hex(4)}", page_title: "Page #{SecureRandom.hex(4)}")
+  def create_access_recording_under_boundary_for(user:, workspace_name: "Workspace #{SecureRandom.hex(4)}")
+    Current.actor = user
+    workspace = Workspace.create!(name: workspace_name)
+    root_recording = RecordingStudio::Recording.create!(recordable: workspace)
+    boundary = RecordingStudio::AccessBoundary.create!(minimum_role: :edit)
+    boundary_recording = RecordingStudio::Recording.create!(recordable: boundary, parent_recording: root_recording)
+    access = RecordingStudio::Access.create!(actor: user, role: :admin)
+    access_recording = RecordingStudio::Recording.create!(recordable: access, parent_recording: boundary_recording)
+
+    [root_recording, boundary_recording, access_recording]
+  end
+
+  def create_page_recording(root_recording:, parent_recording: nil, folder_name: "Folder #{SecureRandom.hex(4)}", page_title: "Page #{SecureRandom.hex(4)}")
+    parent_recording ||= root_recording
     folder = Folder.create!(name: folder_name)
-    folder_recording = RecordingStudio::Recording.create!(recordable: folder, parent_recording: root_recording)
+    folder_recording = RecordingStudio::Recording.create!(recordable: folder, parent_recording: parent_recording)
     page = Page.create!(title: page_title)
 
     RecordingStudio::Recording.create!(recordable: page, parent_recording: folder_recording)

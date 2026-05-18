@@ -7,10 +7,7 @@ module RecordingStudioApi
         def index
           if params[:resource].present?
             recordable_type = resolve_recordable_type!
-            recordings = current_root_recording.recordings_query(
-              type: recordable_type.constantize,
-              include_children: true
-            )
+            recordings = scoped_recordings.where(recordable_type: recordable_type)
 
             render json: {
               resource: params[:resource],
@@ -44,12 +41,20 @@ module RecordingStudioApi
         def resource_recording
           @resource_recording ||= begin
             recordable_type = resolve_recordable_type!
-            recording = current_root_recording.recordings_query(include_children: true).find_by(id: params[:id])
+            recording = scoped_recordings.find_by(id: params[:id])
             raise RecordingStudioApi::NotFoundError, "Resource was not found in this API scope" if recording.nil?
             raise RecordingStudioApi::NotFoundError, "Resource type does not match #{recordable_type}" unless recording.recordable_type == recordable_type
 
             recording
           end
+        end
+
+        def scoped_recordings
+          @scoped_recordings ||= RecordingStudio::Recording.unscoped.where(id: scoped_recording_ids)
+        end
+
+        def scoped_recording_ids
+          @scoped_recording_ids ||= [current_scope_recording, *current_scope_recording.descendants].compact.map(&:id)
         end
 
         def resolve_recordable_type!

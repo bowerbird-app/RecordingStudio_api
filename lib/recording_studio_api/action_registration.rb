@@ -2,7 +2,7 @@
 
 module RecordingStudioApi
   class ActionRegistration
-    ALLOWED_HTTP_VERBS = %i[get post patch put delete].freeze
+    ALLOWED_HTTP_VERBS = %i[post patch put delete].freeze
     ALLOWED_SCOPES = %i[member].freeze
 
     attr_reader :name, :capability, :http_verb, :handler, :serializer, :scope

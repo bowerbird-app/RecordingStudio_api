@@ -20,13 +20,14 @@ module RecordingStudioApi
             api_client: current_api_client,
             credential: current_api_credential,
             access_recording: current_access_recording,
+            scope_recording: current_scope_recording,
             root_recording: current_root_recording,
-            params: member_action_params
+            params: action_params
           )
         end
 
-        def member_action_params
-          params.permit(:destination_id, :new_parent_id)
+        def action_params
+          params.respond_to?(:to_unsafe_h) ? params.to_unsafe_h.symbolize_keys : {}
         end
 
         def resolve_action!
@@ -42,12 +43,20 @@ module RecordingStudioApi
             recordable_type = RecordingStudioApi.recordable_type_for_resource(params[:resource])
             raise RecordingStudioApi::NotFoundError, "Unknown API resource #{params[:resource]}" if recordable_type.blank?
 
-            recording = current_root_recording.recordings_query(include_children: true).find_by(id: params[:id])
+            recording = scoped_recordings.find_by(id: params[:id])
             raise RecordingStudioApi::NotFoundError, "Resource was not found in this API scope" if recording.nil?
             raise RecordingStudioApi::NotFoundError, "Resource type does not match #{recordable_type}" unless recording.recordable_type == recordable_type
 
             recording
           end
+        end
+
+        def scoped_recordings
+          @scoped_recordings ||= RecordingStudio::Recording.unscoped.where(id: scoped_recording_ids)
+        end
+
+        def scoped_recording_ids
+          @scoped_recording_ids ||= [current_scope_recording, *current_scope_recording.descendants].compact.map(&:id)
         end
 
         def serialize_result(action, result)

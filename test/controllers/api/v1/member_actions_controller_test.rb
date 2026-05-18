@@ -47,6 +47,26 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
     assert_equal @page_recording.id, JSON.parse(response.body).fetch("data").fetch("id")
   end
 
+  test "scopes token access to the parent boundary subtree instead of the whole root" do
+    root_recording, boundary_recording, access_recording = create_access_recording_under_boundary_for(user: @user)
+    in_scope_page = create_page_recording(root_recording: root_recording, parent_recording: boundary_recording)
+    out_of_scope_page = create_page_recording(root_recording: root_recording)
+    scoped_token = RecordingStudioApi::Services::ProvisionApiClient.call(
+      access_recording: access_recording,
+      name: "Boundary token"
+    ).value.fetch(:token)
+
+    get "/recording_studio_api/api/v1/pages/#{in_scope_page.id}/actions",
+        headers: { "Authorization" => "Bearer #{scoped_token}" }
+
+    assert_response :success
+
+    get "/recording_studio_api/api/v1/pages/#{out_of_scope_page.id}/actions",
+        headers: { "Authorization" => "Bearer #{scoped_token}" }
+
+    assert_response :not_found
+  end
+
   test "rejects requests without a bearer token" do
     post "/recording_studio_api/api/v1/pages/#{@page_recording.id}/actions/echo"
 

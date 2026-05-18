@@ -39,7 +39,7 @@ module RecordingStudioApi
             token_public_id: token.fetch(:public_id),
             token_digest: token.fetch(:digest),
             token_prefix: token.fetch(:prefix),
-            expires_at: expires_at
+            expires_at: resolved_expiry
           )
 
           payload = {
@@ -56,13 +56,20 @@ module RecordingStudioApi
       end
 
       def revoke_existing_credentials!
-        ApiCredential.active.where(access_recording: access_recording).find_each do |credential|
+        ApiCredential.where(access_recording: access_recording, revoked_at: nil).find_each do |credential|
           credential.revoke!
         end
       end
 
       def service_args
         { access_recording_id: access_recording&.id, name: name, expires_at: expires_at }
+      end
+
+      def resolved_expiry
+        return expires_at if expires_at.present?
+
+        ttl = RecordingStudioApi.configuration.token_ttl
+        ttl.present? ? Time.current + ttl : nil
       end
     end
   end
