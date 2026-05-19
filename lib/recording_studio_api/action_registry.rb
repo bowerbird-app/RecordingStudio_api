@@ -9,14 +9,16 @@ module RecordingStudioApi
       @registrations = {}
     end
 
-    def register(name, capability:, http_verb: :post, handler:, serializer: nil, scope: :member)
+    def register(name, capability:, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil)
       registration = ActionRegistration.new(
         name: name,
         capability: capability,
         http_verb: http_verb,
         handler: handler,
         serializer: serializer,
-        scope: scope
+        scope: scope,
+        openapi: openapi,
+        input_contract: input_contract
       )
       registration.validate!
 

@@ -11,7 +11,7 @@ module RecordingStudioApi
 
             render json: {
               resource: params[:resource],
-              recordable_type: recordable_type,
+              type: recordable_type.demodulize,
               data: recordings.map { |recording| serialize_recording(recording) }
             }
           else
@@ -19,7 +19,7 @@ module RecordingStudioApi
               resources: RecordingStudioApi.api_recordable_types.map do |recordable_type|
                 {
                   name: RecordingStudioApi.resource_name_for(recordable_type),
-                  recordable_type: recordable_type
+                  type: recordable_type.demodulize.underscore
                 }
               end
             }
@@ -64,7 +64,7 @@ module RecordingStudioApi
         end
 
         def serialize_recording(recording)
-          RecordingStudioApi::Serializers::RecordingSerializer.call(recording)
+          RecordingStudioApi::Serializers::ResourceRecordingSerializer.call(recording)
         end
       end
     end

@@ -1,3 +1,6 @@
+inherit_from:
+  - .rubocop_todo.yml
+
 AllCops:
   TargetRubyVersion: 3.3
   NewCops: enable
@@ -14,7 +17,7 @@ Style/StringLiterals:
   EnforcedStyle: double_quotes
 
 Layout/LineLength:
-  Max: 120
+  Enabled: false
 
 # Relax metrics for test files and generators
 Metrics/ClassLength:

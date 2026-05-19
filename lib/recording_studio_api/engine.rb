@@ -85,7 +85,7 @@ module RecordingStudioApi
 
     # Run after_initialize hooks
     initializer "recording_studio_api.after_initialize", after: "recording_studio_api.load_config" do |_app|
-      register_api_client_recordable!
+      RecordingStudioApi::Engine.register_api_client_recordable!
       RecordingStudioApi.register_default_capability_actions!
       RecordingStudioApi.configuration.validate!
       RecordingStudioApi::Hooks.run(:after_initialize, self)

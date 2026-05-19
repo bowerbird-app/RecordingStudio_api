@@ -1,15 +1,19 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
   <%= render FlatPack::PageTitle::Component.new(
     title: "Recordings tree",
-    subtitle: "Active dummy-app recordings shown as a nested parent/child outline.",
+    subtitle: "All dummy-app recordings shown as a nested parent/child outline (including trashed rows).",
     variant: :h1
   ) %>
+
+  <p class="text-sm text-(--surface-muted-content-color)">
+    <%= pluralize(@recordings_count, "recording") %> total in the dummy app database.
+  </p>
 
   <% if @recording_tree.any? %>
     <%= render FlatPack::Tree::Component.new(compact: true, class: "max-w-3xl") do |tree| %>
       <% render_recording_tree_nodes(tree, @recording_tree) %>
     <% end %>
   <% else %>
-    <p class="text-sm text-(--surface-muted-content-color)">No active recordings found.</p>
+    <p class="text-sm text-(--surface-muted-content-color)">No recordings found.</p>
   <% end %>
 </div>

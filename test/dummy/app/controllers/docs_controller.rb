@@ -15,12 +15,27 @@ class DocsController < ApplicationController
   end
 
   def recordings_tree
-    recordings = RecordingStudio::Recording.includes(:recordable).reorder(:created_at, :id).to_a
+    recordings = RecordingStudio::Recording.unscoped.includes(:recordable).reorder(:created_at, :id).to_a
     recordings_by_parent_id = recordings.group_by(&:parent_recording_id)
+    recording_ids = recordings.each_with_object({}) { |recording, ids| ids[recording.id] = true }
 
-    @recording_tree = recordings_by_parent_id.fetch(nil, []).map do |recording|
-      build_recording_node(recording, recordings_by_parent_id)
+    root_recordings = recordings_by_parent_id.fetch(nil, [])
+    disconnected_roots = recordings.select do |recording|
+      recording.parent_recording_id.present? && !recording_ids.key?(recording.parent_recording_id)
     end
+
+    visited = {}
+
+    @recording_tree = (root_recordings + disconnected_roots).filter_map do |recording|
+      build_recording_node(recording, recordings_by_parent_id, visited)
+    end
+
+    remaining_recordings = recordings.reject { |recording| visited.key?(recording.id) }
+    @recording_tree.concat(
+      remaining_recordings.filter_map { |recording| build_recording_node(recording, recordings_by_parent_id, visited) }
+    )
+
+    @recordings_count = recordings.size
   end
 
   def gem_views
@@ -41,6 +56,32 @@ class DocsController < ApplicationController
           relative_path: relative_path
         }
       end
+  end
+
+  def api_routes
+    @api_catalog = RecordingStudioApi::Services::DocumentationCatalog.call
+  end
+
+  def openapi
+    render json: RecordingStudioApi::Services::OpenapiDocument.call
+  end
+
+  def scalar
+    @openapi_path = docs_openapi_path
+  end
+
+  def scalar_fullscreen
+    @openapi_path = docs_openapi_path
+    render :scalar_fullscreen, layout: false
+  end
+
+  def global_allow_list
+  end
+
+  def add_capability
+  end
+
+  def auth
   end
 
   def methods
@@ -70,20 +111,25 @@ class DocsController < ApplicationController
     0
   end
 
-  def build_recording_node(recording, recordings_by_parent_id)
+  def build_recording_node(recording, recordings_by_parent_id, visited)
+    return if visited.key?(recording.id)
+
+    visited[recording.id] = true
+
     {
       label: recording_label(recording),
       children: recordings_by_parent_id.fetch(recording.id, []).map do |child_recording|
-        build_recording_node(child_recording, recordings_by_parent_id)
-      end
+        build_recording_node(child_recording, recordings_by_parent_id, visited)
+      end.compact
     }
   end
 
   def recording_label(recording)
     type_label = recording.recordable_type.to_s.demodulize.underscore.humanize
     identifier = recordable_identifier(recording.recordable)
+    trashed_label = recording.trashed_at.present? ? " [trashed]" : ""
 
-    "#{type_label}: #{identifier}"
+    "#{type_label}: #{identifier} (recording ##{recording.id})#{trashed_label}"
   end
 
   def recordable_identifier(recordable)

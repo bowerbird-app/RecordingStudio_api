@@ -1,19 +1,23 @@
 # frozen_string_literal: true
 
+require_relative "action_input_contract"
+
 module RecordingStudioApi
   class ActionRegistration
     ALLOWED_HTTP_VERBS = %i[post patch put delete].freeze
     ALLOWED_SCOPES = %i[member].freeze
 
-    attr_reader :name, :capability, :http_verb, :handler, :serializer, :scope
+    attr_reader :name, :capability, :http_verb, :handler, :serializer, :scope, :openapi, :input_contract
 
-    def initialize(name:, capability:, http_verb:, handler:, serializer: nil, scope: :member)
+    def initialize(name:, capability:, http_verb:, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil)
       @name = name.to_s
       @capability = capability.to_sym
       @http_verb = http_verb.to_sym
       @handler = handler
       @serializer = serializer
       @scope = scope.to_sym
+      @openapi = normalize_openapi(openapi)
+      @input_contract = normalize_input_contract(input_contract)
     end
 
     def validate!
@@ -23,6 +27,8 @@ module RecordingStudioApi
       raise ConfigurationError, "Unsupported HTTP verb #{http_verb} for #{name}" unless ALLOWED_HTTP_VERBS.include?(http_verb)
       raise ConfigurationError, "Unsupported scope #{scope} for #{name}" unless ALLOWED_SCOPES.include?(scope)
       raise ConfigurationError, "Serializer must respond to call for #{name}" if serializer && !serializer.respond_to?(:call)
+      raise ConfigurationError, "OpenAPI metadata must be a hash for #{name}" unless openapi.is_a?(Hash)
+      raise ConfigurationError, "Input contract must be a RecordingStudioApi::ActionInputContract for #{name}" if input_contract && !input_contract.is_a?(ActionInputContract)
     end
 
     def applicable_to?(recordable_type)
@@ -32,9 +38,11 @@ module RecordingStudioApi
     def as_json(*)
       {
         name: name,
-        capability: capability,
+        action: capability,
         http_verb: http_verb,
-        scope: scope
+        scope: scope,
+        openapi: openapi,
+        input_contract: input_contract&.as_json
       }
     end
 
@@ -45,6 +53,20 @@ module RecordingStudioApi
       return false unless defined?(RecordingStudio) && RecordingStudio.respond_to?(:capability_enabled?)
 
       RecordingStudio.capability_enabled?(capability, for: recordable_type)
+    end
+
+    def normalize_openapi(value)
+      return {} if value.nil?
+      return value.deep_symbolize_keys if value.respond_to?(:deep_symbolize_keys)
+
+      value
+    end
+
+    def normalize_input_contract(value)
+      return if value.nil?
+      return value if value.is_a?(ActionInputContract)
+
+      ActionInputContract.new(value)
     end
   end
 end

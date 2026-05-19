@@ -1,0 +1,27 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <%= render "breadcrumb", anchor_url: main_app.root_path, back_fallback_url: main_app.root_path %>
+
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "API access list",
+    subtitle: @access_list_subtitle,
+    variant: :h1
+  ) %>
+
+  <% if @api_access_rows.any? %>
+    <%= render FlatPack::Table::Component.new(data: @api_access_rows) do |table| %>
+      <% table.column(
+        title: "Name",
+        html: ->(row) { link_to(row.fetch(:name), access_request_path(row.fetch(:id)), class: "text-(--surface-content-color) underline decoration-(--surface-border-color) underline-offset-2 hover:decoration-(--surface-content-color)") }
+      ) %>
+      <% table.column(title: "Access point", html: ->(row) { row.fetch(:access_point) }) %>
+      <% table.column(title: "Role", html: ->(row) { row.fetch(:role) }) %>
+      <% table.column(title: "Expires", html: ->(row) { row.fetch(:expires) }) %>
+    <% end %>
+  <% else %>
+    <%= render FlatPack::EmptyState::Component.new(
+      title: "No API access given yet",
+      description: "Create API access from the demo home page to populate this list.",
+      icon: :inbox
+    ) %>
+  <% end %>
+</div>

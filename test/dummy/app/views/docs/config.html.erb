@@ -1,7 +1,7 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
   <%= render FlatPack::PageTitle::Component.new(
     title: "Config",
-    subtitle: "Current config keys plus the constraints for the future HTTP API registries.",
+    subtitle: "How this gem loads and merges configuration.",
     variant: :h1
   ) %>
 
@@ -9,26 +9,26 @@
     language: :ruby,
     code: <<~'CODE'
       RecordingStudioApi.configure do |config|
-        # Optional placeholder for an outbound API integration you add later.
-        # config.api_key = ENV["RECORDING_STUDIO_API_KEY"]
         config.enable_feature_x = false
-        config.timeout = 5
+        config.timeout = 10
+        config.token_ttl = 45.days
+
+        config.hooks.on_configuration do |loaded_config|
+          Rails.logger.info("RecordingStudioApi timeout=#{loaded_config.timeout}")
+        end
       end
     CODE
   ) %>
 
   <%= render FlatPack::List::Component.new(divider: true) do %>
-    <%= render FlatPack::List::Item.new(icon: :key) do %>
-      <span><code>api_key</code> is currently just stored on the configuration object. The engine does not use it unless the host app adds an external integration that needs one.</span>
-    <% end %>
     <%= render FlatPack::List::Item.new(icon: :settings) do %>
-      <span>Future API surfaces should be registered explicitly rather than inferred from Ruby constants.</span>
+      <span>Defaults come from <code>RecordingStudioApi::Configuration</code>: <code>enable_feature_x</code>, <code>timeout</code>, <code>token_ttl</code>, <code>hooks</code>, and <code>action_registry</code>.</span>
     <% end %>
-    <%= render FlatPack::List::Item.new(icon: :queue_list) do %>
-      <span>Nested resource declarations should mirror the recording tree so route semantics stay consistent.</span>
+    <%= render FlatPack::List::Item.new(icon: :folder_open) do %>
+      <span>At boot, the engine also merges <code>config/recording_studio_api.yml</code> and <code>config.x.recording_studio_api</code> when present.</span>
     <% end %>
-    <%= render FlatPack::List::Item.new(icon: :lock) do %>
-      <span>Boot should fail fast when an action points at a capability that is not enabled for the target recordable type.</span>
+    <%= render FlatPack::List::Item.new(icon: :link) do %>
+      <span>Capability action registration is documented on the API and Methods pages so this page can stay configuration-focused.</span>
     <% end %>
   <% end %>
 </div>

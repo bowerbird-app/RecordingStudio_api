@@ -39,7 +39,7 @@ class EngineTest < Minitest::Test
     app_config = Struct.new(:x).new(xcfg)
     app = Struct.new(:config) do
       def config_for(_name)
-        { api_key: "from_yaml", timeout: 12 }
+        { timeout: 12 }
       end
     end.new(app_config)
 
@@ -47,7 +47,6 @@ class EngineTest < Minitest::Test
 
     assert hook_called
     assert_equal RecordingStudioApi.configuration, hook_payload
-    assert_equal "from_yaml", RecordingStudioApi.configuration.api_key
     assert_equal 12, RecordingStudioApi.configuration.timeout
     assert_equal true, RecordingStudioApi.configuration.enable_feature_x
   end
@@ -84,14 +83,14 @@ class EngineTest < Minitest::Test
     app_config = Struct.new(:x).new(xcfg)
     app = Struct.new(:config) do
       def config_for(_name)
-        { api_key: "ok" }
+        { timeout: 8 }
       end
     end.new(app_config)
 
     # Should not raise even if xcfg.each_pair fails.
     find_initializer("recording_studio_api.load_config").block.call(app)
 
-    assert_equal "ok", RecordingStudioApi.configuration.api_key
+    assert_equal 8, RecordingStudioApi.configuration.timeout
   end
 
   def test_load_config_is_noop_without_config_sources
@@ -99,7 +98,6 @@ class EngineTest < Minitest::Test
 
     find_initializer("recording_studio_api.load_config").block.call(app)
 
-    assert_nil RecordingStudioApi.configuration.api_key
     assert_equal 5, RecordingStudioApi.configuration.timeout
     assert_equal false, RecordingStudioApi.configuration.enable_feature_x
   end

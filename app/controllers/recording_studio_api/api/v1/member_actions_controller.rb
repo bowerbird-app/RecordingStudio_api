@@ -4,17 +4,26 @@ module RecordingStudioApi
   module Api
     module V1
       class MemberActionsController < RecordingStudioApi::ApiController
+        RESERVED_ACTION_PARAM_KEYS = %w[
+          action
+          action_name
+          controller
+          format
+          id
+          resource
+        ].freeze
+
         def create
           action = resolve_action!
           raise UnsupportedActionError, "#{action.name} must be called with #{action.http_verb.to_s.upcase}" unless request.request_method_symbol == action.http_verb
 
-          result = action.handler.call(action_context)
+          result = action.handler.call(action_context(action))
           render json: { data: serialize_result(action, result) }
         end
 
         private
 
-        def action_context
+        def action_context(action)
           RecordingStudioApi::ActionContext.new(
             recording: resource_recording,
             api_client: current_api_client,
@@ -22,12 +31,24 @@ module RecordingStudioApi
             access_recording: current_access_recording,
             scope_recording: current_scope_recording,
             root_recording: current_root_recording,
-            params: action_params
+            params: action_params(action)
           )
         end
 
-        def action_params
-          params.respond_to?(:to_unsafe_h) ? params.to_unsafe_h.symbolize_keys : {}
+        def action_params(action)
+          raw_params = params.respond_to?(:to_unsafe_h) ? params.to_unsafe_h : {}
+          filtered_params = raw_params.except(*RESERVED_ACTION_PARAM_KEYS)
+          normalized_params = filtered_params.respond_to?(:deep_symbolize_keys) ? filtered_params.deep_symbolize_keys : {}
+
+          return normalized_params if action.input_contract.nil?
+
+          contract_result = action.input_contract.call(normalized_params)
+          return contract_result.value if contract_result.success?
+
+          raise InvalidActionInputError.new(
+            "Invalid input for action #{action.name}",
+            details: contract_result.errors
+          )
         end
 
         def resolve_action!
@@ -59,7 +80,7 @@ module RecordingStudioApi
         end
 
         def serialize_result(action, result)
-          serializer = action.serializer || RecordingStudioApi::Serializers::RecordingSerializer
+          serializer = action.serializer || RecordingStudioApi::Serializers::ResourceRecordingSerializer
           serializer.call(result)
         end
       end

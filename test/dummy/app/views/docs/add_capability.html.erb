@@ -1,0 +1,47 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "Add API capability",
+    subtitle: "Register a capability-backed action so it appears on matching API resources.",
+    variant: :h1
+  ) %>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    language: :ruby,
+    code: <<~'CODE'
+      # config/initializers/recording_studio_api.rb
+      RecordingStudioApi.register_capability_action(
+        :publish,
+        capability: :publishable,
+        http_verb: :post,
+        # Handles the action logic and returns the value serialized in the API response.
+        handler: MyAddon::Api::Actions::PublishRecording,
+        serializer: RecordingStudioApi::Serializers::RecordingSerializer
+      )
+    CODE
+  ) %>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    language: :ruby,
+    code: <<~'CODE'
+      # app/services/my_addon/api/actions/publish_recording.rb
+      module MyAddon
+        module Api
+          module Actions
+            class PublishRecording
+              def self.call(context)
+                recording = context.recording
+                recordable = recording.recordable
+
+                recordable.update!(published_at: Time.current)
+
+                # Return the recording so the registered serializer can render it.
+                recording
+              end
+            end
+          end
+        end
+      end
+    CODE
+  ) %>
+
+</div>

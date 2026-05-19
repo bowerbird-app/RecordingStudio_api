@@ -8,15 +8,24 @@ Next steps:
 4. Install the engine migrations with `bin/rails generate recording_studio_api:migrations`.
 5. Apply the migrations with `bin/rails db:migrate`.
 6. Run `bin/rails tailwindcss:build` if you use Tailwind CSS.
-7. Provision bearer credentials from an existing `RecordingStudio::Access` recording:
+7. Provision OAuth2 client credentials from an existing `RecordingStudio::Access` recording, then exchange them for an access token:
 
    ```ruby
    result = RecordingStudioApi::Services::ProvisionApiClient.call(
      access_recording: access_recording,
-     name: "Primary API token"
+    name: "Primary OAuth client"
    )
 
-   result.value.fetch(:token)
+  client_id = result.value.fetch(:credential).oauth_client_id
+  client_secret = result.value.fetch(:token)
+
+  oauth = RecordingStudioApi::Services::IssueOauthAccessToken.call(
+    grant_type: "client_credentials",
+    client_id: client_id,
+    client_secret: client_secret
+  )
+
+  oauth.value.fetch(:access_token)
    ```
 
 8. Mount routes are added at the configured mount path. Adjust auth, layout, and current actor integration to match your host app.

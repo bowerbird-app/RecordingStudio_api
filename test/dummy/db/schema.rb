@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_18_010002) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_19_010004) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -41,10 +41,24 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_18_010002) do
     t.index ["actor_type", "actor_id"], name: "index_recording_studio_accesses_on_actor"
   end
 
+  create_table "recording_studio_api_api_access_tokens", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "api_credential_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "expires_at", null: false
+    t.datetime "last_used_at"
+    t.datetime "revoked_at"
+    t.string "token_digest", null: false
+    t.string "token_prefix", null: false
+    t.datetime "updated_at", null: false
+    t.index ["api_credential_id"], name: "idx_on_api_credential_id_89874cbf51"
+    t.index ["expires_at"], name: "index_recording_studio_api_api_access_tokens_on_expires_at"
+    t.index ["token_digest"], name: "index_recording_studio_api_api_access_tokens_on_token_digest", unique: true
+  end
+
   create_table "recording_studio_api_api_clients", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "access_recording_id", null: false
-    t.string "name", null: false
     t.datetime "created_at", null: false
+    t.string "name", null: false
     t.datetime "updated_at", null: false
     t.index ["access_recording_id"], name: "index_recording_studio_api_api_clients_on_access_recording_id"
   end
@@ -60,7 +74,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_18_010002) do
     t.string "token_prefix", null: false
     t.string "token_public_id", null: false
     t.datetime "updated_at", null: false
-    t.index ["access_recording_id"], name: "index_recording_studio_api_api_credentials_on_access_recording_id"
+    t.index ["access_recording_id"], name: "idx_on_access_recording_id_103368144f"
     t.index ["access_recording_id"], name: "index_recording_studio_api_credentials_on_active_access", unique: true, where: "(revoked_at IS NULL)"
     t.index ["api_client_id"], name: "index_recording_studio_api_api_credentials_on_api_client_id"
     t.index ["token_digest"], name: "index_recording_studio_api_api_credentials_on_token_digest", unique: true
@@ -134,8 +148,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_18_010002) do
     t.datetime "updated_at", null: false
   end
 
-  add_foreign_key "recording_studio_device_sessions", "recording_studio_recordings", column: "root_recording_id"
+  add_foreign_key "recording_studio_api_api_access_tokens", "recording_studio_api_api_credentials", column: "api_credential_id"
   add_foreign_key "recording_studio_api_api_credentials", "recording_studio_api_api_clients", column: "api_client_id"
+  add_foreign_key "recording_studio_device_sessions", "recording_studio_recordings", column: "root_recording_id"
   add_foreign_key "recording_studio_events", "recording_studio_recordings", column: "recording_id"
   add_foreign_key "recording_studio_recordings", "recording_studio_recordings", column: "parent_recording_id"
   add_foreign_key "recording_studio_recordings", "recording_studio_recordings", column: "root_recording_id"

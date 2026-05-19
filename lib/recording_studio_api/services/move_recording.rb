@@ -13,10 +13,7 @@ module RecordingStudioApi
 
       def call
         destination = find_destination!
-
-        unless context.recording.respond_to?(:move_to!)
-          raise UnsupportedActionError, "Move is not supported for #{context.recording.recordable_type}"
-        end
+        raise UnsupportedActionError, "Move is not supported for #{context.recording.recordable_type}" unless context.recording.respond_to?(:move_to!)
 
         context.recording.move_to!(
           new_parent: destination,
@@ -31,8 +28,8 @@ module RecordingStudioApi
       attr_reader :context
 
       def find_destination!
-        destination_id = context.params[:destination_id].presence || context.params[:new_parent_id].presence
-        raise UnsupportedActionError, "destination_id is required for move" if destination_id.blank?
+        destination_id = context.params[:parent_id].presence || context.params[:destination_id].presence || context.params[:new_parent_id].presence
+        raise UnsupportedActionError, "parent_id is required for move" if destination_id.blank?
 
         destination = RecordingStudioApi::AccessibleRecordingScope.new(
           scope_recording: context.scope_recording,

@@ -1,0 +1,13 @@
+<div id="scalar-api-reference" style="height: 100vh; width: 100vw;"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+<script>
+  window.addEventListener("DOMContentLoaded", function() {
+    if (window.Scalar && window.Scalar.createApiReference) {
+      window.Scalar.createApiReference("#scalar-api-reference", {
+        url: "<%= @openapi_path %>",
+        layout: "modern"
+      });
+    }
+  });
+</script>

@@ -10,10 +10,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     reset_recording_studio_capabilities!
     @user = create_user
     @root_recording, @access_recording = create_access_recording_for(user: @user, role: :edit)
-    @token_payload = RecordingStudioApi::Services::ProvisionApiClient.call(
-      access_recording: @access_recording,
-      name: "Read token"
-    ).value
+    @access_token = issue_oauth_access_token_for(access_recording: @access_recording, name: "Read token")
   end
 
   teardown do
@@ -22,13 +19,10 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     Current.actor = nil if defined?(Current)
   end
 
-  test "lists resources outside stricter nested boundaries only" do
+  test "lists resources only within the authenticated root scope" do
     visible_page = create_page_recording(root_recording: @root_recording)
-    restricted_boundary = create_access_boundary_recording(
-      parent_recording: @root_recording,
-      minimum_role: :admin
-    )
-    hidden_page = create_page_recording(root_recording: @root_recording, parent_recording: restricted_boundary)
+    other_root_recording, = create_access_recording_for(user: create_user(email: "other-root-resources@example.com"))
+    hidden_page = create_page_recording(root_recording: other_root_recording)
 
     get "/recording_studio_api/api/v1/pages", headers: authorization_headers
 
@@ -39,12 +33,23 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_not_includes page_ids, hidden_page.id
   end
 
-  test "rejects a resource behind a stricter nested boundary" do
-    restricted_boundary = create_access_boundary_recording(
-      parent_recording: @root_recording,
-      minimum_role: :admin
-    )
-    hidden_page = create_page_recording(root_recording: @root_recording, parent_recording: restricted_boundary)
+  test "serializes recordable-specific payload for page resources" do
+    page_recording = create_page_recording(root_recording: @root_recording, page_title: "Docs Landing")
+
+    get "/recording_studio_api/api/v1/pages/#{page_recording.id}", headers: authorization_headers
+
+    assert_response :success
+
+    payload = JSON.parse(response.body).fetch("data")
+    assert_equal page_recording.id, payload.fetch("id")
+    assert_equal "page", payload.fetch("type")
+    assert_equal "Docs Landing", payload.fetch("title")
+    assert_equal({ "title" => "Docs Landing" }, payload.fetch("attributes"))
+  end
+
+  test "rejects a resource outside the authenticated root scope" do
+    other_root_recording, = create_access_recording_for(user: create_user(email: "outside-root-resources@example.com"))
+    hidden_page = create_page_recording(root_recording: other_root_recording)
 
     get "/recording_studio_api/api/v1/pages/#{hidden_page.id}", headers: authorization_headers
 
@@ -55,6 +60,6 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
   private
 
   def authorization_headers
-    { "Authorization" => "Bearer #{@token_payload.fetch(:token)}" }
+    { "Authorization" => "Bearer #{@access_token}" }
   end
 end

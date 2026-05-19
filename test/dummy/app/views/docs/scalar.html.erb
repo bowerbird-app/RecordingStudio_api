@@ -1,0 +1,31 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "Scalar API reference",
+    subtitle: "Interactive API explorer backed by the generated OpenAPI JSON document.",
+    variant: :h1
+  ) %>
+
+  <div>
+    <%= link_to "Full screen",
+      docs_scalar_fullscreen_path,
+      target: "_blank",
+      rel: "noopener noreferrer",
+      class: "inline-flex items-center rounded-md border border-[var(--surface-border-color)] px-3 py-2 text-sm font-medium text-[var(--surface-content-color)] hover:bg-[var(--surface-muted-background-color)]" %>
+  </div>
+
+  <div class="rounded-lg border border-[var(--surface-border-color)] bg-[var(--surface-background-color)] p-4">
+    <div id="scalar-api-reference" class="min-h-[640px]"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+<script>
+  window.addEventListener("DOMContentLoaded", function() {
+    if (window.Scalar && window.Scalar.createApiReference) {
+      window.Scalar.createApiReference("#scalar-api-reference", {
+        url: "<%= @openapi_path %>",
+        layout: "modern"
+      });
+    }
+  });
+</script>

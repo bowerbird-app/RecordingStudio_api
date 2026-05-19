@@ -24,6 +24,7 @@ def dummy_bundle_base_env
     "BUNDLE_GEMFILE" => DUMMY_GEMFILE,
     "BUNDLE_PATH" => ENV.fetch("BUNDLE_PATH", nil),
     "DISABLE_SIMPLECOV" => "true",
+    "RAILS_ENV" => "test",
     "GEM_HOME" => ENV.fetch("BUNDLER_ORIG_GEM_HOME", ENV.fetch("GEM_HOME", nil)),
     "GEM_PATH" => ENV.fetch("BUNDLER_ORIG_GEM_PATH", nil)
   }
@@ -47,19 +48,27 @@ Rake::TestTask.new(:test) do |t|
   t.verbose = false
 end
 
+task :prepare_test_db do
+  Dir.chdir(DUMMY_APP_ROOT) do
+    run_command!(dummy_bundle_env, "bin/rails", "db:prepare")
+  end
+end
+
+Rake::Task[:test].enhance([:prepare_test_db])
+
 namespace :test do
   desc "Run rename verification tests to validate gem naming consistency"
-  task rename_verification: :environment do
+  task :rename_verification do
     ruby "test/rename_verification_test.rb", verbose: true
   end
 
   desc "Run rename verification tests in verbose mode"
-  task rename_verification_verbose: :environment do
+  task :rename_verification_verbose do
     ruby "test/rename_verification_test.rb", "--verbose", verbose: true
   end
 
   desc "Run dummy app integration tests under the dummy app bundle"
-  task dummy: :environment do
+  task :dummy do
     Dir.chdir(DUMMY_APP_ROOT) do
       env = dummy_bundle_env
 

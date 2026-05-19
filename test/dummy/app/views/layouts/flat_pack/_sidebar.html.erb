@@ -28,15 +28,9 @@
       ) %>
 
       <%= render FlatPack::Sidebar::Item::Component.new(
-        label: "Recordable types",
-        href: docs_recordable_types_path,
-        icon: :queue_list
-      ) %>
-
-      <%= render FlatPack::Sidebar::Item::Component.new(
-        label: "Recordings tree",
-        href: docs_recordings_tree_path,
-        icon: :folder
+        label: "Add API capability",
+        href: docs_add_capability_path,
+        icon: :plus
       ) %>
 
       <%= render FlatPack::Sidebar::Item::Component.new(
@@ -46,9 +40,45 @@
       ) %>
 
       <%= render FlatPack::Sidebar::Item::Component.new(
+        label: "API routes",
+        href: docs_api_routes_path,
+        icon: :link
+      ) %>
+
+      <%= render FlatPack::Sidebar::Item::Component.new(
+        label: "Scalar",
+        href: docs_scalar_path,
+        icon: :document_text
+      ) %>
+
+      <%= render FlatPack::Sidebar::Item::Component.new(
+        label: "Global allow list",
+        href: docs_global_allow_list_path,
+        icon: :globe_alt
+      ) %>
+
+      <%= render FlatPack::Sidebar::Item::Component.new(
+        label: "Auth",
+        href: docs_auth_path,
+        icon: :lock
+      ) %>
+
+      <%= render FlatPack::Sidebar::Item::Component.new(
         label: "Methods",
         href: docs_methods_path,
         icon: :code_bracket
+      ) %>
+
+      <%= render FlatPack::Sidebar::Item::Component.new(
+        label: "Recordings tree",
+        href: docs_recordings_tree_path,
+        icon: :folder
+      ) %>
+
+      <%= render FlatPack::Sidebar::Item::Component.new(
+        label: "Recordable types",
+        href: docs_recordable_types_path,
+        icon: :queue_list
       ) %>
 
     </nav>

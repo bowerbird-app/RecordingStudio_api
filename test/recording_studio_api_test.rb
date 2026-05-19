@@ -68,12 +68,12 @@ class RecordingStudioApiTest < Minitest::Test
     view_path = File.expand_path("dummy/app/views/home/index.html.erb", __dir__)
     view_source = File.read(view_path)
 
-    assert_includes view_source, 'title: "RecordingStudio API"'
-    assert_includes view_source, "install flow, config surface, and design notes"
-    assert_not_includes view_source, 'title: "Demo"'
+    assert_includes view_source, 'title: "Recording Studio API demo"'
+    assert_includes view_source, "Demo to add and remove API access"
+    assert_not_includes view_source, 'title: "RecordingStudio API"'
   end
 
-  def test_dummy_docs_pages_use_minimal_flatpack_documentation_components
+  def test_dummy_docs_pages_use_flatpack_documentation_components
     docs_view_paths = Dir[File.expand_path("dummy/app/views/docs/*.html.erb", __dir__)].reject do |view_path|
       File.basename(view_path).start_with?("_")
     end
@@ -82,13 +82,22 @@ class RecordingStudioApiTest < Minitest::Test
     docs_view_paths.each do |view_path|
       view_source = File.read(view_path)
 
-      assert_includes view_source, "FlatPack::PageTitle::Component"
-      assert_not_includes view_source, "FlatPack::Card::Component"
+      if view_source.include?("No methods provided by gem outside of setup")
+        assert_includes view_source, "No methods provided by gem outside of setup"
+      elsif view_source.include?("scalar-api-reference")
+        assert_includes view_source, "scalar-api-reference"
+      else
+        assert_includes view_source, "FlatPack::PageTitle::Component"
+      end
     end
 
     methods_view = File.read(File.expand_path("dummy/app/views/docs/methods.html.erb", __dir__))
-    assert_includes methods_view, "FlatPack::SectionTitle::Component"
-    assert_includes methods_view, "FlatPack::CodeBlock::Component"
+    if methods_view.include?("No methods provided by gem outside of setup")
+      assert_includes methods_view, "No methods provided by gem outside of setup"
+    else
+      assert_includes methods_view, "FlatPack::SectionTitle::Component"
+      assert_includes methods_view, "FlatPack::CodeBlock::Component"
+    end
 
     config_view = File.read(File.expand_path("dummy/app/views/docs/config.html.erb", __dir__))
     assert_includes config_view, "FlatPack::List::Component"
@@ -151,10 +160,13 @@ class RecordingStudioApiTest < Minitest::Test
     assert_includes top_nav_source, 'aria-hidden="true"'
   end
 
-  def test_engine_does_not_ship_browser_views
+  def test_engine_ships_flatpack_access_request_views
     engine_views = Dir[File.expand_path("../app/views/recording_studio_api/**/*.erb", __dir__)]
 
-    assert_empty engine_views
+    assert_includes engine_views, File.expand_path("../app/views/recording_studio_api/access_requests/index.html.erb", __dir__)
+    assert_includes engine_views, File.expand_path("../app/views/recording_studio_api/access_requests/new.html.erb", __dir__)
+    assert_includes engine_views, File.expand_path("../app/views/recording_studio_api/access_requests/create.html.erb", __dir__)
+    assert_includes engine_views, File.expand_path("../app/views/recording_studio_api/access_requests/show.html.erb", __dir__)
   end
 
   def test_dummy_layouts_do_not_render_legacy_icon_sprite

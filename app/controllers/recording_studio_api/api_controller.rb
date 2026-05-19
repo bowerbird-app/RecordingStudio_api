@@ -20,10 +20,16 @@ module RecordingStudioApi
       render_error(error.message, :unprocessable_entity)
     end
 
+    rescue_from RecordingStudioApi::InvalidActionInputError do |error|
+      render_error(error.message, :unprocessable_entity, details: error.details)
+    end
+
     private
 
-    def render_error(message, status)
-      render json: { error: message }, status: status
+    def render_error(message, status, details: nil)
+      payload = { error: message }
+      payload[:details] = details if details.present?
+      render json: payload, status: status
     end
   end
 end

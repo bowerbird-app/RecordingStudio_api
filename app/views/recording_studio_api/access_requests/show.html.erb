@@ -1,0 +1,36 @@
+<div class="mx-auto flex w-full max-w-4xl flex-col gap-6">
+  <%= render "breadcrumb", back_fallback_url: access_requests_path(include_children: "1") %>
+
+  <%= render FlatPack::PageTitle::Component.new(
+    title: @api_client.name,
+    subtitle: "Inspect the root scope, access recording, API client, and credential status for this access entry.",
+    variant: :h1
+  ) %>
+
+  <div>
+    <%= button_to "Edit", edit_access_request_path(@api_client), method: :get, class: "inline-flex items-center justify-center gap-2 rounded-[var(--button-border-radius)] font-medium cursor-pointer transition-colors duration-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--button-focus-ring-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--button-focus-ring-offset-color)] px-[var(--button-padding-x-md)] py-[var(--button-padding-y-md)] text-sm bg-[var(--button-primary-background-color)] text-[var(--button-primary-text-color)] border border-[var(--button-primary-border-color)] shadow-[var(--button-shadow)]" %>
+  </div>
+
+  <% oauth_client_id = @latest_credential&.oauth_client_id.to_s %>
+  <% masked_oauth_client_id = if oauth_client_id.blank?
+    "Unavailable"
+  elsif oauth_client_id.length <= 4
+    "#{oauth_client_id.first(1)}#{"*" * [oauth_client_id.length - 1, 0].max}"
+  else
+    "#{oauth_client_id.first(2)}#{"*" * (oauth_client_id.length - 4)}#{oauth_client_id.last(2)}"
+  end %>
+  <% detail_rows = [
+    { field: "Name", value: @api_client.name, actions: "" },
+    { field: "API key", value: masked_oauth_client_id, actions: "" },
+    { field: "API secret", value: "Hidden after creation", actions: "" },
+    { field: "Role", value: (@access_recording&.recordable&.try(:role).to_s.humanize.presence || "Unknown"), actions: "" },
+    { field: "Expiry", value: (@latest_credential&.expires_at&.in_time_zone&.strftime("%Y-%m-%d %H:%M %Z") || "None"), actions: "" }
+  ] %>
+
+  <%= render FlatPack::Table::Component.new(data: detail_rows) do |table| %>
+    <% table.column(title: "Field", html: ->(row) { row.fetch(:field) }) %>
+    <% table.column(title: "Value", html: ->(row) { row.fetch(:value) }) %>
+    <% table.column(title: "Actions", html: ->(row) { row.fetch(:actions) }) %>
+  <% end %>
+
+</div>

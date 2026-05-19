@@ -1,7 +1,45 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
   <%= render FlatPack::PageTitle::Component.new(
-    title: "RecordingStudio API",
-    subtitle: "Review the install flow, config surface, and design notes from the sidebar.",
+    title: "Recording Studio API demo",
+    subtitle: "Demo to add and remove API access",
     variant: :h1
   ) %>
+
+  <%= render FlatPack::SectionTitle::Component.new(
+    title: "Workspace",
+    subtitle: "Current child access recordings where workspace access has been provided."
+  ) %>
+
+  <div class="-mt-3 flex flex-wrap justify-start gap-3">
+    <%= button_to "Add", recording_studio_api.new_access_request_path(root_type: "Workspace"), method: :get, class: "inline-flex items-center justify-center gap-2 rounded-[var(--button-border-radius)] font-medium cursor-pointer transition-colors duration-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--button-focus-ring-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--button-focus-ring-offset-color)] px-[var(--button-padding-x-md)] py-[var(--button-padding-y-md)] text-sm bg-[var(--button-primary-background-color)] text-[var(--button-primary-text-color)] border border-[var(--button-primary-border-color)] shadow-[var(--button-shadow)]" %>
+    <%= button_to "API access list", recording_studio_api.access_requests_path(root_type: "Workspace", include_children: "1"), method: :get, class: "inline-flex items-center justify-center gap-2 rounded-[var(--button-border-radius)] font-medium cursor-pointer transition-colors duration-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--button-focus-ring-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--button-focus-ring-offset-color)] px-[var(--button-padding-x-md)] py-[var(--button-padding-y-md)] text-sm bg-[var(--surface-background-color)] text-[var(--surface-content-color)] border border-[var(--surface-border-color)]" %>
+  </div>
+
+  <% if @workspace_access_recordings.any? %>
+    <%= render FlatPack::Table::Component.new(data: @workspace_access_recordings) do |table| %>
+      <% table.column(title: "Root", html: ->(row) { row.fetch(:root) }) %>
+      <% table.column(title: "Child access recording", html: ->(row) { row.fetch(:access_recording) }) %>
+    <% end %>
+  <% else %>
+    <p class="text-sm text-(--surface-muted-content-color)">No workspace child access recordings found.</p>
+  <% end %>
+
+  <%= render FlatPack::SectionTitle::Component.new(
+    title: "Folder",
+    subtitle: "Current child access recordings where folder access has been provided."
+  ) %>
+
+  <div class="-mt-3 flex flex-wrap justify-start gap-3">
+    <%= button_to "Add", recording_studio_api.new_access_request_path(root_type: "Folder"), method: :get, class: "inline-flex items-center justify-center gap-2 rounded-[var(--button-border-radius)] font-medium cursor-pointer transition-colors duration-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--button-focus-ring-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--button-focus-ring-offset-color)] px-[var(--button-padding-x-md)] py-[var(--button-padding-y-md)] text-sm bg-[var(--button-primary-background-color)] text-[var(--button-primary-text-color)] border border-[var(--button-primary-border-color)] shadow-[var(--button-shadow)]" %>
+    <%= button_to "API access list", recording_studio_api.access_requests_path(root_type: "Folder", include_children: "1"), method: :get, class: "inline-flex items-center justify-center gap-2 rounded-[var(--button-border-radius)] font-medium cursor-pointer transition-colors duration-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--button-focus-ring-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--button-focus-ring-offset-color)] px-[var(--button-padding-x-md)] py-[var(--button-padding-y-md)] text-sm bg-[var(--surface-background-color)] text-[var(--surface-content-color)] border border-[var(--surface-border-color)]" %>
+  </div>
+
+  <% if @folder_access_recordings.any? %>
+    <%= render FlatPack::Table::Component.new(data: @folder_access_recordings) do |table| %>
+      <% table.column(title: "Root", html: ->(row) { row.fetch(:root) }) %>
+      <% table.column(title: "Child access recording", html: ->(row) { row.fetch(:access_recording) }) %>
+    <% end %>
+  <% else %>
+    <p class="text-sm text-(--surface-muted-content-color)">No folder child access recordings found.</p>
+  <% end %>
 </div>

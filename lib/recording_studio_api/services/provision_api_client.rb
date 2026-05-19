@@ -42,6 +42,14 @@ module RecordingStudioApi
             expires_at: resolved_expiry
           )
 
+          RecordingStudio.record!(
+            action: "created",
+            recordable: credential,
+            root_recording: recording.root_recording,
+            parent_recording: recording,
+            actor: api_client
+          )
+
           payload = {
             api_client: api_client,
             credential: credential,
@@ -56,7 +64,10 @@ module RecordingStudioApi
       end
 
       def revoke_existing_credentials!
-        ApiCredential.where(access_recording: access_recording, revoked_at: nil).find_each do |credential|
+        ApiCredential.joins(:api_client)
+          .where(revoked_at: nil)
+          .where(recording_studio_api_api_clients: { access_recording_id: access_recording.id })
+          .find_each do |credential|
           credential.revoke!
         end
       end

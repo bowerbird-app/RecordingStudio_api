@@ -25,9 +25,7 @@ module RecordingStudioApi
       end
 
       def add_yaml_config
-        unless yes?("Would you like to add `config/recording_studio_api.yml` for environment-specific settings? [y/N]")
-          return
-        end
+        return unless yes?("Would you like to add `config/recording_studio_api.yml` for environment-specific settings? [y/N]")
 
         template "recording_studio_api.yml", "config/recording_studio_api.yml"
       end

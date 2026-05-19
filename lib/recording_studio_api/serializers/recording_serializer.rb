@@ -17,13 +17,16 @@ module RecordingStudioApi
         def serialize_recording(recording)
           {
             id: recording.id,
-            recordable_id: recording.recordable_id,
-            recordable_type: recording.recordable_type,
-            label: label_for(recording.recordable),
-            capabilities: capabilities_for(recording.recordable_type),
-            root_recording_id: recording.root_recording_id,
-            parent_recording_id: recording.parent_recording_id
+            type: resource_type_for(recording.recordable_type),
+            title: label_for(recording.recordable),
+            actions: capabilities_for(recording.recordable_type),
+            root_id: recording.root_recording_id,
+            parent_id: recording.parent_recording_id
           }
+        end
+
+        def resource_type_for(recordable_type)
+          recordable_type.to_s.demodulize.underscore
         end
 
         def label_for(recordable)

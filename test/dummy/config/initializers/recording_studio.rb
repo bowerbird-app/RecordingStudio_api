@@ -13,12 +13,13 @@ RecordingStudio.configure do |config|
   # Idempotency behavior for log_event!
   config.idempotency_mode = :return_existing # or :raise
 
-  # Include child recordings by default when trashing/restoring
-  config.include_children = false
+  # Removed in RecordingStudio v1.2.0; keep compatibility with older tags.
+  config.include_children = false if config.respond_to?(:include_children=)
 
   # Recordable duplication strategy for revisions
   config.recordable_dup_strategy = :dup
 
   # Built-in capabilities remain disabled until you opt a recordable type into
   # them by including the relevant RecordingStudio capability module.
+  config.enable_capability(:movable, on: "Folder")
 end

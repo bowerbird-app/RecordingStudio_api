@@ -6,7 +6,7 @@ This repository now completes the last unfinished agent pass by renaming the liv
 
 ## Current Scope
 
-- bearer-token API authentication backed by `RecordingStudioApi::ApiClient` and `ApiCredential`
+- OAuth2 client_credentials authentication backed by `RecordingStudioApi::ApiClient`, `ApiCredential`, and issued access tokens
 - API client recordables stored beneath `RecordingStudio::Access` recordings in the Recording Studio tree
 - capability-backed action registry with automatic action exposure when a recordable type enables that capability
 - preserved template reference material in `docs/gem_template/`
@@ -33,12 +33,12 @@ Each action declares its verb, capability mapping, handler, and serializer so ad
 
 ### Access model
 
-- authorization should flow through accessible records and Recording Studio access boundaries
+- authorization should flow through accessible records in the authenticated root scope
 - `ApiClient` is the acting API principal
 - each access recording owns at most one active API credential record
 - raw secrets should only be revealed at creation or rotation time
 
-`ApiClient` is an immutable Recording Studio recordable. It is recorded as a child of a `RecordingStudio::Access` recording, while the mutable bearer-token state lives in `ApiCredential` with a digest, rotation, revocation, and last-used tracking.
+`ApiClient` is an immutable Recording Studio recordable. It is recorded as a child of a `RecordingStudio::Access` recording, while mutable credential and issued-token state lives in `ApiCredential` and `ApiAccessToken` with digest, rotation, revocation, and last-used tracking.
 
 ### Boot validation
 
@@ -54,8 +54,6 @@ The renamed engine currently exposes the same basic Ruby integration points as t
 
 ```ruby
 RecordingStudioApi.configure do |config|
-  # Optional placeholder for an outbound API integration you add later.
-  # config.api_key = ENV["RECORDING_STUDIO_API_KEY"]
   config.enable_feature_x = false
   config.timeout = 5
 end
@@ -64,11 +62,11 @@ RecordingStudioApi.configuration
 RecordingStudioApi::Hooks.run(:before_initialize)
 ```
 
-`api_key` remains available for host-managed outbound integrations, but inbound API authentication now uses provisioned bearer tokens stored in `ApiCredential`.
+Inbound API authentication uses OAuth2 access tokens issued from provisioned API client credentials.
 
 ### Provisioning and authentication
 
-Provision a token from an existing `RecordingStudio::Access` recording:
+Provision client credentials from an existing `RecordingStudio::Access` recording:
 
 ```ruby
 result = RecordingStudioApi::Services::ProvisionApiClient.call(
@@ -76,14 +74,38 @@ result = RecordingStudioApi::Services::ProvisionApiClient.call(
   name: "Primary token"
 )
 
-token = result.value.fetch(:token)
+client_id = result.value.fetch(:credential).oauth_client_id
+client_secret = result.value.fetch(:token)
+
+oauth = RecordingStudioApi::Services::IssueOauthAccessToken.call(
+  grant_type: "client_credentials",
+  client_id: client_id,
+  client_secret: client_secret
+)
+
+access_token = oauth.value.fetch(:access_token)
 ```
 
-Authenticate requests with:
+Or exchange credentials over HTTP:
 
 ```http
-Authorization: Bearer rsapi_<public_id>.<secret>
+POST /recording_studio_api/oauth/token
+grant_type=client_credentials&client_id=<client_id>&client_secret=<client_secret>
 ```
+
+Authenticate API requests with:
+
+```http
+Authorization: Bearer <access_token>
+```
+
+### Authentication and authorization order
+
+Each API request is evaluated in this order:
+
+1. OAuth2 authentication validates the bearer access token.
+2. The engine resolves `current_api_client`, `current_api_credential`, `current_access_recording`, `current_scope_recording`, and `current_root_recording`.
+3. Recording Studio accessible scopes constrain resource queries and member actions to what that authenticated client can access.
 
 ### Capability-backed actions
 
@@ -102,11 +124,13 @@ If a recordable type enables `:movable`, the API automatically exposes the `move
 
 ### API endpoints
 
+- `POST /recording_studio_api/oauth/token` — issue OAuth2 access token using `client_credentials`
 - `GET /recording_studio_api/api/v1` — list available API resources
 - `GET /recording_studio_api/api/v1/:resource` — list recordings of a resource type inside the authenticated root
 - `GET /recording_studio_api/api/v1/:resource/:id` — show one recording
 - `GET /recording_studio_api/api/v1/:resource/:id/actions` — list enabled capability actions
-- `POST /recording_studio_api/api/v1/:resource/:id/actions/:action_name` — execute a capability-backed action
+- `POST|PATCH|PUT|DELETE /recording_studio_api/api/v1/:resource/:id/actions/:action_name` — execute a capability-backed action via nested child actions (for example `/folders/:id/actions/move`)
+- `POST|PATCH|PUT|DELETE /recording_studio_api/api/v1/:resource/:id/:action_name` — compatibility alias for existing clients
 
 ## Dummy App
 
@@ -114,6 +138,9 @@ Use `test/dummy/` as the review surface for the completed handoff:
 
 - `/docs/install` documents the renamed install and migration flow
 - `/docs/config` records the current config API plus the capability action registry
+- `/docs/api` and `/docs/api_routes` document OAuth2 exchange and mounted API endpoints
+- `/docs/auth` explains token exchange plus post-auth Recording Studio access scoping
+- `/docs/add_capability` shows capability action registration patterns
 - `/docs/methods` documents the live Ruby entrypoints
 - `/docs/recordable_types`, `/docs/recordings_tree`, and `/docs/gem_views` verify Recording Studio wiring and the current gem view footprint
 
@@ -138,7 +165,7 @@ Sign in with:
 | Rails           | 8.1+    |
 | PostgreSQL      | 16      |
 | TailwindCSS     | 4       |
-| RecordingStudio | v0.1.0-alpha (pinned in `test/dummy/Gemfile`) |
+| RecordingStudio | v1.2.0 (pinned in `test/dummy/Gemfile`) |
 | FlatPack        | v0.1.33 (pinned in `test/dummy/Gemfile`) |
 | Devise          | latest  |
 

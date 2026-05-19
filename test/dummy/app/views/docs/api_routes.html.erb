@@ -1,0 +1,132 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <% shared_sections = [
+    {
+      title: "Authentication",
+      subtitle: "Shared OAuth endpoints exposed by the engine.",
+      endpoints: @api_catalog.fetch(:auth_endpoints),
+      icon: :lock
+    },
+    {
+      title: "API root",
+      subtitle: "Resource discovery endpoints that are always available.",
+      endpoints: @api_catalog.fetch(:root_endpoints),
+      icon: :link
+    }
+  ] %>
+
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "API routes",
+    subtitle: "How the host app mounts the engine and how the engine declares the JSON API endpoints.",
+    variant: :h1
+  ) %>
+
+  <%= render FlatPack::SectionTitle::Component.new(
+    title: "Mount the engine",
+    subtitle: "Expose the RecordingStudioApi routes from the host application's router.",
+    anchor_link: true,
+  ) %>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    language: :ruby,
+    code: <<~'CODE'
+      # config/routes.rb
+      Rails.application.routes.draw do
+        mount RecordingStudioApi::Engine, at: "/recording_studio_api"
+      end
+    CODE
+  ) %>
+
+  <%= render FlatPack::SectionTitle::Component.new(
+    title: "Define engine routes",
+    subtitle: "These are the routes declared inside RecordingStudioApi itself.",
+    anchor_link: true,
+  ) %>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    language: :ruby,
+    code: <<~'CODE'
+      # config/routes.rb
+      RecordingStudioApi::Engine.routes.draw do
+        resources :access_requests, only: %i[index show new create]
+
+        post "/oauth/token", to: "oauth#token"
+
+        namespace :api, defaults: { format: :json } do
+          namespace :v1 do
+            get "/", to: "resources#index"
+            get "/:resource", to: "resources#index", as: :resource_collection
+            get "/:resource/:id", to: "resources#show", as: :resource
+            get "/:resource/:id/actions", to: "resources#actions", as: :resource_actions
+            match "/:resource/:id/actions/:action_name",
+              to: "member_actions#create",
+              via: %i[post patch put delete],
+              as: :resource_action
+            match "/:resource/:id/:action_name",
+              to: "member_actions#create",
+              via: %i[post patch put delete],
+              as: :resource_nested_action
+          end
+        end
+      end
+    CODE
+  ) %>
+
+  <%= render FlatPack::List::Component.new(divider: true) do %>
+    <%= render FlatPack::List::Item.new(icon: :folder_open) do %>
+      <span>The generated inventory below comes from <code>RecordingStudioApi.documentation_catalog</code>.</span>
+    <% end %>
+    <%= render FlatPack::List::Item.new(icon: :link) do %>
+      <span>Action routes stay grouped under their owning resource, so folder actions render under <code>folders</code>.</span>
+    <% end %>
+    <%= render FlatPack::List::Item.new(icon: :settings) do %>
+      <span>The canonical action shape is <code>/:resource/:id/actions/:action_name</code>; only routes available for the current recordable types appear here.</span>
+    <% end %>
+  <% end %>
+
+  <%= render FlatPack::SectionTitle::Component.new(
+    title: "Generated endpoint inventory",
+    subtitle: "Shared endpoints and action routes derived from the current configuration.",
+    anchor_link: true,
+  ) %>
+
+  <% shared_sections.each do |section| %>
+    <%= render FlatPack::SectionTitle::Component.new(
+      title: section.fetch(:title),
+      subtitle: section.fetch(:subtitle),
+      anchor_link: true,
+    ) %>
+
+    <%= render FlatPack::List::Component.new(divider: true) do %>
+      <% section.fetch(:endpoints).each do |endpoint| %>
+        <%= render FlatPack::List::Item.new(icon: section.fetch(:icon)) do %>
+          <div class="flex flex-col gap-1">
+            <span class="font-mono text-xs text-(--surface-muted-content-color)"><%= endpoint.fetch(:verb) %> <%= endpoint.fetch(:path) %></span>
+            <span><%= endpoint.fetch(:summary) %></span>
+          </div>
+        <% end %>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <% @api_catalog.fetch(:resources).each do |section| %>
+    <%= render FlatPack::SectionTitle::Component.new(
+      title: section.fetch(:resource).humanize,
+      subtitle: "#{section.fetch(:recordable_type)} routes and available actions.",
+      anchor_link: true,
+    ) %>
+
+    <%= render FlatPack::List::Component.new(divider: true) do %>
+      <% section.fetch(:endpoints).each do |endpoint| %>
+        <%= render FlatPack::List::Item.new(icon: endpoint[:action_name].present? ? :bolt : :folder_open) do %>
+          <div class="flex flex-col gap-1">
+            <span class="font-mono text-xs text-(--surface-muted-content-color)"><%= endpoint.fetch(:verb) %> <%= endpoint.fetch(:path) %></span>
+            <span><%= endpoint.fetch(:summary) %></span>
+            <% if endpoint[:action_name].present? %>
+              <span class="text-sm text-(--surface-muted-content-color)">Action: <code><%= endpoint.fetch(:action_name) %></code></span>
+            <% end %>
+          </div>
+        <% end %>
+      <% end %>
+    <% end %>
+  <% end %>
+</div>

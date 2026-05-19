@@ -8,9 +8,8 @@ class ConfigurationTest < Minitest::Test
   end
 
   def test_merge_updates_known_attributes
-    @configuration.merge!(api_key: "abc123", timeout: 9, enable_feature_x: true)
+    @configuration.merge!(timeout: 9, enable_feature_x: true)
 
-    assert_equal "abc123", @configuration.api_key
     assert_equal 9, @configuration.timeout
     assert_equal true, @configuration.enable_feature_x
   end
@@ -28,31 +27,28 @@ class ConfigurationTest < Minitest::Test
 
     @configuration.merge!(nil)
 
-    assert_nil @configuration.api_key if original[:api_key].nil?
-    assert_equal original[:api_key], @configuration.api_key unless original[:api_key].nil?
     assert_equal original[:timeout], @configuration.timeout
     assert_equal original[:enable_feature_x], @configuration.enable_feature_x
   end
 
-  def test_initialize_uses_environment_api_key_and_defaults
-    previous_value = ENV.fetch("RECORDING_STUDIO_API_KEY", nil)
-    ENV["RECORDING_STUDIO_API_KEY"] = "env-token"
-
+  def test_initialize_uses_defaults
     configuration = RecordingStudioApi::Configuration.new
 
-    assert_equal "env-token", configuration.api_key
     assert_equal false, configuration.enable_feature_x
     assert_equal 5, configuration.timeout
+    assert_nil configuration.openapi_title
     assert_instance_of RecordingStudioApi::Hooks, configuration.hooks
-  ensure
-    ENV["RECORDING_STUDIO_API_KEY"] = previous_value
+  end
+
+  def test_merge_updates_openapi_title
+    @configuration.merge!(openapi_title: "My API")
+
+    assert_equal "My API", @configuration.openapi_title
   end
 
   def test_merge_accepts_string_keys
-    @configuration["api_key"] = "string-key"
     @configuration["timeout"] = 12
 
-    assert_equal "string-key", @configuration.api_key
     assert_equal 12, @configuration.timeout
   end
 
@@ -74,7 +70,20 @@ class ConfigurationTest < Minitest::Test
       handler: ->(_context) { :ok }
     )
 
-    assert_equal :echoable, @configuration.to_h.fetch(:action_registrations).fetch("echo").fetch(:capability)
+    assert_equal :echoable, @configuration.to_h.fetch(:action_registrations).fetch("echo").fetch(:action)
+  end
+
+  def test_register_recordable_type_api_tracks_registry_entries
+    @configuration.recordable_registry.register(
+      "Page",
+      serializer: ->(recordable) { { title: recordable.title } },
+      openapi: { details_schema: { type: "object" } }
+    )
+
+    registration = @configuration.to_h.fetch(:recordable_registrations).fetch("Page")
+
+    assert_equal "Page", registration.fetch(:recordable_type)
+    assert_equal true, registration.fetch(:serializer)
   end
 
   def test_configure_without_block_is_safe

@@ -30,12 +30,9 @@ class MoveRecordingTest < ActiveSupport::TestCase
     Current.actor = nil if defined?(Current)
   end
 
-  test "rejects a destination behind a stricter nested boundary" do
-    restricted_boundary = create_access_boundary_recording(
-      parent_recording: @root_recording,
-      minimum_role: :admin
-    )
-    hidden_page = create_page_recording(root_recording: @root_recording, parent_recording: restricted_boundary)
+  test "rejects a destination outside the authenticated root scope" do
+    other_root_recording, = create_access_recording_for(user: create_user(email: "move-other-root@example.com"))
+    hidden_page = create_page_recording(root_recording: other_root_recording)
 
     context = RecordingStudioApi::ActionContext.new(
       recording: StubRecording.new,

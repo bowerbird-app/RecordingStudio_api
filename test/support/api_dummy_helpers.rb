@@ -10,6 +10,7 @@ module ApiDummyHelpers
 
   def reset_recording_studio_api_configuration!
     RecordingStudioApi.instance_variable_set(:@configuration, RecordingStudioApi::Configuration.new)
+    register_dummy_recordable_type_apis!
   end
 
   def reset_recording_studio_capabilities!
@@ -27,34 +28,13 @@ module ApiDummyHelpers
 
   def create_access_recording_for(user:, workspace_name: "Workspace #{SecureRandom.hex(4)}", role: :admin)
     Current.actor = user
+    Current.impersonator = nil if defined?(Current) && Current.respond_to?(:impersonator=)
     workspace = Workspace.create!(name: workspace_name)
     root_recording = RecordingStudio::Recording.create!(recordable: workspace)
     access = RecordingStudio::Access.create!(actor: user, role: role)
     access_recording = RecordingStudio::Recording.create!(recordable: access, parent_recording: root_recording)
 
     [root_recording, access_recording]
-  end
-
-  def create_access_recording_under_boundary_for(user:, workspace_name: "Workspace #{SecureRandom.hex(4)}",
-                                                 role: :admin, minimum_role: :edit)
-    Current.actor = user
-    workspace = Workspace.create!(name: workspace_name)
-    root_recording = RecordingStudio::Recording.create!(recordable: workspace)
-    boundary = RecordingStudio::AccessBoundary.create!(minimum_role: minimum_role)
-    boundary_recording = RecordingStudio::Recording.create!(recordable: boundary, parent_recording: root_recording)
-    access = RecordingStudio::Access.create!(actor: user, role: role)
-    access_recording = RecordingStudio::Recording.create!(recordable: access, parent_recording: boundary_recording)
-
-    [root_recording, boundary_recording, access_recording]
-  end
-
-  def create_access_boundary_recording(parent_recording:, minimum_role: :edit)
-    boundary = RecordingStudio::AccessBoundary.create!(minimum_role: minimum_role)
-
-    RecordingStudio::Recording.create!(
-      recordable: boundary,
-      parent_recording: parent_recording
-    )
   end
 
   def create_page_recording(root_recording:, parent_recording: nil, folder_name: "Folder #{SecureRandom.hex(4)}", page_title: "Page #{SecureRandom.hex(4)}")
@@ -64,5 +44,66 @@ module ApiDummyHelpers
     page = Page.create!(title: page_title)
 
     RecordingStudio::Recording.create!(recordable: page, parent_recording: folder_recording)
+  end
+
+  def issue_oauth_access_token_for(access_recording:, name: "OAuth client")
+    payload = RecordingStudioApi::Services::ProvisionApiClient.call(
+      access_recording: access_recording,
+      name: name
+    ).value
+
+    token_result = RecordingStudioApi::Services::IssueOauthAccessToken.call(
+      grant_type: "client_credentials",
+      client_id: payload.fetch(:credential).oauth_client_id,
+      client_secret: payload.fetch(:token)
+    )
+
+    raise token_result.error unless token_result.success?
+
+    token_result.value.fetch(:access_token)
+  end
+
+  def register_dummy_recordable_type_apis!
+    RecordingStudioApi.register_recordable_type_api(
+      "Workspace",
+      serializer: ->(recordable) { { name: recordable.name } },
+      openapi: {
+        details_schema: {
+          type: "object",
+          properties: {
+            name: { type: "string", description: "Workspace attributes." }
+          },
+          required: ["name"]
+        }
+      }
+    )
+
+    RecordingStudioApi.register_recordable_type_api(
+      "Folder",
+      serializer: ->(recordable) { { name: recordable.name } },
+      openapi: {
+        details_schema: {
+          type: "object",
+          properties: {
+            name: { type: "string", description: "Folder attributes." }
+          },
+          required: ["name"]
+        }
+      }
+    )
+
+    RecordingStudioApi.register_recordable_type_api(
+      "Page",
+      serializer: ->(recordable) { { title: recordable.title } },
+      openapi: {
+        details_schema: {
+          type: "object",
+          properties: {
+            title: { type: "string", description: "Page attributes." }
+          },
+          required: ["title"]
+        }
+      }
+    )
   end
 end

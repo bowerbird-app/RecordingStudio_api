@@ -32,6 +32,9 @@ class ProvisionApiClientTest < ActiveSupport::TestCase
     assert_equal @access_recording.id, payload.fetch(:api_client).access_recording_id
     assert_equal @access_recording.id, payload.fetch(:recording).parent_recording_id
     assert_equal payload.fetch(:api_client).id, payload.fetch(:credential).api_client_id
+    assert_equal @access_recording.id, payload.fetch(:credential).effective_access_recording_id
+    assert_equal payload.fetch(:recording).id, payload.fetch(:credential).recording.parent_recording_id
+    assert_equal "RecordingStudioApi::ApiCredential", payload.fetch(:credential).recording.recordable_type
     assert_equal parsed_token.fetch(:public_id), payload.fetch(:credential).token_public_id
     assert_not_equal payload.fetch(:token), payload.fetch(:credential).token_digest
   end
@@ -65,5 +68,24 @@ class ProvisionApiClientTest < ActiveSupport::TestCase
       assert result.success?, result.error
       assert_equal 2.hours.from_now, result.value.fetch(:credential).expires_at
     end
+  end
+
+  test "uses recording topology over legacy access_recording column" do
+    result = RecordingStudioApi::Services::ProvisionApiClient.call(
+      access_recording: @access_recording,
+      name: "Compatibility token"
+    )
+
+    assert result.success?, result.error
+
+    _other_root, other_access_recording = create_access_recording_for(
+      user: @user,
+      workspace_name: "Other workspace"
+    )
+
+    credential = result.value.fetch(:credential)
+    credential.update_column(:access_recording_id, other_access_recording.id)
+
+    assert_equal @access_recording.id, credential.reload.effective_access_recording_id
   end
 end

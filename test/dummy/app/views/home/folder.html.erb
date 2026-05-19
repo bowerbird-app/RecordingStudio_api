@@ -1,0 +1,12 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "Folder",
+    subtitle: "Child recordings attached to the folder access root.",
+    variant: :h1
+  ) %>
+
+  <%= render partial: "home/recording_tree", locals: {
+    recording_tree: @recording_tree,
+    empty_message: "No folder recordings found."
+  } %>
+</div>

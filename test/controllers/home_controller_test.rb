@@ -1,0 +1,87 @@
+# frozen_string_literal: true
+
+ENV["RAILS_ENV"] = "test"
+require_relative "../test_helper"
+require_relative "../dummy/config/environment"
+
+require "devise/test/integration_helpers"
+require "rails/test_help"
+
+class HomeControllerTest < ActionDispatch::IntegrationTest
+  include Devise::Test::IntegrationHelpers
+
+  TEST_PASSWORD = "HomeTestPassword!2026"
+
+  setup do
+    @user = User.find_or_create_by!(email: "home-test@example.com") do |user|
+      user.password = TEST_PASSWORD
+      user.password_confirmation = TEST_PASSWORD
+    end
+
+    sign_in @user
+  end
+
+  test "root page renders workspace and folder access tables" do
+    workspace = Workspace.create!(name: "Root Workspace")
+    workspace_root_recording = RecordingStudio::Recording.create!(recordable: workspace)
+    workspace_access = RecordingStudio::Access.create!(actor: @user, role: :admin)
+    RecordingStudio::Recording.create!(recordable: workspace_access, parent_recording: workspace_root_recording)
+
+    folder = Folder.create!(name: "Root Folder")
+    folder_root_recording = RecordingStudio::Recording.create!(recordable: folder)
+    folder_access = RecordingStudio::Access.create!(actor: @user, role: :view)
+    RecordingStudio::Recording.create!(recordable: folder_access, parent_recording: folder_root_recording)
+
+    get root_path
+
+    assert_response :success
+    assert_select "h1", text: "Recording Studio API demo"
+    assert_includes response.body, "Current child access recordings where workspace access has been provided."
+    assert_includes response.body, "Current child access recordings where folder access has been provided."
+    assert_includes response.body, "Workspace: Root Workspace"
+    assert_includes response.body, "Access: Admin for #{@user.email}"
+    assert_includes response.body, "Folder: Root Folder"
+    assert_includes response.body, "Access: View for #{@user.email}"
+    assert_select %(form[action="/recording_studio_api/access_requests/new?root_type=Workspace"] button), text: "Add"
+    assert_select %(form[action="/recording_studio_api/access_requests/new?root_type=Folder"] button), text: "Add"
+    assert_select %(form[action="/recording_studio_api/access_requests?include_children=1&root_type=Workspace"] button), text: "API access list"
+    assert_select %(form[action="/recording_studio_api/access_requests?include_children=1&root_type=Folder"] button), text: "API access list"
+    assert_not_includes response.body, "No workspace child access recordings found."
+    assert_not_includes response.body, "No folder child access recordings found."
+  end
+
+  test "workspace page renders its child recordings tree" do
+    workspace = Workspace.create!(name: "Demo Workspace")
+    root_recording = RecordingStudio::Recording.create!(recordable: workspace)
+    folder = Folder.create!(name: "Access Folder")
+    folder_recording = RecordingStudio::Recording.create!(recordable: folder, parent_recording: root_recording)
+    page = Page.create!(title: "Access Page")
+    RecordingStudio::Recording.create!(recordable: page, parent_recording: folder_recording)
+
+    get workspace_path
+
+    assert_response :success
+    assert_select "h1", text: "Workspace"
+    assert_includes response.body, "Child recordings attached to the workspace access root."
+    assert_includes response.body, "Workspace: Demo Workspace"
+    assert_includes response.body, "Folder: Access Folder"
+    assert_includes response.body, "Page: Access Page"
+    assert_not_includes response.body, "No workspace recordings found."
+  end
+
+  test "folder page renders its child recordings tree" do
+    folder = Folder.create!(name: "Demo Folder")
+    root_recording = RecordingStudio::Recording.create!(recordable: folder)
+    page = Page.create!(title: "Folder Child Page")
+    RecordingStudio::Recording.create!(recordable: page, parent_recording: root_recording)
+
+    get folder_path
+
+    assert_response :success
+    assert_select "h1", text: "Folder"
+    assert_includes response.body, "Child recordings attached to the folder access root."
+    assert_includes response.body, "Folder: Demo Folder"
+    assert_includes response.body, "Page: Folder Child Page"
+    assert_not_includes response.body, "No folder recordings found."
+  end
+end
