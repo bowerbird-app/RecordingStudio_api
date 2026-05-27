@@ -4,6 +4,8 @@ module RecordingStudioApi
   module Api
     module V1
       class MemberActionsController < RecordingStudioApi::ApiController
+        before_action :authorize_api_write!, only: :create
+
         RESERVED_ACTION_PARAM_KEYS = %w[
           action
           action_name
@@ -29,7 +31,6 @@ module RecordingStudioApi
             api_client: current_api_client,
             credential: current_api_credential,
             access_recording: current_access_recording,
-            scope_recording: current_scope_recording,
             root_recording: current_root_recording,
             params: action_params(action)
           )
@@ -74,7 +75,7 @@ module RecordingStudioApi
 
         def scoped_recordings
           @scoped_recordings ||= RecordingStudioApi::AccessibleRecordingScope.new(
-            scope_recording: current_scope_recording,
+            scope_recording: current_root_recording,
             access_recording: current_access_recording
           ).relation
         end

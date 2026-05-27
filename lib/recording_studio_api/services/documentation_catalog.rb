@@ -2,7 +2,7 @@
 
 module RecordingStudioApi
   module Services
-    class DocumentationCatalog
+    class DocumentationCatalog # rubocop:disable Metrics/ClassLength
       BASE_PATH = "/recording_studio_api"
       API_ROOT_PATH = "#{BASE_PATH}/api/v1"
 
@@ -80,6 +80,75 @@ module RecordingStudioApi
                 }
               }
             }
+          },
+          {
+            verb: "GET",
+            path: "#{API_ROOT_PATH}/trash",
+            action: "resources#trash_index",
+            summary: "List trashed",
+            description: "List trashed",
+            capability: nil,
+            scope: nil,
+            openapi: {
+              tags: ["trash"],
+              parameters: [
+                {
+                  name: "limit",
+                  in: "query",
+                  required: false,
+                  description: "Maximum number of trashed resources to return (default: 50).",
+                  schema: {
+                    type: "integer",
+                    minimum: 1,
+                    default: 50,
+                    maximum: 100
+                  }
+                }
+              ],
+              responses: global_trash_list_responses
+            }
+          },
+          {
+            verb: "GET",
+            path: "#{API_ROOT_PATH}/trash/:id",
+            action: "resources#trash_show",
+            summary: "Get trashed",
+            description: "Get trashed",
+            capability: nil,
+            scope: nil,
+            openapi: {
+              tags: ["trash"],
+              parameters: [id_parameter],
+              responses: global_trash_item_responses
+            }
+          },
+          {
+            verb: "POST",
+            path: "#{API_ROOT_PATH}/trash/:id/restore",
+            action: "resources#trash_restore",
+            summary: "Restore trashed",
+            description: "Restore trashed",
+            capability: nil,
+            scope: nil,
+            openapi: {
+              tags: ["trash"],
+              parameters: [id_parameter],
+              responses: global_trash_item_responses
+            }
+          },
+          {
+            verb: "DELETE",
+            path: "#{API_ROOT_PATH}/trash/:id",
+            action: "resources#trash_destroy",
+            summary: "Delete trashed",
+            description: "Permanently delete trashed",
+            capability: nil,
+            scope: nil,
+            openapi: {
+              tags: ["trash"],
+              parameters: [id_parameter],
+              responses: global_trash_delete_responses
+            }
           }
         ]
       end
@@ -99,33 +168,52 @@ module RecordingStudioApi
       end
 
       def default_resource_endpoints(resource_name, recordable_type)
-        openapi_tag = openapi_tag_for(resource_name)
+        openapi_tag = openapi_tag_for(resource_name, recordable_type)
+        docs_resource_name = docs_resource_name_for(resource_name, recordable_type)
         registration = RecordingStudioApi.recordable_registration_for(recordable_type)
         openapi_overrides = registration&.openapi || {}
 
-        [
+        endpoints = [
           {
             verb: "GET",
             path: "#{API_ROOT_PATH}/#{resource_name}",
             action: "resources#index",
-            summary: "List #{resource_name}",
-            description: "List accessible #{resource_name} resources.",
+            summary: "List #{docs_resource_name}",
+            description: "List #{docs_resource_name}",
             capability: nil,
             scope: nil,
             openapi: merge_hashes(
               {
                 tags: [openapi_tag],
-                responses: resource_list_responses(resource_name, recordable_type)
+                parameters: pagination_parameters(recordable_type),
+                responses: resource_list_responses(resource_name, recordable_type, docs_resource_name)
               },
               openapi_overrides.fetch(:index, {})
+            )
+          },
+          {
+            verb: "POST",
+            path: "#{API_ROOT_PATH}/#{resource_name}",
+            action: "resources#create",
+            summary: "Create #{docs_resource_name}",
+            description: "Create #{docs_resource_name}",
+            capability: nil,
+            scope: nil,
+            openapi: merge_hashes(
+              {
+                tags: [openapi_tag],
+                request_body: resource_write_request_body(recordable_type),
+                responses: resource_create_responses(recordable_type)
+              },
+              openapi_overrides.fetch(:create, {})
             )
           },
           {
             verb: "GET",
             path: "#{API_ROOT_PATH}/#{resource_name}/:id",
             action: "resources#show",
-            summary: "Get #{resource_name.singularize}",
-            description: "Get #{resource_name.singularize} by ID.",
+            summary: "Get #{docs_resource_name}",
+            description: "Get #{docs_resource_name}",
             capability: nil,
             scope: nil,
             openapi: merge_hashes(
@@ -140,25 +228,43 @@ module RecordingStudioApi
             )
           },
           {
-            verb: "GET",
-            path: "#{API_ROOT_PATH}/#{resource_name}/:id/actions",
-            action: "resources#actions",
-            summary: "Actions",
-            description: "List actions available for this resource.",
+            verb: "PATCH",
+            path: "#{API_ROOT_PATH}/#{resource_name}/:id",
+            action: "resources#update",
+            summary: "Update #{docs_resource_name}",
+            description: "Update #{docs_resource_name}",
             capability: nil,
             scope: nil,
             openapi: merge_hashes(
               {
                 tags: [openapi_tag],
-                parameters: [
-                  id_parameter
-                ],
-                responses: resource_actions_responses(resource_name)
+                parameters: [id_parameter],
+                request_body: resource_write_request_body(recordable_type),
+                responses: resource_item_responses(recordable_type)
               },
-              openapi_overrides.fetch(:actions, {})
+              openapi_overrides.fetch(:update, {})
+            )
+          },
+          {
+            verb: "DELETE",
+            path: "#{API_ROOT_PATH}/#{resource_name}/:id",
+            action: "resources#destroy",
+            summary: "Delete #{docs_resource_name}",
+            description: destroy_description_for(resource_name, recordable_type),
+            capability: nil,
+            scope: nil,
+            openapi: merge_hashes(
+              {
+                tags: [openapi_tag],
+                parameters: [id_parameter],
+                responses: resource_delete_responses(recordable_type)
+              },
+              openapi_overrides.fetch(:destroy, {})
             )
           }
         ]
+
+        endpoints
       end
 
       def action_endpoints(resource_name, recordable_type)
@@ -166,14 +272,16 @@ module RecordingStudioApi
           .sort_by(&:name)
           .map do |action|
             action_openapi = action.respond_to?(:openapi) && action.openapi.is_a?(Hash) ? action.openapi : {}
+            docs_resource_name = docs_resource_name_for(resource_name, recordable_type)
 
             {
               verb: action.http_verb.to_s.upcase,
               path: "#{API_ROOT_PATH}/#{resource_name}/:id/actions/#{action.name}",
               action: "member_actions#create",
-              summary: action_openapi.fetch(:summary, "Execute #{action.name} for #{resource_name.singularize}"),
+              summary: action_openapi.fetch(:summary, "Execute #{action.name} for #{docs_resource_name}"),
               description: "Execute the #{action.name} action.",
               action_name: action.capability.to_s,
+              capability: action.capability.to_s,
               scope: action.scope.to_s,
               openapi: merge_hashes(default_action_openapi(resource_name, recordable_type, action), action_openapi)
             }
@@ -193,9 +301,8 @@ module RecordingStudioApi
       end
 
       def default_action_openapi(resource_name, recordable_type, action)
-        schema_name = RecordingStudioApi.recordable_recording_schema_name_for(recordable_type)
         openapi = {
-          tags: [openapi_tag_for(resource_name)],
+          tags: [openapi_tag_for(resource_name, recordable_type)],
           parameters: [
             id_parameter
           ],
@@ -207,7 +314,7 @@ module RecordingStudioApi
                   schema: {
                     type: "object",
                     properties: {
-                      data: { "$ref" => "#/components/schemas/#{schema_name}" }
+                      data: recording_schema(recordable_type)
                     },
                     required: ["data"]
                   }
@@ -275,17 +382,26 @@ module RecordingStudioApi
         end
       end
 
-      def openapi_tag_for(resource_name)
+      def openapi_tag_for(resource_name, recordable_type)
+        docs_resource_name_for(resource_name, recordable_type)
+      end
+
+      def docs_resource_name_for(resource_name, recordable_type)
+        return "Access" if recordable_type.to_s == "RecordingStudio::Access"
+
         resource_name.to_s.singularize.humanize.titleize
       end
 
-      def resource_list_responses(resource_name, recordable_type)
-        schema_name = RecordingStudioApi.recordable_recording_schema_name_for(recordable_type)
+      def destroy_description_for(resource_name, recordable_type)
+        "Delete #{docs_resource_name_for(resource_name, recordable_type)} permanently"
+      end
+
+      def resource_list_responses(_resource_name, recordable_type, docs_resource_name)
         resource_type = recordable_type.to_s.demodulize.underscore
 
         {
           "200" => {
-            description: "List #{resource_name} visible in scope.",
+            description: "List #{docs_resource_name} visible in scope.",
             content: {
               "application/json" => {
                 schema: {
@@ -295,10 +411,32 @@ module RecordingStudioApi
                     type: { type: "string", example: resource_type },
                     data: {
                       type: "array",
-                      items: { "$ref" => "#/components/schemas/#{schema_name}" }
+                      items: recording_schema(recordable_type)
+                    },
+                    meta: {
+                      type: "object",
+                      properties: {
+                        limit: { type: "integer", minimum: 1 },
+                        sort: { type: "string", example: "created_at" },
+                        order: { type: "string", enum: %w[asc desc] },
+                        has_more: { type: "boolean" },
+                        next_pagination_token: {
+                          type: "string",
+                          nullable: true,
+                          description: "Use this as the pagination_token query parameter on your next request. Null means there are no more results."
+                        }
+                      },
+                      example: {
+                        limit: 50,
+                        sort: "created_at",
+                        order: "asc",
+                        has_more: false,
+                        next_pagination_token: nil
+                      },
+                      required: %w[limit sort order has_more next_pagination_token]
                     }
                   },
-                  required: %w[resource type data]
+                  required: %w[resource type data meta]
                 }
               }
             }
@@ -306,8 +444,57 @@ module RecordingStudioApi
         }
       end
 
+      def pagination_parameters(recordable_type)
+        allowed_sorts = RecordingStudioApi.sortable_attributes_for(recordable_type)
+
+        [
+          {
+            name: "limit",
+            in: "query",
+            required: false,
+            description: "Maximum number of resources to return (default: 50).",
+            schema: {
+              type: "integer",
+              minimum: 1,
+              default: 50,
+              maximum: 100
+            }
+          },
+          {
+            name: "pagination_token",
+            in: "query",
+            required: false,
+            description: "Pagination token from the previous response. Leave blank on the first request, then pass next_pagination_token from the prior response as pagination_token to fetch the next results.",
+            schema: {
+              type: "string"
+            }
+          },
+          {
+            name: "sort",
+            in: "query",
+            required: false,
+            description: "Sort field for this resource.",
+            schema: {
+              type: "string",
+              enum: allowed_sorts,
+              default: "created_at"
+            }
+          },
+          {
+            name: "order",
+            in: "query",
+            required: false,
+            description: "Sort order for created_at and id.",
+            schema: {
+              type: "string",
+              enum: %w[asc desc],
+              default: "asc"
+            }
+          }
+        ]
+      end
+
       def resource_item_responses(recordable_type)
-        schema_name = RecordingStudioApi.recordable_recording_schema_name_for(recordable_type)
 
         {
           "200" => {
@@ -317,7 +504,7 @@ module RecordingStudioApi
                 schema: {
                   type: "object",
                   properties: {
-                    data: { "$ref" => "#/components/schemas/#{schema_name}" }
+                    data: recording_schema(recordable_type)
                   },
                   required: ["data"]
                 }
@@ -330,37 +517,255 @@ module RecordingStudioApi
         }
       end
 
-      def resource_actions_responses(_resource_name)
+      def resource_create_responses(recordable_type)
+
+        {
+          "201" => {
+            description: "Resource created.",
+            content: {
+              "application/json" => {
+                schema: {
+                  type: "object",
+                  properties: {
+                    data: recording_schema(recordable_type)
+                  },
+                  required: ["data"]
+                }
+              }
+            }
+          }
+        }
+      end
+
+      def resource_delete_responses(recordable_type)
+
         {
           "200" => {
-            description: "Actions available for this resource.",
+            description: "Resource deleted or already trashed.",
             content: {
               "application/json" => {
                 schema: {
                   type: "object",
                   properties: {
                     data: {
-                      type: "array",
-                      items: {
-                        type: "object",
-                        properties: {
-                          name: { type: "string" },
-                          action: { type: "string" },
-                          http_verb: { type: "string" },
-                          scope: { type: "string" }
-                        },
-                        required: %w[name action http_verb scope]
-                      }
+                      allOf: [
+                        recording_schema(recordable_type),
+                        {
+                          type: "object",
+                          properties: {
+                            deleted: { type: "boolean" },
+                            deleted_via: { type: "string", enum: ["trashed", "destroyed"] }
+                          },
+                          required: %w[deleted deleted_via]
+                        }
+                      ]
                     }
                   },
                   required: ["data"]
                 }
               }
             }
-          },
-          "404" => {
-            "$ref" => "#/components/responses/NotFound"
           }
+        }
+      end
+
+      def global_trash_list_responses
+        {
+          "200" => {
+            description: "List trashed resources visible in scope.",
+            content: {
+              "application/json" => {
+                schema: {
+                  type: "object",
+                  properties: {
+                    resource: { type: "string", example: "trash" },
+                    data: {
+                      type: "array",
+                      items: recording_schema
+                    },
+                    meta: {
+                      type: "object",
+                      properties: {
+                        limit: { type: "integer", minimum: 1 },
+                        returned: { type: "integer", minimum: 0 }
+                      },
+                      required: %w[limit returned]
+                    }
+                  },
+                  required: %w[resource data meta]
+                }
+              }
+            }
+          }
+        }
+      end
+
+      def global_trash_item_responses
+        response = resource_item_responses(nil)
+        response["200"][:description] = "Single trashed record payload."
+        response
+      end
+
+      def global_trash_delete_responses
+        response = resource_delete_responses(nil)
+        response["200"][:description] = "Trashed item permanently deleted."
+        response
+      end
+
+      def resource_write_request_body(_recordable_type)
+
+        {
+          required: true,
+          content: {
+            "application/json" => {
+              schema: {
+                type: "object",
+                properties: {
+                  attributes: {
+                    type: "object",
+                    additionalProperties: true
+                  },
+                  parent_id: { type: "string", nullable: true }
+                },
+                required: ["attributes"]
+              }
+            }
+          }
+        }
+      end
+
+      def recording_schema(recordable_type = nil)
+        {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            type: { type: "string" },
+            actions: {
+              type: "array",
+              items: { type: "string" },
+              example: []
+            },
+            root_id: { type: "string", example: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f" },
+            parent_id: {
+              type: "string",
+              nullable: true,
+              example: "f8792164-4d83-4810-8c89-6484feff5d28"
+            },
+            attributes: attributes_schema_for(recordable_type)
+          },
+          required: %w[id type actions root_id]
+        }
+      end
+
+      def attributes_schema_for(recordable_type)
+        schema = recordable_details_schema(recordable_type)
+        return schema if schema
+
+        inferred_properties = infer_recordable_attribute_properties(recordable_type)
+        return generic_attributes_schema if inferred_properties.empty?
+
+        {
+          type: "object",
+          properties: inferred_properties,
+          additionalProperties: false
+        }
+      end
+
+      def recordable_details_schema(recordable_type)
+        return if recordable_type.blank?
+
+        details_schema = RecordingStudioApi.recordable_registration_for(recordable_type)&.openapi&.dig(:details_schema)
+        return unless details_schema.is_a?(Hash)
+
+        properties = details_schema[:properties] || details_schema["properties"]
+        return unless properties.is_a?(Hash) && properties.any?
+
+        {
+          type: "object",
+          properties: properties,
+          additionalProperties: false
+        }
+      end
+
+      def infer_recordable_attribute_properties(recordable_type)
+        return {} if recordable_type.blank?
+
+        recordable_class = recordable_type.safe_constantize
+        columns = if recordable_class.respond_to?(:columns)
+                    recordable_class.columns
+                  else
+                    infer_columns_from_table(recordable_type)
+                  end
+        return {} if columns.blank?
+
+        columns.each_with_object({}) do |column, properties|
+          next if %w[id created_at updated_at].include?(column.name)
+
+          properties[column.name] = openapi_schema_for_column(column, recordable_class)
+        end
+      end
+
+      def infer_columns_from_table(recordable_type)
+        return [] unless defined?(::ActiveRecord::Base)
+
+        table_name = recordable_type.to_s.tableize
+        connection = ::ActiveRecord::Base.connection
+        return [] unless connection.data_source_exists?(table_name)
+
+        connection.columns(table_name)
+      rescue StandardError
+        []
+      end
+
+      def openapi_schema_for_column(column, recordable_class = nil)
+        enum_schema = openapi_schema_for_enum_column(column, recordable_class)
+        return enum_schema if enum_schema
+
+        case column.type
+        when :integer
+          { type: "integer", nullable: column.null, example: 1 }
+        when :float, :decimal
+          { type: "number", nullable: column.null, example: 1.0 }
+        when :boolean
+          { type: "boolean", nullable: column.null, example: false }
+        when :datetime
+          { type: "string", format: "date-time", nullable: column.null, example: "2026-01-01T12:00:00Z" }
+        when :date
+          { type: "string", format: "date", nullable: column.null, example: "2026-01-01" }
+        when :time
+          { type: "string", format: "time", nullable: column.null, example: "12:00:00" }
+        else
+          { type: "string", nullable: column.null, example: string_example_for_column(column.name) }
+        end
+      end
+
+      def openapi_schema_for_enum_column(column, recordable_class)
+        return unless recordable_class.respond_to?(:defined_enums)
+
+        enum_mapping = recordable_class.defined_enums[column.name]
+        return unless enum_mapping.is_a?(Hash) && enum_mapping.any?
+
+        enum_values = enum_mapping.keys
+        {
+          type: "string",
+          nullable: column.null,
+          enum: enum_values,
+          example: enum_values.first
+        }
+      end
+
+      def string_example_for_column(column_name)
+        normalized_name = column_name.to_s
+        return "Example title" if normalized_name.include?("title")
+        return "Example name" if normalized_name.include?("name")
+
+        "Example #{normalized_name.tr('_', ' ')}"
+      end
+
+      def generic_attributes_schema
+        {
+          type: "object",
+          additionalProperties: false
         }
       end
 

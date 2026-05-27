@@ -3,9 +3,11 @@
 module RecordingStudioApi
   class AccessRequestsController < ApplicationController
     before_action :authenticate_user!, if: -> { respond_to?(:authenticate_user!, true) }
+    before_action :authorize_access_management_edit_for_new_request!, only: %i[new create]
     before_action :load_form_state, only: %i[new create]
     before_action :load_api_access_list, only: :index
     before_action :load_api_access_detail, only: %i[show edit update]
+    before_action :authorize_access_management_edit_for_loaded_client!, only: %i[edit update]
 
     def index
     end
@@ -48,9 +50,9 @@ module RecordingStudioApi
       @errors << "Role is invalid" unless role_options.any? { |(_label, value)| value == @form_values.fetch(:role) }
       return render :edit, status: :unprocessable_entity if @errors.any?
 
-      return redirect_to(access_request_path(@api_client), notice: "API access updated.") if persist_access_updates(expires_at)
+      return redirect_to(api_client_path(@api_client), notice: "API access updated.") if persist_access_updates(expires_at)
 
-      @errors << "The request could not be updated"
+      @errors << "The API client could not be updated"
       render :edit, status: :unprocessable_entity
     end
 
@@ -65,22 +67,22 @@ module RecordingStudioApi
       @form_values = {
         root_type: @root_type,
         root_recording_id: root_recording&.id,
-        role: access_request_params[:role].presence || "admin",
-        api_client_name: access_request_params[:api_client_name].presence || default_api_client_name,
-        expires_at: access_request_params[:expires_at].to_s
+        role: api_client_params[:role].presence || "admin",
+        api_client_name: api_client_params[:api_client_name].presence || default_api_client_name,
+        expires_at: api_client_params[:expires_at].to_s
       }
     end
 
-    def access_request_params
-      params.fetch(:access_request, {}).permit(:root_type, :role, :api_client_name, :expires_at)
+    def api_client_params
+      params.fetch(:api_client, params.fetch(:access_request, {})).permit(:root_type, :role, :api_client_name, :expires_at)
     end
 
-    def access_request_update_params
-      params.fetch(:access_request, {}).permit(:role, :api_client_name, :expires_at)
+    def api_client_update_params
+      params.fetch(:api_client, params.fetch(:access_request, {})).permit(:role, :api_client_name, :expires_at)
     end
 
     def normalized_root_type
-      requested_root_type = access_request_params[:root_type].presence || params[:root_type].presence
+      requested_root_type = api_client_params[:root_type].presence || params[:root_type].presence
       allowed_root_types.include?(requested_root_type) ? requested_root_type : allowed_root_types.first
     end
 
@@ -91,11 +93,7 @@ module RecordingStudioApi
     def available_root_recordings(root_type)
       return [] if root_type.blank?
 
-      RecordingStudio::Recording
-        .includes(:recordable)
-        .where(parent_recording_id: nil, recordable_type: root_type)
-        .reorder(:created_at, :id)
-        .to_a
+      manageable_root_recordings.select { |recording| recording.recordable_type == root_type }
     end
 
     def role_options
@@ -115,6 +113,42 @@ module RecordingStudioApi
       return Current.actor if defined?(Current) && Current.respond_to?(:actor)
 
       nil
+    end
+
+    def authorize_access_management_edit_for_new_request!
+      return if access_management_policy.can_manage_root_recording?(selected_root_recording_for_request)
+
+      raise RecordingStudioApi::AuthorizationError, "API access management requires higher access"
+    end
+
+    def authorize_access_management_edit_for_loaded_client!
+      root_recording = @api_client&.access_recording&.root_recording
+      return if access_management_policy.can_manage_root_recording?(root_recording)
+
+      raise RecordingStudioApi::AuthorizationError, "API access management requires higher access"
+    end
+
+    def selected_root_recording_for_request
+      root_type = normalized_root_type
+      return nil if root_type.blank?
+
+      available_root_recordings(root_type).first
+    end
+
+    def access_management_policy
+      @access_management_policy ||= RecordingStudioApi::AccessManagementPolicy.new(actor: current_request_actor)
+    end
+
+    def visible_access_recordings
+      access_management_policy.visible_access_recordings
+    end
+
+    def visible_root_recordings
+      access_management_policy.visible_root_recordings
+    end
+
+    def manageable_root_recordings
+      access_management_policy.manageable_root_recordings
     end
 
     def parsed_expires_at
@@ -157,10 +191,17 @@ module RecordingStudioApi
 
     def load_api_access_list
       root_type_filter = params[:root_type].presence
-      root_recording_id_filter = params[:root_recording_id].presence
+      scoped_recording_filter = params[:recording_id].presence || params[:root_recording_id].presence
+      scoped_recording = scoped_access_list_recording(scoped_recording_filter)
+      scoped_recording_ids = scoped_recording_subtree_ids(scoped_recording)
+      visible_access_recording_ids = visible_access_recordings.map(&:id)
+      @can_manage_access_requests = visible_root_recordings.any? do |recording|
+        access_management_policy.can_manage_root_recording?(recording)
+      end
 
       api_clients = RecordingStudioApi::ApiClient
         .includes(:credentials, access_recording: [:recordable, { parent_recording: :parent_recording }])
+        .where(access_recording_id: visible_access_recording_ids)
         .reorder(:created_at, :id)
         .to_a
 
@@ -171,7 +212,7 @@ module RecordingStudioApi
         root_recording = access_recording.root_recording
         next if root_recording.nil?
         next if root_type_filter.present? && root_recording.recordable_type != root_type_filter
-        next if root_recording_id_filter.present? && root_recording.id.to_s != root_recording_id_filter
+        next if scoped_recording_ids.present? && !scoped_recording_ids.include?(access_recording.id)
 
         access_point_recording = access_point_recording_for(access_recording)
 
@@ -180,6 +221,7 @@ module RecordingStudioApi
         {
           id: api_client.id,
           root_recording: root_recording,
+          access_point_recording: access_point_recording,
           name: api_client.name,
           access_point: access_point_label(access_point_recording),
           role: access_recording.recordable&.try(:role).to_s.humanize.presence || "Unknown",
@@ -191,36 +233,51 @@ module RecordingStudioApi
 
       @access_list_subtitle = resolve_access_list_subtitle(
         rows: @api_access_rows,
-        root_recording_id_filter: root_recording_id_filter,
+        scoped_recording: scoped_recording,
         root_type_filter: root_type_filter
       )
     end
 
-    def resolve_access_list_subtitle(rows:, root_recording_id_filter:, root_type_filter:)
-      if root_recording_id_filter.present?
-        scoped_recording = RecordingStudio::Recording.includes(:recordable).find_by(id: root_recording_id_filter)
-        return subtitle_for_scoped_recording(scoped_recording) if scoped_recording.present?
+    def resolve_access_list_subtitle(rows:, scoped_recording:, root_type_filter:)
+      if scoped_recording.present?
+        return subtitle_for_scoped_recording(scoped_recording, rows) if scoped_recording.present?
       end
 
       unique_root_recordings = rows.filter_map { |row| row[:root_recording] }.uniq { |recording| recording.id }
-      return subtitle_for_scoped_recording(unique_root_recordings.first) if unique_root_recordings.one?
+      return "API access below #{humanized_recording_type(unique_root_recordings.first)}." if unique_root_recordings.one?
 
-      return "Showing API access for #{root_type_filter.to_s.demodulize.underscore.humanize}." if root_type_filter.present?
+      return "API access below #{root_type_filter.to_s.demodulize.underscore.humanize}." if root_type_filter.present?
 
-      "Review provisioned API access."
+      "API access below all roots."
     end
 
-    def subtitle_for_scoped_recording(recording)
-      "Showing API access for #{recordable_identifier(recording.recordable)}."
+    def scoped_access_list_recording(recording_id)
+      return nil if recording_id.blank?
+
+      RecordingStudio::Recording.includes(:recordable).find_by(id: recording_id)
+    end
+
+    def scoped_recording_subtree_ids(recording)
+      return nil if recording.nil?
+
+      recording.subtree_recordings(include_self: true).pluck(:id)
+    end
+
+    def subtitle_for_scoped_recording(recording, rows)
+      access_points = rows.filter_map { |row| row[:access_point_recording] }.uniq { |access_point| access_point.id }
+      return "API access below #{recording_label(access_points.first)}." if access_points.one? && access_points.first.parent_recording_id.present?
+
+      "API access below #{recording_label(recording)}."
+    end
+
+    def humanized_recording_type(recording)
+      recording.recordable_type.to_s.demodulize.underscore.humanize
     end
 
     def access_point_recording_for(access_recording)
       parent_recording = access_recording.parent_recording
-      return access_recording.root_recording if parent_recording.nil?
 
-      if parent_recording.recordable_type == "RecordingStudio::AccessBoundary"
-        return parent_recording.parent_recording || access_recording.root_recording
-      end
+      return access_recording.root_recording if parent_recording.nil?
 
       parent_recording
     end
@@ -237,22 +294,123 @@ module RecordingStudioApi
 
     def load_api_access_detail
       @api_client = RecordingStudioApi::ApiClient
-        .includes(:credentials, access_recording: [:recordable, { parent_recording: :parent_recording }])
+        .includes(credentials: :access_tokens, access_recording: [:recordable, { parent_recording: :parent_recording }])
+        .where(access_recording_id: visible_access_recordings.map(&:id))
         .find(params[:id])
 
       @access_recording = @api_client.access_recording
       @root_recording = @access_recording&.root_recording
+      @can_manage_access_request = access_management_policy.can_manage_root_recording?(@root_recording)
       @latest_credential = @api_client.credentials.max_by { |credential| [credential.created_at.to_i, credential.id.to_i] }
+      load_api_token_activity
+      load_oauth_activity
     rescue ActiveRecord::RecordNotFound
       head :not_found
+    end
+
+    def load_api_token_activity
+      all_tokens = @api_client.credentials.flat_map(&:access_tokens)
+      active_tokens = all_tokens.select do |token|
+        token.revoked_at.nil? && token.expires_at.present? && token.expires_at.future?
+      end
+
+      @api_token_activity_rows = [
+        { field: "Issued tokens", value: all_tokens.count.to_s, actions: "" },
+        { field: "Active tokens", value: active_tokens.count.to_s, actions: "" },
+        { field: "Revoked tokens", value: all_tokens.count { |token| token.revoked_at.present? }.to_s, actions: "" },
+        {
+          field: "Next expiry",
+          value: format_activity_timestamp(active_tokens.filter_map(&:expires_at).min, fallback: "No active tokens"),
+          actions: ""
+        },
+        {
+          field: "Last used",
+          value: format_activity_timestamp(all_tokens.filter_map(&:last_used_at).max),
+          actions: ""
+        }
+      ]
+    end
+
+    def load_oauth_activity
+      if @access_recording.nil?
+        @oauth_activity_rows = [
+          { field: "Active grant sessions", value: "Unavailable", actions: "" },
+          { field: "Last session use", value: "Unavailable", actions: "" },
+          { field: "Active OAuth access tokens", value: "Unavailable", actions: "" },
+          { field: "Active refresh tokens", value: "Unavailable", actions: "" },
+          { field: "Auth codes consumed (7d)", value: "Unavailable", actions: "" }
+        ]
+        return
+      end
+
+      active_sessions = RecordingStudioApi::OauthGrantSession.where(access_recording_id: @access_recording.id, revoked_at: nil)
+      active_session_ids = active_sessions.pluck(:id)
+      now = Time.current
+
+      active_oauth_access_token_count = if active_session_ids.empty?
+                                          0
+                                        else
+                                          RecordingStudioApi::OauthSessionAccessToken.where(oauth_grant_session_id: active_session_ids, revoked_at: nil)
+                                                                                    .where(RecordingStudioApi::OauthSessionAccessToken.arel_table[:expires_at].gt(now))
+                                                                                    .count
+                                        end
+
+      active_refresh_token_count = if active_session_ids.empty?
+                                     0
+                                   else
+                                     RecordingStudioApi::OauthRefreshToken.where(
+                                       oauth_grant_session_id: active_session_ids,
+                                       revoked_at: nil,
+                                       consumed_at: nil
+                                     ).where(RecordingStudioApi::OauthRefreshToken.arel_table[:expires_at].gt(now)).count
+                                   end
+
+      consumed_code_count = RecordingStudioApi::OauthAuthorizationCode.where(access_recording_id: @access_recording.id)
+                                                                       .where.not(consumed_at: nil)
+                                                                       .where(RecordingStudioApi::OauthAuthorizationCode.arel_table[:consumed_at].gteq(7.days.ago))
+                                                                       .count
+
+      @oauth_activity_rows = [
+        {
+          field: "Active grant sessions",
+          value: active_sessions.count.to_s,
+          actions: view_context.link_to("View sessions", oauth_grant_sessions_path(access_recording_id: @access_recording.id), class: "text-(--surface-content-color) underline decoration-(--surface-border-color) underline-offset-2 hover:decoration-(--surface-content-color)")
+        },
+        {
+          field: "Last session use",
+          value: format_activity_timestamp(active_sessions.maximum(:last_used_at)),
+          actions: ""
+        },
+        {
+          field: "Active OAuth access tokens",
+          value: active_oauth_access_token_count.to_s,
+          actions: ""
+        },
+        {
+          field: "Active refresh tokens",
+          value: active_refresh_token_count.to_s,
+          actions: ""
+        },
+        {
+          field: "Auth codes consumed (7d)",
+          value: consumed_code_count.to_s,
+          actions: ""
+        }
+      ]
+    end
+
+    def format_activity_timestamp(value, fallback: "Never")
+      return fallback if value.blank?
+
+      human_readable_timestamp(value)
     end
 
     def load_edit_form_state
       @errors = []
       @role_options = role_options
       @form_values = {
-        role: access_request_update_params[:role].presence || resolved_edit_role_value,
-        api_client_name: access_request_update_params[:api_client_name].presence || @api_client.name,
+        role: api_client_update_params[:role].presence || resolved_edit_role_value,
+        api_client_name: api_client_update_params[:api_client_name].presence || @api_client.name,
         expires_at: resolved_edit_expires_at_value
       }
     end
@@ -262,7 +420,7 @@ module RecordingStudioApi
     end
 
     def resolved_edit_expires_at_value
-      return access_request_update_params[:expires_at].to_s if access_request_update_params.key?(:expires_at)
+      return api_client_update_params[:expires_at].to_s if api_client_update_params.key?(:expires_at)
 
       datetime_local_value(@latest_credential&.expires_at)
     end
@@ -321,7 +479,12 @@ module RecordingStudioApi
       return "No credentials" if credential.nil?
       return "Never" if credential.expires_at.blank?
 
-      credential.expires_at.in_time_zone.strftime("%Y-%m-%d %H:%M")
+      human_readable_timestamp(credential.expires_at)
+    end
+
+    def human_readable_timestamp(value)
+      timestamp = value.in_time_zone
+      "#{timestamp.strftime("%B %-d, %Y at %-l:%M %p")} #{timestamp.strftime("%Z")}".strip
     end
 
     def recording_label(recording)
@@ -350,10 +513,7 @@ module RecordingStudioApi
 
       return recordable.role.to_s.humanize if recordable.respond_to?(:role) && recordable.role.present?
 
-      return recordable.minimum_role.to_s.humanize if recordable.respond_to?(:minimum_role) &&
-        recordable.minimum_role.present?
-
-      "##{recordable.id}"
+      "Unknown recordable"
     end
   end
 end

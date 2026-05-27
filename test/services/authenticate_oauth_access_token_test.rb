@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require_relative "../support/api_dummy_helpers"
+require "base64"
+require "digest"
 
 class AuthenticateOauthAccessTokenTest < ActiveSupport::TestCase
   include ApiDummyHelpers
@@ -53,7 +55,9 @@ class AuthenticateOauthAccessTokenTest < ActiveSupport::TestCase
   end
 
   test "rejects inactive access tokens" do
-    access_token = RecordingStudioApi::ApiAccessToken.last
+    access_token = RecordingStudioApi::ApiAccessToken.find_by(
+      token_digest: RecordingStudioApi::OauthAccessToken.digest(@access_token)
+    )
     access_token.revoke!
 
     result = RecordingStudioApi::Services::AuthenticateOauthAccessToken.call(
@@ -62,5 +66,73 @@ class AuthenticateOauthAccessTokenTest < ActiveSupport::TestCase
 
     assert result.failure?
     assert_equal "Bearer access token is inactive", result.error
+  end
+
+  test "rejects access tokens with trashed token recordings" do
+    access_token = RecordingStudioApi::ApiAccessToken.find_by(
+      token_digest: RecordingStudioApi::OauthAccessToken.digest(@access_token)
+    )
+    access_token.recording.update_column(:trashed_at, Time.current)
+
+    result = RecordingStudioApi::Services::AuthenticateOauthAccessToken.call(
+      authorization_header: "Bearer #{@access_token}"
+    )
+
+    assert result.failure?
+    assert_equal "Bearer access token is invalid", result.error
+  end
+
+  test "rejects access tokens missing token recordings" do
+    access_token = RecordingStudioApi::ApiAccessToken.find_by(
+      token_digest: RecordingStudioApi::OauthAccessToken.digest(@access_token)
+    )
+    access_token.recording.destroy!
+
+    result = RecordingStudioApi::Services::AuthenticateOauthAccessToken.call(
+      authorization_header: "Bearer #{@access_token}"
+    )
+
+    assert result.failure?
+    assert_equal "Bearer access token is invalid", result.error
+  end
+
+  test "authenticates mobile oauth session access token" do
+    oauth_client = RecordingStudioApi::OauthClient.create!(
+      name: "Mobile app",
+      client_identifier: "mobile-auth-client",
+      redirect_uri: "myapp://oauth/callback"
+    )
+
+    code_verifier = SecureRandom.urlsafe_base64(64, false).first(96)
+    code_challenge = Base64.urlsafe_encode64(Digest::SHA256.digest(code_verifier), padding: false)
+
+    authorize_result = RecordingStudioApi::Services::AuthorizeOauthClient.call(
+      response_type: "code",
+      client_id: oauth_client.client_identifier,
+      redirect_uri: oauth_client.redirect_uri,
+      code_challenge: code_challenge,
+      code_challenge_method: "S256",
+      access_recording_id: @access_recording.id
+    )
+
+    exchange_result = RecordingStudioApi::Services::ExchangeOauthAuthorizationCode.call(
+      grant_type: "authorization_code",
+      client_id: oauth_client.client_identifier,
+      code: authorize_result.value.fetch(:code),
+      redirect_uri: oauth_client.redirect_uri,
+      code_verifier: code_verifier
+    )
+
+    mobile_token = exchange_result.value.fetch(:access_token)
+
+    result = RecordingStudioApi::Services::AuthenticateOauthAccessToken.call(
+      authorization_header: "Bearer #{mobile_token}"
+    )
+
+    assert result.success?, result.error
+    assert_equal oauth_client.id, result.value.api_client.id
+    assert_equal @access_recording.id, result.value.access_recording.id
+    assert_not_nil result.value.credential
+    assert_instance_of RecordingStudioApi::OauthGrantSession, result.value.credential
   end
 end

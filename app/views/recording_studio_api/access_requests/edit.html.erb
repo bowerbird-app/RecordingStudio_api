@@ -1,5 +1,5 @@
-<div class="mx-auto flex w-full max-w-3xl flex-col gap-6">
-  <%= render "breadcrumb", anchor_url: access_request_path(@api_client), back_fallback_url: access_request_path(@api_client) %>
+<div class="flex w-full flex-col gap-6">
+  <%= render "breadcrumb", anchor_url: api_client_path(@api_client), back_fallback_url: api_client_path(@api_client) %>
 
   <%= render FlatPack::PageTitle::Component.new(
     title: "Edit API access",
@@ -10,7 +10,7 @@
   <% if @errors.any? %>
     <%= render FlatPack::Card::Component.new(style: :default) do %>
       <div class="space-y-2">
-        <p class="text-sm font-medium text-red-700">The request could not be updated.</p>
+        <p class="text-sm font-medium text-red-700">The API client could not be updated.</p>
         <ul class="list-disc space-y-1 pl-5 text-sm text-red-700">
           <% @errors.uniq.each do |error| %>
             <li><%= error %></li>
@@ -20,16 +20,16 @@
     <% end %>
   <% end %>
 
-  <%= form_with url: access_request_path(@api_client), scope: :access_request, method: :patch, class: "space-y-6" do |form| %>
+  <%= form_with url: api_client_path(@api_client), scope: :api_client, method: :patch, class: "space-y-6" do |form| %>
     <div class="space-y-2">
-      <label for="access_request_api_client_name" class="block text-sm font-medium text-[var(--surface-content-color)]">Name</label>
+      <label for="api_client_api_client_name" class="block text-sm font-medium text-[var(--surface-content-color)]">Name</label>
       <%= form.text_field :api_client_name,
         value: @form_values.fetch(:api_client_name),
         class: "flat-pack-input w-full rounded-md border bg-[var(--surface-background-color)] px-[var(--form-control-padding)] py-[var(--form-control-padding)] text-sm text-[var(--surface-content-color)] border-[var(--surface-border-color)]" %>
     </div>
 
     <div class="space-y-2">
-      <label for="access_request_role" class="block text-sm font-medium text-[var(--surface-content-color)]">Role</label>
+      <label for="api_client_role" class="block text-sm font-medium text-[var(--surface-content-color)]">Role</label>
       <%= form.select :role,
         options_for_select(@role_options, @form_values.fetch(:role)),
         {},
@@ -37,7 +37,7 @@
     </div>
 
     <div class="space-y-2">
-      <label for="access_request_expires_at" class="block text-sm font-medium text-[var(--surface-content-color)]">Expires</label>
+      <label for="api_client_expires_at" class="block text-sm font-medium text-[var(--surface-content-color)]">Expires</label>
       <%= form.datetime_local_field :expires_at,
         value: @form_values.fetch(:expires_at),
         class: "flat-pack-input w-full rounded-md border bg-[var(--surface-background-color)] px-[var(--form-control-padding)] py-[var(--form-control-padding)] text-sm text-[var(--surface-content-color)] border-[var(--surface-border-color)]" %>

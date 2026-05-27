@@ -1,0 +1,11 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "API hierarchy",
+    subtitle: "How API recordables nest beneath each other in the Recording Studio tree.",
+    variant: :h1
+  ) %>
+
+  <%= render FlatPack::Tree::Component.new(compact: true, class: "max-w-3xl") do |tree| %>
+    <% render_recording_tree_nodes(tree, @api_hierarchy) %>
+  <% end %>
+</div>

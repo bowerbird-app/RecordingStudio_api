@@ -56,11 +56,44 @@ The renamed engine currently exposes the same basic Ruby integration points as t
 RecordingStudioApi.configure do |config|
   config.enable_feature_x = false
   config.timeout = 5
+  config.layout_name = "application"
 end
 
 RecordingStudioApi.configuration
 RecordingStudioApi::Hooks.run(:before_initialize)
 ```
+
+### Access management role settings
+
+The gem uses Recording Studio access roles to control access-management UI and actions.
+
+- `config.access_management_view_role` controls who can see API access records.
+- `config.access_management_edit_role` controls who can create, edit, and revoke API access.
+
+Defaults:
+
+- `access_management_view_role: :view`
+- `access_management_edit_role: :admin`
+
+This means users with view-level access can inspect API access in the UI, but only admin-level access can mutate API access.
+
+Example overrides:
+
+```ruby
+RecordingStudioApi.configure do |config|
+  config.access_management_view_role = :edit
+  config.access_management_edit_role = :admin
+end
+```
+
+```ruby
+RecordingStudioApi.configure do |config|
+  config.access_management_view_role = :view
+  config.access_management_edit_role = :edit
+end
+```
+
+Allowed values are `:view`, `:edit`, and `:admin`. The view role must be less than or equal to the edit role.
 
 Inbound API authentication uses OAuth2 access tokens issued from provisioned API client credentials.
 
@@ -104,8 +137,22 @@ Authorization: Bearer <access_token>
 Each API request is evaluated in this order:
 
 1. OAuth2 authentication validates the bearer access token.
-2. The engine resolves `current_api_client`, `current_api_credential`, `current_access_recording`, `current_scope_recording`, and `current_root_recording`.
+2. The engine resolves `current_api_client`, `current_api_credential`, `current_access_recording`, and `current_root_recording`.
 3. Recording Studio accessible scopes constrain resource queries and member actions to what that authenticated client can access.
+
+## Mobile Integration Guidance
+
+The current engine implements OAuth2 `client_credentials` for machine-to-machine access.
+For mobile apps, prefer a backend-for-frontend pattern first:
+
+1. Mobile app authenticates the user with host-app auth.
+2. Mobile app calls your backend.
+3. Backend exchanges/uses API credentials and calls RecordingStudioApi.
+4. Backend returns scoped data to the app.
+
+This keeps API secrets off-device while preserving workspace-scoped auditability in the Recording Studio tree.
+
+If direct mobile-to-API OAuth is required, staged implementation guidance is documented in [docs/MOBILE_AUTH_ROADMAP.md](docs/MOBILE_AUTH_ROADMAP.md).
 
 ### Capability-backed actions
 
@@ -128,6 +175,10 @@ If a recordable type enables `:movable`, the API automatically exposes the `move
 - `GET /recording_studio_api/api/v1` — list available API resources
 - `GET /recording_studio_api/api/v1/:resource` — list recordings of a resource type inside the authenticated root
 - `GET /recording_studio_api/api/v1/:resource/:id` — show one recording
+- `GET /recording_studio_api/api/v1/trash` — list trashed recordings across all resource types in the authenticated root
+- `GET /recording_studio_api/api/v1/trash/:id` — show one trashed recording
+- `POST /recording_studio_api/api/v1/trash/:id/restore` — restore one trashed recording
+- `DELETE /recording_studio_api/api/v1/trash/:id` — permanently delete one trashed recording
 - `GET /recording_studio_api/api/v1/:resource/:id/actions` — list enabled capability actions
 - `POST|PATCH|PUT|DELETE /recording_studio_api/api/v1/:resource/:id/actions/:action_name` — execute a capability-backed action via nested child actions (for example `/folders/:id/actions/move`)
 - `POST|PATCH|PUT|DELETE /recording_studio_api/api/v1/:resource/:id/:action_name` — compatibility alias for existing clients

@@ -1,0 +1,58 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "Mobile grant sessions",
+    subtitle: "Active mobile OAuth sessions for the selected access branch.",
+    variant: :h1
+  ) %>
+
+  <% if @selected_access_recording.present? %>
+    <%= form_with url: oauth_grant_sessions_path, method: :get, local: true, class: "max-w-xl" do |form| %>
+      <div class="space-y-2">
+        <label for="access_recording_id" class="block text-sm font-medium text-[var(--surface-content-color)]">Access branch</label>
+        <%= form.select :access_recording_id,
+          options_for_select(@access_options, @selected_access_recording.id),
+          {},
+          class: "flat-pack-input w-full rounded-md border bg-[var(--surface-background-color)] px-[var(--form-control-padding)] py-[var(--form-control-padding)] text-sm text-[var(--surface-content-color)] border-[var(--surface-border-color)]" %>
+      </div>
+      <div class="mt-3">
+        <%= render FlatPack::Button::Component.new(text: "Filter", style: :primary, size: :md, type: "submit") %>
+      </div>
+    <% end %>
+
+    <% if @session_rows.any? %>
+      <%= render FlatPack::Table::Component.new(data: @session_rows) do |table| %>
+        <% table.column(title: "App", html: ->(row) { row.fetch(:app) }) %>
+        <% table.column(title: "Created", html: ->(row) { row.fetch(:created_at) }) %>
+        <% table.column(title: "Last used", html: ->(row) { row.fetch(:last_used_at) }) %>
+        <% table.column(title: "Status", html: ->(row) { row.fetch(:status) }) %>
+        <% table.column(
+          title: "Actions",
+          html: lambda { |row|
+            if @can_manage_selected_access_recording
+              button_to(
+                "Revoke",
+                revoke_oauth_grant_session_path(row.fetch(:id)),
+                method: :post,
+                class: "inline-flex items-center justify-center gap-2 rounded-[var(--button-border-radius)] font-medium cursor-pointer transition-colors duration-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--button-focus-ring-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--button-focus-ring-offset-color)] px-[var(--button-padding-x-md)] py-[var(--button-padding-y-md)] text-sm bg-[var(--surface-background-color)] text-[var(--surface-content-color)] border border-[var(--surface-border-color)]"
+              )
+            else
+              content_tag(:span, "No revoke access", class: "text-sm text-[var(--surface-muted-content-color)]")
+            end
+          }
+        ) %>
+      <% end %>
+    <% else %>
+      <%= render FlatPack::EmptyState::Component.new(
+        title: "No active mobile sessions",
+        description: "No OAuth grant sessions are currently active for this access branch.",
+        icon: :inbox
+      ) %>
+    <% end %>
+  <% else %>
+    <%= render FlatPack::EmptyState::Component.new(
+      title: "No access branches",
+      description: "This actor has no active access recording available for mobile sessions.",
+      icon: :inbox
+    ) %>
+  <% end %>
+</div>

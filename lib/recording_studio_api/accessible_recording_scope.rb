@@ -2,28 +2,28 @@
 
 module RecordingStudioApi
   class AccessibleRecordingScope
-    def initialize(scope_recording:, access_recording:)
+    def initialize(scope_recording:, access_recording:, include_trashed: false)
       @scope_recording = scope_recording
       @access_recording = access_recording
+      @include_trashed = include_trashed
     end
 
     def relation
-      RecordingStudio::Recording.unscoped.where("id IN (#{accessible_recording_ids_sql})")
+      recordings_table = RecordingStudio::Recording.table_name
+      RecordingStudio::Recording.unscoped.where("#{recordings_table}.id IN (#{accessible_recording_ids_sql})")
     end
 
     private
 
-    attr_reader :scope_recording, :access_recording
+    attr_reader :scope_recording, :access_recording, :include_trashed
 
     def accessible_recording_ids_sql
       return "SELECT NULL::uuid WHERE FALSE" if scope_recording.nil? || access_role_rank.nil?
 
       @accessible_recording_ids_sql ||= begin
         recordings_table = RecordingStudio::Recording.table_name
-        boundaries_table = RecordingStudio::AccessBoundary.table_name
         root_id = connection.quote(scope_recording.id)
-        access_boundary_type = connection.quote("RecordingStudio::AccessBoundary")
-        minimum_role_rank = connection.quote(access_role_rank)
+        trashed_filter = include_trashed ? "" : "WHERE child.trashed_at IS NULL"
 
         <<~SQL.squish
           WITH RECURSIVE
@@ -37,33 +37,10 @@ module RecordingStudioApi
             SELECT child.id, parent.depth + 1
             FROM #{recordings_table} child
             INNER JOIN scope_tree parent ON child.parent_recording_id = parent.id
-            WHERE child.trashed_at IS NULL
-          ),
-          blocked_roots AS (
-            SELECT recording.id
-            FROM scope_tree
-            INNER JOIN #{recordings_table} recording ON recording.id = scope_tree.id
-            INNER JOIN #{boundaries_table} boundary ON boundary.id = recording.recordable_id
-            WHERE scope_tree.depth > 0
-              AND recording.trashed_at IS NULL
-              AND recording.recordable_type = #{access_boundary_type}
-              AND boundary.minimum_role > #{minimum_role_rank}
-          ),
-          blocked_tree AS (
-            SELECT id
-            FROM blocked_roots
-
-            UNION ALL
-
-            SELECT child.id
-            FROM #{recordings_table} child
-            INNER JOIN blocked_tree parent ON child.parent_recording_id = parent.id
-            WHERE child.trashed_at IS NULL
+            #{trashed_filter}
           )
-          SELECT scope_tree.id
+          SELECT id
           FROM scope_tree
-          LEFT JOIN blocked_tree ON blocked_tree.id = scope_tree.id
-          WHERE blocked_tree.id IS NULL
         SQL
       end
     end

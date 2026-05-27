@@ -3,6 +3,53 @@
 RecordingStudioApi.configure do |config|
   # Configure timeout, token_ttl, hooks, and action registration here.
 
+  config.admin_layout_name = "flat_pack_sidebar"
+
+  config.admin_dashboard_path_resolver = lambda do |controller:, **|
+    controller.main_app.admin_api_path
+  end
+
+  config.admin_logs_path_resolver = lambda do |controller:, **params|
+    controller.main_app.admin_api_logs_path(params)
+  end
+
+  config.action_registry.register(
+    :trash,
+    capability: :trashable,
+    http_verb: :post,
+    handler: ->(context) { Dummy::Api::Actions::TrashRecording.call(context) },
+    openapi: {
+      summary: "Trash",
+      description: "Soft-delete a trashable resource and return the updated recording payload.",
+      responses: {
+        "200" => {
+          description: "Recording moved to trash.",
+          content: {
+            "application/json" => {
+              examples: {
+                trashed: {
+                  value: {
+                    data: {
+                      id: "74c7a8bd-9787-45dc-8479-40347f8c0422",
+                      type: "page",
+                      actions: ["trash"],
+                      root_id: "8f8ee9f8-5448-4438-b65f-7578f69009f1",
+                      parent_id: "a8f2ab7d-2f2e-4062-9fe2-10e490a2d664",
+                      trashed_at: "2026-05-26T00:00:00Z",
+                      attributes: {
+                        title: "Homepage"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  )
+
   config.action_registry.register(
     :move,
     capability: :movable,
@@ -44,8 +91,7 @@ RecordingStudioApi.configure do |config|
                     data: {
                       id: "74c7a8bd-9787-45dc-8479-40347f8c0422",
                       type: "folder",
-                      title: "Marketing",
-                      actions: ["movable"],
+                      actions: ["move"],
                       root_id: "8f8ee9f8-5448-4438-b65f-7578f69009f1",
                       parent_id: "a8f2ab7d-2f2e-4062-9fe2-10e490a2d664",
                       attributes: {
@@ -76,7 +122,7 @@ RecordingStudioApi.register_recordable_type_api(
     },
     index: {
       summary: "List workspaces",
-      description: "List workspace recordings that are visible inside the authenticated scope.",
+      description: "List workspaces",
       responses: {
         "200" => {
           content: {
@@ -90,7 +136,6 @@ RecordingStudioApi.register_recordable_type_api(
                       {
                         id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f",
                         type: "workspace",
-                        title: "Editorial",
                         actions: [],
                         root_id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f",
                         parent_id: nil,
@@ -98,7 +143,14 @@ RecordingStudioApi.register_recordable_type_api(
                           name: "Editorial"
                         }
                       }
-                    ]
+                    ],
+                    meta: {
+                      limit: 50,
+                      sort: "created_at",
+                      order: "asc",
+                      has_more: false,
+                      next_pagination_token: nil
+                    }
                   }
                 }
               }
@@ -109,7 +161,7 @@ RecordingStudioApi.register_recordable_type_api(
     },
     show: {
       summary: "Get workspace",
-      description: "Return one workspace recording with workspace-specific details.",
+      description: "Get workspace",
       responses: {
         "200" => {
           content: {
@@ -120,7 +172,6 @@ RecordingStudioApi.register_recordable_type_api(
                     data: {
                       id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f",
                       type: "workspace",
-                      title: "Editorial",
                       actions: [],
                       root_id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f",
                       parent_id: nil,
@@ -128,25 +179,6 @@ RecordingStudioApi.register_recordable_type_api(
                         name: "Editorial"
                       }
                     }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    actions: {
-      summary: "List workspace actions",
-      description: "List capability actions currently available for the selected workspace.",
-      responses: {
-        "200" => {
-          content: {
-            "application/json" => {
-              examples: {
-                default: {
-                  value: {
-                    data: []
                   }
                 }
               }
@@ -171,7 +203,7 @@ RecordingStudioApi.register_recordable_type_api(
     },
     index: {
       summary: "List folders",
-      description: "List folder recordings that the API client can access.",
+      description: "List folders",
       responses: {
         "200" => {
           content: {
@@ -185,15 +217,21 @@ RecordingStudioApi.register_recordable_type_api(
                       {
                         id: "74c7a8bd-9787-45dc-8479-40347f8c0422",
                         type: "folder",
-                        title: "Marketing",
-                        actions: ["movable"],
+                        actions: ["move"],
                         root_id: "8f8ee9f8-5448-4438-b65f-7578f69009f1",
                         parent_id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f",
                         attributes: {
                           name: "Marketing"
                         }
                       }
-                    ]
+                    ],
+                    meta: {
+                      limit: 50,
+                      sort: "created_at",
+                      order: "asc",
+                      has_more: false,
+                      next_pagination_token: nil
+                    }
                   }
                 }
               }
@@ -204,7 +242,7 @@ RecordingStudioApi.register_recordable_type_api(
     },
     show: {
       summary: "Get folder",
-      description: "Return one folder recording, including folder details and enabled capabilities.",
+      description: "Get folder",
       responses: {
         "200" => {
           content: {
@@ -215,8 +253,7 @@ RecordingStudioApi.register_recordable_type_api(
                     data: {
                       id: "74c7a8bd-9787-45dc-8479-40347f8c0422",
                       type: "folder",
-                      title: "Marketing",
-                      actions: ["movable"],
+                      actions: ["move"],
                       root_id: "8f8ee9f8-5448-4438-b65f-7578f69009f1",
                       parent_id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f",
                       attributes: {
@@ -230,127 +267,7 @@ RecordingStudioApi.register_recordable_type_api(
           }
         }
       }
-    },
-    actions: {
-      summary: "List folder actions",
-      description: "List capability actions available for this folder (for example move).",
-      responses: {
-        "200" => {
-          content: {
-            "application/json" => {
-              examples: {
-                default: {
-                  value: {
-                    data: [
-                      {
-                        name: "move",
-                        action: "movable",
-                        http_verb: "post",
-                        scope: "member"
-                      }
-                    ]
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
     }
   }
 )
 
-RecordingStudioApi.register_recordable_type_api(
-  "Page",
-  serializer: ->(recordable) { { title: recordable.title } },
-  openapi: {
-    details_schema: {
-      type: "object",
-      properties: {
-        title: { type: "string", description: "Page attributes." }
-      },
-      required: ["title"]
-    },
-    index: {
-      summary: "List pages",
-      description: "List page recordings visible inside the authenticated root scope.",
-      responses: {
-        "200" => {
-          content: {
-            "application/json" => {
-              examples: {
-                default: {
-                  value: {
-                    resource: "pages",
-                    type: "page",
-                    data: [
-                      {
-                        id: "a39ed0af-daf0-424a-8011-4c28889f658f",
-                        type: "page",
-                        title: "Welcome",
-                        actions: [],
-                        root_id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f",
-                        parent_id: "f8792164-4d83-4810-8c89-6484feff5d28",
-                        attributes: {
-                          title: "Welcome"
-                        }
-                      }
-                    ]
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    show: {
-      summary: "Get page",
-      description: "Return one page recording with page-specific details.",
-      responses: {
-        "200" => {
-          content: {
-            "application/json" => {
-              examples: {
-                default: {
-                  value: {
-                    data: {
-                      id: "a39ed0af-daf0-424a-8011-4c28889f658f",
-                      type: "page",
-                      title: "Welcome",
-                      actions: [],
-                      root_id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f",
-                      parent_id: "f8792164-4d83-4810-8c89-6484feff5d28",
-                      attributes: {
-                        title: "Welcome"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    actions: {
-      summary: "List page actions",
-      description: "List capability actions available for this page.",
-      responses: {
-        "200" => {
-          content: {
-            "application/json" => {
-              examples: {
-                default: {
-                  value: {
-                    data: []
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-)

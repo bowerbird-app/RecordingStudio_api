@@ -20,7 +20,7 @@ module RecordingStudioApi
           info: {
             title: RecordingStudioApi.openapi_title,
             version: RecordingStudioApi::VERSION,
-            description: "Generated OpenAPI document for RecordingStudioApi routes."
+            description: RecordingStudioApi.openapi_description
           },
           servers: [
             { url: "/", description: "Host application root" }
@@ -117,24 +117,6 @@ module RecordingStudioApi
       end
 
       def components
-        base_recording_schema = {
-          type: "object",
-          properties: {
-            id: { type: "string" },
-            type: { type: "string" },
-            title: { type: "string" },
-            actions: {
-              type: "array",
-              items: { type: "string" }
-            },
-            root_id: { type: "string" },
-            parent_id: { type: "string", nullable: true }
-          },
-          required: %w[id type title actions root_id]
-        }
-
-        recordable_schemas = recordable_component_schemas
-
         {
           securitySchemes: {
             bearerAuth: {
@@ -168,9 +150,8 @@ module RecordingStudioApi
                 expires_in: { type: "integer" }
               },
               required: %w[access_token token_type expires_in]
-            },
-            Recording: base_recording_schema
-          }.merge(recordable_schemas),
+            }
+          },
           responses: {
             Unauthorized: {
               description: "Authentication failed.",
@@ -204,38 +185,8 @@ module RecordingStudioApi
                 }
               }
             }
-          },
-          
-        }
-      end
-
-      def recordable_component_schemas
-        RecordingStudioApi.api_recordable_types.each_with_object({}) do |recordable_type, output|
-          details_schema_name = RecordingStudioApi.recordable_details_schema_name_for(recordable_type)
-          recording_schema_name = RecordingStudioApi.recordable_recording_schema_name_for(recordable_type)
-          details_schema = details_schema_for(recordable_type)
-
-          output[details_schema_name.to_sym] = details_schema
-          output[recording_schema_name.to_sym] = {
-            allOf: [
-              { "$ref" => "#/components/schemas/Recording" },
-              {
-                type: "object",
-                properties: {
-                  attributes: { "$ref" => "#/components/schemas/#{details_schema_name}" }
-                },
-                required: ["attributes"]
-              }
-            ]
           }
-        end
-      end
-
-      def details_schema_for(recordable_type)
-        registration = RecordingStudioApi.recordable_registration_for(recordable_type)
-        openapi = registration&.openapi || {}
-
-        stringify_keys(openapi.fetch(:details_schema, { type: "object", additionalProperties: true }))
+        }
       end
 
       def stringify_keys(value)

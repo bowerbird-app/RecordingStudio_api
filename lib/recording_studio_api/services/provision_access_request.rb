@@ -21,6 +21,7 @@ module RecordingStudioApi
         return failure("Actor is required") if actor.nil?
         return failure("Access role is required") if role.blank?
         return failure("API client name is required") if api_client_name.blank?
+        return failure("Actor is not authorized to manage API access for this root recording") unless access_management_policy.can_manage_root_recording?(root_recording)
 
         payload = nil
 
@@ -71,6 +72,10 @@ module RecordingStudioApi
           api_client_name: api_client_name,
           expires_at: expires_at
         }
+      end
+
+      def access_management_policy
+        @access_management_policy ||= RecordingStudioApi::AccessManagementPolicy.new(actor: actor)
       end
     end
   end

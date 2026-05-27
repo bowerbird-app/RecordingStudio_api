@@ -5,12 +5,22 @@ Rails.application.routes.draw do
   # Keep legacy links working by redirecting the base path to the app home.
   get "/recording_studio", to: redirect("/"), as: nil
   mount RecordingStudio::Engine, at: "/recording_studio"
+  mount RecordingStudioAccessible::Engine, at: "/recording_studio_accessible"
   mount RecordingStudioApi::Engine, at: "/recording_studio_api"
+  mount RecordingStudioRootSwitchable::Engine, at: "/recording_studio_root_switchable"
 
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
   get "/workspace", to: "home#workspace", as: :workspace
   get "/folder", to: "home#folder", as: :folder
+  get "/admin/api", to: "recording_studio_api/admin_dashboards#show", as: :admin_api
+  get "/admin/api/logs", to: "recording_studio_api/admin_logs#index", as: :admin_api_logs
+  resource :mobile_app_demo, only: :show do
+    post :start
+    get :callback
+    post :refresh
+    post :revoke
+  end
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
   # Can be used by load balancers and uptime monitors to verify that the app is live.
@@ -22,6 +32,7 @@ Rails.application.routes.draw do
 
   get "docs/install", to: "docs#install", as: :docs_install
   get "docs/config", to: "docs#configuration", as: :docs_config
+  get "docs/api_hierarchy", to: "docs#api_hierarchy", as: :docs_api_hierarchy
   get "docs/recordable_types", to: "docs#recordable_types", as: :docs_recordable_types
   get "docs/recordings_tree", to: "docs#recordings_tree", as: :docs_recordings_tree
   get "docs/gem_views", to: "docs#gem_views", as: :docs_gem_views
@@ -29,9 +40,9 @@ Rails.application.routes.draw do
   get "docs/openapi.json", to: "docs#openapi", as: :docs_openapi
   get "docs/scalar", to: "docs#scalar", as: :docs_scalar
   get "docs/scalar/fullscreen", to: "docs#scalar_fullscreen", as: :docs_scalar_fullscreen
-  get "docs/global_allow_list", to: "docs#global_allow_list", as: :docs_global_allow_list
   get "docs/add_capability", to: "docs#add_capability", as: :docs_add_capability
   get "docs/auth", to: "docs#auth", as: :docs_auth
+  get "docs/mobile_auth", to: "docs#mobile_auth", as: :docs_mobile_auth
   get "docs/methods", to: "docs#methods", as: :docs_methods
 
   # Defines the root path route ("/")

@@ -1,5 +1,5 @@
 <div class="mx-auto flex w-full max-w-4xl flex-col gap-6">
-  <%= render "breadcrumb", anchor_url: access_requests_path(include_children: "1"), back_fallback_url: access_requests_path(include_children: "1") %>
+  <%= render "breadcrumb", anchor_url: api_clients_path(include_children: "1"), back_fallback_url: api_clients_path(include_children: "1") %>
 
   <%= render FlatPack::PageTitle::Component.new(
     title: "#{human_root_type} API access created",
@@ -11,7 +11,7 @@
     <dl class="grid gap-4 md:grid-cols-2">
       <div>
         <dt class="text-sm font-medium text-(--surface-muted-content-color)">Root recording</dt>
-        <dd class="text-sm text-(--surface-content-color)"><%= @payload.fetch(:root_recording).recordable_type.demodulize %>: <%= @payload.fetch(:root_recording).recordable.try(:name).presence || @payload.fetch(:root_recording).id %></dd>
+        <dd class="text-sm text-(--surface-content-color)"><%= recording_label(@payload.fetch(:root_recording)) %></dd>
       </div>
       <div>
         <dt class="text-sm font-medium text-(--surface-muted-content-color)">Access role</dt>
@@ -44,6 +44,6 @@
 
   <div class="flex flex-wrap gap-3">
     <%= button_to "Back to demo", main_app.root_path, method: :get, class: "inline-flex items-center justify-center gap-2 rounded-[var(--button-border-radius)] font-medium cursor-pointer transition-colors duration-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--button-focus-ring-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--button-focus-ring-offset-color)] px-[var(--button-padding-x-md)] py-[var(--button-padding-y-md)] text-sm bg-[var(--button-primary-background-color)] text-[var(--button-primary-text-color)] border border-[var(--button-primary-border-color)] shadow-[var(--button-shadow)]" %>
-    <%= button_to "Add another", new_access_request_path(root_type: @form_values.fetch(:root_type)), method: :get, class: "inline-flex items-center justify-center gap-2 rounded-[var(--button-border-radius)] font-medium cursor-pointer transition-colors duration-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--button-focus-ring-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--button-focus-ring-offset-color)] px-[var(--button-padding-x-md)] py-[var(--button-padding-y-md)] text-sm bg-[var(--surface-background-color)] text-[var(--surface-content-color)] border border-[var(--surface-border-color)]" %>
+    <%= button_to "Add another", new_api_client_path(root_type: @form_values.fetch(:root_type)), method: :get, class: "inline-flex items-center justify-center gap-2 rounded-[var(--button-border-radius)] font-medium cursor-pointer transition-colors duration-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--button-focus-ring-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--button-focus-ring-offset-color)] px-[var(--button-padding-x-md)] py-[var(--button-padding-y-md)] text-sm bg-[var(--surface-background-color)] text-[var(--surface-content-color)] border border-[var(--surface-border-color)]" %>
   </div>
 </div>

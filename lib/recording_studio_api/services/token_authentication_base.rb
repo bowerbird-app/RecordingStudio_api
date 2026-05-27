@@ -22,9 +22,6 @@ module RecordingStudioApi
         return failure(AuthenticationError.new(inactive_token_error_message)) unless credential.active_for_authentication?
         return failure(AuthenticationError.new(inactive_token_error_message)) unless access_recording_active?(credential)
 
-        scope_recording = resolve_scope_recording(credential)
-        return failure(AuthenticationError.new(invalid_scope_error_message)) if scope_recording.nil?
-
         root_recording = resolve_root_recording(credential)
         return failure(AuthenticationError.new(invalid_scope_error_message)) if root_recording.nil?
 
@@ -35,7 +32,6 @@ module RecordingStudioApi
             api_client: credential.api_client,
             credential: credential,
             access_recording: credential.effective_access_recording,
-            scope_recording: scope_recording,
             root_recording: root_recording
           )
         )
@@ -60,10 +56,6 @@ module RecordingStudioApi
       def access_recording_active?(credential)
         access_recording = credential.effective_access_recording
         access_recording.present? && access_recording.trashed_at.nil?
-      end
-
-      def resolve_scope_recording(credential)
-        resolve_root_recording(credential)
       end
 
       def resolve_root_recording(credential)

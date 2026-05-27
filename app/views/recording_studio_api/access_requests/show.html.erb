@@ -1,27 +1,28 @@
-<div class="mx-auto flex w-full max-w-4xl flex-col gap-6">
-  <%= render "breadcrumb", back_fallback_url: access_requests_path(include_children: "1") %>
+<div class="flex w-full flex-col gap-6">
+  <%= render "breadcrumb", back_fallback_url: api_clients_path(include_children: "1") %>
 
   <%= render FlatPack::PageTitle::Component.new(
     title: @api_client.name,
-    subtitle: "Inspect the root scope, access recording, API client, and credential status for this access entry.",
+    subtitle: "API credentials",
     variant: :h1
   ) %>
 
-  <div>
-    <%= button_to "Edit", edit_access_request_path(@api_client), method: :get, class: "inline-flex items-center justify-center gap-2 rounded-[var(--button-border-radius)] font-medium cursor-pointer transition-colors duration-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--button-focus-ring-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--button-focus-ring-offset-color)] px-[var(--button-padding-x-md)] py-[var(--button-padding-y-md)] text-sm bg-[var(--button-primary-background-color)] text-[var(--button-primary-text-color)] border border-[var(--button-primary-border-color)] shadow-[var(--button-shadow)]" %>
+  <div class="flex flex-wrap gap-3">
+    <% if @can_manage_access_request %>
+      <%= button_to "Edit", edit_api_client_path(@api_client), method: :get, class: "inline-flex items-center justify-center gap-2 rounded-[var(--button-border-radius)] font-medium cursor-pointer transition-colors duration-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--button-focus-ring-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--button-focus-ring-offset-color)] px-[var(--button-padding-x-md)] py-[var(--button-padding-y-md)] text-sm bg-[var(--button-primary-background-color)] text-[var(--button-primary-text-color)] border border-[var(--button-primary-border-color)] shadow-[var(--button-shadow)]" %>
+    <% end %>
+    <%= button_to "Tokens", api_client_api_access_tokens_path(@api_client), method: :get, class: "inline-flex items-center justify-center gap-2 rounded-[var(--button-border-radius)] font-medium cursor-pointer transition-colors duration-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--button-focus-ring-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--button-focus-ring-offset-color)] px-[var(--button-padding-x-md)] py-[var(--button-padding-y-md)] text-sm bg-[var(--surface-background-color)] text-[var(--surface-content-color)] border border-[var(--surface-border-color)]" %>
   </div>
 
   <% oauth_client_id = @latest_credential&.oauth_client_id.to_s %>
-  <% masked_oauth_client_id = if oauth_client_id.blank?
-    "Unavailable"
-  elsif oauth_client_id.length <= 4
-    "#{oauth_client_id.first(1)}#{"*" * [oauth_client_id.length - 1, 0].max}"
-  else
-    "#{oauth_client_id.first(2)}#{"*" * (oauth_client_id.length - 4)}#{oauth_client_id.last(2)}"
-  end %>
+  <% masked_oauth_client_id = if oauth_client_id.length > 4
+                                "#{oauth_client_id.first(2)}#{"*" * (oauth_client_id.length - 4)}#{oauth_client_id.last(2)}"
+                              else
+                                oauth_client_id
+                              end %>
   <% detail_rows = [
     { field: "Name", value: @api_client.name, actions: "" },
-    { field: "API key", value: masked_oauth_client_id, actions: "" },
+    { field: "API key", value: (masked_oauth_client_id.presence || "Unavailable"), actions: "" },
     { field: "API secret", value: "Hidden after creation", actions: "" },
     { field: "Role", value: (@access_recording&.recordable&.try(:role).to_s.humanize.presence || "Unknown"), actions: "" },
     { field: "Expiry", value: (@latest_credential&.expires_at&.in_time_zone&.strftime("%Y-%m-%d %H:%M %Z") || "None"), actions: "" }
@@ -32,5 +33,33 @@
     <% table.column(title: "Value", html: ->(row) { row.fetch(:value) }) %>
     <% table.column(title: "Actions", html: ->(row) { row.fetch(:actions) }) %>
   <% end %>
+
+  <div class="space-y-3">
+    <%= render FlatPack::SectionTitle::Component.new(
+      title: "Machine token health",
+      subtitle: "Operational snapshot for issued machine-to-machine access tokens.",
+      anchor_link: true
+    ) %>
+
+    <%= render FlatPack::Table::Component.new(data: @api_token_activity_rows) do |table| %>
+      <% table.column(title: "Field", html: ->(row) { row.fetch(:field) }) %>
+      <% table.column(title: "Value", html: ->(row) { row.fetch(:value) }) %>
+      <% table.column(title: "Actions", html: ->(row) { row.fetch(:actions) }) %>
+    <% end %>
+  </div>
+
+  <div class="space-y-3">
+    <%= render FlatPack::SectionTitle::Component.new(
+      title: "OAuth2 activity",
+      subtitle: "Session and token activity for this access branch.",
+      anchor_link: true
+    ) %>
+
+    <%= render FlatPack::Table::Component.new(data: @oauth_activity_rows) do |table| %>
+      <% table.column(title: "Field", html: ->(row) { row.fetch(:field) }) %>
+      <% table.column(title: "Value", html: ->(row) { row.fetch(:value) }) %>
+      <% table.column(title: "Actions", html: ->(row) { row.fetch(:actions) }) %>
+    <% end %>
+  </div>
 
 </div>

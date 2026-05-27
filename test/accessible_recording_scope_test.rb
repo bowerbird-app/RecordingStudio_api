@@ -17,18 +17,17 @@ class AccessibleRecordingScopeTest < ActiveSupport::TestCase
     Current.actor = nil if defined?(Current)
   end
 
-  test "excludes stricter nested boundary subtree for lower role access" do
+  test "includes the non-trashed subtree rooted at the scoped recording" do
     root_recording, access_recording = create_access_recording_for(user: @user, role: :edit)
     visible_page = create_page_recording(root_recording: root_recording)
-
-    restricted_boundary = RecordingStudio::AccessBoundary.create!(minimum_role: :admin)
-    restricted_boundary_recording = RecordingStudio::Recording.create!(
-      recordable: restricted_boundary,
+    nested_folder = Folder.create!(name: "Nested")
+    nested_folder_recording = RecordingStudio::Recording.create!(
+      recordable: nested_folder,
       parent_recording: root_recording
     )
-    hidden_page = create_page_recording(
+    nested_page = create_page_recording(
       root_recording: root_recording,
-      parent_recording: restricted_boundary_recording
+      parent_recording: nested_folder_recording
     )
 
     ids = RecordingStudioApi::AccessibleRecordingScope.new(
@@ -36,30 +35,43 @@ class AccessibleRecordingScopeTest < ActiveSupport::TestCase
       access_recording: access_recording
     ).relation.pluck(:id)
 
+    assert_includes ids, root_recording.id
     assert_includes ids, visible_page.id
-    assert_not_includes ids, restricted_boundary_recording.id
-    assert_not_includes ids, hidden_page.id
+    assert_includes ids, nested_folder_recording.id
+    assert_includes ids, nested_page.id
   end
 
-  test "includes nested boundary subtree when role satisfies minimum" do
+  test "excludes trashed descendants from the scoped subtree" do
     root_recording, access_recording = create_access_recording_for(user: @user, role: :admin)
 
-    restricted_boundary = RecordingStudio::AccessBoundary.create!(minimum_role: :admin)
-    restricted_boundary_recording = RecordingStudio::Recording.create!(
-      recordable: restricted_boundary,
-      parent_recording: root_recording
-    )
+    folder = Folder.create!(name: "Trashed Folder")
+    folder_recording = RecordingStudio::Recording.create!(recordable: folder, parent_recording: root_recording)
     page_recording = create_page_recording(
       root_recording: root_recording,
-      parent_recording: restricted_boundary_recording
+      parent_recording: folder_recording
     )
+    page_recording.update_column(:trashed_at, Time.current)
 
     ids = RecordingStudioApi::AccessibleRecordingScope.new(
       scope_recording: root_recording,
       access_recording: access_recording
     ).relation.pluck(:id)
 
-    assert_includes ids, restricted_boundary_recording.id
+    assert_includes ids, folder_recording.id
+    assert_not_includes ids, page_recording.id
+  end
+
+  test "can include trashed descendants when requested" do
+    root_recording, access_recording = create_access_recording_for(user: @user, role: :admin)
+    page_recording = create_page_recording(root_recording: root_recording)
+    page_recording.update_column(:trashed_at, Time.current)
+
+    ids = RecordingStudioApi::AccessibleRecordingScope.new(
+      scope_recording: root_recording,
+      access_recording: access_recording,
+      include_trashed: true
+    ).relation.pluck(:id)
+
     assert_includes ids, page_recording.id
   end
 

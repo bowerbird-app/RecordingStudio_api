@@ -1,0 +1,22 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <nav class="flat-pack-breadcrumb" aria-label="Breadcrumb">
+    <ol class="flex items-center gap-2 text-sm">
+      <li class="inline-flex items-center gap-1">
+        <%= link_to RecordingStudioApi.admin_dashboard_path(controller: self), class: "inline-flex items-center gap-1 text-(--surface-content-color) underline decoration-(--surface-border-color) underline-offset-2 hover:decoration-(--surface-content-color)" do %>
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-4 w-4" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+          </svg>
+          <span>Back</span>
+        <% end %>
+      </li>
+    </ol>
+  </nav>
+
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "API logs",
+    subtitle: "Request log entries recorded by the API logging database.",
+    variant: :h1
+  ) %>
+
+  <%= render partial: "content" %>
+</div>

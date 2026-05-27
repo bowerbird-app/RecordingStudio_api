@@ -18,6 +18,7 @@ class RecordingStudioApiTest < Minitest::Test
     application_controller_path = File.expand_path("dummy/app/controllers/application_controller.rb", __dir__)
     controller_source = File.read(application_controller_path)
     assert_includes controller_source, "flat_pack_sidebar"
+    assert_not_includes controller_source, "flat_pack_admin_sidebar"
   end
 
   def test_dummy_layouts_default_to_flatpack_rounded_theme
@@ -60,17 +61,24 @@ class RecordingStudioApiTest < Minitest::Test
     readme_source = File.read(readme_path)
 
     assert_includes readme_source, "This Rails app exists to validate the RecordingStudio API integration surface"
+    assert_includes readme_source, "/recording_studio_root_switchable/v1/root_switch?scope=all_roots"
     assert_includes readme_source, "/recording_studio"
     assert_includes readme_source, "architecture handoff"
   end
 
   def test_dummy_home_page_uses_recording_studio_api_title
-    view_path = File.expand_path("dummy/app/views/home/index.html.erb", __dir__)
-    view_source = File.read(view_path)
+    standard_root_view_path = File.expand_path("dummy/app/views/home/standard_root.html.erb", __dir__)
+    admin_root_view_path = File.expand_path("dummy/app/views/recording_studio_admin/home/index.html.erb", __dir__)
+    standard_root_view_source = File.read(standard_root_view_path)
+    admin_root_view_source = File.read(admin_root_view_path)
 
-    assert_includes view_source, 'title: "Recording Studio API demo"'
-    assert_includes view_source, "Demo to add and remove API access"
-    assert_not_includes view_source, 'title: "RecordingStudio API"'
+    assert_includes standard_root_view_source, 'title: "Recording Studio API demo"'
+    assert_includes standard_root_view_source, "Demo to add and remove API access"
+    assert_includes standard_root_view_source, 'title: "Workspace"'
+    assert_includes standard_root_view_source, 'title: "Folder"'
+    assert_includes standard_root_view_source, '"API access list"'
+    assert_includes admin_root_view_source, 'title: "Admin"'
+    assert_includes admin_root_view_source, 'text: "Open Admin API"'
   end
 
   def test_dummy_docs_pages_use_flatpack_documentation_components
@@ -100,8 +108,8 @@ class RecordingStudioApiTest < Minitest::Test
     end
 
     config_view = File.read(File.expand_path("dummy/app/views/docs/config.html.erb", __dir__))
-    assert_includes config_view, "FlatPack::List::Component"
-    assert_includes config_view, "FlatPack::List::Item"
+    assert_includes config_view, "FlatPack::CodeBlock::Component"
+    assert_includes config_view, "RecordingStudioApi.configure do |config|"
 
     gem_views_view = File.read(File.expand_path("dummy/app/views/docs/gem_views.html.erb", __dir__))
     assert_includes gem_views_view, "FlatPack::Table::Component"
@@ -109,7 +117,12 @@ class RecordingStudioApiTest < Minitest::Test
     assert_includes gem_views_view, "No gem views were found."
 
     recordable_types_view = File.read(File.expand_path("dummy/app/views/docs/recordable_types.html.erb", __dir__))
-    assert_includes recordable_types_view, "FlatPack::List::Component"
+    assert_includes recordable_types_view, "FlatPack::Table::Component"
+
+    api_hierarchy_view = File.read(File.expand_path("dummy/app/views/docs/api_hierarchy.html.erb", __dir__))
+    assert_includes api_hierarchy_view, 'title: "API hierarchy"'
+    assert_includes api_hierarchy_view, "FlatPack::Tree::Component"
+    assert_includes api_hierarchy_view, "render_recording_tree_nodes"
 
     recordings_tree_view = File.read(File.expand_path("dummy/app/views/docs/recordings_tree.html.erb", __dir__))
     assert_includes recordings_tree_view, "FlatPack::Tree::Component"
@@ -133,10 +146,14 @@ class RecordingStudioApiTest < Minitest::Test
 
     assert_includes sidebar_source, 'title: "RecordingStudio API"'
     assert_includes sidebar_source, 'subtitle: "Host app guide"'
+    assert_includes sidebar_source, 'label: "Admin API"'
+    assert_includes sidebar_source, 'RecordingStudioApi.admin_dashboard_path(controller: self)'
     assert_includes sidebar_source, 'label: "Recordable types"'
-    assert_includes sidebar_source, "docs_recordable_types_path"
+    assert_includes sidebar_source, "main_app.docs_recordable_types_path"
+    assert_includes sidebar_source, 'label: "API hierarchy"'
+    assert_includes sidebar_source, "main_app.docs_api_hierarchy_path"
     assert_includes sidebar_source, 'label: "Recordings tree"'
-    assert_includes sidebar_source, "docs_recordings_tree_path"
+    assert_includes sidebar_source, "main_app.docs_recordings_tree_path"
     assert_not_includes sidebar_source, 'title: "Addon Template"'
   end
 
@@ -152,12 +169,67 @@ class RecordingStudioApiTest < Minitest::Test
     assert_not_includes sidebar_source, "icon: :code\n"
   end
 
-  def test_dummy_top_nav_uses_center_slot_to_keep_avatar_right_aligned
+  def test_dummy_top_nav_keeps_root_switch_button_without_center_label
     top_nav_path = File.expand_path("dummy/app/views/layouts/flat_pack/_top_nav.html.erb", __dir__)
     top_nav_source = File.read(top_nav_path)
 
-    assert_includes top_nav_source, "nav.center"
-    assert_includes top_nav_source, 'aria-hidden="true"'
+    assert_not_includes top_nav_source, "nav.center"
+    assert_includes top_nav_source, "text: \"\#{current_root_name} - Change\""
+    assert_includes top_nav_source, 'recording_studio_root_switchable.root_switch_path('
+    assert_includes top_nav_source, 'return_to: request.fullpath'
+  end
+
+  def test_dummy_application_controller_exposes_root_switchable_support
+    controller_path = File.expand_path("dummy/app/controllers/application_controller.rb", __dir__)
+    controller_source = File.read(controller_path)
+
+    assert_includes controller_source, "include RecordingStudio::RootSwitchable::ControllerSupport"
+    assert_includes controller_source, "RecordingStudioAdmin.admin_root_recording?"
+  end
+
+  def test_dummy_routes_mount_admin_accessible_and_root_switchable_engines
+    routes_path = File.expand_path("dummy/config/routes.rb", __dir__)
+    routes_source = File.read(routes_path)
+
+    assert_includes routes_source, 'mount RecordingStudioAccessible::Engine, at: "/recording_studio_accessible"'
+    assert_includes routes_source, 'mount RecordingStudioRootSwitchable::Engine, at: "/recording_studio_root_switchable"'
+    assert_includes routes_source, 'get "/admin/api", to: "recording_studio_api/admin_dashboards#show", as: :admin_api'
+    assert_not_includes routes_source, 'mount RecordingStudioAdmin::Engine, at: "/admin"'
+  end
+
+  def test_dummy_root_switchable_initializer_uses_all_roots_scope_for_admin_flow
+    initializer_path = File.expand_path("dummy/config/initializers/recording_studio_root_switchable.rb", __dir__)
+    initializer_source = File.read(initializer_path)
+
+    assert_includes initializer_source, "config.layout = :application_layout"
+    assert_includes initializer_source, "config.scope :all_roots"
+    assert_includes initializer_source, "RecordingStudioAdmin::Admin"
+    assert_not_includes initializer_source, 'requested_return_to.start_with?("/admin")'
+  end
+
+  def test_dummy_admin_initializer_uses_controller_current_root_recording
+    initializer_path = File.expand_path("dummy/config/initializers/recording_studio_admin.rb", __dir__)
+    initializer_source = File.read(initializer_path)
+
+    assert_includes initializer_source, "config.current_root_recording_resolver"
+    assert_includes initializer_source, "controller.current_root_recording"
+  end
+
+  def test_dummy_api_initializer_configures_admin_dashboard_path_resolver
+    initializer_path = File.expand_path("dummy/config/initializers/recording_studio_api.rb", __dir__)
+    initializer_source = File.read(initializer_path)
+
+    assert_includes initializer_source, 'config.admin_layout_name = "flat_pack_sidebar"'
+    assert_includes initializer_source, "config.admin_dashboard_path_resolver"
+    assert_includes initializer_source, "controller.main_app.admin_api_path"
+  end
+
+  def test_engine_ships_admin_api_dashboard_view_and_model
+    dashboard_view = File.expand_path("../app/views/recording_studio_api/admin_dashboards/show.html.erb", __dir__)
+    model_path = File.expand_path("../app/models/recording_studio_api/admin_api.rb", __dir__)
+
+    assert File.exist?(dashboard_view)
+    assert File.exist?(model_path)
   end
 
   def test_engine_ships_flatpack_access_request_views

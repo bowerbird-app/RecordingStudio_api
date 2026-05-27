@@ -53,7 +53,7 @@
         <span>The OAuth token service validates issued access token digests and confirms both token and underlying credential are active.</span>
       <% end %>
       <%= render FlatPack::List::Item.new(icon: :folder_open) do %>
-        <span>It resolves <code>access_recording</code>, <code>scope_recording</code>, and <code>root_recording</code>, rejecting trashed or invalid scope records.</span>
+        <span>It resolves <code>access_recording</code> and <code>root_recording</code>, rejecting trashed or invalid recording references.</span>
       <% end %>
       <%= render FlatPack::List::Item.new(icon: :clock) do %>
         <span>On success, it updates <code>last_used_at</code> and exposes authenticated context to controllers.</span>
@@ -73,7 +73,7 @@
         <span>OAuth2 proves which API client is calling the endpoint.</span>
       <% end %>
       <%= render FlatPack::List::Item.new(icon: :adjustments_horizontal) do %>
-        <span>Then <code>RecordingStudioApi::AccessibleRecordingScope</code> applies Recording Studio visibility rules using <code>current_scope_recording</code> and <code>current_access_recording</code>.</span>
+        <span>Then <code>RecordingStudioApi::AccessibleRecordingScope</code> applies Recording Studio visibility rules using <code>current_root_recording</code> and <code>current_access_recording</code>.</span>
       <% end %>
       <%= render FlatPack::List::Item.new(icon: :eye_slash) do %>
         <span>Resources outside the authenticated client's accessible tree remain hidden even with a valid token.</span>
@@ -93,7 +93,6 @@
       current_api_client
       current_api_credential
       current_access_recording
-      current_scope_recording
       current_root_recording
     CODE
   ) %>

@@ -1,0 +1,37 @@
+<div class="mx-auto flex w-full max-w-3xl flex-col gap-6">
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "Choose access",
+    subtitle: "Select which access branch this mobile authorization should use.",
+    variant: :h1
+  ) %>
+
+  <%= render FlatPack::Card::Component.new(style: :default) do %>
+    <%= form_with url: request.path, method: :get, local: true, class: "space-y-6" do |form| %>
+      <%= form.hidden_field :response_type, value: @authorize_form_values.fetch(:response_type) %>
+      <%= form.hidden_field :client_id, value: @authorize_form_values.fetch(:client_id) %>
+      <%= form.hidden_field :redirect_uri, value: @authorize_form_values.fetch(:redirect_uri) %>
+      <%= form.hidden_field :code_challenge, value: @authorize_form_values.fetch(:code_challenge) %>
+      <%= form.hidden_field :code_challenge_method, value: @authorize_form_values.fetch(:code_challenge_method) %>
+      <% if @authorize_form_values[:state].present? %>
+        <%= form.hidden_field :state, value: @authorize_form_values.fetch(:state) %>
+      <% end %>
+
+      <div class="space-y-2">
+        <label for="access_recording_id" class="block text-sm font-medium text-(--surface-content-color)">Access</label>
+        <%= form.select :access_recording_id,
+          options_for_select(@authorize_access_options),
+          {},
+          class: "flat-pack-input w-full rounded-md border bg-[var(--surface-background-color)] px-[var(--form-control-padding)] py-[var(--form-control-padding)] text-sm text-[var(--surface-content-color)] border-[var(--surface-border-color)]" %>
+      </div>
+
+      <div class="flex flex-wrap gap-3">
+        <%= render FlatPack::Button::Component.new(
+          text: "Continue",
+          style: :primary,
+          size: :md,
+          type: "submit"
+        ) %>
+      </div>
+    <% end %>
+  <% end %>
+</div>

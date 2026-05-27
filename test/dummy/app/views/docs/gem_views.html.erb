@@ -1,16 +1,67 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
   <%= render FlatPack::PageTitle::Component.new(
     title: "Gem Views",
-    subtitle: "All ERB views currently shipped by the gem, shown as a FlatPack table.",
+    subtitle: "All ERB views currently shipped by the gem, grouped by API credentials, API tokens, and OAuth.",
     variant: :h1
   ) %>
 
+  <% api_credentials_views = @engine_views.select do |view| %>
+    <% view.fetch(:logical_path).start_with?("recording_studio_api/access_requests/") && view.fetch(:template) != "tokens" %>
+  <% end %>
+  <% api_tokens_views = @engine_views.select do |view| %>
+    <% view.fetch(:logical_path).start_with?("recording_studio_api/api_access_tokens/") || view.fetch(:template) == "tokens" %>
+  <% end %>
+  <% oauth_views = @engine_views.select do |view| %>
+    <% view.fetch(:logical_path).start_with?("recording_studio_api/oauth_authorizations/", "recording_studio_api/oauth_grant_sessions/", "recording_studio_api/oauth/") %>
+  <% end %>
+
   <% if @engine_views.any? %>
-    <%= render FlatPack::Table::Component.new(data: @engine_views) do |table| %>
-      <% table.column(title: "Template", html: ->(view) { view.fetch(:template) }) %>
-      <% table.column(title: "Directory", html: ->(view) { view.fetch(:directory) }) %>
-      <% table.column(title: "Type", html: ->(view) { view.fetch(:partial) ? "Partial" : "Page" }) %>
-      <% table.column(title: "Path", html: ->(view) { view.fetch(:relative_path) }) %>
+    <%= render FlatPack::SectionTitle::Component.new(
+      title: "API credentials",
+      subtitle: "CRUD and supporting views for API credentials.",
+      anchor_link: true,
+    ) %>
+
+    <% if api_credentials_views.any? %>
+      <%= render FlatPack::Table::Component.new(data: api_credentials_views) do |table| %>
+        <% table.column(title: "Template", html: ->(view) { view.fetch(:template) }) %>
+        <% table.column(title: "Type", html: ->(view) { view.fetch(:partial) ? "Partial" : "Page" }) %>
+        <% table.column(title: "Path", html: ->(view) { view.fetch(:relative_path) }) %>
+      <% end %>
+    <% else %>
+      <p class="text-sm text-(--surface-muted-content-color)">No API credential views were found.</p>
+    <% end %>
+
+    <%= render FlatPack::SectionTitle::Component.new(
+      title: "API tokens",
+      subtitle: "Token-focused views used by API credential flows.",
+      anchor_link: true,
+    ) %>
+
+    <% if api_tokens_views.any? %>
+      <%= render FlatPack::Table::Component.new(data: api_tokens_views) do |table| %>
+        <% table.column(title: "Template", html: ->(view) { view.fetch(:template) }) %>
+        <% table.column(title: "Type", html: ->(view) { view.fetch(:partial) ? "Partial" : "Page" }) %>
+        <% table.column(title: "Path", html: ->(view) { view.fetch(:relative_path) }) %>
+      <% end %>
+    <% else %>
+      <p class="text-sm text-(--surface-muted-content-color)">No API token views were found.</p>
+    <% end %>
+
+    <%= render FlatPack::SectionTitle::Component.new(
+      title: "OAuth",
+      subtitle: "OAuth authorization and session views.",
+      anchor_link: true,
+    ) %>
+
+    <% if oauth_views.any? %>
+      <%= render FlatPack::Table::Component.new(data: oauth_views) do |table| %>
+        <% table.column(title: "Template", html: ->(view) { view.fetch(:template) }) %>
+        <% table.column(title: "Type", html: ->(view) { view.fetch(:partial) ? "Partial" : "Page" }) %>
+        <% table.column(title: "Path", html: ->(view) { view.fetch(:relative_path) }) %>
+      <% end %>
+    <% else %>
+      <p class="text-sm text-(--surface-muted-content-color)">No OAuth views were found.</p>
     <% end %>
   <% else %>
     <p class="text-sm text-(--surface-muted-content-color)">No gem views were found.</p>

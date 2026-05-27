@@ -205,17 +205,17 @@ class RenameVerificationTest < Minitest::Test
                  "Application controller should be in module #{@pascal_name}")
   end
 
-  def test_home_controller_exists
-    path = File.join(@root, "app", "controllers", @gem_name, "home_controller.rb")
+  def test_api_controller_exists
+    path = File.join(@root, "app", "controllers", @gem_name, "api_controller.rb")
     assert File.exist?(path),
-           "Home controller should exist at #{path}"
+           "API controller should exist at #{path}"
   end
 
-  def test_home_controller_has_correct_module
-    path = File.join(@root, "app", "controllers", @gem_name, "home_controller.rb")
+  def test_api_controller_has_correct_module
+    path = File.join(@root, "app", "controllers", @gem_name, "api_controller.rb")
     content = File.read(path)
     assert_match(/^module #{@pascal_name}$/, content,
-                 "Home controller should be in module #{@pascal_name}")
+                 "API controller should be in module #{@pascal_name}")
   end
 
   # ============================================================
@@ -231,7 +231,7 @@ class RenameVerificationTest < Minitest::Test
 
     ruby_files = Dir.glob(File.join(@root, "**", "*.rb"))
     # Exclude test files and this verification test itself
-    ruby_files.reject! { |f| f.include?("test/dummy") || f.include?("rename_verification_test.rb") }
+    ruby_files.reject! { |f| f.include?("/test/") || f.include?("rename_verification_test.rb") }
 
     files_with_old_refs = []
 
@@ -263,16 +263,16 @@ class RenameVerificationTest < Minitest::Test
     skip if @gem_name == "gem_template"
 
     old_gemspec = File.join(@root, "gem_template.gemspec")
-    assert_not File.exist?(old_gemspec),
-               "Old gemspec file should not exist: #{old_gemspec}"
+      refute File.exist?(old_gemspec),
+        "Old gemspec file should not exist: #{old_gemspec}"
   end
 
   def test_no_old_main_lib_file
     skip if @gem_name == "gem_template"
 
     old_lib = File.join(@root, "lib", "gem_template.rb")
-    assert_not File.exist?(old_lib),
-               "Old main lib file should not exist: #{old_lib}"
+      refute File.exist?(old_lib),
+        "Old main lib file should not exist: #{old_lib}"
   end
 
   # ============================================================
@@ -300,7 +300,7 @@ class RenameVerificationTest < Minitest::Test
     begin
       require "#{@gem_name}/version"
       mod = Object.const_get(@pascal_name)
-      assert_not_nil mod::VERSION, "#{@pascal_name}::VERSION should be defined"
+      refute_nil mod::VERSION, "#{@pascal_name}::VERSION should be defined"
     rescue LoadError, NameError => e
       flunk "Could not access VERSION: #{e.message}"
     end

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "ostruct"
 
 class ConfigurationTest < Minitest::Test
   def setup
@@ -8,10 +9,10 @@ class ConfigurationTest < Minitest::Test
   end
 
   def test_merge_updates_known_attributes
-    @configuration.merge!(timeout: 9, enable_feature_x: true)
+    @configuration.merge!(timeout: 9, rate_limit_api_enabled: true)
 
     assert_equal 9, @configuration.timeout
-    assert_equal true, @configuration.enable_feature_x
+    assert_equal true, @configuration.rate_limit_api_enabled
   end
 
   def test_merge_ignores_unknown_keys
@@ -28,16 +29,74 @@ class ConfigurationTest < Minitest::Test
     @configuration.merge!(nil)
 
     assert_equal original[:timeout], @configuration.timeout
-    assert_equal original[:enable_feature_x], @configuration.enable_feature_x
+    assert_equal original[:rate_limit_api_enabled], @configuration.rate_limit_api_enabled
   end
 
   def test_initialize_uses_defaults
     configuration = RecordingStudioApi::Configuration.new
 
-    assert_equal false, configuration.enable_feature_x
     assert_equal 5, configuration.timeout
+    assert_equal :view, configuration.access_management_view_role
+    assert_equal :admin, configuration.access_management_edit_role
+    assert_respond_to configuration.admin_dashboard_path_resolver, :call
+    assert_respond_to configuration.admin_logs_path_resolver, :call
+    assert_nil configuration.admin_layout_name
     assert_nil configuration.openapi_title
+    assert_nil configuration.openapi_description
+    assert_equal "application", configuration.layout_name
+    assert_equal false, configuration.rate_limit_oauth_enabled
+    assert_equal false, configuration.rate_limit_api_enabled
+    assert_equal "recording_studio_api", configuration.rate_limit_redis_namespace
+    assert_equal 10, configuration.rate_limit_oauth_requests
+    assert_equal 60, configuration.rate_limit_oauth_period_seconds
+    assert_equal 120, configuration.rate_limit_api_requests
+    assert_equal 60, configuration.rate_limit_api_period_seconds
+    assert_equal 120, configuration.rate_limit_api_read_requests
+    assert_equal 60, configuration.rate_limit_api_read_period_seconds
+    assert_equal 30, configuration.rate_limit_api_write_requests
+    assert_equal 60, configuration.rate_limit_api_write_period_seconds
+    assert_equal false, configuration.api_request_logging_enabled
+    assert_equal "metadata_only", configuration.api_request_logging_payload_mode
     assert_instance_of RecordingStudioApi::Hooks, configuration.hooks
+  end
+
+  def test_merge_updates_rate_limit_and_logging_settings
+    @configuration.merge!(
+      rate_limit_oauth_enabled: true,
+      rate_limit_api_enabled: true,
+      rate_limit_redis_namespace: "custom_ns",
+      rate_limit_oauth_requests: 10,
+      rate_limit_oauth_period_seconds: 30,
+      rate_limit_api_requests: 90,
+      rate_limit_api_period_seconds: 45,
+      rate_limit_api_read_requests: 150,
+      rate_limit_api_read_period_seconds: 25,
+      rate_limit_api_write_requests: 40,
+      rate_limit_api_write_period_seconds: 20,
+      api_request_logging_enabled: true,
+      api_request_logging_payload_mode: "metadata_only"
+    )
+
+    assert_equal true, @configuration.rate_limit_oauth_enabled
+    assert_equal true, @configuration.rate_limit_api_enabled
+    assert_equal "custom_ns", @configuration.rate_limit_redis_namespace
+    assert_equal 10, @configuration.rate_limit_oauth_requests
+    assert_equal 30, @configuration.rate_limit_oauth_period_seconds
+    assert_equal 90, @configuration.rate_limit_api_requests
+    assert_equal 45, @configuration.rate_limit_api_period_seconds
+    assert_equal 150, @configuration.rate_limit_api_read_requests
+    assert_equal 25, @configuration.rate_limit_api_read_period_seconds
+    assert_equal 40, @configuration.rate_limit_api_write_requests
+    assert_equal 20, @configuration.rate_limit_api_write_period_seconds
+    assert_equal true, @configuration.api_request_logging_enabled
+    assert_equal "metadata_only", @configuration.api_request_logging_payload_mode
+  end
+
+  def test_merge_updates_access_management_roles
+    @configuration.merge!(access_management_view_role: "edit", access_management_edit_role: "admin")
+
+    assert_equal :edit, @configuration.access_management_view_role
+    assert_equal :admin, @configuration.access_management_edit_role
   end
 
   def test_merge_updates_openapi_title
@@ -46,10 +105,44 @@ class ConfigurationTest < Minitest::Test
     assert_equal "My API", @configuration.openapi_title
   end
 
+  def test_merge_updates_openapi_description
+    @configuration.merge!(openapi_description: "Public endpoints for mobile clients")
+
+    assert_equal "Public endpoints for mobile clients", @configuration.openapi_description
+  end
+
   def test_merge_accepts_string_keys
     @configuration["timeout"] = 12
 
     assert_equal 12, @configuration.timeout
+  end
+
+  def test_merge_updates_layout_name
+    @configuration.merge!(layout_name: "flat_pack_sidebar")
+
+    assert_equal "flat_pack_sidebar", @configuration.layout_name
+  end
+
+  def test_merge_updates_admin_layout_name
+    @configuration.merge!(admin_layout_name: "flat_pack_sidebar")
+
+    assert_equal "flat_pack_sidebar", @configuration.admin_layout_name
+  end
+
+  def test_merge_updates_admin_dashboard_path_resolver
+    resolver = ->(controller:, **) { controller.main_app.admin_api_path }
+
+    @configuration.merge!(admin_dashboard_path_resolver: resolver)
+
+    assert_equal resolver, @configuration.admin_dashboard_path_resolver
+  end
+
+  def test_merge_updates_admin_logs_path_resolver
+    resolver = ->(controller:, **) { controller.main_app.admin_api_logs_path }
+
+    @configuration.merge!(admin_logs_path_resolver: resolver)
+
+    assert_equal resolver, @configuration.admin_logs_path_resolver
   end
 
   def test_to_h_reports_registered_hook_counts
@@ -84,6 +177,40 @@ class ConfigurationTest < Minitest::Test
 
     assert_equal "Page", registration.fetch(:recordable_type)
     assert_equal true, registration.fetch(:serializer)
+  end
+
+  def test_register_recordable_type_api_composes_multiple_registrations_for_same_type
+    @configuration.recordable_registry.register(
+      "Page",
+      serializer: ->(recordable) { { title: recordable.title } },
+      openapi: {
+        details_schema: {
+          properties: {
+            title: { type: "string" }
+          }
+        }
+      }
+    )
+
+    @configuration.recordable_registry.register(
+      "Page",
+      serializer: ->(recordable) { { summary: "Summary: #{recordable.title}" } },
+      openapi: {
+        details_schema: {
+          properties: {
+            summary: { type: "string" }
+          }
+        }
+      }
+    )
+
+    registration = @configuration.recordable_registry.fetch("Page")
+    payload = registration.serializer.call(Struct.new(:title).new("Docs"))
+
+    assert_equal({ title: "Docs", summary: "Summary: Docs" }, payload)
+    properties = registration.openapi.fetch(:details_schema).fetch(:properties)
+    assert_equal "string", properties.fetch(:title).fetch(:type)
+    assert_equal "string", properties.fetch(:summary).fetch(:type)
   end
 
   def test_configure_without_block_is_safe

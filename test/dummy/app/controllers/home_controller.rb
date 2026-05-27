@@ -1,7 +1,11 @@
 class HomeController < ApplicationController
   def index
-    @workspace_access_recordings = access_recordings_for("Workspace")
-    @folder_access_recordings = access_recordings_for("Folder")
+    if admin_root_current?
+      render :admin_root, layout: "flat_pack_sidebar"
+    else
+      load_standard_root_data
+      render :standard_root, layout: "flat_pack_sidebar"
+    end
   end
 
   def workspace
@@ -13,6 +17,11 @@ class HomeController < ApplicationController
   end
 
   private
+
+  def load_standard_root_data
+    @workspace_access_recordings = access_recordings_for("Workspace")
+    @folder_access_recordings = access_recordings_for("Folder")
+  end
 
   def access_recordings_for(root_recordable_type)
     recordings = RecordingStudio::Recording.includes(:recordable).reorder(:created_at, :id).to_a

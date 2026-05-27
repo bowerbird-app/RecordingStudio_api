@@ -15,11 +15,18 @@
 
   <% end %>
 
-  <% nav.center do %>
-    <span aria-hidden="true"></span>
-  <% end %>
-
   <% nav.right do %>
+    <%= link_to recording_studio_root_switchable.root_switch_path(
+      scope: "all_roots",
+      return_to: request.fullpath
+    ), class: "inline-flex" do %>
+      <%= render FlatPack::Button::Component.new(
+        text: "#{current_root_name} - Change",
+        style: :primary,
+        size: :sm
+      ) %>
+    <% end %>
+
     <% if user_signed_in? %>
       <%= render FlatPack::Avatar::Component.new(
         name: current_user.try(:name).presence || current_user.email,

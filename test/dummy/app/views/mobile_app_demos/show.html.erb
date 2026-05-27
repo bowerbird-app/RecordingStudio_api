@@ -1,0 +1,53 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "Mobile app demo",
+    subtitle: "Run the browser-based OAuth login flow, exchange the authorization code, and inspect the API scope granted to the issued token.",
+    variant: :h1
+  ) %>
+
+  <% if @error_message.present? %>
+    <%= render FlatPack::Card::Component.new(style: :default) do %>
+      <p class="text-sm text-[var(--surface-content-color)]"><strong>Error:</strong> <%= @error_message %></p>
+    <% end %>
+  <% end %>
+
+  <% if @available_access_recordings.any? %>
+    <div class="flex flex-wrap gap-3">
+      <%= button_to "Login with mobile app demo", start_mobile_app_demo_path, method: :post, class: "inline-flex items-center justify-center gap-2 rounded-[var(--button-border-radius)] font-medium cursor-pointer transition-colors duration-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--button-focus-ring-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--button-focus-ring-offset-color)] px-[var(--button-padding-x-md)] py-[var(--button-padding-y-md)] text-sm bg-[var(--button-primary-background-color)] text-[var(--button-primary-text-color)] border border-[var(--button-primary-border-color)] shadow-[var(--button-shadow)]" %>
+
+      <% if @token_bundle.present? %>
+        <%= button_to "Refresh demo token", refresh_mobile_app_demo_path, method: :post, class: "inline-flex items-center justify-center gap-2 rounded-[var(--button-border-radius)] font-medium cursor-pointer transition-colors duration-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--button-focus-ring-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--button-focus-ring-offset-color)] px-[var(--button-padding-x-md)] py-[var(--button-padding-y-md)] text-sm bg-[var(--surface-background-color)] text-[var(--surface-content-color)] border border-[var(--surface-border-color)]" %>
+        <%= button_to "Revoke demo session", revoke_mobile_app_demo_path, method: :post, class: "inline-flex items-center justify-center gap-2 rounded-[var(--button-border-radius)] font-medium cursor-pointer transition-colors duration-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--button-focus-ring-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--button-focus-ring-offset-color)] px-[var(--button-padding-x-md)] py-[var(--button-padding-y-md)] text-sm bg-[var(--surface-background-color)] text-[var(--surface-content-color)] border border-[var(--surface-border-color)]" %>
+      <% end %>
+    </div>
+  <% else %>
+    <%= render FlatPack::EmptyState::Component.new(
+      title: "No access branch available",
+      description: "Create API access from the home page before running the mobile login demo.",
+      icon: :inbox
+    ) do |empty_state| %>
+      <% empty_state.actions do %>
+        <%= render FlatPack::Button::Component.new(
+          text: "Back to home",
+          style: :primary,
+          size: :md,
+          url: root_path
+        ) %>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <% if @status_message.present? %>
+    <%= render FlatPack::Card::Component.new(style: :default) do %>
+      <p class="text-sm text-[var(--surface-content-color)]"><strong>Status:</strong> <%= @status_message %></p>
+    <% end %>
+  <% end %>
+
+  <% if @recording_tree.any? %>
+    <%= render FlatPack::Tree::Component.new(compact: true, class: "max-w-3xl") do |tree| %>
+      <% render_recording_tree_nodes(tree, @recording_tree) %>
+    <% end %>
+  <% else %>
+    <p class="text-sm text-(--surface-muted-content-color)">No recording tree available for the current access selection.</p>
+  <% end %>
+</div>

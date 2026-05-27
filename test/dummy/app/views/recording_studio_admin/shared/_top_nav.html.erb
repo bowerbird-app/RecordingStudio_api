@@ -1,0 +1,28 @@
+<%= render FlatPack::TopNav::Component.new do |nav| %>
+  <% nav.left do %>
+    <%= render FlatPack::Button::Component.new(
+      icon: "menu",
+      icon_only: true,
+      style: :ghost,
+      size: :md,
+      aria: { label: "Toggle sidebar" },
+      data: {
+        "flat-pack--sidebar-layout-target": "mobileToggle",
+        action: "click->flat-pack--sidebar-layout#toggleMobile"
+      },
+      class: "md:hidden"
+    ) %>
+  <% end %>
+
+  <% nav.right do %>
+    <% if recording_studio_admin_root_switcher_path.present? %>
+      <%= link_to recording_studio_admin_root_switcher_path, class: "inline-flex" do %>
+        <%= render FlatPack::Button::Component.new(
+          text: recording_studio_admin_exit_root_label,
+          style: :primary,
+          size: :sm
+        ) %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>

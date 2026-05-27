@@ -32,7 +32,7 @@ module RecordingStudioApi
         raise UnsupportedActionError, "parent_id is required for move" if destination_id.blank?
 
         destination = RecordingStudioApi::AccessibleRecordingScope.new(
-          scope_recording: context.scope_recording,
+          scope_recording: context.root_recording,
           access_recording: context.access_recording
         ).relation.find_by(id: destination_id)
         raise NotFoundError, "Destination recording was not found in this API scope" if destination.nil?

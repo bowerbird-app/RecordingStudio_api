@@ -1,0 +1,26 @@
+<div class="flex w-full flex-col gap-6">
+  <%= render "recording_studio_api/access_requests/breadcrumb", anchor_url: api_client_path(@api_client), back_fallback_url: api_client_path(@api_client) %>
+
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "Tokens",
+    subtitle: @api_client.name,
+    variant: :h1
+  ) %>
+
+  <% if @token_rows.any? %>
+    <%= render FlatPack::Table::Component.new(data: @token_rows) do |table| %>
+      <% table.column(title: "Prefix", html: ->(row) { row.fetch(:prefix) }) %>
+      <% table.column(title: "Status", html: ->(row) { row.fetch(:status) }) %>
+      <% table.column(title: "Expires", html: ->(row) { row.fetch(:expires_at) }) %>
+      <% table.column(title: "Last used", html: ->(row) { row.fetch(:last_used_at) }) %>
+      <% table.column(title: "Issued", html: ->(row) { row.fetch(:issued_at) }) %>
+      <% table.column(title: "Actions", html: ->(row) { row.fetch(:actions) }) %>
+    <% end %>
+  <% else %>
+    <%= render FlatPack::EmptyState::Component.new(
+      title: "No child tokens",
+      description: "This API client has not issued any child access tokens yet.",
+      icon: :inbox
+    ) %>
+  <% end %>
+</div>

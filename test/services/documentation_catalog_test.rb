@@ -26,11 +26,14 @@ module RecordingStudioApi
 
         workspace_section = resources.find { |section| section.fetch(:resource) == "workspaces" }
         endpoint_paths = workspace_section.fetch(:endpoints).map { |endpoint| endpoint.fetch(:path) }
+        destroy_endpoint = workspace_section.fetch(:endpoints).find do |endpoint|
+          endpoint.fetch(:path) == "/recording_studio_api/api/v1/workspaces/:id" && endpoint.fetch(:verb) == "DELETE"
+        end
 
         assert_includes endpoint_paths, "/recording_studio_api/api/v1/workspaces"
         assert_includes endpoint_paths, "/recording_studio_api/api/v1/workspaces/:id"
-        assert_includes endpoint_paths, "/recording_studio_api/api/v1/workspaces/:id/actions"
         assert_includes endpoint_paths, "/recording_studio_api/api/v1/workspaces/:id/actions/publish"
+        assert_equal "resources#destroy", destroy_endpoint.fetch(:action)
       end
 
       def test_action_endpoints_include_capability_metadata
@@ -79,6 +82,17 @@ module RecordingStudioApi
         end
 
         assert_equal ["Folder"], move_endpoint.fetch(:openapi).fetch(:tags)
+        action_data_schema = move_endpoint
+          .fetch(:openapi)
+          .fetch(:responses)
+          .fetch("200")
+          .fetch(:content)
+          .fetch("application/json")
+          .fetch(:schema)
+          .fetch(:properties)
+          .fetch(:data)
+        assert_equal "object", action_data_schema.fetch(:type)
+        assert action_data_schema.fetch(:properties).key?(:id)
       end
 
       def test_default_resource_tags_are_human_readable_for_access
@@ -91,15 +105,16 @@ module RecordingStudioApi
           DocumentationCatalog.call
         end
 
-        access_section = catalog.fetch(:resources).find { |section| section.fetch(:resource) == "accesses" }
+        access_section = catalog.fetch(:resources).find { |section| section.fetch(:resource) == "access" }
         index_endpoint = access_section.fetch(:endpoints).find do |endpoint|
-          endpoint.fetch(:path) == "/recording_studio_api/api/v1/accesses"
+          endpoint.fetch(:path) == "/recording_studio_api/api/v1/access"
         end
 
+        assert_equal "List Access", index_endpoint.fetch(:summary)
         assert_equal ["Access"], index_endpoint.fetch(:openapi).fetch(:tags)
       end
 
-      def test_resource_responses_reference_recordable_specific_schema
+      def test_resource_responses_reference_shared_recording_schema
         catalog = with_catalog_stubs(
           recordable_types: ["Page"],
           actions_by_type: {
@@ -114,7 +129,7 @@ module RecordingStudioApi
           endpoint.fetch(:path) == "/recording_studio_api/api/v1/pages"
         end
 
-        schema_ref = index_endpoint
+        item_schema = index_endpoint
           .fetch(:openapi)
           .fetch(:responses)
           .fetch("200")
@@ -124,9 +139,9 @@ module RecordingStudioApi
           .fetch(:properties)
           .fetch(:data)
           .fetch(:items)
-          .fetch("$ref")
 
-        assert_equal "#/components/schemas/PageRecording", schema_ref
+        assert_equal "object", item_schema.fetch(:type)
+        assert item_schema.fetch(:properties).key?(:id)
         assert index_endpoint
           .fetch(:openapi)
           .fetch(:responses)
@@ -163,6 +178,69 @@ module RecordingStudioApi
 
           assert_equal "Get page details", show_endpoint.fetch(:openapi).fetch(:summary)
         end
+      end
+
+      def test_action_request_body_uses_input_contract_schema
+        input_contract = Struct.new(:as_json).new(
+          {
+            fields: {
+              title: { type: :string, required: true, description: "Title" },
+              published: { type: :boolean, required: false },
+              score: { type: :float, required: false },
+              tags: { type: :array, required: false },
+              mode: { type: :string, required: false, enum: %w[draft final] }
+            }
+          }
+        )
+
+        action = ActionStub.new(
+          name: "publish",
+          http_verb: :post,
+          capability: :publishable,
+          scope: :member,
+          openapi: {}
+        )
+        action.define_singleton_method(:input_contract) { input_contract }
+
+        catalog = with_catalog_stubs(
+          recordable_types: ["Page"],
+          actions_by_type: {
+            "Page" => [action]
+          }
+        ) do
+          DocumentationCatalog.call
+        end
+
+        page_section = catalog.fetch(:resources).find { |section| section.fetch(:resource) == "pages" }
+        endpoint = page_section.fetch(:endpoints).find { |entry| entry.fetch(:path).end_with?("/actions/publish") }
+        schema = endpoint.fetch(:openapi).fetch(:request_body).fetch(:content).fetch("application/json").fetch(:schema)
+
+        assert_equal "object", schema.fetch(:type)
+        assert_equal ["title"], schema.fetch(:required)
+        assert_equal "string", schema.fetch(:properties).fetch("title").fetch(:type)
+        assert_equal "boolean", schema.fetch(:properties).fetch("published").fetch(:type)
+        assert_equal "number", schema.fetch(:properties).fetch("score").fetch(:type)
+        assert_equal "array", schema.fetch(:properties).fetch("tags").fetch(:type)
+        assert_equal %w[draft final], schema.fetch(:properties).fetch("mode").fetch(:enum)
+      end
+
+      def test_resource_write_request_body_uses_generic_attributes_schema
+        catalog = with_catalog_stubs(
+          recordable_types: ["Workspace"],
+          actions_by_type: {
+            "Workspace" => []
+          }
+        ) do
+          DocumentationCatalog.call
+        end
+
+        section = catalog.fetch(:resources).find { |resource| resource.fetch(:resource) == "workspaces" }
+        create_endpoint = section.fetch(:endpoints).find { |entry| entry.fetch(:verb) == "POST" && entry.fetch(:action) == "resources#create" }
+        schema = create_endpoint.fetch(:openapi).fetch(:request_body).fetch(:content).fetch("application/json").fetch(:schema)
+
+        assert_equal "object", schema.fetch(:properties).fetch(:attributes).fetch(:type)
+        assert_equal true, schema.fetch(:properties).fetch(:attributes).fetch(:additionalProperties)
+        assert_equal %w[attributes], schema.fetch(:required)
       end
 
       private

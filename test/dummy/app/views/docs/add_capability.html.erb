@@ -13,9 +13,40 @@
         :publish,
         capability: :publishable,
         http_verb: :post,
+        scope: :member,
         # Handles the action logic and returns the value serialized in the API response.
         handler: MyAddon::Api::Actions::PublishRecording,
-        serializer: RecordingStudioApi::Serializers::RecordingSerializer
+        serializer: RecordingStudioApi::Serializers::RecordingSerializer,
+        input_contract: {
+          reject_unknown: true,
+          fields: {
+            audience: {
+              type: :string,
+              required: true,
+              enum: %w[internal public],
+              description: "Who this publish event is intended for."
+            },
+            notify_followers: {
+              type: :boolean,
+              required: false,
+              default: true,
+              description: "Notify followers after publishing."
+            }
+          }
+        },
+        openapi: {
+          summary: "Publish recording",
+          description: "Publishes the recording and returns the updated payload.",
+          tags: ["Publishing"],
+          responses: {
+            "200" => {
+              description: "Recording published successfully."
+            },
+            "422" => {
+              description: "Validation failed while publishing."
+            }
+          }
+        }
       )
     CODE
   ) %>

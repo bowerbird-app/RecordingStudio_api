@@ -41,29 +41,41 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, expected_copy
     assert_includes response.body, "RecordingStudioApi.configure do |config|"
     assert_includes response.body, "config.token_ttl = 45.days"
-    assert_includes response.body, "config/recording_studio_api.yml"
-    assert_includes response.body, "config.x.recording_studio_api"
-    assert_includes response.body, "Capability action registration is documented on the API and Methods pages"
+    assert_includes response.body, "config.rate_limit_oauth_enabled = true"
+    assert_includes response.body, "config.rate_limit_api_enabled = true"
+    assert_includes response.body, "config.rate_limit_oauth_requests = 10"
+    assert_includes response.body, "config.rate_limit_api_read_requests = 120"
+    assert_includes response.body, "config.rate_limit_api_write_requests = 30"
+    assert_includes response.body, "config.api_request_logging_enabled = true"
+    assert_includes response.body, "config.api_request_logging_payload_mode ="
+    assert_includes response.body, "metadata_only"
     assert_not_includes response.body, "RecordingStudioApi.register_capability_action"
   end
 
   test "recordable types page renders configured recordables dynamically" do
     with_recordable_types([Workspace, "Folder"]) do
-      summary_data = create_recordable_type_summary_data
+      create_recordable_type_summary_data
+      access = RecordingStudio::Access.create!(actor: @user, role: :admin)
+      RecordingStudio::Recording.create!(recordable: access)
 
       get docs_recordable_types_path
       response_text = response.body.gsub(/\s+/, " ").strip
 
       assert_response :success
       assert_select "h1", text: "Recordable types"
-      assert_includes(
-        response.body,
-        "The list below comes directly from RecordingStudio.configuration.recordable_types."
-      )
+      assert_includes response.body, "Distinct recordable types currently present in RecordingStudio::Recording."
+      assert_includes response.body, "Type"
+      assert_includes response.body, "Recordings"
+      assert_includes response.body, "Recordables"
       assert_includes response.body, "Workspace"
       assert_includes response.body, "Folder"
-      assert_includes response_text, summary_data[:workspace]
-      assert_includes response_text, summary_data[:folder]
+      assert_includes response_text, pluralized_label(RecordingStudio::Recording.where(recordable_type: "Workspace").count, "recording")
+      assert_includes response_text, pluralized_label(Workspace.count, "recordable")
+      assert_includes response_text, pluralized_label(RecordingStudio::Recording.where(recordable_type: "Folder").count, "recording")
+      assert_includes response_text, pluralized_label(Folder.count, "recordable")
+      assert_includes response_text, "Access"
+      assert_includes response_text, pluralized_label(RecordingStudio::Recording.where(recordable_type: "RecordingStudio::Access").count, "recording")
+      assert_includes response_text, pluralized_label(RecordingStudio::Access.count, "recordable")
     end
   end
 
@@ -71,9 +83,27 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     get docs_recordable_types_path
 
     assert_response :success
+    assert_includes response.body, "Distinct recordable types currently present in RecordingStudio::Recording."
     assert_includes response.body, "Workspace"
     assert_includes response.body, "Folder"
     assert_includes response.body, "Page"
+  end
+
+  test "api hierarchy page renders successfully" do
+    get docs_api_hierarchy_path
+
+    assert_response :success
+    assert_select "h1", text: "API hierarchy"
+    assert_includes response.body, "How API recordables nest beneath each other in the Recording Studio tree."
+    assert_includes response.body, "Folder"
+    assert_includes response.body, "Access"
+    assert_includes response.body, "API client"
+    assert_includes response.body, "API credential"
+    assert_includes response.body, "API access token"
+    assert_includes response.body, "OAuth grant session"
+    assert_includes response.body, "OAuth authorization code"
+    assert_includes response.body, "OAuth session access token"
+    assert_includes response.body, "OAuth refresh token"
   end
 
   test "recordings tree page renders successfully" do
@@ -118,7 +148,8 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
   test "methods page renders successfully" do
     get docs_methods_path
     assert_response :success
-    assert_select "h1", text: "No methods provided by gem outside of setup"
+    assert_select "h1", text: "Methods"
+    assert_includes response.body, "No methods provided by gem outside of setup"
   end
 
   test "api routes page renders successfully" do
@@ -132,7 +163,7 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
       assert_select "h1", text: "API routes"
       assert_includes response.body, "mount RecordingStudioApi::Engine, at: &quot;/recording_studio_api&quot;"
       assert_includes response.body, "RecordingStudioApi::Engine.routes.draw do"
-      assert_includes response.body, "resources :access_requests, only: %i[index show new create]"
+      assert_includes response.body, "resources :api_clients, controller: &quot;access_requests&quot;, only: %i[index show new create]"
       assert_includes response.body, "post &quot;/oauth/token&quot;, to: &quot;oauth#token&quot;"
       assert_includes response.body, "match &quot;/:resource/:id/actions/:action_name&quot;"
       assert_includes response.body, "match &quot;/:resource/:id/:action_name&quot;"
@@ -142,12 +173,12 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
       assert_includes response.body, "Action routes stay grouped under their owning resource"
       assert_includes response.body, "/recording_studio_api/api/v1/folders/:id/actions/move"
       assert_includes response.body, "Action:"
-      assert_includes response.body, "movable"
+      assert_includes response.body, "move"
     end
   end
 
   test "openapi endpoint renders successfully" do
-    with_recordable_types([Workspace]) do
+    with_recordable_types([Workspace, "RecordingStudio::Access"]) do
       get docs_openapi_path
 
       assert_response :success
@@ -157,6 +188,11 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
       assert_equal Rails.application.class.module_parent_name, payload.fetch("info").fetch("title")
       assert payload.fetch("paths").key?("/recording_studio_api/oauth/token")
       assert payload.fetch("paths").key?("/recording_studio_api/api/v1/workspaces")
+      assert payload.fetch("paths").fetch("/recording_studio_api/api/v1/workspaces").key?("post")
+      assert payload.fetch("paths").fetch("/recording_studio_api/api/v1/workspaces/{id}").key?("patch")
+      assert payload.fetch("paths").fetch("/recording_studio_api/api/v1/workspaces/{id}").key?("delete")
+      assert payload.fetch("paths").key?("/recording_studio_api/api/v1/access")
+      assert payload.fetch("paths").key?("/recording_studio_api/api/v1/access/{id}")
       assert_match(
         /^resources_index_get_/,
         payload.fetch("paths").fetch("/recording_studio_api/api/v1/workspaces").fetch("get").fetch("operationId")
@@ -188,17 +224,6 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "createApiReference"
   end
 
-  test "global allow list page renders successfully" do
-    get docs_global_allow_list_path
-
-    assert_response :success
-    assert_select "h1", text: "Global allow list"
-    assert_includes response.body, "Global resource-type allowlist"
-      assert_includes response.body, "config.recordable_types = [&quot;Workspace&quot;, &quot;Folder&quot;, &quot;Page&quot;]"
-    assert_includes response.body, "def api_recordable_types"
-    assert_includes response.body, "RecordingStudioApi::ApiClient"
-  end
-
   test "add capability page renders successfully" do
     get docs_add_capability_path
 
@@ -226,6 +251,18 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "401 Unauthorized"
   end
 
+  test "mobile auth page renders successfully" do
+    get docs_mobile_auth_path
+
+    assert_response :success
+    assert_select "h1", text: "Mobile auth"
+    assert_includes response.body, "How mobile OAuth authorization, refresh, and revocation now work in the recording tree."
+    assert_includes response.body, "The mobile app sends the user to the OAuth authorize page, where the user signs in if they are not already signed in."
+    assert_includes response.body, "The server checks which RecordingStudio::Access records belong to that user and has them choose one if there is more than one option."
+    assert_includes response.body, "The app exchanges that code, together with its PKCE verifier, for a mobile access token and a refresh token."
+    assert_includes response.body, "The app uses the access token for API calls, and when it expires it uses the refresh token to get a new access token and a rotated refresh token."
+  end
+
   test "mounted recording_studio_api engine has no browser root page" do
     get "/recording_studio_api"
 
@@ -234,6 +271,12 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
 
   test "api docs page is not available" do
     get "/docs/api"
+
+    assert_response :not_found
+  end
+
+  test "global allow list page is not available" do
+    get "/docs/global_allow_list"
 
     assert_response :not_found
   end
@@ -248,17 +291,23 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_select %(a[href="#{docs_gem_views_path}"]), text: /Gem Views/
     assert_select %(a[href="#{docs_api_routes_path}"]), text: /API routes/
     assert_select %(a[href="#{docs_scalar_path}"]), text: /Scalar/
-    assert_select %(a[href="#{docs_global_allow_list_path}"]), text: /Global allow list/
     assert_select %(a[href="#{docs_add_capability_path}"]), text: /Add API capability/
     assert_select %(a[href="#{docs_auth_path}"]), text: /Auth/
+    assert_select %(a[href="#{docs_mobile_auth_path}"]), text: /Mobile auth/
     assert_select %(a[href="#{docs_methods_path}"]), text: /Methods/
+      assert_select %(a[href="#{docs_api_hierarchy_path}"]), text: /API hierarchy/
+    assert_select %(a[href="/docs/global_allow_list"]), false
 
     methods_link_index = response.body.index(%(href="#{docs_methods_path}"))
+    api_hierarchy_link_index = response.body.index(%(href="#{docs_api_hierarchy_path}"))
     recordings_tree_link_index = response.body.index(%(href="#{docs_recordings_tree_path}"))
 
     assert_not_nil methods_link_index
+    assert_not_nil api_hierarchy_link_index
     assert_not_nil recordings_tree_link_index
     assert_operator methods_link_index, :<, recordings_tree_link_index
+    assert_operator methods_link_index, :<, api_hierarchy_link_index
+    assert_operator api_hierarchy_link_index, :<, recordings_tree_link_index
   end
 
   private
@@ -331,5 +380,10 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
 
     "#{recording_count} #{recording_label} point to this type " \
       "• #{recordable_count} #{recordable_label} in the database"
+  end
+
+  def pluralized_label(count, word)
+    suffix = count == 1 ? word : "#{word}s"
+    "#{count} #{suffix}"
   end
 end

@@ -28,38 +28,29 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
     Current.actor = nil if defined?(Current)
   end
 
-  test "lists only capability actions enabled for the target recordable type" do
-    get "/recording_studio_api/api/v1/pages/#{@page_recording.id}/actions",
-        headers: authorization_headers
-
-    assert_response :success
-    assert_equal ["echo"], JSON.parse(response.body).fetch("data").map { |row| row.fetch("name") }
-  end
-
-  test "exposes move only for folder resources when movable is enabled on Folder" do
+  test "executes move only for folder resources when movable is enabled on Folder" do
     folder_recording = @page_recording.parent_recording
 
     RecordingStudio.enable_capability(:movable, on: "Folder")
+    RecordingStudioApi.configuration.action_registry.instance_variable_get(:@registrations).delete("move")
     RecordingStudioApi.register_capability_action(
       :move,
       capability: :movable,
       http_verb: :post,
-      handler: RecordingStudioApi::Services::MoveRecording
+      handler: ->(context) { context.recording }
     )
 
-    get "/recording_studio_api/api/v1/folders/#{folder_recording.id}/actions",
+    post "/recording_studio_api/api/v1/folders/#{folder_recording.id}/actions/move",
         headers: authorization_headers
 
     assert_response :success
-    folder_actions = JSON.parse(response.body).fetch("data").map { |row| row.fetch("name") }
-    assert_includes folder_actions, "move"
+    assert_equal folder_recording.id, JSON.parse(response.body).fetch("data").fetch("id")
 
-    get "/recording_studio_api/api/v1/pages/#{@page_recording.id}/actions",
+    post "/recording_studio_api/api/v1/pages/#{@page_recording.id}/actions/move",
         headers: authorization_headers
 
-    assert_response :success
-    page_actions = JSON.parse(response.body).fetch("data").map { |row| row.fetch("name") }
-    assert_not_includes page_actions, "move"
+    assert_response :unprocessable_entity
+    assert_equal "move is not enabled for Page", JSON.parse(response.body).fetch("error")
   end
 
   test "dispatches a registered capability action with OAuth2 bearer authentication" do
@@ -76,6 +67,26 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_equal @page_recording.id, JSON.parse(response.body).fetch("data").fetch("id")
+  end
+
+  test "exposes trash for trashable recordables through the nested resource route" do
+    post "/recording_studio_api/api/v1/pages/#{@page_recording.id}/trash",
+         headers: authorization_headers
+
+    assert_response :success
+    payload = JSON.parse(response.body).fetch("data")
+    assert_equal @page_recording.id, payload.fetch("id")
+    assert_not_nil RecordingStudio::Recording.unscoped.find(@page_recording.id).trashed_at
+  end
+
+  test "does not expose trash for non-trashable recordables" do
+    workspace_recording = @root_recording
+
+    post "/recording_studio_api/api/v1/workspaces/#{workspace_recording.id}/trash",
+         headers: authorization_headers
+
+    assert_response :unprocessable_entity
+    assert_equal "trash is not enabled for Workspace", JSON.parse(response.body).fetch("error")
   end
 
   test "passes only action payload params to handlers" do
@@ -111,7 +122,7 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
     refute_includes payload.keys, "format"
   end
 
-  test "scopes token access to the authenticated root recording" do
+  test "scopes capability action execution to the authenticated root recording" do
     root_recording, access_recording = create_access_recording_for(user: @user)
     in_scope_page = create_page_recording(root_recording: root_recording)
     other_root_recording, = create_access_recording_for(user: create_user(email: "other-root-actions@example.com"))
@@ -127,12 +138,12 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
       client_secret: scoped_token.fetch(:token)
     ).value.fetch(:access_token)
 
-    get "/recording_studio_api/api/v1/pages/#{in_scope_page.id}/actions",
+    post "/recording_studio_api/api/v1/pages/#{in_scope_page.id}/actions/echo",
         headers: { "Authorization" => "Bearer #{scoped_oauth_token}" }
 
     assert_response :success
 
-    get "/recording_studio_api/api/v1/pages/#{out_of_scope_page.id}/actions",
+    post "/recording_studio_api/api/v1/pages/#{out_of_scope_page.id}/actions/echo",
       headers: { "Authorization" => "Bearer #{scoped_oauth_token}" }
 
     assert_response :not_found
@@ -167,6 +178,19 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
     post "/recording_studio_api/api/v1/pages/#{@page_recording.id}/actions/echo"
 
     assert_response :unauthorized
+  end
+
+  test "forbids member actions for clients with view-only access" do
+    view_user = create_user(email: "view-only-member-actions@example.com")
+    view_root_recording, view_access_recording = create_access_recording_for(user: view_user, role: :view)
+    view_page_recording = create_page_recording(root_recording: view_root_recording)
+    view_token = issue_oauth_access_token_for(access_recording: view_access_recording, name: "View-only token")
+
+    post "/recording_studio_api/api/v1/pages/#{view_page_recording.id}/actions/echo",
+         headers: { "Authorization" => "Bearer #{view_token}" }
+
+    assert_response :forbidden
+    assert_equal "API client does not have write access", JSON.parse(response.body).fetch("error")
   end
 
   private

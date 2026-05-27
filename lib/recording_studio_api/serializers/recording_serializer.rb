@@ -3,8 +3,6 @@
 module RecordingStudioApi
   module Serializers
     class RecordingSerializer
-      IDENTIFIER_ATTRIBUTES = %i[name title label slug email identifier].freeze
-
       class << self
         def call(recording)
           return recording if recording.is_a?(Hash)
@@ -18,8 +16,7 @@ module RecordingStudioApi
           {
             id: recording.id,
             type: resource_type_for(recording.recordable_type),
-            title: label_for(recording.recordable),
-            actions: capabilities_for(recording.recordable_type),
+            actions: action_names_for(recording.recordable_type),
             root_id: recording.root_recording_id,
             parent_id: recording.parent_recording_id
           }
@@ -29,23 +26,10 @@ module RecordingStudioApi
           recordable_type.to_s.demodulize.underscore
         end
 
-        def label_for(recordable)
-          return "Unknown recordable" if recordable.nil?
+        def action_names_for(recordable_type)
+          return [] unless RecordingStudioApi.respond_to?(:capability_actions_for)
 
-          IDENTIFIER_ATTRIBUTES.each do |attribute|
-            next unless recordable.respond_to?(attribute)
-
-            value = recordable.public_send(attribute)
-            return value if value.present?
-          end
-
-          "##{recordable.id}"
-        end
-
-        def capabilities_for(recordable_type)
-          return [] unless defined?(RecordingStudio) && RecordingStudio.respond_to?(:capabilities_for)
-
-          RecordingStudio.capabilities_for(recordable_type)
+          RecordingStudioApi.capability_actions_for(recordable_type).map(&:name)
         end
       end
     end

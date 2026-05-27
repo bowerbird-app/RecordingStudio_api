@@ -15,6 +15,7 @@ module RecordingStudioApi
   class AuthenticationError < Error; end
   class AuthorizationError < Error; end
   class ConfigurationError < Error; end
+  class InvalidPaginationTokenError < Error; end
   class NotFoundError < Error; end
   class UnsupportedActionError < Error; end
 end

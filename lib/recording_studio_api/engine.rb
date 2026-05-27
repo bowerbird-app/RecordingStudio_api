@@ -85,8 +85,10 @@ module RecordingStudioApi
 
     # Run after_initialize hooks
     initializer "recording_studio_api.after_initialize", after: "recording_studio_api.load_config" do |_app|
+      RecordingStudioApi::Engine.register_admin_api_recordable!
       RecordingStudioApi::Engine.register_api_client_recordable!
       RecordingStudioApi.register_default_capability_actions!
+      RecordingStudioApi.register_default_resource_actions!
       RecordingStudioApi.configuration.validate!
       RecordingStudioApi::Hooks.run(:after_initialize, self)
     end
@@ -116,12 +118,20 @@ module RecordingStudioApi
     end
 
     def self.register_api_client_recordable!
+      register_recordable_type!("RecordingStudioApi::ApiClient")
+    end
+
+    def self.register_admin_api_recordable!
+      register_recordable_type!("RecordingStudioApi::AdminApi")
+    end
+
+    def self.register_recordable_type!(recordable_type_name)
       return unless defined?(RecordingStudio) && RecordingStudio.respond_to?(:register_recordable_type)
 
-      api_client_type = "RecordingStudioApi::ApiClient".safe_constantize
-      return if api_client_type.nil?
+      recordable_type = recordable_type_name.safe_constantize
+      return if recordable_type.nil?
 
-      RecordingStudio.register_recordable_type(api_client_type.name)
+      RecordingStudio.register_recordable_type(recordable_type.name)
     end
   end
 end

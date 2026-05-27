@@ -4,14 +4,14 @@ require_relative "action_input_contract"
 
 module RecordingStudioApi
   class ActionRegistration
-    ALLOWED_HTTP_VERBS = %i[post patch put delete].freeze
-    ALLOWED_SCOPES = %i[member].freeze
+    ALLOWED_HTTP_VERBS = %i[get post patch put delete].freeze
+    ALLOWED_SCOPES = %i[collection resource member].freeze
 
     attr_reader :name, :capability, :http_verb, :handler, :serializer, :scope, :openapi, :input_contract
 
     def initialize(name:, capability:, http_verb:, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil)
       @name = name.to_s
-      @capability = capability.to_sym
+      @capability = capability&.to_sym
       @http_verb = http_verb.to_sym
       @handler = handler
       @serializer = serializer
@@ -22,7 +22,7 @@ module RecordingStudioApi
 
     def validate!
       raise ConfigurationError, "API action name is required" if name.blank?
-      raise ConfigurationError, "Capability is required for #{name}" if capability.blank?
+      raise ConfigurationError, "Capability is required for #{name}" if capability.blank? && scope == :member
       raise ConfigurationError, "Handler is required for #{name}" unless handler.respond_to?(:call)
       raise ConfigurationError, "Unsupported HTTP verb #{http_verb} for #{name}" unless ALLOWED_HTTP_VERBS.include?(http_verb)
       raise ConfigurationError, "Unsupported scope #{scope} for #{name}" unless ALLOWED_SCOPES.include?(scope)
@@ -49,6 +49,7 @@ module RecordingStudioApi
     private
 
     def capability_enabled_for?(recordable_type)
+      return recordable_type.present? if capability.blank?
       return false if recordable_type.blank?
       return false unless defined?(RecordingStudio) && RecordingStudio.respond_to?(:capability_enabled?)
 

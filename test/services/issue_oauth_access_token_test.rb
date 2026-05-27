@@ -33,6 +33,11 @@ class IssueOauthAccessTokenTest < ActiveSupport::TestCase
     assert_equal "Bearer", result.value.fetch(:token_type)
     assert_operator result.value.fetch(:expires_in), :>, 0
     assert_match(/\Arsapi_at_/, result.value.fetch(:access_token))
+
+    access_token = RecordingStudioApi::ApiAccessToken.order(created_at: :desc).first
+    assert_not_nil access_token
+    assert_not_nil access_token.recording
+    assert_equal @payload.fetch(:credential).recording&.id, access_token.recording.parent_recording_id
   end
 
   test "rejects unsupported grant types" do

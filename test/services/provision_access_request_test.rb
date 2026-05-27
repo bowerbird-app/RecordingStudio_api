@@ -10,8 +10,7 @@ class ProvisionAccessRequestTest < ActiveSupport::TestCase
     reset_recording_studio_capabilities!
     @user = create_user
     Current.actor = @user
-    workspace = Workspace.create!(name: "Provisioned Workspace")
-    @root_recording = RecordingStudio::Recording.create!(recordable: workspace)
+    @root_recording, @access_recording = create_access_recording_for(user: @user, workspace_name: "Provisioned Workspace", role: :admin)
   end
 
   teardown do
@@ -60,5 +59,20 @@ class ProvisionAccessRequestTest < ActiveSupport::TestCase
     assert second_result.success?, second_result.error
     refute_equal first_result.value.fetch(:access_recording).id, second_result.value.fetch(:access_recording).id
     assert_equal @root_recording.id, second_result.value.fetch(:access_recording).parent_recording_id
+  end
+
+  test "rejects provisioning for view-only access by default" do
+    view_user = create_user(email: "view-provision@example.com")
+    view_root_recording, = create_access_recording_for(user: view_user, role: :view)
+
+    result = RecordingStudioApi::Services::ProvisionAccessRequest.call(
+      root_recording: view_root_recording,
+      actor: view_user,
+      role: :view,
+      api_client_name: "Blocked client"
+    )
+
+    assert result.failure?
+    assert_equal "Actor is not authorized to manage API access for this root recording", result.error
   end
 end

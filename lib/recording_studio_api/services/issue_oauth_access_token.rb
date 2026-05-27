@@ -30,12 +30,26 @@ module RecordingStudioApi
         token_data = OauthAccessToken.generate
         expires_at = resolved_expiry
 
-        access_token = ApiAccessToken.create!(
-          credential: credential,
-          token_digest: token_data.fetch(:digest),
-          token_prefix: token_data.fetch(:prefix),
-          expires_at: expires_at
-        )
+        access_token = nil
+        ApiAccessToken.transaction do
+          access_token = ApiAccessToken.create!(
+            credential: credential,
+            token_digest: token_data.fetch(:digest),
+            token_prefix: token_data.fetch(:prefix),
+            expires_at: expires_at
+          )
+
+          credential_recording = credential.recording
+          raise ActiveRecord::RecordInvalid, access_token if credential_recording.nil?
+
+          RecordingStudio.record!(
+            action: "created",
+            recordable: access_token,
+            root_recording: credential_recording.root_recording,
+            parent_recording: credential_recording,
+            actor: credential.api_client
+          )
+        end
 
         success(
           {

@@ -1,0 +1,16 @@
+<% if log_rows.any? %>
+  <%= render FlatPack::Table::Component.new(data: log_rows) do |table| %>
+    <% table.column(title: "Occurred", html: ->(row) { row.fetch(:occurred_at) }) %>
+    <% table.column(title: "Method", html: ->(row) { row.fetch(:method) }) %>
+    <% table.column(title: "Path", html: ->(row) { row.fetch(:path) }) %>
+    <% table.column(title: "Status", html: ->(row) { row.fetch(:status) }) %>
+    <% table.column(title: "Duration", html: ->(row) { row.fetch(:duration) }) %>
+    <% table.column(title: "Request ID", html: ->(row) { row.fetch(:request_id) }) %>
+  <% end %>
+<% else %>
+  <%= render FlatPack::EmptyState::Component.new(
+    title: "No API logs yet",
+    description: "API request logging has not produced any rows yet.",
+    icon: :inbox
+  ) %>
+<% end %>

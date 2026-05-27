@@ -144,6 +144,103 @@ class InstallGeneratorTest < Minitest::Test
     assert_equal RecordingStudioApi::Generators::MigrationsGenerator, RecordingStudioApi::Generators::MigrationsGenerator
   end
 
+  def test_migrations_generator_reports_when_source_directory_is_missing
+    with_temp_app do |destination_root|
+      source_root = Dir.mktmpdir
+      generator = RecordingStudioApi::Generators::MigrationsGenerator.new([], {}, destination_root: destination_root)
+      messages = []
+
+      RecordingStudioApi::Generators::MigrationsGenerator.stub(:source_root, source_root) do
+        generator.stub(:say, ->(message, color = nil) { messages << [message, color] }) do
+          generator.copy_migrations
+        end
+      end
+
+      assert_includes messages, ["No migrations found in RecordingStudioApi engine.", :yellow]
+    ensure
+      FileUtils.remove_entry(source_root)
+    end
+  end
+
+  def test_migrations_generator_reports_when_no_migration_files_exist
+    with_temp_app do |destination_root|
+      source_root = Dir.mktmpdir
+      FileUtils.mkdir_p(File.join(source_root, "db/migrate"))
+      generator = RecordingStudioApi::Generators::MigrationsGenerator.new([], {}, destination_root: destination_root)
+      messages = []
+
+      RecordingStudioApi::Generators::MigrationsGenerator.stub(:source_root, source_root) do
+        generator.stub(:say, ->(message, color = nil) { messages << [message, color] }) do
+          generator.copy_migrations
+        end
+      end
+
+      assert_includes messages, ["No migrations found in RecordingStudioApi engine.", :yellow]
+    ensure
+      FileUtils.remove_entry(source_root)
+    end
+  end
+
+  def test_migrations_generator_skips_existing_and_copies_new_migrations
+    with_temp_app do |destination_root|
+      source_root = Dir.mktmpdir
+      source_migrations_dir = File.join(source_root, "db/migrate")
+      destination_migrations_dir = File.join(destination_root, "db/migrate")
+
+      FileUtils.mkdir_p(source_migrations_dir)
+      FileUtils.mkdir_p(destination_migrations_dir)
+
+      existing_name = "create_recording_studio_api_existing.rb"
+      new_name = "create_recording_studio_api_new_table.rb"
+      File.write(File.join(source_migrations_dir, "20250101000001_#{existing_name}"), "# existing")
+      File.write(File.join(source_migrations_dir, "20250101000002_#{new_name}"), "# new")
+      File.write(File.join(destination_migrations_dir, "20260101000001_#{existing_name}"), "# already installed")
+
+      generator = RecordingStudioApi::Generators::MigrationsGenerator.new([], { skip_existing: true }, destination_root: destination_root)
+      copied = []
+      messages = []
+      sequence = Enumerator.new do |y|
+        y << "20270101000001"
+        y << "20270101000002"
+      end
+
+      RecordingStudioApi::Generators::MigrationsGenerator.stub(:source_root, source_root) do
+        generator.stub(:next_migration_number, -> { sequence.next }) do
+          generator.stub(:copy_file, ->(source, destination) { copied << [source, destination] }) do
+            generator.stub(:sleep, nil) do
+              generator.stub(:say, ->(message, color = nil) { messages << [message, color] }) do
+                generator.copy_migrations
+              end
+            end
+          end
+        end
+      end
+
+      assert_equal 1, copied.size
+      assert copied.first.last.end_with?("_#{new_name}")
+      assert_includes messages, ["  skip  #{existing_name} (already exists)", :yellow]
+    ensure
+      FileUtils.remove_entry(source_root)
+    end
+  end
+
+  def test_migration_exists_and_next_migration_number_helpers
+    with_temp_app do |destination_root|
+      migrations_dir = File.join(destination_root, "db/migrate")
+      FileUtils.mkdir_p(migrations_dir)
+      migration_name = "create_recording_studio_api_table.rb"
+      File.write(File.join(migrations_dir, "20260101000000_#{migration_name}"), "# migration")
+
+      generator = RecordingStudioApi::Generators::MigrationsGenerator.new([], {}, destination_root: destination_root)
+
+      assert_equal true, generator.send(:migration_exists?, migration_name)
+      assert_equal false, generator.send(:migration_exists?, "missing_migration.rb")
+
+      timestamp = generator.send(:next_migration_number)
+      assert_match(/\A\d{14}\z/, timestamp)
+    end
+  end
+
   def test_install_guide_includes_migration_and_host_setup_steps
     install_guide = File.read(INSTALL_TEMPLATE_PATH)
 

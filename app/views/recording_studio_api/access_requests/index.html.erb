@@ -11,7 +11,7 @@
     <%= render FlatPack::Table::Component.new(data: @api_access_rows) do |table| %>
       <% table.column(
         title: "Name",
-        html: ->(row) { link_to(row.fetch(:name), access_request_path(row.fetch(:id)), class: "text-(--surface-content-color) underline decoration-(--surface-border-color) underline-offset-2 hover:decoration-(--surface-content-color)") }
+        html: ->(row) { link_to(row.fetch(:name), api_client_path(row.fetch(:id)), class: "text-(--surface-content-color) underline decoration-(--surface-border-color) underline-offset-2 hover:decoration-(--surface-content-color)") }
       ) %>
       <% table.column(title: "Access point", html: ->(row) { row.fetch(:access_point) }) %>
       <% table.column(title: "Role", html: ->(row) { row.fetch(:role) }) %>
@@ -20,8 +20,19 @@
   <% else %>
     <%= render FlatPack::EmptyState::Component.new(
       title: "No API access given yet",
-      description: "Create API access from the demo home page to populate this list.",
+      description: @can_manage_access_requests ? "Create API access from the demo home page to populate this list." : "You can view API access details, but you do not have permission to create new API access.",
       icon: :inbox
-    ) %>
+    ) do |empty_state| %>
+      <% if @can_manage_access_requests %>
+        <% empty_state.actions do %>
+          <%= render FlatPack::Button::Component.new(
+            text: "New",
+            style: :primary,
+            size: :md,
+            url: new_api_client_path
+          ) %>
+        <% end %>
+      <% end %>
+    <% end %>
   <% end %>
 </div>

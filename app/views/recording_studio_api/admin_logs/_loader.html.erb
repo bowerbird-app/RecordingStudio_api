@@ -1,0 +1,16 @@
+<% if has_more %>
+  <div class="flex justify-center py-4" data-controller="auto-load" data-auto-load-delay-value="150">
+    <%= link_to RecordingStudioApi.admin_logs_path(controller: self, page: next_page),
+      data: {
+        turbo_frame: "admin_api_logs_content",
+        auto_load_target: "link"
+      },
+      class: "inline-flex" do %>
+      <%= render FlatPack::Button::Component.new(
+        text: "Loading more logs...",
+        style: :default,
+        size: :md
+      ) %>
+    <% end %>
+  </div>
+<% end %>

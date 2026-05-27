@@ -8,32 +8,47 @@ class DocsController < ApplicationController
     render :config
   end
 
+  def api_hierarchy
+    @api_hierarchy = [
+      {
+        label: "Folder",
+        children: [
+          {
+            label: "Access",
+            children: [
+              {
+                label: "API client",
+                children: [
+                  {label: "API credential", children: []},
+                  {label: "API access token", children: []},
+                  {
+                    label: "OAuth grant session",
+                    children: [
+                      {label: "OAuth authorization code", children: []},
+                      {label: "OAuth session access token", children: []},
+                      {label: "OAuth refresh token", children: []}
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  end
+
   def recordable_types
-    @recordable_types = Array(RecordingStudio.configuration.recordable_types).filter_map do |recordable_type|
-      normalize_recordable_type(recordable_type)
+    @recordable_types = RecordingStudio::Recording.unscoped.reorder(nil).group(:recordable_type).count.sort_by do |recordable_type, _count|
+      recordable_type.to_s
+    end.filter_map do |recordable_type, recordings_count|
+      normalize_recordable_type(recordable_type, recordings_count: recordings_count)
     end
   end
 
   def recordings_tree
     recordings = RecordingStudio::Recording.unscoped.includes(:recordable).reorder(:created_at, :id).to_a
-    recordings_by_parent_id = recordings.group_by(&:parent_recording_id)
-    recording_ids = recordings.each_with_object({}) { |recording, ids| ids[recording.id] = true }
-
-    root_recordings = recordings_by_parent_id.fetch(nil, [])
-    disconnected_roots = recordings.select do |recording|
-      recording.parent_recording_id.present? && !recording_ids.key?(recording.parent_recording_id)
-    end
-
-    visited = {}
-
-    @recording_tree = (root_recordings + disconnected_roots).filter_map do |recording|
-      build_recording_node(recording, recordings_by_parent_id, visited)
-    end
-
-    remaining_recordings = recordings.reject { |recording| visited.key?(recording.id) }
-    @recording_tree.concat(
-      remaining_recordings.filter_map { |recording| build_recording_node(recording, recordings_by_parent_id, visited) }
-    )
+    @recording_tree = RecordingTreePresenter.new(recordings: recordings, include_trashed: true).nodes
 
     @recordings_count = recordings.size
   end
@@ -75,13 +90,13 @@ class DocsController < ApplicationController
     render :scalar_fullscreen, layout: false
   end
 
-  def global_allow_list
-  end
-
   def add_capability
   end
 
   def auth
+  end
+
+  def mobile_auth
   end
 
   def methods
@@ -89,14 +104,14 @@ class DocsController < ApplicationController
 
   private
 
-  def normalize_recordable_type(recordable_type)
+  def normalize_recordable_type(recordable_type, recordings_count: nil)
     type_name = recordable_type.is_a?(Class) ? recordable_type.name : recordable_type.to_s
     return if type_name.blank?
 
     {
       name: type_name,
-      label: type_name.demodulize.underscore.humanize,
-      recordings_count: RecordingStudio::Recording.where(recordable_type: type_name).count,
+      label: RecordingStudio.recordable_type_label(type_name),
+      recordings_count: recordings_count || RecordingStudio::Recording.where(recordable_type: type_name).count,
       recordables_count: count_recordables_for(type_name)
     }
   end
@@ -109,51 +124,5 @@ class DocsController < ApplicationController
     recordable_class.count
   rescue ActiveRecord::ActiveRecordError
     0
-  end
-
-  def build_recording_node(recording, recordings_by_parent_id, visited)
-    return if visited.key?(recording.id)
-
-    visited[recording.id] = true
-
-    {
-      label: recording_label(recording),
-      children: recordings_by_parent_id.fetch(recording.id, []).map do |child_recording|
-        build_recording_node(child_recording, recordings_by_parent_id, visited)
-      end.compact
-    }
-  end
-
-  def recording_label(recording)
-    type_label = recording.recordable_type.to_s.demodulize.underscore.humanize
-    identifier = recordable_identifier(recording.recordable)
-    trashed_label = recording.trashed_at.present? ? " [trashed]" : ""
-
-    "#{type_label}: #{identifier} (recording ##{recording.id})#{trashed_label}"
-  end
-
-  def recordable_identifier(recordable)
-    return "Unknown recordable" if recordable.nil?
-
-    %i[name title email label slug identifier].each do |attribute|
-      next unless recordable.respond_to?(attribute)
-
-      value = recordable.public_send(attribute)
-      return value if value.present?
-    end
-
-    actor = recordable.actor if recordable.respond_to?(:actor)
-    actor_email = actor.email if actor&.respond_to?(:email) && actor.email.present?
-
-    if recordable.respond_to?(:role) && recordable.role.present? && actor_email.present?
-      return "#{recordable.role.to_s.humanize} for #{actor_email}"
-    end
-
-    return recordable.role.to_s.humanize if recordable.respond_to?(:role) && recordable.role.present?
-
-    return recordable.minimum_role.to_s.humanize if recordable.respond_to?(:minimum_role) &&
-      recordable.minimum_role.present?
-
-    "##{recordable.id}"
   end
 end

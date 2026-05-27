@@ -9,9 +9,23 @@
     language: :ruby,
     code: <<~'CODE'
       RecordingStudioApi.configure do |config|
-        config.enable_feature_x = false
         config.timeout = 10
         config.token_ttl = 45.days
+
+        # Optional Redis-backed throttling
+        config.rate_limit_oauth_enabled = true
+        config.rate_limit_api_enabled = true
+        config.rate_limit_redis_url = ENV["RECORDING_STUDIO_API_RATE_LIMIT_REDIS_URL"]
+        config.rate_limit_oauth_requests = 10
+        config.rate_limit_oauth_period_seconds = 60
+        config.rate_limit_api_read_requests = 120
+        config.rate_limit_api_read_period_seconds = 60
+        config.rate_limit_api_write_requests = 30
+        config.rate_limit_api_write_period_seconds = 60
+
+        # Optional: log API requests to the API request log database
+        config.api_request_logging_enabled = true
+        config.api_request_logging_payload_mode = "metadata_only"
 
         config.hooks.on_configuration do |loaded_config|
           Rails.logger.info("RecordingStudioApi timeout=#{loaded_config.timeout}")
@@ -19,16 +33,4 @@
       end
     CODE
   ) %>
-
-  <%= render FlatPack::List::Component.new(divider: true) do %>
-    <%= render FlatPack::List::Item.new(icon: :settings) do %>
-      <span>Defaults come from <code>RecordingStudioApi::Configuration</code>: <code>enable_feature_x</code>, <code>timeout</code>, <code>token_ttl</code>, <code>hooks</code>, and <code>action_registry</code>.</span>
-    <% end %>
-    <%= render FlatPack::List::Item.new(icon: :folder_open) do %>
-      <span>At boot, the engine also merges <code>config/recording_studio_api.yml</code> and <code>config.x.recording_studio_api</code> when present.</span>
-    <% end %>
-    <%= render FlatPack::List::Item.new(icon: :link) do %>
-      <span>Capability action registration is documented on the API and Methods pages so this page can stay configuration-focused.</span>
-    <% end %>
-  <% end %>
 </div>

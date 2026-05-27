@@ -36,8 +36,10 @@ module RecordingStudioApi
       @registrations[name.to_s]
     end
 
-    def available_for(recordable_type)
-      @registrations.values.select { |registration| registration.applicable_to?(recordable_type) }
+    def available_for(recordable_type, scope: nil)
+      @registrations.values.select do |registration|
+        registration.applicable_to?(recordable_type) && (scope.nil? || registration.scope == scope.to_sym)
+      end
     end
 
     def to_h

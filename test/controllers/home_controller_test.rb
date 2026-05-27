@@ -13,7 +13,7 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
   TEST_PASSWORD = "HomeTestPassword!2026"
 
   setup do
-    @user = User.find_or_create_by!(email: "home-test@example.com") do |user|
+    @user = User.create!(email: "home-test-#{SecureRandom.hex(4)}@example.com") do |user|
       user.password = TEST_PASSWORD
       user.password_confirmation = TEST_PASSWORD
     end
@@ -21,33 +21,62 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
     sign_in @user
   end
 
-  test "root page renders workspace and folder access tables" do
+  test "root page renders the api access demo for workspace roots" do
     workspace = Workspace.create!(name: "Root Workspace")
     workspace_root_recording = RecordingStudio::Recording.create!(recordable: workspace)
     workspace_access = RecordingStudio::Access.create!(actor: @user, role: :admin)
     RecordingStudio::Recording.create!(recordable: workspace_access, parent_recording: workspace_root_recording)
 
     folder = Folder.create!(name: "Root Folder")
-    folder_root_recording = RecordingStudio::Recording.create!(recordable: folder)
+    folder_recording = RecordingStudio::Recording.create!(recordable: folder, parent_recording: workspace_root_recording)
     folder_access = RecordingStudio::Access.create!(actor: @user, role: :view)
-    RecordingStudio::Recording.create!(recordable: folder_access, parent_recording: folder_root_recording)
+    RecordingStudio::Recording.create!(recordable: folder_access, parent_recording: folder_recording)
 
     get root_path
 
     assert_response :success
     assert_select "h1", text: "Recording Studio API demo"
-    assert_includes response.body, "Current child access recordings where workspace access has been provided."
-    assert_includes response.body, "Current child access recordings where folder access has been provided."
-    assert_includes response.body, "Workspace: Root Workspace"
-    assert_includes response.body, "Access: Admin for #{@user.email}"
-    assert_includes response.body, "Folder: Root Folder"
-    assert_includes response.body, "Access: View for #{@user.email}"
-    assert_select %(form[action="/recording_studio_api/access_requests/new?root_type=Workspace"] button), text: "Add"
-    assert_select %(form[action="/recording_studio_api/access_requests/new?root_type=Folder"] button), text: "Add"
-    assert_select %(form[action="/recording_studio_api/access_requests?include_children=1&root_type=Workspace"] button), text: "API access list"
-    assert_select %(form[action="/recording_studio_api/access_requests?include_children=1&root_type=Folder"] button), text: "API access list"
-    assert_not_includes response.body, "No workspace child access recordings found."
-    assert_not_includes response.body, "No folder child access recordings found."
+    assert_includes response.body, "Demo to add and remove API access"
+    assert_includes response.body, "RecordingStudio API"
+    assert_includes response.body, "Root Workspace"
+    assert_includes response.body, "Workspace"
+    assert_includes response.body, "Folder"
+    assert_includes response.body, "API access list"
+    assert_select %(a[href="#{docs_install_path}"]), count: 1
+    assert_select %(form[action="/mobile_app_demo"] button), text: "Mobile app demo"
+    assert_select %(form[action="/recording_studio_api/api_clients/new?root_type=Workspace"] button), text: "Add"
+    assert_select %(form[action="/recording_studio_api/api_clients/new?root_type=Folder"] button), text: "Add"
+    assert_select %(form[action="/recording_studio_api/api_clients?include_children=1&root_type=Workspace"] button), text: "API access list"
+    assert_select %(form[action="/recording_studio_api/api_clients?include_children=1&root_type=Folder"] button), text: "API access list"
+    assert_includes response.body, "Admin for"
+    assert_not_includes response.body, "Open admin"
+    assert_not_includes response.body, "Manage users"
+    assert_not_includes response.body, "Open tree"
+    assert_not_includes response.body, "Current root"
+  end
+
+  test "root page shows admin content when admin root is selected" do
+    admin_root = RecordingStudioAdmin::Admin.create!(name: "Admin", key: SecureRandom.hex(4))
+    admin_root_recording = RecordingStudio::Recording.create!(recordable: admin_root)
+    admin_api = RecordingStudioApi::AdminApi.create!(key: "api-#{SecureRandom.hex(4)}", name: "Admin API")
+    admin_access = RecordingStudio::Access.create!(actor: @user, role: :admin)
+    RecordingStudio::Recording.create!(recordable: admin_access, parent_recording: admin_root_recording)
+    RecordingStudio::Recording.create!(recordable: admin_api, parent_recording: admin_root_recording)
+
+    workspace = Workspace.create!(name: "Old Workspace")
+    workspace_root_recording = RecordingStudio::Recording.create!(recordable: workspace)
+    workspace_access = RecordingStudio::Access.create!(actor: @user, role: :admin)
+    RecordingStudio::Recording.create!(recordable: workspace_access, parent_recording: workspace_root_recording)
+
+    get root_path
+
+    assert_response :success
+    assert_select "h1", text: "Admin"
+    assert_not_includes response.body, "Recording Studio API demo"
+    assert_includes response.body, "RecordingStudio API"
+    assert_includes response.body, "Admin API"
+    assert_not_includes response.body, "Old Workspace"
+    assert_not_includes response.body, "API keys"
   end
 
   test "workspace page renders its child recordings tree" do
@@ -83,5 +112,50 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Folder: Demo Folder"
     assert_includes response.body, "Page: Folder Child Page"
     assert_not_includes response.body, "No folder recordings found."
+  end
+
+  test "root switch page uses the shared host layout when admin root is current" do
+    admin_root = RecordingStudioAdmin::Admin.create!(name: "Admin", key: SecureRandom.hex(4))
+    admin_root_recording = RecordingStudio::Recording.create!(recordable: admin_root)
+    admin_access = RecordingStudio::Access.create!(actor: @user, role: :admin)
+    RecordingStudio::Recording.create!(recordable: admin_access, parent_recording: admin_root_recording)
+
+    get recording_studio_root_switchable.root_switch_path(
+      scope: "all_roots",
+      return_to: root_path
+    )
+
+    assert_response :success
+    assert_includes response.body, "RecordingStudio API"
+    assert_includes response.body, "Admin - Change"
+  end
+
+  test "switching from admin to workspace returns to the host root demo" do
+    admin_root = RecordingStudioAdmin::Admin.create!(name: "Admin", key: SecureRandom.hex(4))
+    admin_root_recording = RecordingStudio::Recording.create!(recordable: admin_root)
+    admin_access = RecordingStudio::Access.create!(actor: @user, role: :admin)
+    RecordingStudio::Recording.create!(recordable: admin_access, parent_recording: admin_root_recording)
+
+    workspace = Workspace.create!(name: "Studio Workspace")
+    workspace_root_recording = RecordingStudio::Recording.create!(recordable: workspace)
+    workspace_access = RecordingStudio::Access.create!(actor: @user, role: :admin)
+    RecordingStudio::Recording.create!(recordable: workspace_access, parent_recording: workspace_root_recording)
+
+    patch recording_studio_root_switchable.root_switch_path(scope: "all_roots"), params: {
+      root_switch: {
+        root_recording_id: workspace_root_recording.id,
+        return_to: root_path
+      }
+    }
+
+    assert_redirected_to "/"
+
+    follow_redirect!
+
+    assert_response :success
+    assert_select "h1", text: "Recording Studio API demo"
+    assert_includes response.body, "Demo to add and remove API access"
+    assert_includes response.body, "API access list"
+    assert_not_includes response.body, "<h1>Admin</h1>"
   end
 end

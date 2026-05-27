@@ -1,0 +1,4 @@
+<turbo-frame id="admin_api_logs_content">
+  <%= render partial: "table", locals: { log_rows: @log_rows } %>
+  <%= render partial: "loader", locals: { has_more: @has_more, next_page: @page + 1 } %>
+</turbo-frame>

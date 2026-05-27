@@ -1,0 +1,30 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "Mobile auth",
+    subtitle: "How mobile OAuth authorization, refresh, and revocation now work in the recording tree.",
+    variant: :h1
+  ) %>
+
+  <% steps = [
+    "The mobile app sends the user to the OAuth authorize page, where the user signs in if they are not already signed in.",
+    "The server checks which RecordingStudio::Access records belong to that user and has them choose one if there is more than one option.",
+    "Once access is confirmed, the server creates a one-time OAuth authorization code record and redirects the app back with the code.",
+    "The app exchanges that code, together with its PKCE verifier, for a mobile access token and a refresh token.",
+    "The app uses the access token for API calls, and when it expires it uses the refresh token to get a new access token and a rotated refresh token."
+  ] %>
+
+  <%= render FlatPack::Card::Component.new(style: :outlined) do %>
+    <%= render FlatPack::List::Component.new(divider: true) do %>
+      <% steps.each_with_index do |step, index| %>
+        <%= render FlatPack::List::Item.new(icon: :device_phone_mobile) do %>
+          <div class="flex items-start gap-3">
+            <span class="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[var(--surface-secondary-background-color)] px-2 text-xs font-semibold text-[var(--surface-content-color)]">
+              <%= index + 1 %>
+            </span>
+            <span><%= step %></span>
+          </div>
+        <% end %>
+      <% end %>
+    <% end %>
+  <% end %>
+</div>

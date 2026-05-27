@@ -35,7 +35,7 @@ class EngineTest < Minitest::Test
       hook_payload = cfg
     end
 
-    xcfg = Struct.new(:recording_studio_api).new({ enable_feature_x: true })
+    xcfg = Struct.new(:recording_studio_api).new({ rate_limit_api_enabled: true })
     app_config = Struct.new(:x).new(xcfg)
     app = Struct.new(:config) do
       def config_for(_name)
@@ -48,7 +48,7 @@ class EngineTest < Minitest::Test
     assert hook_called
     assert_equal RecordingStudioApi.configuration, hook_payload
     assert_equal 12, RecordingStudioApi.configuration.timeout
-    assert_equal true, RecordingStudioApi.configuration.enable_feature_x
+    assert_equal true, RecordingStudioApi.configuration.rate_limit_api_enabled
   end
 
   def test_load_config_handles_errors_and_each_pair_fallback
@@ -99,7 +99,7 @@ class EngineTest < Minitest::Test
     find_initializer("recording_studio_api.load_config").block.call(app)
 
     assert_equal 5, RecordingStudioApi.configuration.timeout
-    assert_equal false, RecordingStudioApi.configuration.enable_feature_x
+    assert_equal false, RecordingStudioApi.configuration.rate_limit_api_enabled
   end
 
   def test_load_config_ignores_non_enumerable_yaml_and_merge_errors
@@ -291,6 +291,24 @@ class EngineTest < Minitest::Test
     end
 
     assert_equal :movable, RecordingStudioApi.capability_action(:move).capability
+    assert_equal :trashable, RecordingStudioApi.capability_action(:trash_restore).capability
+    assert_equal :trashable, RecordingStudioApi.capability_action(:trash_destroy).capability
+  end
+
+  def test_register_default_resource_actions_adds_core_resource_operations
+    RecordingStudioApi.register_default_resource_actions!
+
+    assert_equal :collection, RecordingStudioApi.resource_action(:index).scope
+    assert_equal :resource, RecordingStudioApi.resource_action(:show).scope
+    assert_equal :collection, RecordingStudioApi.resource_action(:create).scope
+    assert_equal :resource, RecordingStudioApi.resource_action(:update).scope
+    assert_equal :resource, RecordingStudioApi.resource_action(:destroy).scope
+  end
+
+  def test_capability_actions_for_excludes_core_resource_operations
+    RecordingStudioApi.register_default_resource_actions!
+
+    assert_equal [], RecordingStudioApi.capability_actions_for("Workspace")
   end
 
   private

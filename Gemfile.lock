@@ -15,6 +15,17 @@ GIT
       recording_studio (>= 0.1.0)
 
 GIT
+  remote: https://github.com/bowerbird-app/RecordingStudio_admin.git
+  revision: f6a3736316d3339167066a32ab02c4e34bc3cc15
+  specs:
+    recording_studio_admin (0.1.1)
+      flat_pack
+      importmap-rails
+      rails (~> 8.1.0)
+      recording_studio
+      tailwindcss-rails
+
+GIT
   remote: https://github.com/bowerbird-app/RecordingStudio_icons.git
   revision: 7c32c08d4c0a28dca5cfcb624d1beb03632f79b0
   specs:
@@ -32,6 +43,16 @@ GIT
       recording_studio_icons (>= 0.1.0)
 
 GIT
+  remote: https://github.com/bowerbird-app/RecordingStudio_root_switchable.git
+  revision: e42ca3a3069ceaa4559cc4b35679bb993183a2ad
+  specs:
+    recording_studio_root_switchable (0.1.0)
+      flat_pack
+      rails (~> 8.1.0)
+      recording_studio
+      recording_studio_accessible
+
+GIT
   remote: https://github.com/bowerbird-app/flatpack.git
   revision: 3160f4a4812568fabc7f073fc092137cc7f3d924
   tag: v0.1.33
@@ -47,6 +68,8 @@ PATH
   specs:
     recording_studio_api (0.1.1)
       rails (~> 8.1.0)
+      recording_studio_accessible (>= 0.1.0)
+      redis (~> 5.3)
 
 GEM
   remote: https://rubygems.org/
@@ -273,6 +296,10 @@ GEM
       erb
       psych (>= 4.0.0)
       tsort
+    redis (5.4.1)
+      redis-client (>= 0.22.0)
+    redis-client (0.29.0)
+      connection_pool
     regexp_parser (2.11.3)
     reline (0.6.3)
       io-console (~> 0.5)
@@ -319,6 +346,16 @@ GEM
     stringio (3.2.0)
     tailwind_merge (0.16.0)
       sin_lru_redux (~> 2.5)
+    tailwindcss-rails (4.4.0)
+      railties (>= 7.0.0)
+      tailwindcss-ruby (~> 4.0)
+    tailwindcss-ruby (4.3.0)
+    tailwindcss-ruby (4.3.0-aarch64-linux-gnu)
+    tailwindcss-ruby (4.3.0-aarch64-linux-musl)
+    tailwindcss-ruby (4.3.0-arm64-darwin)
+    tailwindcss-ruby (4.3.0-x86_64-darwin)
+    tailwindcss-ruby (4.3.0-x86_64-linux-gnu)
+    tailwindcss-ruby (4.3.0-x86_64-linux-musl)
     thor (1.5.0)
     timeout (0.6.1)
     tsort (0.2.0)
@@ -360,9 +397,11 @@ DEPENDENCIES
   puma
   recording_studio!
   recording_studio_accessible!
+  recording_studio_admin!
   recording_studio_api!
   recording_studio_icons!
   recording_studio_moveable!
+  recording_studio_root_switchable!
   rubocop
   rubocop-rails
   simplecov
@@ -455,9 +494,13 @@ CHECKSUMS
   rdoc (7.2.0) sha256=8650f76cd4009c3b54955eb5d7e3a075c60a57276766ebf36f9085e8c9f23192
   recording_studio (1.2.0)
   recording_studio_accessible (0.1.0)
+  recording_studio_admin (0.1.1)
   recording_studio_api (0.1.1)
   recording_studio_icons (0.1.0)
   recording_studio_moveable (0.1.0)
+  recording_studio_root_switchable (0.1.0)
+  redis (5.4.1) sha256=b5e675b57ad22b15c9bcc765d5ac26f60b675408af916d31527af9bd5a81faae
+  redis-client (0.29.0) sha256=0c65bf1f8f6dca22063ddb085c0bb2054feef6f03a84869f4161b18a9a15bea3
   regexp_parser (2.11.3) sha256=ca13f381a173b7a93450e53459075c9b76a10433caadcb2f1180f2c741fc55a4
   reline (0.6.3) sha256=1198b04973565b36ec0f11542ab3f5cfeeec34823f4e54cebde90968092b1835
   responders (3.2.0) sha256=89c2d6ac0ae16f6458a11524cae4a8efdceba1a3baea164d28ee9046bd3df55a
@@ -474,6 +517,14 @@ CHECKSUMS
   sprockets-rails (3.5.2) sha256=a9e88e6ce9f8c912d349aa5401509165ec42326baf9e942a85de4b76dbc4119e
   stringio (3.2.0) sha256=c37cb2e58b4ffbd33fe5cd948c05934af997b36e0b6ca6fdf43afa234cf222e1
   tailwind_merge (0.16.0) sha256=e2a2b26aaef57ae6af6d0e98380bbcbf324ce4e9778cd56df8e837c30e66005c
+  tailwindcss-rails (4.4.0) sha256=efa2961351a52acebe616e645a81a30bb4f27fde46cc06ce7688d1cd1131e916
+  tailwindcss-ruby (4.3.0) sha256=4fd3219d97419d2b4f8c0f52c8a73972e55e29a0e0da38fb5fe8a16bf1a68b51
+  tailwindcss-ruby (4.3.0-aarch64-linux-gnu) sha256=e43b94aba29785bba71b5868bab29b63ae48911fee038b2b5e9e5148baca3886
+  tailwindcss-ruby (4.3.0-aarch64-linux-musl) sha256=ae2aff1e8482a9ba8723b57fbfa50cbf009788587ca9763f00489f3c5639e6ef
+  tailwindcss-ruby (4.3.0-arm64-darwin) sha256=828f49ddb3f19f67b36a1c5cb5c25175f7c93619a2ecf66e95d74408db9b73fd
+  tailwindcss-ruby (4.3.0-x86_64-darwin) sha256=f1e4c58ff7b1c256d8a8e5ee4fd01252c963e04110104ea1772668e04660a5bd
+  tailwindcss-ruby (4.3.0-x86_64-linux-gnu) sha256=0d1b0f491990c735d2f7bf5dbaedf33ddc635fd800b7244b39b30b25a8616cb2
+  tailwindcss-ruby (4.3.0-x86_64-linux-musl) sha256=71e83a3f5f40e1cd7c28e7e6328a9c899cb2c0c98f6b42f29de968fff221ef75
   thor (1.5.0) sha256=e3a9e55fe857e44859ce104a84675ab6e8cd59c650a49106a05f55f136425e73
   timeout (0.6.1) sha256=78f57368a7e7bbadec56971f78a3f5ecbcfb59b7fcbb0a3ed6ddc08a5094accb
   tsort (0.2.0) sha256=9650a793f6859a43b6641671278f79cfead60ac714148aabe4e3f0060480089f
