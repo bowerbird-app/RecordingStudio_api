@@ -26,10 +26,13 @@ module RecordingStudioApi
                   :pagination_max_limit,
                   :rate_limit_oauth_enabled,
                   :rate_limit_api_enabled,
+                  :rate_limit_api_pre_auth_enabled,
                   :rate_limit_redis_url,
                   :rate_limit_redis_namespace,
                   :rate_limit_oauth_requests,
                   :rate_limit_oauth_period_seconds,
+                  :rate_limit_api_pre_auth_requests,
+                  :rate_limit_api_pre_auth_period_seconds,
                   :rate_limit_api_requests,
                   :rate_limit_api_period_seconds,
                   :rate_limit_api_read_requests,
@@ -59,10 +62,13 @@ module RecordingStudioApi
       @pagination_max_limit = 100
       @rate_limit_oauth_enabled = false
       @rate_limit_api_enabled = false
+      @rate_limit_api_pre_auth_enabled = false
       @rate_limit_redis_url = ENV["RECORDING_STUDIO_API_RATE_LIMIT_REDIS_URL"].presence
       @rate_limit_redis_namespace = "recording_studio_api"
       @rate_limit_oauth_requests = 10
       @rate_limit_oauth_period_seconds = 60
+      @rate_limit_api_pre_auth_requests = 300
+      @rate_limit_api_pre_auth_period_seconds = 60
       @rate_limit_api_requests = 120
       @rate_limit_api_period_seconds = 60
       @rate_limit_api_read_requests = 120
@@ -90,10 +96,13 @@ module RecordingStudioApi
         pagination_max_limit: pagination_max_limit,
         rate_limit_oauth_enabled: rate_limit_oauth_enabled,
         rate_limit_api_enabled: rate_limit_api_enabled,
+        rate_limit_api_pre_auth_enabled: rate_limit_api_pre_auth_enabled,
         rate_limit_redis_url_present: rate_limit_redis_url.present?,
         rate_limit_redis_namespace: rate_limit_redis_namespace,
         rate_limit_oauth_requests: rate_limit_oauth_requests,
         rate_limit_oauth_period_seconds: rate_limit_oauth_period_seconds,
+        rate_limit_api_pre_auth_requests: rate_limit_api_pre_auth_requests,
+        rate_limit_api_pre_auth_period_seconds: rate_limit_api_pre_auth_period_seconds,
         rate_limit_api_requests: rate_limit_api_requests,
         rate_limit_api_period_seconds: rate_limit_api_period_seconds,
         rate_limit_api_read_requests: rate_limit_api_read_requests,

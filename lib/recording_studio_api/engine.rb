@@ -4,6 +4,76 @@ module RecordingStudioApi
   class Engine < ::Rails::Engine
     isolate_namespace RecordingStudioApi
 
+    API_RECORDABLE_TYPE_NAMES = %w[
+      RecordingStudio::Access
+      RecordingStudioApi::ApiClient
+      RecordingStudioApi::ApiCredential
+      RecordingStudioApi::ApiAccessToken
+      RecordingStudioApi::OauthAuthorizationCode
+      RecordingStudioApi::OauthGrantSession
+      RecordingStudioApi::OauthSessionAccessToken
+      RecordingStudioApi::OauthRefreshToken
+    ].freeze
+
+    ADMIN_ROOT_RECORDABLE_TYPE_NAME = "RecordingStudioAdmin::Admin"
+    ADMIN_API_RECORDABLE_TYPE_NAME = "RecordingStudioApi::AdminApi"
+
+    RECORDABLE_MODEL_DEPENDENCIES = {
+      "RecordingStudio::Access" => "recording_studio/access",
+      "RecordingStudioApi::ApiClient" => "recording_studio_api/api_client",
+      "RecordingStudioApi::ApiCredential" => "recording_studio_api/api_credential",
+      "RecordingStudioApi::ApiAccessToken" => "recording_studio_api/api_access_token",
+      "RecordingStudioApi::OauthAuthorizationCode" => "recording_studio_api/oauth_authorization_code",
+      "RecordingStudioApi::OauthGrantSession" => "recording_studio_api/oauth_grant_session",
+      "RecordingStudioApi::OauthSessionAccessToken" => "recording_studio_api/oauth_session_access_token",
+      "RecordingStudioApi::OauthRefreshToken" => "recording_studio_api/oauth_refresh_token"
+    }.freeze
+
+    API_RECORDABLE_DECLARATIONS = {
+      "RecordingStudioApi::ApiClient" => {
+        label: "API Client",
+        plural_label: "API Clients",
+        root: false,
+        allowed_parent_types: ["RecordingStudio::Access"]
+      },
+      "RecordingStudioApi::ApiCredential" => {
+        label: "API Credential",
+        plural_label: "API Credentials",
+        root: false,
+        allowed_parent_types: ["RecordingStudioApi::ApiClient"]
+      },
+      "RecordingStudioApi::ApiAccessToken" => {
+        label: "API Access Token",
+        plural_label: "API Access Tokens",
+        root: false,
+        allowed_parent_types: ["RecordingStudioApi::ApiCredential"]
+      },
+      "RecordingStudioApi::OauthAuthorizationCode" => {
+        label: "OAuth Authorization Code",
+        plural_label: "OAuth Authorization Codes",
+        root: false,
+        allowed_parent_types: ["RecordingStudio::Access"]
+      },
+      "RecordingStudioApi::OauthGrantSession" => {
+        label: "OAuth Grant Session",
+        plural_label: "OAuth Grant Sessions",
+        root: false,
+        allowed_parent_types: ["RecordingStudio::Access"]
+      },
+      "RecordingStudioApi::OauthSessionAccessToken" => {
+        label: "OAuth Session Access Token",
+        plural_label: "OAuth Session Access Tokens",
+        root: false,
+        allowed_parent_types: ["RecordingStudioApi::OauthGrantSession"]
+      },
+      "RecordingStudioApi::OauthRefreshToken" => {
+        label: "OAuth Refresh Token",
+        plural_label: "OAuth Refresh Tokens",
+        root: false,
+        allowed_parent_types: ["RecordingStudioApi::OauthGrantSession"]
+      }
+    }.freeze
+
     class << self
       def apply_model_extensions(target)
         apply_extensions(target,
@@ -83,10 +153,19 @@ module RecordingStudioApi
       RecordingStudioApi::Hooks.run(:on_configuration, RecordingStudioApi.configuration)
     end
 
+    initializer "recording_studio_api.register_recordable_types", after: "recording_studio.load_config" do
+      RecordingStudio::RecordableDeclarations.install_active_record_macro! if defined?(RecordingStudio::RecordableDeclarations)
+      RecordingStudioApi::Engine.load_recordable_models!
+      RecordingStudioApi::Engine.register_recordable_types!
+
+      config.to_prepare do
+        RecordingStudioApi::Engine.register_recordable_types!
+        RecordingStudio::DelegatedTypeRegistrar.apply! if defined?(RecordingStudio::DelegatedTypeRegistrar)
+      end
+    end
+
     # Run after_initialize hooks
     initializer "recording_studio_api.after_initialize", after: "recording_studio_api.load_config" do |_app|
-      RecordingStudioApi::Engine.register_admin_api_recordable!
-      RecordingStudioApi::Engine.register_api_client_recordable!
       RecordingStudioApi.register_default_capability_actions!
       RecordingStudioApi.register_default_resource_actions!
       RecordingStudioApi.configuration.validate!
@@ -117,21 +196,99 @@ module RecordingStudioApi
       end
     end
 
-    def self.register_api_client_recordable!
-      register_recordable_type!("RecordingStudioApi::ApiClient")
+    def self.register_recordable_types!
+      return unless defined?(RecordingStudio) && RecordingStudio.respond_to?(:configuration)
+      return unless defined?(RecordingStudio::RecordableDeclarations)
+
+      RecordingStudio::RecordableDeclarations.install_active_record_macro!
+      register_admin_root_recordable!
+
+      declare_recordable_type!(
+        "RecordingStudio::Access",
+        label: "Access",
+        plural_label: "Access",
+        root: false,
+        allowed_parent_types: access_parent_type_names
+      )
+
+      API_RECORDABLE_DECLARATIONS.each do |recordable_type_name, declaration|
+        declare_recordable_type!(recordable_type_name, **declaration)
+      end
+
+      if admin_root_recordable_available?
+        declare_recordable_type!(
+          ADMIN_API_RECORDABLE_TYPE_NAME,
+          label: "Admin API",
+          plural_label: "Admin APIs",
+          root: false,
+          allowed_parent_types: [ADMIN_ROOT_RECORDABLE_TYPE_NAME]
+        )
+      end
+
+      register_recordable_type_names!(recordable_type_names_to_register)
     end
 
-    def self.register_admin_api_recordable!
-      register_recordable_type!("RecordingStudioApi::AdminApi")
+    def self.load_recordable_models!
+      RECORDABLE_MODEL_DEPENDENCIES.each do |recordable_type_name, dependency|
+        next if recordable_type_name.safe_constantize.present?
+
+        require_dependency dependency
+      end
     end
 
-    def self.register_recordable_type!(recordable_type_name)
-      return unless defined?(RecordingStudio) && RecordingStudio.respond_to?(:register_recordable_type)
+    def self.internal_recordable_type_names
+      API_RECORDABLE_TYPE_NAMES + [ADMIN_ROOT_RECORDABLE_TYPE_NAME, ADMIN_API_RECORDABLE_TYPE_NAME]
+    end
 
+    def self.register_admin_root_recordable!
+      return unless admin_root_recordable_available?
+
+      register_recordable_type_names!([ADMIN_ROOT_RECORDABLE_TYPE_NAME])
+      return if declaration_defined?(ADMIN_ROOT_RECORDABLE_TYPE_NAME)
+
+      declare_recordable_type!(
+        ADMIN_ROOT_RECORDABLE_TYPE_NAME,
+        label: "Admin",
+        plural_label: "Admin",
+        root: true,
+        allowed_parent_types: []
+      )
+    end
+
+    def self.recordable_type_names_to_register
+      type_names = API_RECORDABLE_TYPE_NAMES.dup
+      type_names << ADMIN_API_RECORDABLE_TYPE_NAME if admin_root_recordable_available?
+      type_names
+    end
+
+    def self.register_recordable_type_names!(recordable_type_names)
+      existing_type_names = Array(RecordingStudio.configuration.recordable_types).map(&:to_s)
+      available_type_names = recordable_type_names.select { |recordable_type_name| recordable_type_name.safe_constantize.present? }
+
+      RecordingStudio.configuration.recordable_types = (existing_type_names + available_type_names).uniq
+    end
+
+    def self.access_parent_type_names
+      Array(RecordingStudio.configuration.recordable_types).map(&:to_s).uniq - internal_child_recordable_type_names
+    end
+
+    def self.internal_child_recordable_type_names
+      API_RECORDABLE_TYPE_NAMES + [ADMIN_API_RECORDABLE_TYPE_NAME]
+    end
+
+    def self.declare_recordable_type!(recordable_type_name, **declaration)
       recordable_type = recordable_type_name.safe_constantize
-      return if recordable_type.nil?
+      return unless recordable_type.respond_to?(:recording_studio_recordable)
 
-      RecordingStudio.register_recordable_type(recordable_type.name)
+      recordable_type.recording_studio_recordable(**declaration)
+    end
+
+    def self.declaration_defined?(recordable_type_name)
+      RecordingStudio::RecordableDeclarations.declarations.key?(recordable_type_name)
+    end
+
+    def self.admin_root_recordable_available?
+      ADMIN_ROOT_RECORDABLE_TYPE_NAME.safe_constantize.present?
     end
   end
 end

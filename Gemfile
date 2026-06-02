@@ -6,7 +6,7 @@ source "https://rubygems.org"
 gem "devise"
 gemspec
 
-gem "recording_studio", github: "bowerbird-app/RecordingStudio", tag: "v1.2.0"
+gem "recording_studio", github: "bowerbird-app/RecordingStudio", tag: "recording_studio/v2.0.0"
 gem "recording_studio_accessible", github: "bowerbird-app/RecordingStudio_accessible"
 gem "recording_studio_admin", github: "bowerbird-app/RecordingStudio_admin"
 gem "recording_studio_icons", github: "bowerbird-app/RecordingStudio_icons"

@@ -6,6 +6,13 @@ module RecordingStudioApi
 
     self.table_name = "recording_studio_api_oauth_refresh_tokens"
 
+    recording_studio_recordable(
+      label: "OAuth Refresh Token",
+      plural_label: "OAuth Refresh Tokens",
+      root: false,
+      allowed_parent_types: ["RecordingStudioApi::OauthGrantSession"]
+    )
+
     belongs_to :oauth_grant_session,
                class_name: "RecordingStudioApi::OauthGrantSession",
                inverse_of: :refresh_tokens

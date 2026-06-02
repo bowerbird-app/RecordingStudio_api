@@ -6,6 +6,13 @@ module RecordingStudioApi
 
     self.table_name = "recording_studio_api_api_credentials"
 
+    recording_studio_recordable(
+      label: "API Credential",
+      plural_label: "API Credentials",
+      root: false,
+      allowed_parent_types: ["RecordingStudioApi::ApiClient"]
+    )
+
     belongs_to :api_client,
                class_name: "RecordingStudioApi::ApiClient",
                inverse_of: :credentials

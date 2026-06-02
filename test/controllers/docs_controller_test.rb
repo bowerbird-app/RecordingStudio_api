@@ -60,8 +60,6 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
   test "recordable types page renders configured recordables dynamically" do
     with_recordable_types([Workspace, "Folder"]) do
       create_recordable_type_summary_data
-      access = RecordingStudio::Access.create!(actor: @user, role: :admin)
-      RecordingStudio::Recording.create!(recordable: access)
 
       get docs_recordable_types_path
       response_text = response.body.gsub(/\s+/, " ").strip
@@ -78,9 +76,6 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
       assert_includes response_text, pluralized_label(Workspace.count, "recordable")
       assert_includes response_text, pluralized_label(RecordingStudio::Recording.where(recordable_type: "Folder").count, "recording")
       assert_includes response_text, pluralized_label(Folder.count, "recordable")
-      assert_includes response_text, "Access"
-      assert_includes response_text, pluralized_label(RecordingStudio::Recording.where(recordable_type: "RecordingStudio::Access").count, "recording")
-      assert_includes response_text, pluralized_label(RecordingStudio::Access.count, "recordable")
     end
   end
 
@@ -205,8 +200,6 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
       assert payload.fetch("paths").fetch("/recording_studio_api/api/v1/workspaces").key?("post")
       assert payload.fetch("paths").fetch("/recording_studio_api/api/v1/workspaces/{id}").key?("patch")
       assert payload.fetch("paths").fetch("/recording_studio_api/api/v1/workspaces/{id}").key?("delete")
-      assert payload.fetch("paths").key?("/recording_studio_api/api/v1/access")
-      assert payload.fetch("paths").key?("/recording_studio_api/api/v1/access/{id}")
       assert_match(
         /^resources_index_get_/,
         payload.fetch("paths").fetch("/recording_studio_api/api/v1/workspaces").fetch("get").fetch("operationId")

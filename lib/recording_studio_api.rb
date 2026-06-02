@@ -146,7 +146,7 @@ module RecordingStudioApi
       return [] unless defined?(RecordingStudio) && RecordingStudio.respond_to?(:configuration)
 
       Array(RecordingStudio.configuration.recordable_types).map(&:to_s).uniq.reject do |recordable_type|
-        ["RecordingStudioApi::AdminApi", "RecordingStudioApi::ApiClient"].include?(recordable_type)
+        RecordingStudioApi::Engine.internal_recordable_type_names.include?(recordable_type)
       end
     end
 

@@ -21,9 +21,14 @@ The current codebase still ships the template engine mechanics (configuration, h
 
 `RecordingStudioApi` is intended to expose explicit registration layers for:
 
-- authenticated API resources resolved from `RecordingStudio.configuration.recordable_types`
+- authenticated API resources resolved from declared `RecordingStudio.configuration.recordable_types`
 - actions backed by Recording Studio capabilities
 - addon-owned handlers and serializers registered against those actions
+
+Recording Studio 2.x requires every configured ActiveRecord recordable to declare its hierarchy with
+`recording_studio_recordable(...)`. The dummy app marks `Workspace` and `Folder` as root-capable, keeps `Page` as a
+child recordable, and the API engine registers its internal `RecordingStudio::Access`, API client, credential, token,
+OAuth, and admin API recordables with explicit parent rules.
 
 Each action declares its verb, capability mapping, handler, and serializer so addon gems can register an API action once and let the API expose it automatically for any recordable type that enables the capability.
 

@@ -6,6 +6,13 @@ module RecordingStudioApi
 
     self.table_name = "recording_studio_api_oauth_grant_sessions"
 
+    recording_studio_recordable(
+      label: "OAuth Grant Session",
+      plural_label: "OAuth Grant Sessions",
+      root: false,
+      allowed_parent_types: ["RecordingStudio::Access"]
+    )
+
     belongs_to :oauth_client,
                class_name: "RecordingStudioApi::OauthClient",
                inverse_of: false

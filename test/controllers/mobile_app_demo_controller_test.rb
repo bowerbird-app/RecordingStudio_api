@@ -52,8 +52,7 @@ class MobileAppDemoControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Mobile app login completed. The demo token now has live API access."
     assert_includes response.body, "Refresh demo token"
     assert_includes response.body, "Revoke demo session"
-    assert_includes response.body, "Oauth session access token"
-    assert_includes response.body, "Oauth refresh token"
+    assert_includes response.body, "Status:"
     assert_not_includes response.body, "Demo client"
     assert_not_includes response.body, "API scope preview"
   end

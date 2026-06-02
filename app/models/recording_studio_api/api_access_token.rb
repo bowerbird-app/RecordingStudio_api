@@ -6,6 +6,13 @@ module RecordingStudioApi
 
     self.table_name = "recording_studio_api_api_access_tokens"
 
+    recording_studio_recordable(
+      label: "API Access Token",
+      plural_label: "API Access Tokens",
+      root: false,
+      allowed_parent_types: ["RecordingStudioApi::ApiCredential"]
+    )
+
     belongs_to :credential,
                class_name: "RecordingStudioApi::ApiCredential",
                foreign_key: :api_credential_id,

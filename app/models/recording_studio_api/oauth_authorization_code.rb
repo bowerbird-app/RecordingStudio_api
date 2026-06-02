@@ -6,6 +6,13 @@ module RecordingStudioApi
 
     self.table_name = "recording_studio_api_oauth_authorization_codes"
 
+    recording_studio_recordable(
+      label: "OAuth Authorization Code",
+      plural_label: "OAuth Authorization Codes",
+      root: false,
+      allowed_parent_types: ["RecordingStudio::Access"]
+    )
+
     belongs_to :oauth_client,
                class_name: "RecordingStudioApi::OauthClient",
                inverse_of: :authorization_codes

@@ -6,6 +6,13 @@ module RecordingStudioApi
 
     self.table_name = "recording_studio_api_api_clients"
 
+    recording_studio_recordable(
+      label: "API Client",
+      plural_label: "API Clients",
+      root: false,
+      allowed_parent_types: ["RecordingStudio::Access"]
+    )
+
     belongs_to :access_recording,
                class_name: "RecordingStudio::Recording",
                inverse_of: false

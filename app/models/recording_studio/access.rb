@@ -6,6 +6,13 @@ module RecordingStudio
 
     include RecordingStudio::Recordable
 
+    recording_studio_recordable(
+      label: "Access",
+      plural_label: "Access",
+      root: false,
+      allowed_parent_types: %w[Workspace Folder Page]
+    )
+
     belongs_to :actor, polymorphic: true
 
     enum :role, { view: 0, edit: 1, admin: 2 }
