@@ -63,6 +63,8 @@
                 recording = context.recording
                 recordable = recording.recordable
 
+                context.access_grant.authorize!(recording: recording, role: :edit)
+
                 recordable.update!(published_at: Time.current)
 
                 # Return the recording so the registered serializer can render it.
@@ -74,5 +76,25 @@
       end
     CODE
   ) %>
+
+  <%= render FlatPack::SectionTitle::Component.new(
+    title: "Authorization contract",
+    subtitle: "The API validates the token and passes the access grant; the capability decides what access is required.",
+    anchor_link: true,
+  ) %>
+
+  <%= render FlatPack::Card::Component.new(style: :default) do %>
+    <%= render FlatPack::List::Component.new(divider: true) do %>
+      <%= render FlatPack::List::Item.new(icon: :key) do %>
+        <span>The API core authenticates the credential and resolves <code>context.access_grant</code>.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :shield_check) do %>
+        <span>The capability handler authorizes with <code>context.access_grant.authorize!</code> or with direct Recording Studio Accessible checks for complex multi-recording actions.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :route) do %>
+        <span>Handlers that move, copy, export, or share data should check every source and destination recording they touch.</span>
+      <% end %>
+    <% end %>
+  <% end %>
 
 </div>

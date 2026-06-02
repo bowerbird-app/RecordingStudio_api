@@ -4,8 +4,6 @@ module RecordingStudioApi
   module Api
     module V1
       class ResourcesController < RecordingStudioApi::ApiController
-        before_action :authorize_api_write!, only: %i[create update destroy trash_restore trash_destroy]
-
         def index
           return render json: root_resources_payload if params[:resource].blank?
 
@@ -72,11 +70,7 @@ module RecordingStudioApi
 
         def scoped_recordings(include_trashed: false)
           @scoped_recordings ||= {}
-          @scoped_recordings[include_trashed] ||= RecordingStudioApi::AccessibleRecordingScope.new(
-            scope_recording: current_root_recording,
-            access_recording: current_access_recording,
-            include_trashed: include_trashed
-          ).relation
+          @scoped_recordings[include_trashed] ||= current_access_grant.accessible_recordings(include_trashed: include_trashed)
         end
 
         def resolve_recordable_type!
@@ -224,6 +218,7 @@ module RecordingStudioApi
             api_client: current_api_client,
             credential: current_api_credential,
             access_recording: current_access_recording,
+            access_grant: current_access_grant,
             root_recording: current_root_recording,
             params: params,
             scoped_recordings: scoped_recordings

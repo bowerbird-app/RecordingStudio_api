@@ -57,7 +57,7 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "renders the admin api dashboard from the configured host route" do
-    get admin_api_path
+    get "/admin/api"
 
     assert_response :success
     assert_includes response.body, "Admin API"
@@ -69,6 +69,8 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Last 24 hours"
     assert_includes response.body, "Open full log view"
     assert_includes response.body, "API log volume over the last 24 hours"
+    assert_select %(a[href="#{admin_api_logs_path(close_url: admin_api_path)}"]), text: "Logs", count: 1
+    assert_select %(a[href="#{admin_api_logs_path(close_url: admin_api_path)}"]), text: "Open full log view", count: 1
     assert_not_includes response.body, "Admin API views start here"
     assert_not_includes response.body, "Section key"
   end
@@ -82,7 +84,7 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
       recordable_type: "RecordingStudioApi::AdminApi"
     )
 
-    get admin_api_path
+    get "/admin/api"
 
     assert_response :success
 
@@ -96,7 +98,7 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "api", created_recording.recordable.key
   end
 
-  test "forbids the dashboard when the current root is not admin" do
+  test "switching to a workspace root falls back to the host root when the admin dashboard path is requested" do
     workspace = Workspace.create!(name: "Workspace root")
     workspace_root_recording = RecordingStudio::Recording.create!(recordable: workspace)
     workspace_access = RecordingStudio::Access.create!(actor: @user, role: :admin)
@@ -109,7 +111,28 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
       }
     }
 
+    assert_redirected_to "/"
+
     follow_redirect!
+
+    assert_response :success
+    assert_select "h1", text: "Recording Studio API demo"
+  end
+
+  test "forbids the dashboard when accessed directly from a non-admin root" do
+    workspace = Workspace.create!(name: "Workspace root")
+    workspace_root_recording = RecordingStudio::Recording.create!(recordable: workspace)
+    workspace_access = RecordingStudio::Access.create!(actor: @user, role: :admin)
+    RecordingStudio::Recording.create!(recordable: workspace_access, parent_recording: workspace_root_recording)
+
+    patch recording_studio_root_switchable.root_switch_path(scope: "all_roots"), params: {
+      root_switch: {
+        root_recording_id: workspace_root_recording.id,
+        return_to: root_path
+      }
+    }
+
+    get "/admin/api"
 
     assert_response :forbidden
   end

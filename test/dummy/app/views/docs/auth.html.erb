@@ -1,7 +1,7 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
   <%= render FlatPack::PageTitle::Component.new(
     title: "Auth",
-    subtitle: "How OAuth2 client_credentials authentication works for RecordingStudioApi endpoints.",
+    subtitle: "How OAuth2 credentials become a RecordingStudioApi access grant for endpoint dispatch.",
     variant: :h1
   ) %>
 
@@ -37,12 +37,15 @@
 
   <%= render FlatPack::SectionTitle::Component.new(
     title: "Validation flow",
-    subtitle: "Every API request runs through RecordingStudioApi::Concerns::BearerAuthentication.",
+    subtitle: "API requests can be throttled before bearer-token lookup, then authenticated into an access grant.",
     anchor_link: true,
   ) %>
 
   <%= render FlatPack::Card::Component.new(style: :default) do %>
     <%= render FlatPack::List::Component.new(divider: true) do %>
+      <%= render FlatPack::List::Item.new(icon: :adjustments_horizontal) do %>
+        <span>When <code>rate_limit_api_pre_auth_enabled</code> is enabled, <code>/api/v1</code> requests are first throttled by IP before bearer-token lookup.</span>
+      <% end %>
       <%= render FlatPack::List::Item.new(icon: :shield_check) do %>
         <span>The token endpoint calls <code>RecordingStudioApi::Services::IssueOauthAccessToken</code> and only accepts <code>grant_type=client_credentials</code>.</span>
       <% end %>
@@ -55,28 +58,40 @@
       <%= render FlatPack::List::Item.new(icon: :folder_open) do %>
         <span>It resolves <code>access_recording</code> and <code>root_recording</code>, rejecting trashed or invalid recording references.</span>
       <% end %>
+      <%= render FlatPack::List::Item.new(icon: :link) do %>
+        <span>The controller builds <code>RecordingStudioApi::AccessGrant</code> from the API client, credential, access recording, and root recording.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :chart_bar) do %>
+        <span>When <code>rate_limit_api_enabled</code> is enabled, authenticated API requests are then throttled by credential or client using separate read and write buckets.</span>
+      <% end %>
       <%= render FlatPack::List::Item.new(icon: :clock) do %>
-        <span>On success, it updates <code>last_used_at</code> and exposes authenticated context to controllers.</span>
+        <span>On success, it updates <code>last_used_at</code> and passes authenticated context to the selected resource or capability handler.</span>
       <% end %>
     <% end %>
   <% end %>
 
   <%= render FlatPack::SectionTitle::Component.new(
-    title: "Authorization after authentication",
-    subtitle: "Recording Studio access checks still run after token validation.",
+    title: "Capability authorization",
+    subtitle: "The API core authenticates; capability handlers authorize their own behavior.",
     anchor_link: true,
   ) %>
 
   <%= render FlatPack::Card::Component.new(style: :default) do %>
     <%= render FlatPack::List::Component.new(divider: true) do %>
       <%= render FlatPack::List::Item.new(icon: :check_badge) do %>
-        <span>OAuth2 proves which API client is calling the endpoint.</span>
+        <span>OAuth2 proves that the API credential or mobile access token is valid.</span>
       <% end %>
       <%= render FlatPack::List::Item.new(icon: :adjustments_horizontal) do %>
-        <span>Then <code>RecordingStudioApi::AccessibleRecordingScope</code> applies Recording Studio visibility rules using <code>current_root_recording</code> and <code>current_access_recording</code>.</span>
+        <span>The API resolves <code>current_access_grant</code> and dispatches it to the requested capability.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :shield_check) do %>
+        <span>Default resource, trash, and move handlers call <code>context.access_grant.authorize!</code> before returning or mutating recordings.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :sparkles) do %>
+        <span>Custom capability handlers are responsible for their own Recording Studio Accessible checks using the passed grant.</span>
       <% end %>
       <%= render FlatPack::List::Item.new(icon: :eye_slash) do %>
-        <span>Resources outside the authenticated client's accessible tree remain hidden even with a valid token.</span>
+        <span>Resources outside the authenticated access grant remain hidden even with a valid token.</span>
       <% end %>
     <% end %>
   <% end %>
@@ -93,6 +108,7 @@
       current_api_client
       current_api_credential
       current_access_recording
+      current_access_grant
       current_root_recording
     CODE
   ) %>
@@ -104,6 +120,9 @@
       <% end %>
       <%= render FlatPack::List::Item.new(icon: :ban) do %>
         <span>Authorization failures during action execution return <code>403 Forbidden</code>.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :clock) do %>
+        <span>Rate limit failures return <code>429 Too Many Requests</code> with <code>Retry-After</code> and rate-limit headers.</span>
       <% end %>
     <% end %>
   <% end %>

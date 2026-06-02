@@ -78,6 +78,43 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_equal "0", response.headers["X-RateLimit-Remaining"]
   end
 
+  test "disabled pre auth api limiter leaves invalid bearer traffic to authentication" do
+    RecordingStudioApi.configuration.rate_limit_api_pre_auth_enabled = false
+    RecordingStudioApi::Concerns::RateLimiting.decider = lambda do |controller|
+      {
+        limited: controller.send(:rate_limit_bucket) == "api_pre_auth",
+        limit: 2,
+        remaining: 0,
+        retry_after: 11
+      }
+    end
+
+    get "/recording_studio_api/api/v1/pages", headers: { "Authorization" => "Bearer invalid-token" }
+
+    assert_response :unauthorized
+  end
+
+  test "pre auth api limiter can throttle invalid bearer traffic before authentication" do
+    RecordingStudioApi.configuration.rate_limit_api_pre_auth_enabled = true
+    RecordingStudioApi::Concerns::RateLimiting.decider = lambda do |controller|
+      {
+        limited: controller.send(:rate_limit_bucket) == "api_pre_auth",
+        limit: 2,
+        remaining: 0,
+        retry_after: 11
+      }
+    end
+
+    get "/recording_studio_api/api/v1/pages", headers: { "Authorization" => "Bearer invalid-token" }
+
+    assert_response :too_many_requests
+    body = JSON.parse(response.body)
+    assert_equal "rate_limit_exceeded", body.fetch("error")
+    assert_equal "11", response.headers["Retry-After"]
+    assert_equal "2", response.headers["X-RateLimit-Limit"]
+    assert_equal "0", response.headers["X-RateLimit-Remaining"]
+  end
+
   test "lists resources only within the authenticated root scope" do
     visible_page = create_page_recording(root_recording: @root_recording)
     other_root_recording, = create_access_recording_for(user: create_user(email: "other-root-resources@example.com"))
@@ -95,6 +132,31 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_equal 50, meta.fetch("limit")
     assert_equal "created_at", meta.fetch("sort")
     assert_equal "asc", meta.fetch("order")
+  end
+
+  test "lists resources only within a descendant access recording scope" do
+    user = create_user(email: "descendant-api-scope@example.com")
+    workspace = Workspace.create!(name: "Descendant API Workspace")
+    root_recording = RecordingStudio::Recording.create!(recordable: workspace)
+    scoped_folder = Folder.create!(name: "Scoped Folder")
+    scoped_folder_recording = RecordingStudio::Recording.create!(recordable: scoped_folder, parent_recording: root_recording)
+    scoped_page = create_page_recording(root_recording: root_recording, parent_recording: scoped_folder_recording)
+    sibling_page = create_page_recording(root_recording: root_recording)
+    access = RecordingStudio::Access.create!(actor: user, role: :view)
+    access_recording = RecordingStudio::Recording.create!(recordable: access, parent_recording: scoped_folder_recording)
+    token = issue_oauth_access_token_for(access_recording: access_recording, name: "Descendant view token")
+
+    get "/recording_studio_api/api/v1/pages", headers: { "Authorization" => "Bearer #{token}" }
+
+    assert_response :success
+
+    page_ids = JSON.parse(response.body).fetch("data").map { |row| row.fetch("id") }
+    assert_includes page_ids, scoped_page.id
+    assert_not_includes page_ids, sibling_page.id
+
+    get "/recording_studio_api/api/v1/pages/#{sibling_page.id}", headers: { "Authorization" => "Bearer #{token}" }
+
+    assert_response :not_found
   end
 
   test "lists default recordable attributes for unregistered page resources" do
@@ -225,6 +287,50 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_not_includes payload.fetch("attributes").keys, "unknown_attribute"
   end
 
+  test "returns validation errors when creating a page without a title" do
+    post "/recording_studio_api/api/v1/pages", params: {
+      attributes: {
+        additionalProperty: "anything"
+      }
+    }, headers: authorization_headers
+
+    assert_response :unprocessable_entity
+
+    payload = JSON.parse(response.body)
+    assert_equal "Title can't be blank", payload.fetch("error")
+    assert_equal [
+      {
+        "attribute" => "title",
+        "message" => "can't be blank",
+        "full_message" => "Title can't be blank",
+        "type" => "blank"
+      }
+    ], payload.fetch("details")
+  end
+
+  test "returns validation errors when updating a page with a blank title" do
+    page_recording = create_page_recording(root_recording: @root_recording)
+
+    patch "/recording_studio_api/api/v1/pages/#{page_recording.id}", params: {
+      attributes: {
+        title: ""
+      }
+    }, headers: authorization_headers
+
+    assert_response :unprocessable_entity
+
+    payload = JSON.parse(response.body)
+    assert_equal "Title can't be blank", payload.fetch("error")
+    assert_equal [
+      {
+        "attribute" => "title",
+        "message" => "can't be blank",
+        "full_message" => "Title can't be blank",
+        "type" => "blank"
+      }
+    ], payload.fetch("details")
+  end
+
   test "rejects create when parent is outside authenticated scope" do
     other_root_recording, = create_access_recording_for(user: create_user(email: "outside-create@example.com"))
 
@@ -299,7 +405,24 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     }, headers: { "Authorization" => "Bearer #{view_token}" }
 
     assert_response :forbidden
-    assert_equal "API client does not have write access", JSON.parse(response.body).fetch("error")
+    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).fetch("error")
+  end
+
+  test "view token cannot inherit another access recording owned by the same actor" do
+    user = create_user(email: "view-token-other-access@example.com")
+    root_recording, view_access_recording = create_access_recording_for(user: user, role: :view)
+    admin_access = RecordingStudio::Access.create!(actor: user, role: :admin)
+    RecordingStudio::Recording.create!(recordable: admin_access, parent_recording: root_recording)
+    view_token = issue_oauth_access_token_for(access_recording: view_access_recording, name: "View token with sibling admin")
+
+    post "/recording_studio_api/api/v1/workspaces", params: {
+      attributes: {
+        name: "Blocked Workspace"
+      }
+    }, headers: { "Authorization" => "Bearer #{view_token}" }
+
+    assert_response :forbidden
+    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).fetch("error")
   end
 
   test "forbids update for clients with view-only access" do
@@ -317,7 +440,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     }, headers: { "Authorization" => "Bearer #{view_token}" }
 
     assert_response :forbidden
-    assert_equal "API client does not have write access", JSON.parse(response.body).fetch("error")
+    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).fetch("error")
   end
 
   test "forbids destroy for clients with view-only access" do
@@ -331,7 +454,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     delete "/recording_studio_api/api/v1/pages/#{page_recording.id}", headers: { "Authorization" => "Bearer #{view_token}" }
 
     assert_response :forbidden
-    assert_equal "API client does not have write access", JSON.parse(response.body).fetch("error")
+    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).fetch("error")
   end
 
   test "forbids trash restore for clients with view-only access" do
@@ -346,7 +469,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     post "/recording_studio_api/api/v1/trash/#{page_recording.id}/restore", headers: { "Authorization" => "Bearer #{view_token}" }
 
     assert_response :forbidden
-    assert_equal "API client does not have write access", JSON.parse(response.body).fetch("error")
+    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).fetch("error")
     assert_not_nil RecordingStudio::Recording.unscoped.find(page_recording.id).trashed_at
   end
 
@@ -362,7 +485,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     delete "/recording_studio_api/api/v1/trash/#{page_recording.id}", headers: { "Authorization" => "Bearer #{view_token}" }
 
     assert_response :forbidden
-    assert_equal "API client does not have write access", JSON.parse(response.body).fetch("error")
+    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).fetch("error")
     assert_not_nil RecordingStudio::Recording.unscoped.find_by(id: page_recording.id)
   end
 

@@ -122,6 +122,32 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
     refute_includes payload.keys, "format"
   end
 
+  test "passes authenticated access grant to capability handlers" do
+    RecordingStudioApi.register_capability_action(
+      :echo_access_grant,
+      capability: :echoable,
+      http_verb: :post,
+      handler: lambda { |context|
+        {
+          access_recording_id: context.access_recording.id,
+          access_grant_recording_id: context.access_grant.access_recording.id,
+          actor_id: context.access_grant.actor.id
+        }
+      },
+      serializer: ->(result) { result }
+    )
+
+    post "/recording_studio_api/api/v1/pages/#{@page_recording.id}/actions/echo_access_grant",
+         headers: authorization_headers
+
+    assert_response :success
+
+    payload = JSON.parse(response.body).fetch("data")
+    assert_equal @access_recording.id, payload.fetch("access_recording_id")
+    assert_equal @access_recording.id, payload.fetch("access_grant_recording_id")
+    assert_equal @user.id, payload.fetch("actor_id")
+  end
+
   test "scopes capability action execution to the authenticated root recording" do
     root_recording, access_recording = create_access_recording_for(user: @user)
     in_scope_page = create_page_recording(root_recording: root_recording)
@@ -180,7 +206,7 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
     assert_response :unauthorized
   end
 
-  test "forbids member actions for clients with view-only access" do
+  test "dispatches custom member actions for clients with view-only access" do
     view_user = create_user(email: "view-only-member-actions@example.com")
     view_root_recording, view_access_recording = create_access_recording_for(user: view_user, role: :view)
     view_page_recording = create_page_recording(root_recording: view_root_recording)
@@ -189,8 +215,22 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
     post "/recording_studio_api/api/v1/pages/#{view_page_recording.id}/actions/echo",
          headers: { "Authorization" => "Bearer #{view_token}" }
 
+    assert_response :success
+    assert_equal view_page_recording.id, JSON.parse(response.body).fetch("data").fetch("id")
+  end
+
+  test "trash capability owns write authorization for view-only clients" do
+    view_user = create_user(email: "view-only-trash-action@example.com")
+    view_root_recording, view_access_recording = create_access_recording_for(user: view_user, role: :view)
+    view_page_recording = create_page_recording(root_recording: view_root_recording)
+    view_token = issue_oauth_access_token_for(access_recording: view_access_recording, name: "View-only trash token")
+
+    post "/recording_studio_api/api/v1/pages/#{view_page_recording.id}/actions/trash",
+         headers: { "Authorization" => "Bearer #{view_token}" }
+
     assert_response :forbidden
-    assert_equal "API client does not have write access", JSON.parse(response.body).fetch("error")
+    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).fetch("error")
+    assert_nil RecordingStudio::Recording.unscoped.find(view_page_recording.id).trashed_at
   end
 
   private

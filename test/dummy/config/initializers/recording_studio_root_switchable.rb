@@ -14,7 +14,33 @@ RecordingStudioRootSwitchable.configure do |config|
     requested_return_to = return_to.presence
     return controller.main_app.root_path if requested_return_to.blank?
 
-    requested_return_to
+    root_switch_path = URI.parse(
+      controller.recording_studio_root_switchable.root_switch_path(scope: "all_roots")
+    ).path
+    resolved_return_to = requested_return_to
+
+    loop do
+      parsed_return_to = URI.parse(resolved_return_to)
+      break unless parsed_return_to.path == root_switch_path
+
+      nested_return_to = Rack::Utils.parse_nested_query(parsed_return_to.query)["return_to"].presence
+      break if nested_return_to.blank?
+
+      resolved_return_to = nested_return_to
+    rescue URI::InvalidURIError
+      break
+    end
+
+    resolved_return_to_path = URI.parse(resolved_return_to).path
+    non_admin_root = !root_recording.recordable.is_a?(RecordingStudioAdmin::Admin)
+
+    if non_admin_root && resolved_return_to_path.start_with?("/admin")
+      controller.main_app.root_path
+    else
+      resolved_return_to
+    end
+  rescue URI::InvalidURIError
+    controller.main_app.root_path
   end
 
   config.scope :all_roots do |scope|

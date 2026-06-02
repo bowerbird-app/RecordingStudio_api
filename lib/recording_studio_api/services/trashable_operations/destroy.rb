@@ -5,6 +5,8 @@ module RecordingStudioApi
     module TrashableOperations
       class Destroy < RecordingStudioApi::Services::ResourceOperations::Base
         def call
+          authorize_access!(recording, role: :edit, include_trashed: true)
+
           serialized_recording = serialize_recording(recording)
           destroy_resource!(recording)
 

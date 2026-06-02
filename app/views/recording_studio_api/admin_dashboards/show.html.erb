@@ -10,7 +10,7 @@
       text: "Logs",
       style: :default,
       size: :md,
-      url: RecordingStudioApi.admin_logs_path(controller: self)
+      url: RecordingStudioApi.admin_logs_path(controller: self, close_url: request.fullpath)
     ) %>
   </div>
 
@@ -95,7 +95,7 @@
             text: "Open full log view",
             style: :default,
             size: :md,
-            url: RecordingStudioApi.admin_logs_path(controller: self)
+            url: RecordingStudioApi.admin_logs_path(controller: self, close_url: request.fullpath)
           ) %>
         </div>
       </div>

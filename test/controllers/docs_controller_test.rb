@@ -30,6 +30,9 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "flat_pack"
     assert_includes response.body, "generate recording_studio_api:migrations"
     assert_includes response.body, "tailwindcss:build"
+    assert_includes response.body, "Wire API access"
+    assert_includes response.body, "RecordingStudioApi::Services::ProvisionApiClient"
+    assert_includes response.body, "context.access_grant.authorize!"
   end
 
   test "config page renders successfully" do
@@ -42,8 +45,10 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "RecordingStudioApi.configure do |config|"
     assert_includes response.body, "config.token_ttl = 45.days"
     assert_includes response.body, "config.rate_limit_oauth_enabled = true"
+    assert_includes response.body, "config.rate_limit_api_pre_auth_enabled = true"
     assert_includes response.body, "config.rate_limit_api_enabled = true"
     assert_includes response.body, "config.rate_limit_oauth_requests = 10"
+    assert_includes response.body, "config.rate_limit_api_pre_auth_requests = 300"
     assert_includes response.body, "config.rate_limit_api_read_requests = 120"
     assert_includes response.body, "config.rate_limit_api_write_requests = 30"
     assert_includes response.body, "config.api_request_logging_enabled = true"
@@ -149,7 +154,9 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     get docs_methods_path
     assert_response :success
     assert_select "h1", text: "Methods"
-    assert_includes response.body, "No methods provided by gem outside of setup"
+    assert_includes response.body, "Reference for the public Ruby entrypoints and runtime context used by API handlers."
+    assert_includes response.body, "RecordingStudioApi.register_capability_action"
+    assert_includes response.body, "context.access_grant.authorize!"
   end
 
   test "api routes page renders successfully" do
@@ -163,14 +170,21 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
       assert_select "h1", text: "API routes"
       assert_includes response.body, "mount RecordingStudioApi::Engine, at: &quot;/recording_studio_api&quot;"
       assert_includes response.body, "RecordingStudioApi::Engine.routes.draw do"
-      assert_includes response.body, "resources :api_clients, controller: &quot;access_requests&quot;, only: %i[index show new create]"
+      assert_includes response.body, "get &quot;/admin_api&quot;, to: &quot;admin_dashboards#show&quot;"
+      assert_includes response.body, "get &quot;/admin_api/logs&quot;, to: &quot;admin_logs#index&quot;"
+      assert_includes response.body, "resources :api_clients, controller: &quot;access_requests&quot;, only: %i[index show new create edit update]"
+      assert_includes response.body, "resources :api_access_tokens, path: &quot;tokens&quot;"
+      assert_includes response.body, "get &quot;/oauth/authorize&quot;, to: &quot;oauth_authorizations#new&quot;"
       assert_includes response.body, "post &quot;/oauth/token&quot;, to: &quot;oauth#token&quot;"
+      assert_includes response.body, "post &quot;/oauth/revoke&quot;, to: &quot;oauth#revoke&quot;"
+      assert_includes response.body, "post &quot;/trash/:id/restore&quot;"
       assert_includes response.body, "match &quot;/:resource/:id/actions/:action_name&quot;"
       assert_includes response.body, "match &quot;/:resource/:id/:action_name&quot;"
       assert_includes response.body, "via: %i[post patch put delete]"
       assert_includes response.body, "Define engine routes"
       assert_includes response.body, "Generated endpoint inventory"
       assert_includes response.body, "Action routes stay grouped under their owning resource"
+      assert_includes response.body, "Admin browser routes are separate from JSON API routes"
       assert_includes response.body, "/recording_studio_api/api/v1/folders/:id/actions/move"
       assert_includes response.body, "Action:"
       assert_includes response.body, "move"
@@ -201,16 +215,68 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "scalar page renders successfully" do
+    create_manageable_workspace_root(name: "Scalar Form Workspace")
+
     get docs_scalar_path
 
     assert_response :success
     assert_select "h1", text: "Scalar API reference"
     assert_includes response.body, "Interactive API explorer"
+    assert_includes response.body, "Test auth helper"
+    assert_select %(div[data-controller="flat-pack--collapse"][data-flat-pack--collapse-open-value="false"]), count: 1
+    assert_select %(#scalar-test-auth), count: 1
+    assert_select %(#scalar-test-auth-collapse-content[hidden]), count: 1
+    assert_select %(form[action="#{scalar_test_token_path}"]), count: 1
     assert_includes response.body, "id=\"scalar-api-reference\""
     assert_includes response.body, docs_openapi_path
-    assert_includes response.body, "@scalar/api-reference"
+    assert_includes response.body, "@scalar/api-reference/dist/browser/standalone.js"
     assert_includes response.body, "createApiReference"
+    assert_includes response.body, "recordingStudioApiScalarInit"
+    assert_includes response.body, "onload=\"window.recordingStudioApiScalarInit"
     assert_select %(a[href="#{docs_scalar_fullscreen_path}"][target="_blank"]), text: /Full screen/
+  end
+
+  test "scalar test auth issues a bearer token for the selected access point" do
+    root_recording = create_manageable_workspace_root(name: "Scalar Workspace")
+
+    post scalar_test_token_path, params: {
+      access_point_recording_id: root_recording.id,
+      role: "edit"
+    }
+
+    assert_redirected_to "#{docs_scalar_path}#scalar-test-auth"
+
+    follow_redirect!
+
+    assert_response :success
+    assert_select %(div[data-controller="flat-pack--collapse"][data-flat-pack--collapse-open-value="true"]), count: 1
+    assert_includes response.body, "Scalar test bearer token issued."
+    assert_includes response.body, "Bearer rsapi_at_"
+    assert_includes response.body, "Edit"
+    assert_includes response.body, "Workspace: Scalar Workspace"
+    assert_includes response.body, "Scoped sample IDs"
+    assert_select %(form[action="#{scalar_test_token_path}"] input[name="_method"][value="delete"]), count: 1
+  end
+
+  test "scalar test auth revokes the session bearer token" do
+    root_recording = create_manageable_workspace_root(name: "Scalar Revoke Workspace")
+
+    post scalar_test_token_path, params: {
+      access_point_recording_id: root_recording.id,
+      role: "admin"
+    }
+    token = RecordingStudioApi::ApiAccessToken.order(created_at: :desc).first
+
+    delete scalar_test_token_path
+
+    assert_redirected_to "#{docs_scalar_path}#scalar-test-auth"
+    assert_not_nil token.reload.revoked_at
+
+    follow_redirect!
+
+    assert_response :success
+    assert_includes response.body, "Scalar test bearer token revoked."
+    assert_not_includes response.body, "Bearer rsapi_at_"
   end
 
   test "scalar fullscreen page renders successfully" do
@@ -220,8 +286,10 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "id=\"scalar-api-reference\""
     assert_includes response.body, "height: 100vh"
     assert_includes response.body, docs_openapi_path
-    assert_includes response.body, "@scalar/api-reference"
+    assert_includes response.body, "@scalar/api-reference/dist/browser/standalone.js"
     assert_includes response.body, "createApiReference"
+    assert_includes response.body, "recordingStudioApiScalarInit"
+    assert_includes response.body, "onload=\"window.recordingStudioApiScalarInit"
   end
 
   test "add capability page renders successfully" do
@@ -233,6 +301,8 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "RecordingStudioApi.register_capability_action"
     assert_includes response.body, "capability: :publishable"
     assert_includes response.body, "config/initializers/recording_studio_api.rb"
+    assert_includes response.body, "context.access_grant.authorize!"
+    assert_includes response.body, "Authorization contract"
   end
 
   test "auth page renders successfully" do
@@ -240,15 +310,19 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "h1", text: "Auth"
-    assert_includes response.body, "OAuth2 client_credentials authentication"
+    assert_includes response.body, "How OAuth2 credentials become a RecordingStudioApi access grant"
     assert_includes response.body, "/recording_studio_api/oauth/token"
     assert_includes response.body, "grant_type=client_credentials"
     assert_includes response.body, "Authorization: Bearer &lt;access_token&gt;"
+    assert_includes response.body, "rate_limit_api_pre_auth_enabled"
+    assert_includes response.body, "throttled by credential or client"
     assert_includes response.body, "RecordingStudioApi::Services::AuthenticateOauthAccessToken"
-    assert_includes response.body, "Authorization after authentication"
-    assert_includes response.body, "RecordingStudioApi::AccessibleRecordingScope"
+    assert_includes response.body, "Capability authorization"
+    assert_includes response.body, "RecordingStudioApi::AccessGrant"
+    assert_includes response.body, "current_access_grant"
     assert_includes response.body, "current_api_client"
     assert_includes response.body, "401 Unauthorized"
+    assert_includes response.body, "429 Too Many Requests"
   end
 
   test "mobile auth page renders successfully" do
@@ -261,6 +335,7 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "The server checks which RecordingStudio::Access records belong to that user and has them choose one if there is more than one option."
     assert_includes response.body, "The app exchanges that code, together with its PKCE verifier, for a mobile access token and a refresh token."
     assert_includes response.body, "The app uses the access token for API calls, and when it expires it uses the refresh token to get a new access token and a rotated refresh token."
+    assert_includes response.body, "Each accepted mobile access token resolves to a RecordingStudioApi::AccessGrant"
   end
 
   test "mounted recording_studio_api engine has no browser root page" do
@@ -372,6 +447,15 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
         "recordable"
       )
     }
+  end
+
+  def create_manageable_workspace_root(name:)
+    workspace = Workspace.create!(name: name)
+    root_recording = RecordingStudio::Recording.create!(recordable: workspace)
+    access = RecordingStudio::Access.create!(actor: @user, role: :admin)
+    RecordingStudio::Recording.create!(recordable: access, parent_recording: root_recording)
+
+    root_recording
   end
 
   def recordable_type_summary(recording_count, recordable_count, recording_word, recordable_word)

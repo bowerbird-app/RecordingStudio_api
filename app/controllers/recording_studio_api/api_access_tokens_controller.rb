@@ -16,7 +16,7 @@ module RecordingStudioApi
 
       token.revoke! if token.revoked_at.nil?
 
-      redirect_to api_client_api_access_tokens_path(@api_client), notice: "Token revoked."
+      redirect_to api_client_api_access_tokens_path(@api_client, page_nav_close_param), notice: "Token revoked."
     end
 
     private
@@ -56,7 +56,7 @@ module RecordingStudioApi
 
       view_context.button_to(
         "Revoke",
-        revoke_api_client_api_access_token_path(@api_client, token),
+        revoke_api_client_api_access_token_path(@api_client, token, page_nav_close_param),
         method: :post,
         data: { turbo_confirm: "Revoke this token?" },
         class: "inline-flex items-center justify-center gap-2 rounded-[var(--button-border-radius)] font-medium cursor-pointer transition-colors duration-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--button-focus-ring-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--button-focus-ring-offset-color)] px-[var(--button-padding-x-md)] py-[var(--button-padding-y-md)] text-sm bg-[var(--surface-background-color)] text-[var(--surface-content-color)] border border-[var(--surface-border-color)]"

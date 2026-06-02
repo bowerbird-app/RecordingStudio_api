@@ -53,11 +53,12 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "renders the logs page with a lazy frame-targeted loader" do
-    get admin_api_logs_path
+    get "/admin/api/logs"
 
     assert_response :success
-    assert_includes response.body, "Back"
-    assert_includes response.body, admin_api_path
+    assert_includes response.body, "flat-pack-page-nav"
+    assert_select %(nav.flat-pack-page-nav a[href="#{admin_api_path}"]), text: "Back", count: 1
+    assert_select %(nav.flat-pack-page-nav a[href="#{admin_api_path}"]), text: "Close", count: 1
     assert_includes response.body, "API logs"
     assert_includes response.body, "Request log entries recorded by the API logging database."
     assert_includes response.body, "Occurred"
@@ -67,6 +68,13 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, 'data-controller="auto-load"'
     assert_includes response.body, "Loading more logs..."
     assert_includes response.body, "page=2"
+  end
+
+  test "logs page honors an explicit close url" do
+    get admin_api_logs_path, params: { close_url: root_path }
+
+    assert_response :success
+    assert_select %(nav.flat-pack-page-nav a[href="#{root_path}"]), text: "Close", count: 1
   end
 
   test "frame request replaces the logs content with additional rows" do
@@ -85,7 +93,7 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
     assert_redirected_to admin_api_logs_path(page: 2)
   end
 
-  test "forbids the logs page when the current root is not admin" do
+  test "switching to a workspace root falls back to the host root when the logs path is requested" do
     workspace = Workspace.create!(name: "Workspace root")
     workspace_root_recording = RecordingStudio::Recording.create!(recordable: workspace)
     workspace_access = RecordingStudio::Access.create!(actor: @user, role: :admin)
@@ -98,7 +106,28 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
       }
     }
 
+    assert_redirected_to "/"
+
     follow_redirect!
+
+    assert_response :success
+    assert_select "h1", text: "Recording Studio API demo"
+  end
+
+  test "forbids the logs page when accessed directly from a non-admin root" do
+    workspace = Workspace.create!(name: "Workspace root")
+    workspace_root_recording = RecordingStudio::Recording.create!(recordable: workspace)
+    workspace_access = RecordingStudio::Access.create!(actor: @user, role: :admin)
+    RecordingStudio::Recording.create!(recordable: workspace_access, parent_recording: workspace_root_recording)
+
+    patch recording_studio_root_switchable.root_switch_path(scope: "all_roots"), params: {
+      root_switch: {
+        root_recording_id: workspace_root_recording.id,
+        return_to: root_path
+      }
+    }
+
+    get "/admin/api/logs"
 
     assert_response :forbidden
   end

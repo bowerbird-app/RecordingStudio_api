@@ -5,6 +5,8 @@ module RecordingStudioApi
     module TrashableOperations
       class Restore < RecordingStudioApi::Services::ResourceOperations::Base
         def call
+          authorize_access!(recording, role: :edit, include_trashed: true)
+
           restore_resource!(recording)
 
           { json: { data: serialize_recording(recording.reload) } }

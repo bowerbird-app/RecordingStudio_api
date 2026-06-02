@@ -15,6 +15,9 @@ module RecordingStudioApi
         destination = find_destination!
         raise UnsupportedActionError, "Move is not supported for #{context.recording.recordable_type}" unless context.recording.respond_to?(:move_to!)
 
+        context.access_grant.authorize!(recording: context.recording, role: :edit)
+        context.access_grant.authorize!(recording: destination, role: :edit)
+
         context.recording.move_to!(
           new_parent: destination,
           actor: context.api_client,
@@ -31,10 +34,7 @@ module RecordingStudioApi
         destination_id = context.params[:parent_id].presence || context.params[:destination_id].presence || context.params[:new_parent_id].presence
         raise UnsupportedActionError, "parent_id is required for move" if destination_id.blank?
 
-        destination = RecordingStudioApi::AccessibleRecordingScope.new(
-          scope_recording: context.root_recording,
-          access_recording: context.access_recording
-        ).relation.find_by(id: destination_id)
+        destination = context.access_grant.accessible_recordings.find_by(id: destination_id)
         raise NotFoundError, "Destination recording was not found in this API scope" if destination.nil?
 
         destination

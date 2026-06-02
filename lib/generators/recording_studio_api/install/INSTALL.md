@@ -10,5 +10,6 @@ If you use Tailwind CSS:
 To use the engine:
 1. Start your Rails server
 2. Wire your API routes and host-app review surface as needed; the gem does not ship a browser root page
+3. Register custom capability handlers so they authorize through the passed RecordingStudioApi access grant before doing work
 
 ===============================================================================

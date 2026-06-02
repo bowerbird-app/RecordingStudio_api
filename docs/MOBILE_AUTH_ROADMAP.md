@@ -1,19 +1,22 @@
 # Mobile Auth Roadmap
 
-This document describes a staged path from current machine-to-machine auth to mobile-ready user-delegated OAuth while keeping all auth artifacts inside the Recording Studio recording/recordable model.
+This document describes the mobile auth shape for RecordingStudioApi while keeping all auth artifacts inside the Recording Studio recording/recordable model.
 
 ## Current State
 
-- Grant type: `client_credentials`
-- Token chain in recording tree: Access -> ApiClient -> ApiCredential -> ApiAccessToken
-- Access-token TTL default: 30 days
-- Best-fit use case: server-to-server and backend-for-frontend integration
+- Grant types: `client_credentials`, `authorization_code` with PKCE, and `refresh_token`
+- Machine token chain in recording tree: Access -> ApiClient -> ApiCredential -> ApiAccessToken
+- Mobile token chain in recording tree: Access -> OauthGrantSession -> OauthSessionAccessToken and OauthRefreshToken
+- Machine access-token TTL follows `RecordingStudioApi.configuration.token_ttl`
+- Mobile access tokens are short-lived and refresh tokens rotate on use
+- Every accepted bearer token resolves to a `RecordingStudioApi::AccessGrant` before API dispatch
 
 ## Target State
 
-- Mobile users authenticate with user-delegated OAuth
+- Mobile users authenticate with user-delegated OAuth when direct mobile access is required
 - Workspace/root scope remains explicit and auditable
 - No parallel auth subsystem outside Recording Studio recording topology
+- Capability handlers authorize behavior through the resolved access grant and Recording Studio Accessible
 
 ## Stage 0: Alignment
 
@@ -72,27 +75,34 @@ Notes:
 
 - This stage enables mobile product delivery with minimal gem auth changes.
 
-## Stage 3B: Direct Mobile OAuth Path (If Required)
+## Stage 3B: Direct Mobile OAuth Path
+
+Status: implemented baseline.
 
 Goals:
 
-- Add user-delegated OAuth support for mobile public clients
+- Support user-delegated OAuth for mobile public clients
 - Support Authorization Code + PKCE
-- Add refresh-token lifecycle
+- Support refresh-token rotation and token-family revocation
 
-Structural gem changes:
+Implemented structural pieces:
 
 - Authorization endpoint + token endpoint extensions
-- Public client registration (redirect URIs, PKCE required)
-- New grant/session recordables under access recording scope
+- Public client model with exact redirect URI matching and PKCE requirement
+- Grant/session recordables under access recording scope
 - Refresh-token model with rotation and revocation controls
-- Scope/consent persistence by workspace/root
 
-Deliverables:
+Remaining product decisions:
+
+- Scope and consent persistence by workspace/root
+- Mobile client registration UI and operator runbooks
+- User-facing copy for multi-access selection
+
+Delivered baseline:
 
 - OAuth endpoints and services
 - Grant/session/refresh recordables and migrations
-- Tests for login, consent, token exchange, refresh, revocation
+- Tests for login, access selection, token exchange, refresh, and revocation
 
 ## Stage 4: Security Hardening
 

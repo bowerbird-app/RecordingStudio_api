@@ -117,7 +117,7 @@ module FlatPack
 
         content_tag(:div, **leaf_wrapper_attributes(tree_node, level: level, index: index)) do
           if tree_node.href.present?
-            link_to(tree_node.href, class: "flex min-w-0 flex-1 items-center gap-1.5", aria: {current: ("page" if tree_node.active)}) { row }
+            link_to(tree_node.href, class: "flex min-w-0 flex-1 items-center gap-1.5", aria: { current: ("page" if tree_node.active) }) { row }
           else
             row
           end
@@ -246,7 +246,7 @@ module FlatPack
         node_aria = node_attributes.delete(:aria) || {}
 
         {
-          class: TailwindMerge::Merger.new.merge([additional_attrs.delete(:class), node_class].compact.join(" ")),
+          class: TailwindMerge::Merger.new.merge([ additional_attrs.delete(:class), node_class ].compact.join(" ")),
           data: node_data.merge(additional_attrs.delete(:data) || {}),
           aria: node_aria.merge(additional_attrs.delete(:aria) || {})
         }.merge(node_attributes).merge(additional_attrs).compact

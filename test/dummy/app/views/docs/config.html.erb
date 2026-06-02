@@ -14,10 +14,13 @@
 
         # Optional Redis-backed throttling
         config.rate_limit_oauth_enabled = true
+        config.rate_limit_api_pre_auth_enabled = true
         config.rate_limit_api_enabled = true
         config.rate_limit_redis_url = ENV["RECORDING_STUDIO_API_RATE_LIMIT_REDIS_URL"]
         config.rate_limit_oauth_requests = 10
         config.rate_limit_oauth_period_seconds = 60
+        config.rate_limit_api_pre_auth_requests = 300
+        config.rate_limit_api_pre_auth_period_seconds = 60
         config.rate_limit_api_read_requests = 120
         config.rate_limit_api_read_period_seconds = 60
         config.rate_limit_api_write_requests = 30

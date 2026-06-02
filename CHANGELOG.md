@@ -13,7 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Replaced placeholder README and dummy-app docs content with the RecordingStudio API architecture handoff
 - Updated gem and dummy-app documentation to describe OAuth2 `client_credentials` token exchange and access-token usage
-- Clarified that Recording Studio accessible-scope authorization runs after OAuth2 authentication for API requests
+- Clarified that API authentication now builds an access grant and capability handlers own Recording Studio Accessible authorization checks
+- Added a configurable pre-auth `/api/v1` IP rate-limit bucket before bearer-token lookup
 
 
 ## [0.1.1] - 2026-04-28

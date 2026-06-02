@@ -5,6 +5,8 @@ module RecordingStudioApi
     module ResourceOperations
       class Index < Base
         def call
+          authorize_access!(access_scope_recording, role: :view)
+
           pagination = RecordingStudioApi::Services::PaginateResourceCollection.call(
             relation: scoped_recordings.where(recordable_type: recordable_type),
             resource: resource_name,

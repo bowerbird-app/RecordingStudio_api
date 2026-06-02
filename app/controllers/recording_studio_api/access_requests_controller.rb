@@ -50,7 +50,7 @@ module RecordingStudioApi
       @errors << "Role is invalid" unless role_options.any? { |(_label, value)| value == @form_values.fetch(:role) }
       return render :edit, status: :unprocessable_entity if @errors.any?
 
-      return redirect_to(api_client_path(@api_client), notice: "API access updated.") if persist_access_updates(expires_at)
+      return redirect_to(api_client_path(@api_client, page_nav_close_param), notice: "API access updated.") if persist_access_updates(expires_at)
 
       @errors << "The API client could not be updated"
       render :edit, status: :unprocessable_entity

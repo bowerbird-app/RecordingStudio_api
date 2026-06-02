@@ -21,6 +21,9 @@ RecordingStudioApi.configure do |config|
   # config.rate_limit_redis_namespace = "recording_studio_api"
   # config.rate_limit_oauth_requests = 10
   # config.rate_limit_oauth_period_seconds = 60
+  # config.rate_limit_api_pre_auth_enabled = true
+  # config.rate_limit_api_pre_auth_requests = 300
+  # config.rate_limit_api_pre_auth_period_seconds = 60
   # config.rate_limit_api_enabled = false
   # config.rate_limit_api_read_requests = 120
   # config.rate_limit_api_read_period_seconds = 60

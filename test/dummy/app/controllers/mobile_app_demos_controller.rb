@@ -251,7 +251,7 @@ class MobileAppDemosController < ApplicationController
       grant_session_recording.subtree_recordings(include_self: false).includes(:recordable).to_a
     end
 
-    scoped_recordings = [access_recording, *grant_session_recordings, *grant_session_descendants]
+    scoped_recordings = [ access_recording, *grant_session_recordings, *grant_session_descendants ]
       .uniq { |recording| recording.id }
 
     RecordingTreePresenter.new(recordings: scoped_recordings).nodes
@@ -272,6 +272,6 @@ class MobileAppDemosController < ApplicationController
 
   def oauth_error_message(error, description = nil)
     payload = error.is_a?(Hash) ? error.symbolize_keys : { error: error.to_s, error_description: description }
-    [payload[:error], payload[:error_description]].compact.join(": ")
+    [ payload[:error], payload[:error_description] ].compact.join(": ")
   end
 end

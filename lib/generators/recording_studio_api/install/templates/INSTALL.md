@@ -13,20 +13,21 @@ Next steps:
    ```ruby
    result = RecordingStudioApi::Services::ProvisionApiClient.call(
      access_recording: access_recording,
-    name: "Primary OAuth client"
+     name: "Primary OAuth client"
    )
 
-  client_id = result.value.fetch(:credential).oauth_client_id
-  client_secret = result.value.fetch(:token)
+   client_id = result.value.fetch(:credential).oauth_client_id
+   client_secret = result.value.fetch(:token)
 
-  oauth = RecordingStudioApi::Services::IssueOauthAccessToken.call(
-    grant_type: "client_credentials",
-    client_id: client_id,
-    client_secret: client_secret
-  )
+   oauth = RecordingStudioApi::Services::IssueOauthAccessToken.call(
+     grant_type: "client_credentials",
+     client_id: client_id,
+     client_secret: client_secret
+   )
 
-  oauth.value.fetch(:access_token)
+   oauth.value.fetch(:access_token)
    ```
 
 8. Mount routes are added at the configured mount path. Adjust auth, layout, and current actor integration to match your host app.
 9. Add addon gems that enable Recording Studio capabilities, then register the related API action once with `RecordingStudioApi.register_capability_action`.
+10. In each custom capability handler, authorize with the passed `context.access_grant` before exposing or mutating Recording Studio data.

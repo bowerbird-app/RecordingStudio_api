@@ -58,5 +58,9 @@ module RecordingStudioApi
 
       nil
     end
+
+    def page_nav_default_close_url
+      RecordingStudioApi.admin_dashboard_path(controller: self)
+    end
   end
 end

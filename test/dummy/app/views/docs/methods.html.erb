@@ -1,9 +1,42 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
 	<%= render FlatPack::PageTitle::Component.new(
 		title: "Methods",
-		subtitle: "Reference for helper methods provided by the gem.",
+		subtitle: "Reference for the public Ruby entrypoints and runtime context used by API handlers.",
 		variant: :h1
 	) %>
 
-	<p class="text-sm text-(--surface-muted-content-color)">No methods provided by gem outside of setup.</p>
+	<%= render FlatPack::SectionTitle::Component.new(
+		title: "Registration",
+		subtitle: "Methods called from host-app initializers or addon gems.",
+		anchor_link: true,
+	) %>
+
+	<%= render FlatPack::CodeBlock::Component.new(
+		language: :ruby,
+		code: <<~'CODE'
+			RecordingStudioApi.configure { |config| config.token_ttl = 30.days }
+			RecordingStudioApi.register_recordable_type_api("Page", serializer: PageSerializer)
+			RecordingStudioApi.register_capability_action(:publish, capability: :publishable, handler: PublishRecording)
+			RecordingStudioApi.capability_action(:publish)
+			RecordingStudioApi.resource_action(:show)
+		CODE
+	) %>
+
+	<%= render FlatPack::SectionTitle::Component.new(
+		title: "Handler context",
+		subtitle: "Methods available to capability and resource handlers at runtime.",
+		anchor_link: true,
+	) %>
+
+	<%= render FlatPack::CodeBlock::Component.new(
+		language: :ruby,
+		code: <<~'CODE'
+			context.api_client
+			context.credential
+			context.access_recording
+			context.access_grant
+			context.access_grant.actor
+			context.access_grant.authorize!(recording: context.recording, role: :edit)
+		CODE
+	) %>
 </div>

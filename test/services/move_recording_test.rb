@@ -39,6 +39,12 @@ class MoveRecordingTest < ActiveSupport::TestCase
       api_client: @payload.fetch(:api_client),
       credential: @payload.fetch(:credential),
       access_recording: @access_recording,
+      access_grant: RecordingStudioApi::AccessGrant.new(
+        api_client: @payload.fetch(:api_client),
+        credential: @payload.fetch(:credential),
+        access_recording: @access_recording,
+        root_recording: @root_recording
+      ),
       root_recording: @root_recording,
       params: { destination_id: hidden_page.parent_recording_id }
     )

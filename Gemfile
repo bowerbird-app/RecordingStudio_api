@@ -12,7 +12,7 @@ gem "recording_studio_admin", github: "bowerbird-app/RecordingStudio_admin"
 gem "recording_studio_icons", github: "bowerbird-app/RecordingStudio_icons"
 gem "recording_studio_moveable", github: "bowerbird-app/RecordingStudio_moveable"
 gem "recording_studio_root_switchable", github: "bowerbird-app/RecordingStudio_root_switchable"
-gem "flat_pack", github: "bowerbird-app/flatpack", tag: "v0.1.33"
+gem "flat_pack", github: "bowerbird-app/flatpack", tag: "v0.1.66"
 gem "pg", "~> 1.1"
 
 gem "puma"

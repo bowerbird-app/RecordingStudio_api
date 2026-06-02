@@ -71,6 +71,7 @@ class RateLimitingTest < ActiveSupport::TestCase
 
   class Harness
     def self.before_action(*) = nil
+    def self.prepend_before_action(*) = nil
 
     include RecordingStudioApi::Concerns::RateLimiting
 
@@ -158,6 +159,35 @@ class RateLimitingTest < ActiveSupport::TestCase
     assert_equal [], redis.expire_calls
   end
 
+  test "computed api pre auth decision uses ip identifier before bearer authentication" do
+    RecordingStudioApi.configuration.rate_limit_api_pre_auth_enabled = true
+    RecordingStudioApi.configuration.rate_limit_api_pre_auth_requests = 2
+    RecordingStudioApi.configuration.rate_limit_api_pre_auth_period_seconds = 20
+
+    harness = Harness.new(
+      path: "/recording_studio_api/api/v1/pages",
+      method: :get,
+      remote_ip: "203.0.113.9"
+    )
+    redis = FakeRedis.new(incr_values: [3], ttl: 18)
+
+    decision = harness.stub(:rate_limit_redis_client, redis) do
+      harness.send(:with_rate_limit_bucket, "api_pre_auth") do
+        harness.send(:resolved_rate_limit_decision)
+      end
+    end
+
+    assert_equal true, decision.fetch(:limited)
+    assert_equal 2, decision.fetch(:limit)
+    assert_equal 0, decision.fetch(:remaining)
+    assert_equal 18, decision.fetch(:retry_after)
+
+    current_window = (Time.current.to_i / 20).to_i
+    expected_key = "recording_studio_api:api_pre_auth:ip:203.0.113.9:#{current_window}"
+    assert_equal [expected_key], redis.incr_calls
+    assert_equal [], redis.expire_calls
+  end
+
   test "computed api write decision uses current api client identifier" do
     RecordingStudioApi.configuration.rate_limit_api_enabled = true
     RecordingStudioApi.configuration.rate_limit_api_write_requests = 3
@@ -190,6 +220,14 @@ class RateLimitingTest < ActiveSupport::TestCase
 
     assert_equal "ip:10.0.0.9", oauth_harness.send(:rate_limit_identifier)
     assert_equal "ip:10.0.0.10", api_harness.send(:rate_limit_identifier)
+  end
+
+  test "api pre auth limiter is disabled outside api v1 paths" do
+    RecordingStudioApi.configuration.rate_limit_api_pre_auth_enabled = true
+
+    harness = Harness.new(path: "/recording_studio_api/oauth/token", method: :post)
+
+    assert_equal false, harness.send(:api_pre_auth_rate_limit_enabled_for_request?)
   end
 
   test "resolved decision logs and returns unlimited decision when decider raises" do

@@ -1,5 +1,7 @@
 <div class="mx-auto flex w-full max-w-3xl flex-col gap-6">
-  <%= render "breadcrumb", anchor_url: main_app.root_path, back_fallback_url: main_app.root_path %>
+  <%= render FlatPack::PageNav::Component.new(
+    close_url: page_nav_close_url
+  ) %>
 
   <%= render FlatPack::PageTitle::Component.new(
     title: "Add API access",
@@ -19,7 +21,7 @@
     <% end %>
   <% end %>
 
-  <%= form_with url: api_clients_path, scope: :api_client, method: :post, class: "space-y-6" do |form| %>
+  <%= form_with url: api_clients_path(page_nav_close_param), scope: :api_client, method: :post, class: "space-y-6" do |form| %>
     <%= form.hidden_field :root_type, value: @form_values.fetch(:root_type) %>
 
     <div class="space-y-2">
@@ -41,6 +43,7 @@
       <label for="api_client_expires_at" class="block text-sm font-medium text-(--surface-content-color)">Expires</label>
       <%= form.datetime_local_field :expires_at,
         value: @form_values.fetch(:expires_at),
+        placeholder: "Never",
         class: "flat-pack-input w-full rounded-md border bg-[var(--surface-background-color)] px-[var(--form-control-padding)] py-[var(--form-control-padding)] text-sm text-[var(--surface-content-color)] border-[var(--surface-border-color)]" %>
       <p class="text-sm text-(--surface-muted-content-color)">Leave blank to use the configured token TTL.</p>
     </div>
@@ -53,7 +56,7 @@
         type: "submit"
       ) %>
 
-      <%= button_to "Cancel", main_app.root_path, method: :get, class: "inline-flex items-center justify-center gap-2 rounded-[var(--button-border-radius)] font-medium cursor-pointer transition-colors duration-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--button-focus-ring-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--button-focus-ring-offset-color)] px-[var(--button-padding-x-md)] py-[var(--button-padding-y-md)] text-sm bg-[var(--surface-background-color)] text-[var(--surface-content-color)] border border-[var(--surface-border-color)]" %>
+      <%= button_to "Cancel", page_nav_close_url, method: :get, class: "inline-flex items-center justify-center gap-2 rounded-[var(--button-border-radius)] font-medium cursor-pointer transition-colors duration-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--button-focus-ring-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--button-focus-ring-offset-color)] px-[var(--button-padding-x-md)] py-[var(--button-padding-y-md)] text-sm bg-[var(--surface-background-color)] text-[var(--surface-content-color)] border border-[var(--surface-border-color)]" %>
     </div>
   <% end %>
 </div>

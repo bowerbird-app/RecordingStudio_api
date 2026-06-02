@@ -1,13 +1,26 @@
 <div id="scalar-api-reference" style="height: 100vh; width: 100vw;"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
 <script>
-  window.addEventListener("DOMContentLoaded", function() {
+  window.recordingStudioApiScalarInit = function() {
+    var target = document.getElementById("scalar-api-reference");
+
+    if (!target || target.dataset.scalarInitialized === "true") {
+      return;
+    }
+
     if (window.Scalar && window.Scalar.createApiReference) {
+      target.dataset.scalarInitialized = "true";
       window.Scalar.createApiReference("#scalar-api-reference", {
         url: "<%= @openapi_path %>",
         layout: "modern"
       });
     }
-  });
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", window.recordingStudioApiScalarInit, { once: true });
+  } else {
+    window.recordingStudioApiScalarInit();
+  }
 </script>
+<script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference/dist/browser/standalone.js" onload="window.recordingStudioApiScalarInit && window.recordingStudioApiScalarInit()"></script>

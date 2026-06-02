@@ -50,4 +50,23 @@
       bin/rails tailwindcss:build
     CODE
   ) %>
+
+  <%= render FlatPack::SectionTitle::Component.new(
+    title: "4. Wire API access",
+    subtitle: "Provision credentials from a Recording Studio access recording, then authorize inside each capability handler.",
+    anchor_link: true,
+  ) %>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    language: :ruby,
+    code: <<~'CODE'
+      result = RecordingStudioApi::Services::ProvisionApiClient.call(
+        access_recording: access_recording,
+        name: "Primary OAuth client"
+      )
+
+      # Later, inside a custom capability handler:
+      context.access_grant.authorize!(recording: context.recording, role: :edit)
+    CODE
+  ) %>
 </div>

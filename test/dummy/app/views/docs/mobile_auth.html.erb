@@ -10,7 +10,8 @@
     "The server checks which RecordingStudio::Access records belong to that user and has them choose one if there is more than one option.",
     "Once access is confirmed, the server creates a one-time OAuth authorization code record and redirects the app back with the code.",
     "The app exchanges that code, together with its PKCE verifier, for a mobile access token and a refresh token.",
-    "The app uses the access token for API calls, and when it expires it uses the refresh token to get a new access token and a rotated refresh token."
+    "The app uses the access token for API calls, and when it expires it uses the refresh token to get a new access token and a rotated refresh token.",
+    "Each accepted mobile access token resolves to a RecordingStudioApi::AccessGrant, and the selected capability authorizes behavior through that grant."
   ] %>
 
   <%= render FlatPack::Card::Component.new(style: :outlined) do %>

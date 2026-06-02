@@ -13,19 +13,119 @@
       class: "inline-flex items-center rounded-md border border-[var(--surface-border-color)] px-3 py-2 text-sm font-medium text-[var(--surface-content-color)] hover:bg-[var(--surface-muted-background-color)]" %>
   </div>
 
-  <div class="rounded-lg border border-[var(--surface-border-color)] bg-[var(--surface-background-color)] p-4">
+  <div id="scalar-test-auth">
+    <%= render FlatPack::Collapse::Component.new(
+      id: "scalar-test-auth-collapse",
+      title: "Test auth helper",
+      open: @scalar_test_auth_open
+    ) do %>
+      <div class="space-y-5">
+        <% if @scalar_test_error.present? %>
+          <%= render FlatPack::Card::Component.new(style: :default) do %>
+            <p class="text-sm text-(--surface-content-color)"><strong>Error:</strong> <%= @scalar_test_error %></p>
+          <% end %>
+        <% end %>
+
+        <% if @scalar_test_notice.present? %>
+          <%= render FlatPack::Card::Component.new(style: :default) do %>
+            <p class="text-sm text-(--surface-content-color)"><strong>Status:</strong> <%= @scalar_test_notice %></p>
+          <% end %>
+        <% end %>
+
+        <% if @scalar_test_access_points.any? %>
+          <%= form_with url: scalar_test_token_path, method: :post, local: true, class: "grid gap-4 md:grid-cols-[minmax(0,1fr)_12rem_auto] md:items-end" do |form| %>
+            <div class="space-y-1">
+              <%= form.label :access_point_recording_id, "Access point", class: "text-sm font-medium text-[var(--surface-content-color)]" %>
+              <%= form.select :access_point_recording_id,
+                options_for_select(@scalar_test_access_points.map { |entry| [entry.fetch(:label), entry.fetch(:id)] }, @scalar_test_selected_access_point_id),
+                {},
+                class: "w-full rounded-[var(--button-border-radius)] border border-[var(--surface-border-color)] bg-[var(--surface-background-color)] px-3 py-2 text-sm text-[var(--surface-content-color)]" %>
+            </div>
+
+            <div class="space-y-1">
+              <%= form.label :role, "Role", class: "text-sm font-medium text-[var(--surface-content-color)]" %>
+              <%= form.select :role,
+                options_for_select(@scalar_test_roles.map { |role| [role.humanize, role] }, @scalar_test_token&.fetch("role", "admin") || "admin"),
+                {},
+                class: "w-full rounded-[var(--button-border-radius)] border border-[var(--surface-border-color)] bg-[var(--surface-background-color)] px-3 py-2 text-sm text-[var(--surface-content-color)]" %>
+            </div>
+
+            <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-(--button-border-radius) border border-(--button-primary-border-color) bg-(--button-primary-background-color) px-(--button-padding-x-md) py-(--button-padding-y-md) text-sm font-medium text-(--button-primary-text-color) shadow-(--button-shadow) transition-colors duration-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--button-focus-ring-color) focus-visible:ring-offset-2 focus-visible:ring-offset-(--button-focus-ring-offset-color)">
+              Generate token
+            </button>
+          <% end %>
+        <% else %>
+          <%= render FlatPack::EmptyState::Component.new(
+            title: "No manageable API scope",
+            description: "Switch to a root where your user has admin access, then return to Scalar.",
+            icon: :inbox
+          ) %>
+        <% end %>
+
+        <% if @scalar_test_context_rows.any? %>
+          <div class="space-y-3">
+            <%= render FlatPack::SectionTitle::Component.new(
+              title: "Current bearer token",
+              subtitle: "Paste this bearer value into Scalar's Auth Required panel."
+            ) %>
+
+            <pre class="overflow-x-auto rounded-md border border-(--surface-border-color) bg-(--surface-background-color) p-4 text-sm text-(--surface-content-color)"><%= "Bearer #{@scalar_test_token.fetch("access_token")}" %></pre>
+
+            <div class="flex flex-wrap gap-3">
+              <%= button_to "Revoke token", scalar_test_token_path, method: :delete, class: "inline-flex items-center justify-center gap-2 rounded-(--button-border-radius) border border-(--surface-border-color) bg-(--surface-background-color) px-(--button-padding-x-md) py-(--button-padding-y-md) text-sm font-medium text-(--surface-content-color) transition-colors duration-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--button-focus-ring-color) focus-visible:ring-offset-2 focus-visible:ring-offset-(--button-focus-ring-offset-color)" %>
+            </div>
+
+            <%= render FlatPack::Table::Component.new(data: @scalar_test_context_rows) do |table| %>
+              <% table.column(title: "Field", html: ->(row) { row.fetch(:field) }) %>
+              <% table.column(title: "Value", html: ->(row) { row.fetch(:value) }) %>
+            <% end %>
+          </div>
+        <% end %>
+
+        <% if @scalar_test_sample_rows.any? %>
+          <div class="space-y-3">
+            <%= render FlatPack::SectionTitle::Component.new(
+              title: "Scoped sample IDs",
+              subtitle: "Use these IDs for Scalar path parameters."
+            ) %>
+
+            <%= render FlatPack::Table::Component.new(data: @scalar_test_sample_rows) do |table| %>
+              <% table.column(title: "Resource", html: ->(row) { row.fetch(:resource) }) %>
+              <% table.column(title: "Label", html: ->(row) { row.fetch(:label) }) %>
+              <% table.column(title: "ID", html: ->(row) { row.fetch(:id) }) %>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+
+  <div class="rounded-lg border border-(--surface-border-color) bg-(--surface-background-color) p-4">
     <div id="scalar-api-reference" class="min-h-[640px]"></div>
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
 <script>
-  window.addEventListener("DOMContentLoaded", function() {
+  window.recordingStudioApiScalarInit = function() {
+    var target = document.getElementById("scalar-api-reference");
+
+    if (!target || target.dataset.scalarInitialized === "true") {
+      return;
+    }
+
     if (window.Scalar && window.Scalar.createApiReference) {
+      target.dataset.scalarInitialized = "true";
       window.Scalar.createApiReference("#scalar-api-reference", {
         url: "<%= @openapi_path %>",
         layout: "modern"
       });
     }
-  });
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", window.recordingStudioApiScalarInit, { once: true });
+  } else {
+    window.recordingStudioApiScalarInit();
+  }
 </script>
+<script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference/dist/browser/standalone.js" onload="window.recordingStudioApiScalarInit && window.recordingStudioApiScalarInit()"></script>

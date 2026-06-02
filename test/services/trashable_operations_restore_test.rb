@@ -99,6 +99,7 @@ class TrashableOperationsRestoreTest < ActiveSupport::TestCase
       api_client: ApiClient.new(11),
       credential: Credential.new(22),
       access_recording: nil,
+      access_grant: nil,
       root_recording: nil,
       params: {},
       scoped_recordings: nil

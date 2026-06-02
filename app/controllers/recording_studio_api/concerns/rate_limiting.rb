@@ -10,10 +10,19 @@ module RecordingStudioApi
       end
 
       included do
+        prepend_before_action :enforce_api_pre_auth_rate_limit!
         before_action :enforce_rate_limit!
       end
 
       private
+
+      def enforce_api_pre_auth_rate_limit!
+        return unless api_pre_auth_rate_limit_enabled_for_request?
+
+        with_rate_limit_bucket("api_pre_auth") do
+          enforce_rate_limit!
+        end
+      end
 
       def enforce_rate_limit!
         decision = resolved_rate_limit_decision
@@ -82,7 +91,20 @@ module RecordingStudioApi
         }
       end
 
+      def with_rate_limit_bucket(bucket)
+        previous_bucket = @rate_limit_bucket_override
+        @rate_limit_bucket_override = bucket
+        yield
+      ensure
+        @rate_limit_bucket_override = previous_bucket
+      end
+
+      def api_pre_auth_rate_limit_enabled_for_request? = RecordingStudioApi.configuration.rate_limit_api_pre_auth_enabled && api_v1_rate_limited_path?
+
       def rate_limit_enabled_for_request?
+        if rate_limit_bucket_override == "api_pre_auth"
+          return api_pre_auth_rate_limit_enabled_for_request?
+        end
         if oauth_rate_limited_path?
           return RecordingStudioApi.configuration.rate_limit_oauth_enabled
         end
@@ -93,6 +115,8 @@ module RecordingStudioApi
       end
 
       def rate_limit_bucket
+        return rate_limit_bucket_override if rate_limit_bucket_override.present?
+
         if oauth_rate_limited_path?
           "oauth"
         elsif api_read_request?
@@ -106,6 +130,8 @@ module RecordingStudioApi
         case rate_limit_bucket
         when "oauth"
           RecordingStudioApi.configuration.rate_limit_oauth_requests.to_i
+        when "api_pre_auth"
+          RecordingStudioApi.configuration.rate_limit_api_pre_auth_requests.to_i
         when "api_read"
           RecordingStudioApi.configuration.rate_limit_api_read_requests.to_i.nonzero? ||
             RecordingStudioApi.configuration.rate_limit_api_requests.to_i
@@ -119,6 +145,8 @@ module RecordingStudioApi
         case rate_limit_bucket
         when "oauth"
           RecordingStudioApi.configuration.rate_limit_oauth_period_seconds.to_i
+        when "api_pre_auth"
+          RecordingStudioApi.configuration.rate_limit_api_pre_auth_period_seconds.to_i
         when "api_read"
           RecordingStudioApi.configuration.rate_limit_api_read_period_seconds.to_i.nonzero? ||
             RecordingStudioApi.configuration.rate_limit_api_period_seconds.to_i
@@ -129,6 +157,8 @@ module RecordingStudioApi
       end
 
       def rate_limit_identifier
+        return "ip:#{request.remote_ip}" if rate_limit_bucket == "api_pre_auth"
+
         if oauth_rate_limited_path?
           client_id = params[:client_id].to_s.strip
           return "client:#{client_id}" if client_id.present?
@@ -149,6 +179,8 @@ module RecordingStudioApi
         configured = RecordingStudioApi.configuration.rate_limit_redis_namespace.to_s.strip
         configured.present? ? configured : "recording_studio_api"
       end
+
+      def rate_limit_bucket_override = @rate_limit_bucket_override
 
       def oauth_rate_limited_path?
         request.path.end_with?("/oauth/token") || request.path.end_with?("/oauth/revoke")

@@ -138,7 +138,19 @@ module RecordingStudioApi
             Error: {
               type: "object",
               properties: {
-                error: { type: "string" }
+                error: { type: "string" },
+                details: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      attribute: { type: "string" },
+                      message: { type: "string" },
+                      full_message: { type: "string" },
+                      type: { type: "string" }
+                    }
+                  }
+                }
               },
               required: ["error"]
             },

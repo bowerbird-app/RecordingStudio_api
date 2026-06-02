@@ -30,34 +30,35 @@ module RecordingStudioApi
       render_error(error.message, :unprocessable_entity)
     end
 
+    rescue_from ActiveRecord::RecordInvalid do |error|
+      render_validation_error(error.record)
+    end
+
     private
 
-    def authorize_api_read!
-      return if api_access_policy.can_read?
-
-      raise RecordingStudioApi::AuthorizationError, "API client does not have read access"
+    def render_validation_error(record)
+      render_error(
+        record.errors.full_messages.to_sentence,
+        :unprocessable_entity,
+        details: validation_error_details(record)
+      )
     end
 
-    def authorize_api_write!
-      return if api_access_policy.can_write?
-
-      raise RecordingStudioApi::AuthorizationError, "API client does not have write access"
-    end
-
-    def authorize_api_admin!
-      return if api_access_policy.can_admin?
-
-      raise RecordingStudioApi::AuthorizationError, "API client does not have admin access"
+    def validation_error_details(record)
+      record.errors.map do |validation_error|
+        {
+          attribute: validation_error.attribute,
+          message: validation_error.message,
+          full_message: validation_error.full_message,
+          type: validation_error.type
+        }
+      end
     end
 
     def render_error(message, status, details: nil)
       payload = { error: message }
       payload[:details] = details if details.present?
       render json: payload, status: status
-    end
-
-    def api_access_policy
-      @api_access_policy ||= RecordingStudioApi::AccessPolicy.new(access_recording: current_access_recording)
     end
   end
 end

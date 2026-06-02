@@ -50,6 +50,19 @@ module RecordingStudioApi
           context.credential
         end
 
+        def access_grant
+          context.access_grant || RecordingStudioApi::AccessGrant.new(
+            api_client: api_client,
+            credential: credential,
+            access_recording: context.access_recording,
+            root_recording: root_recording
+          )
+        end
+
+        def access_scope_recording
+          access_grant.scope_recording || root_recording
+        end
+
         def serialize_recording(target_recording)
           RecordingStudioApi::Serializers::ResourceRecordingSerializer.call(target_recording)
         end
@@ -80,12 +93,16 @@ module RecordingStudioApi
         end
 
         def parent_recording_for_create
-          return root_recording if params[:parent_id].blank?
+          return access_scope_recording if params[:parent_id].blank?
 
           parent_recording = scoped_recordings.find_by(id: params[:parent_id])
           raise RecordingStudioApi::NotFoundError, "Parent resource was not found in this API scope" if parent_recording.nil?
 
           parent_recording
+        end
+
+        def authorize_access!(target_recording, role:, include_trashed: false)
+          access_grant.authorize!(recording: target_recording, role: role, include_trashed: include_trashed)
         end
 
         def delete_metadata

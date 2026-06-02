@@ -7,13 +7,15 @@ This repository now completes the last unfinished agent pass by renaming the liv
 ## Current Scope
 
 - OAuth2 client_credentials authentication backed by `RecordingStudioApi::ApiClient`, `ApiCredential`, and issued access tokens
+- OAuth2 Authorization Code + PKCE, refresh-token rotation, and revocation for public mobile clients
 - API client recordables stored beneath `RecordingStudio::Access` recordings in the Recording Studio tree
+- authenticated API requests resolved into a `RecordingStudioApi::AccessGrant` that is passed to capability handlers
 - capability-backed action registry with automatic action exposure when a recordable type enables that capability
 - preserved template reference material in `docs/gem_template/`
 
 The current codebase still ships the template engine mechanics (configuration, hooks, install generator, sample service objects), but the engine now also exposes a real JSON API surface for authenticated resource lookup and capability-backed member actions.
 
-## Proposed API Architecture
+## API Architecture
 
 ### Core registries
 
@@ -33,8 +35,11 @@ Each action declares its verb, capability mapping, handler, and serializer so ad
 
 ### Access model
 
-- authorization should flow through accessible records in the authenticated root scope
-- `ApiClient` is the acting API principal
+- the API core authenticates credentials and resolves the `RecordingStudio::Access` recording attached to those credentials
+- `RecordingStudioApi::AccessGrant` carries `api_client`, `credential`, `access_recording`, `root_recording`, and the access actor into handlers
+- capability handlers own authorization and should call `context.access_grant.authorize!` or `RecordingStudioAccessible.authorized?` before doing work
+- the built-in resource, trash, and move handlers already perform their own grant checks
+- `ApiClient` is the API credential principal for audit metadata, while the `RecordingStudio::Access` actor remains the Recording Studio authorization actor
 - each access recording owns at most one active API credential record
 - raw secrets should only be revealed at creation or rotation time
 
@@ -42,15 +47,15 @@ Each action declares its verb, capability mapping, handler, and serializer so ad
 
 ### Boot validation
 
-The eventual runtime should fail fast when:
+The runtime should fail fast when:
 
 - an API action points at a capability that is not enabled
 - duplicate action names are registered
 - required handlers or serializers are missing
 
-## Current Ruby Surface
+## Ruby Integration Surface
 
-The renamed engine currently exposes the same basic Ruby integration points as the template:
+Host apps and addon gems use these entrypoints for configuration, resource exposure, and capability registration:
 
 ```ruby
 RecordingStudioApi.configure do |config|
@@ -61,6 +66,8 @@ end
 
 RecordingStudioApi.configuration
 RecordingStudioApi::Hooks.run(:before_initialize)
+RecordingStudioApi.register_recordable_type_api("Page", serializer: PageSerializer)
+RecordingStudioApi.register_capability_action(:publish, capability: :publishable, handler: PublishRecording)
 ```
 
 ### Access management role settings
@@ -136,14 +143,16 @@ Authorization: Bearer <access_token>
 
 Each API request is evaluated in this order:
 
-1. OAuth2 authentication validates the bearer access token.
-2. The engine resolves `current_api_client`, `current_api_credential`, `current_access_recording`, and `current_root_recording`.
-3. Recording Studio accessible scopes constrain resource queries and member actions to what that authenticated client can access.
+1. If enabled, the API pre-auth limiter throttles `/api/v1` requests by IP before bearer-token lookup.
+2. OAuth2 authentication validates the bearer access token.
+3. The engine resolves `current_api_client`, `current_api_credential`, `current_access_recording`, `current_root_recording`, and `current_access_grant`.
+4. If enabled, the authenticated API limiter throttles by API credential/client, split between read and write buckets.
+5. The API controller resolves the requested resource or action and dispatches to the registered handler with the access grant in context.
+6. The capability handler authorizes its own behavior with the passed grant. Simple handlers can call `context.access_grant.authorize!(recording: ..., role: ...)`; complex handlers can check multiple recordings or roles with Recording Studio Accessible.
 
 ## Mobile Integration Guidance
 
-The current engine implements OAuth2 `client_credentials` for machine-to-machine access.
-For mobile apps, prefer a backend-for-frontend pattern first:
+The engine supports OAuth2 `client_credentials` for machine-to-machine access and Authorization Code + PKCE for public mobile clients. For mobile apps that can use a backend-for-frontend pattern, prefer it first:
 
 1. Mobile app authenticates the user with host-app auth.
 2. Mobile app calls your backend.
@@ -152,7 +161,7 @@ For mobile apps, prefer a backend-for-frontend pattern first:
 
 This keeps API secrets off-device while preserving workspace-scoped auditability in the Recording Studio tree.
 
-If direct mobile-to-API OAuth is required, staged implementation guidance is documented in [docs/MOBILE_AUTH_ROADMAP.md](docs/MOBILE_AUTH_ROADMAP.md).
+If direct mobile-to-API OAuth is required, register a public OAuth client with an exact redirect URI, send users through `/recording_studio_api/oauth/authorize`, and let the token endpoint exchange authorization codes or refresh tokens. The same access-grant dispatch model is used after the mobile access token is presented to the JSON API.
 
 ### Capability-backed actions
 
@@ -169,9 +178,26 @@ RecordingStudioApi.register_capability_action(
 
 If a recordable type enables `:movable`, the API automatically exposes the `move` action for that resource.
 
+Handlers receive `RecordingStudioApi::ActionContext` or `RecordingStudioApi::ResourceOperationContext`. Custom handlers should authorize through the grant before mutating or exposing sensitive data:
+
+```ruby
+class PublishRecording
+  def self.call(context)
+    context.access_grant.authorize!(recording: context.recording, role: :edit)
+
+    context.recording.recordable.update!(published_at: Time.current)
+    context.recording
+  end
+end
+```
+
 ### API endpoints
 
-- `POST /recording_studio_api/oauth/token` — issue OAuth2 access token using `client_credentials`
+- `GET /recording_studio_api/admin_api` — browser admin dashboard for configured API access
+- `GET /recording_studio_api/admin_api/logs` — browser admin request-log view
+- `GET /recording_studio_api/oauth/authorize` — issue a PKCE authorization code for a public OAuth client
+- `POST /recording_studio_api/oauth/token` — issue or refresh OAuth2 access tokens using `client_credentials`, `authorization_code`, or `refresh_token`
+- `POST /recording_studio_api/oauth/revoke` — revoke a mobile OAuth grant session or token family
 - `GET /recording_studio_api/api/v1` — list available API resources
 - `GET /recording_studio_api/api/v1/:resource` — list recordings of a resource type inside the authenticated root
 - `GET /recording_studio_api/api/v1/:resource/:id` — show one recording
@@ -189,8 +215,9 @@ Use `test/dummy/` as the review surface for the completed handoff:
 
 - `/docs/install` documents the renamed install and migration flow
 - `/docs/config` records the current config API plus the capability action registry
-- `/docs/api` and `/docs/api_routes` document OAuth2 exchange and mounted API endpoints
-- `/docs/auth` explains token exchange plus post-auth Recording Studio access scoping
+- `/docs/api_routes` documents mounted API endpoints and the generated JSON endpoint inventory
+- `/docs/scalar` renders the generated OpenAPI explorer
+- `/docs/auth` explains token exchange, access-grant resolution, and capability-owned authorization
 - `/docs/add_capability` shows capability action registration patterns
 - `/docs/methods` documents the live Ruby entrypoints
 - `/docs/recordable_types`, `/docs/recordings_tree`, and `/docs/gem_views` verify Recording Studio wiring and the current gem view footprint

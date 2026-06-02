@@ -204,7 +204,8 @@ class RecordingStudioApiTest < Minitest::Test
     assert_includes initializer_source, "config.layout = :application_layout"
     assert_includes initializer_source, "config.scope :all_roots"
     assert_includes initializer_source, "RecordingStudioAdmin::Admin"
-    assert_not_includes initializer_source, 'requested_return_to.start_with?("/admin")'
+    assert_includes initializer_source, "nested_return_to = Rack::Utils.parse_nested_query"
+    assert_includes initializer_source, 'resolved_return_to_path.start_with?("/admin")'
   end
 
   def test_dummy_admin_initializer_uses_controller_current_root_recording

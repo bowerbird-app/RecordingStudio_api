@@ -44,10 +44,10 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "API access list"
     assert_select %(a[href="#{docs_install_path}"]), count: 1
     assert_select %(form[action="/mobile_app_demo"] button), text: "Mobile app demo"
-    assert_select %(form[action="/recording_studio_api/api_clients/new?root_type=Workspace"] button), text: "Add"
-    assert_select %(form[action="/recording_studio_api/api_clients/new?root_type=Folder"] button), text: "Add"
-    assert_select %(form[action="/recording_studio_api/api_clients?include_children=1&root_type=Workspace"] button), text: "API access list"
-    assert_select %(form[action="/recording_studio_api/api_clients?include_children=1&root_type=Folder"] button), text: "API access list"
+    assert_select %(form[action="/recording_studio_api/api_clients/new?close_url=%2F&root_type=Workspace"] button), text: "Add"
+    assert_select %(form[action="/recording_studio_api/api_clients/new?close_url=%2F&root_type=Folder"] button), text: "Add"
+    assert_select %(form[action="/recording_studio_api/api_clients?close_url=%2F&include_children=1&root_type=Workspace"] button), text: "API access list"
+    assert_select %(form[action="/recording_studio_api/api_clients?close_url=%2F&include_children=1&root_type=Folder"] button), text: "API access list"
     assert_includes response.body, "Admin for"
     assert_not_includes response.body, "Open admin"
     assert_not_includes response.body, "Manage users"
@@ -157,5 +157,38 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Demo to add and remove API access"
     assert_includes response.body, "API access list"
     assert_not_includes response.body, "<h1>Admin</h1>"
+  end
+
+  test "switching from a nested root switch return target falls back to the host root demo" do
+    admin_root = RecordingStudioAdmin::Admin.create!(name: "Admin", key: SecureRandom.hex(4))
+    admin_root_recording = RecordingStudio::Recording.create!(recordable: admin_root)
+    admin_access = RecordingStudio::Access.create!(actor: @user, role: :admin)
+    RecordingStudio::Recording.create!(recordable: admin_access, parent_recording: admin_root_recording)
+
+    workspace = Workspace.create!(name: "Studio Workspace")
+    workspace_root_recording = RecordingStudio::Recording.create!(recordable: workspace)
+    workspace_access = RecordingStudio::Access.create!(actor: @user, role: :admin)
+    RecordingStudio::Recording.create!(recordable: workspace_access, parent_recording: workspace_root_recording)
+
+    nested_return_to = recording_studio_root_switchable.root_switch_path(
+      scope: "all_roots",
+      return_to: admin_api_path
+    )
+
+    patch recording_studio_root_switchable.root_switch_path(scope: "all_roots"), params: {
+      root_switch: {
+        root_recording_id: workspace_root_recording.id,
+        return_to: nested_return_to
+      }
+    }
+
+    assert_redirected_to "/"
+
+    follow_redirect!
+
+    assert_response :success
+    assert_select "h1", text: "Recording Studio API demo"
+    assert_includes response.body, "Demo to add and remove API access"
+    assert_not_includes response.body, "Change root"
   end
 end

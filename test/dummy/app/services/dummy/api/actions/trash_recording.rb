@@ -15,6 +15,8 @@ module Dummy
         end
 
         def call
+          context.access_grant.authorize!(recording: recording, role: :edit)
+
           trash_resource!
           recording.reload
         end

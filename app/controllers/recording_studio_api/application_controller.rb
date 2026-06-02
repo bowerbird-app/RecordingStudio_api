@@ -6,6 +6,8 @@ module RecordingStudioApi
 
     helper_method :admin_root_current?
     helper_method :current_root_name
+    helper_method :page_nav_close_url
+    helper_method :page_nav_close_param
 
     protect_from_forgery with: :exception
     layout :recording_studio_api_layout
@@ -47,6 +49,36 @@ module RecordingStudioApi
 
     def turbo_frame_request?
       request.headers["Turbo-Frame"].present?
+    end
+
+    def page_nav_close_url
+      @page_nav_close_url ||= sanitized_page_nav_close_url(params[:close_url]) || page_nav_default_close_url
+    end
+
+    def page_nav_close_param
+      return {} if page_nav_close_url.blank?
+
+      { close_url: page_nav_close_url }
+    end
+
+    def page_nav_default_close_url
+      main_app.root_path
+    end
+
+    def sanitized_page_nav_close_url(raw_url)
+      return if raw_url.blank?
+
+      sanitized_url = FlatPack::AttributeSanitizer.sanitize_url(raw_url)
+      return unless sanitized_url.present?
+      return if sanitized_url.start_with?("//")
+
+      uri = URI.parse(sanitized_url)
+      path = uri.path.to_s
+      return unless path.start_with?("/")
+
+      [path, uri.query.present? ? "?#{uri.query}" : nil, uri.fragment.present? ? "##{uri.fragment}" : nil].compact.join
+    rescue URI::InvalidURIError
+      nil
     end
   end
 end

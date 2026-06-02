@@ -34,12 +34,13 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     get "/recording_studio_api/api_clients/new", params: { root_type: "Workspace" }
 
     assert_response :success
-    assert_includes response.body, "flat-pack-breadcrumb"
+    assert_select %(nav.flat-pack-page-nav a[href="/"][aria-label="Close"]), count: 1
     assert_includes response.body, "Add API access"
     assert_includes response.body, "Create access"
     assert_includes response.body, "Name"
     assert_includes response.body, "Role"
     assert_includes response.body, "Expires"
+    assert_select %(input[name="api_client[expires_at]"][placeholder="Never"]), count: 1
     assert_not_includes response.body, "Access role"
     assert_not_includes response.body, "Credential expiry"
     assert_not_includes response.body, "Top-level recording"
@@ -59,7 +60,7 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     }
 
     assert_response :created
-    assert_includes response.body, "flat-pack-breadcrumb"
+    assert_select %(nav.flat-pack-page-nav a[href="/"][aria-label="Close"]), count: 1
     assert_includes response.body, "Workspace API access created"
     assert_includes response.body, "UI provisioned client"
     assert_includes response.body, "Client secret"
@@ -90,10 +91,10 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
       name: "Nested API client"
     )
 
-    get "/recording_studio_api/api_clients", params: { root_recording_id: @workspace_root_recording.id }
+    get "/recording_studio_api/api_clients", params: { root_recording_id: @workspace_root_recording.id, close_url: "/workspace" }
 
     assert_response :success
-    assert_includes response.body, "flat-pack-breadcrumb"
+    assert_select %(nav.flat-pack-page-nav a[href="/workspace"][aria-label="Close"]), count: 1
     assert_includes response.body, "API access list"
     assert_includes response.body, "API access below Workspace: UI Workspace."
     assert_includes response.body, "Name"
@@ -106,11 +107,16 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Workspace"
     assert_includes response.body, nested_api_client.name
     assert_includes response.body, "Nested Folder"
-    assert_select %(nav.flat-pack-breadcrumb a), text: "Back", count: 1
-    assert_select %(nav.flat-pack-breadcrumb a[href="/"]), text: "Back", count: 1
-    assert_select %(nav.flat-pack-breadcrumb a[href="/"]), text: "Home", count: 1
-    assert_select %(a[href="/recording_studio_api/api_clients/#{direct_api_client.id}"]), text: direct_api_client.name
-    assert_select %(a[href="/recording_studio_api/api_clients/#{nested_api_client.id}"]), text: nested_api_client.name
+    assert_select %(a[href="/recording_studio_api/api_clients/#{direct_api_client.id}?close_url=%2Fworkspace"]), text: direct_api_client.name
+    assert_select %(a[href="/recording_studio_api/api_clients/#{nested_api_client.id}?close_url=%2Fworkspace"]), text: nested_api_client.name
+  end
+
+  test "page nav falls back to the default close url when close url is unsafe" do
+    get "/recording_studio_api/api_clients/new", params: { root_type: "Workspace", close_url: "https://example.com/escape" }
+
+    assert_response :success
+    assert_select %(nav.flat-pack-page-nav a[href="/"][aria-label="Close"]), count: 1
+    assert_not_includes response.body, "https://example.com/escape"
   end
 
   test "view-only access can see api access but cannot change it" do
@@ -223,7 +229,7 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "No API access given yet"
     assert_includes response.body, "Create API access from the demo home page to populate this list."
-    assert_select %(a[href="/recording_studio_api/api_clients/new"]), text: "New", count: 1
+    assert_select %(a[href="/recording_studio_api/api_clients/new?close_url=%2F"]), text: "New", count: 1
   end
 
   test "index subtitle falls back to root type label when multiple roots match" do
@@ -260,7 +266,7 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     get "/recording_studio_api/api_clients/#{api_client.id}"
 
     assert_response :success
-    assert_includes response.body, "flat-pack-breadcrumb"
+    assert_select %(nav.flat-pack-page-nav a[href="/"][aria-label="Close"]), count: 1
     assert_includes response.body, "Details API client"
     assert_includes response.body, "Field"
     assert_includes response.body, "Value"
@@ -281,10 +287,8 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_select %(a[href="#machine-token-health"][data-flat-pack--section-title-anchor-target="link"]), count: 1
     assert_select %(div#oauth2-activity[data-controller="flat-pack--section-title-anchor"]), count: 1
     assert_select %(a[href="#oauth2-activity"][data-flat-pack--section-title-anchor-target="link"]), count: 1
-    assert_select %(nav.flat-pack-breadcrumb a[href="/recording_studio_api/api_clients?include_children=1"]), text: "Back", count: 1
-    assert_select %(nav.flat-pack-breadcrumb a[href="/"]), text: "Home", count: 1
-    assert_select %(form[action="/recording_studio_api/api_clients/#{api_client.id}/edit"] button), text: "Edit"
-    assert_select %(form[action="/recording_studio_api/api_clients/#{api_client.id}/tokens"] button), text: "Tokens"
+    assert_select %(form[action="/recording_studio_api/api_clients/#{api_client.id}/edit?close_url=%2F"] button), text: "Edit"
+    assert_select %(form[action="/recording_studio_api/api_clients/#{api_client.id}/tokens?close_url=%2F"] button), text: "Tokens"
     assert_not_includes response.body, "Back to API access list"
     assert_not_includes response.body, "Back to demo"
   end
@@ -322,9 +326,8 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "****main"
     assert_not_includes response.body, "tok-main"
     assert_not_includes response.body, "tok-other"
-    assert_select %(form[action="/recording_studio_api/api_clients/#{api_client.id}/tokens/#{token.id}/revoke"] button), text: "Revoke", count: 1
-    assert_select %(nav.flat-pack-breadcrumb a[href="/recording_studio_api/api_clients/#{api_client.id}"]), text: "Back", count: 1
-    assert_select %(nav.flat-pack-breadcrumb a[href="/"]), text: "Home", count: 1
+    assert_select %(form[action="/recording_studio_api/api_clients/#{api_client.id}/tokens/#{token.id}/revoke?close_url=%2F"] button), text: "Revoke", count: 1
+    assert_select %(nav.flat-pack-page-nav a[href="/"][aria-label="Close"]), count: 1
   end
 
   test "tokens index shows revoke action and revoke marks token revoked" do
@@ -341,18 +344,18 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     get "/recording_studio_api/api_clients/#{api_client.id}/tokens"
 
     assert_response :success
-    assert_select %(form[action="/recording_studio_api/api_clients/#{api_client.id}/tokens/#{token.id}/revoke"] button), text: "Revoke", count: 1
+    assert_select %(form[action="/recording_studio_api/api_clients/#{api_client.id}/tokens/#{token.id}/revoke?close_url=%2F"] button), text: "Revoke", count: 1
 
     post "/recording_studio_api/api_clients/#{api_client.id}/tokens/#{token.id}/revoke"
 
-    assert_redirected_to "/recording_studio_api/api_clients/#{api_client.id}/tokens"
+    assert_redirected_to "/recording_studio_api/api_clients/#{api_client.id}/tokens?close_url=%2F"
     assert_not_nil token.reload.revoked_at
 
     get "/recording_studio_api/api_clients/#{api_client.id}/tokens"
 
     assert_response :success
     assert_includes response.body, "Revoked"
-    assert_select %(form[action="/recording_studio_api/api_clients/#{api_client.id}/tokens/#{token.id}/revoke"] button), count: 0
+    assert_select %(form[action="/recording_studio_api/api_clients/#{api_client.id}/tokens/#{token.id}/revoke?close_url=%2F"] button), count: 0
   end
 
   test "show renders token and oauth activity counts with session link" do
@@ -433,8 +436,8 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Name"
     assert_includes response.body, "Expires"
     assert_includes response.body, "Save changes"
-    assert_select %(nav.flat-pack-breadcrumb a[href="/recording_studio_api/api_clients/#{api_client.id}"]), text: "Back", count: 1
-    assert_select %(nav.flat-pack-breadcrumb a[href="/"]), text: "Home", count: 1
+    assert_select %(nav.flat-pack-page-nav a[href="/"][aria-label="Close"]), count: 1
+    assert_select %(form[action="/recording_studio_api/api_clients/#{api_client.id}?close_url=%2F"]), count: 1
   end
 
   test "show returns not found for unknown API client" do
@@ -485,7 +488,7 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
       }
     }
 
-    assert_redirected_to "/recording_studio_api/api_clients/#{api_client.id}"
+    assert_redirected_to "/recording_studio_api/api_clients/#{api_client.id}?close_url=%2F"
 
     assert_equal "Renamed API client", api_client.reload.name
     assert_in_delta new_expires_at.to_i, latest_credential.reload.expires_at.to_i, 60
