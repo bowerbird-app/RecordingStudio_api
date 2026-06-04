@@ -76,20 +76,24 @@ class DocsController < ApplicationController
   end
 
   def api_routes
-    @api_catalog = RecordingStudioApi::Services::DocumentationCatalog.call
+    @api_version = selected_api_version
+    @api_catalog = RecordingStudioApi::Services::DocumentationCatalog.call(version: @api_version)
   end
 
   def openapi
-    render json: RecordingStudioApi::Services::OpenapiDocument.call
+    render json: RecordingStudioApi::Services::OpenapiDocument.call(version: selected_api_version)
   end
 
   def scalar
-    @openapi_path = docs_openapi_path
+    @api_version = selected_api_version
+    @openapi_path = scalar_openapi_path_for(@api_version)
+    @scalar_fullscreen_path = scalar_fullscreen_path_for(@api_version)
     load_scalar_test_auth
   end
 
   def scalar_fullscreen
-    @openapi_path = docs_openapi_path
+    @api_version = selected_api_version
+    @openapi_path = scalar_openapi_path_for(@api_version)
     render :scalar_fullscreen, layout: false
   end
 
@@ -103,6 +107,9 @@ class DocsController < ApplicationController
   end
 
   def methods
+  end
+
+  def versions
   end
 
   private
@@ -247,5 +254,25 @@ class DocsController < ApplicationController
     recordable_class.count
   rescue ActiveRecord::ActiveRecordError
     0
+  end
+
+  def selected_api_version
+    @selected_api_version ||= RecordingStudioApi.resolve_api_version(params[:version])
+  end
+
+  def scalar_openapi_path_for(api_version)
+    return api_docs_openapi_path(version: api_version) if versioned_api_docs_request?
+
+    docs_openapi_path(version: api_version)
+  end
+
+  def scalar_fullscreen_path_for(api_version)
+    return api_docs_fullscreen_path(version: api_version) if versioned_api_docs_request?
+
+    docs_scalar_fullscreen_path(version: api_version)
+  end
+
+  def versioned_api_docs_request?
+    request.path.start_with?("/APIdocs")
   end
 end

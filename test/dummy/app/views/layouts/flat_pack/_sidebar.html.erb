@@ -77,6 +77,12 @@
         ) %>
 
         <%= render FlatPack::Sidebar::Item::Component.new(
+          label: "Versions",
+          href: main_app.docs_versions_path,
+          icon: :rectangle_group
+        ) %>
+
+        <%= render FlatPack::Sidebar::Item::Component.new(
           label: "API hierarchy",
           href: main_app.docs_api_hierarchy_path,
           icon: :folder_open

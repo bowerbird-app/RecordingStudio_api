@@ -16,7 +16,18 @@
 		code: <<~'CODE'
 			RecordingStudioApi.configure { |config| config.token_ttl = 30.days }
 			RecordingStudioApi.register_recordable_type_api("Page", serializer: PageSerializer)
-			RecordingStudioApi.register_capability_action(:publish, capability: :publishable, handler: PublishRecording)
+			RecordingStudioApi.register_capability_action(
+			  :publish,
+			  capability: :publishable,
+			  version: "1.0.0",
+			  version_notes: ["Initial publish contract"],
+			  deprecation: {
+			    deprecated: true,
+			    removal_date: "2026-12-31",
+			    reason: "Use publish v2"
+			  },
+			  handler: PublishRecording
+			)
 			RecordingStudioApi.capability_action(:publish)
 			RecordingStudioApi.resource_action(:show)
 		CODE

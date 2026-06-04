@@ -41,6 +41,8 @@ class ConfigurationTest < Minitest::Test
     assert_respond_to configuration.admin_dashboard_path_resolver, :call
     assert_respond_to configuration.admin_logs_path_resolver, :call
     assert_nil configuration.admin_layout_name
+    assert_equal ["v1"], configuration.api_versions
+    assert_equal "v1", configuration.default_api_version
     assert_nil configuration.openapi_title
     assert_nil configuration.openapi_description
     assert_equal "application", configuration.layout_name
@@ -111,6 +113,20 @@ class ConfigurationTest < Minitest::Test
     assert_equal "Public endpoints for mobile clients", @configuration.openapi_description
   end
 
+  def test_merge_normalizes_api_versions_and_default
+    @configuration.merge!(api_versions: %w[1 V2], default_api_version: "2")
+
+    assert_equal %w[v1 v2], @configuration.api_versions
+    assert_equal "v2", @configuration.default_api_version
+  end
+
+  def test_merge_includes_default_api_version_when_not_present
+    @configuration.merge!(api_versions: ["v2"], default_api_version: "v9")
+
+    assert_equal %w[v2 v9], @configuration.api_versions
+    assert_equal "v9", @configuration.default_api_version
+  end
+
   def test_merge_accepts_string_keys
     @configuration["timeout"] = 12
 
@@ -160,10 +176,58 @@ class ConfigurationTest < Minitest::Test
     @configuration.action_registry.register(
       :echo,
       capability: :echoable,
+      version: "1.2.3",
+      version_notes: ["Initial public echo contract"],
+      deprecation: {
+        deprecated: true,
+        removal_date: "2026-12-31",
+        reason: "Replaced by echo v2"
+      },
       handler: ->(_context) { :ok }
     )
 
-    assert_equal :echoable, @configuration.to_h.fetch(:action_registrations).fetch("echo").fetch(:action)
+    registration = @configuration.to_h.fetch(:action_registrations).fetch("echo")
+    assert_equal :echoable, registration.fetch(:action)
+    assert_equal "1.2.3", registration.fetch(:version)
+    assert_equal ["Initial public echo contract"], registration.fetch(:version_notes)
+    assert_equal true, registration.fetch(:deprecation).fetch(:deprecated)
+    assert_equal "2026-12-31", registration.fetch(:deprecation).fetch(:removal_date)
+    assert_equal "Replaced by echo v2", registration.fetch(:deprecation).fetch(:reason)
+    assert_equal ["1.2.3"], registration.fetch(:versions)
+  end
+
+  def test_version_profile_dsl_tracks_contribution_requirements
+    profile = @configuration.version("2") do |api|
+      api.use :moveable, "~> 2.0"
+      api.use :publishable
+    end
+
+    assert_equal "v2", profile.name
+    assert_includes @configuration.api_versions, "v2"
+    assert_equal "~> 2.0", @configuration.api_version_profile_for("v2").requirements.fetch(:moveable).to_s
+    assert_equal ">= 0", @configuration.api_version_profile_for("2").requirements.fetch(:publishable).to_s
+    assert_equal "~> 2.0", @configuration.to_h.fetch(:api_version_profiles).fetch("v2").fetch(:requirements).fetch(:moveable)
+  end
+
+  def test_action_registry_resolves_highest_matching_contribution_version
+    @configuration.action_registry.register(
+      :echo,
+      capability: :echoable,
+      version: "1.5.0",
+      handler: ->(_context) { :v1 }
+    )
+    @configuration.action_registry.register(
+      :echo,
+      capability: :echoable,
+      version: "2.0.0",
+      handler: ->(_context) { :v2 }
+    )
+
+    @configuration.version("v1") { |api| api.use :echoable, "~> 1.0" }
+    @configuration.version("v2") { |api| api.use :echoable }
+
+    assert_equal "1.5.0", @configuration.action_registry.resolve(:echo, profile: @configuration.api_version_profile_for("v1")).version.to_s
+    assert_equal "2.0.0", @configuration.action_registry.resolve(:echo, profile: @configuration.api_version_profile_for("v2")).version.to_s
   end
 
   def test_register_recordable_type_api_tracks_registry_entries

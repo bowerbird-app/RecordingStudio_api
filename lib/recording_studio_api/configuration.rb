@@ -2,10 +2,13 @@
 
 require_relative "hooks"
 require_relative "action_registry"
+require_relative "api_version_profile"
 require_relative "recordable_registry"
 
 module RecordingStudioApi
   class Configuration
+    DEFAULT_API_VERSION = "v1"
+
     ACCESS_ROLE_RANKS = {
       view: 0,
       edit: 1,
@@ -41,7 +44,7 @@ module RecordingStudioApi
                   :rate_limit_api_write_period_seconds,
                   :api_request_logging_enabled,
                   :api_request_logging_payload_mode
-    attr_reader :hooks, :action_registry, :recordable_registry
+            attr_reader :hooks, :action_registry, :recordable_registry, :default_api_version, :api_version_profiles
 
     def initialize
       @timeout = 5
@@ -55,6 +58,9 @@ module RecordingStudioApi
         controller.recording_studio_api.admin_logs_path(params)
       end
       @admin_layout_name = nil
+      @api_versions = [DEFAULT_API_VERSION]
+      @default_api_version = DEFAULT_API_VERSION
+      @api_version_profiles = {}
       @openapi_title = nil
       @openapi_description = nil
       @layout_name = "application"
@@ -89,6 +95,9 @@ module RecordingStudioApi
         admin_dashboard_path_resolver: admin_dashboard_path_resolver.respond_to?(:call),
         admin_logs_path_resolver: admin_logs_path_resolver.respond_to?(:call),
         admin_layout_name: admin_layout_name,
+        api_versions: api_versions,
+        default_api_version: default_api_version,
+        api_version_profiles: api_version_profiles.transform_values(&:as_json),
         openapi_title: openapi_title,
         openapi_description: openapi_description,
         layout_name: layout_name,
@@ -136,6 +145,11 @@ module RecordingStudioApi
       action_registry.validate!
       recordable_registry.validate!
       validate_access_management_roles!
+      validate_api_versions!
+    end
+
+    def api_versions
+      (Array(@api_versions) + api_version_profiles.keys).filter_map { |entry| normalize_api_version(entry) }.uniq
     end
 
     def access_management_view_role=(value)
@@ -144,6 +158,33 @@ module RecordingStudioApi
 
     def access_management_edit_role=(value)
       @access_management_edit_role = normalize_access_role(value, default: :admin)
+    end
+
+    def api_versions=(value)
+      normalized_versions = Array(value).filter_map { |entry| normalize_api_version(entry) }.uniq
+      @api_versions = normalized_versions.presence || [DEFAULT_API_VERSION]
+
+      @default_api_version = @api_versions.first if @default_api_version.blank? || !@api_versions.include?(@default_api_version)
+    end
+
+    def default_api_version=(value)
+      @default_api_version = normalize_api_version(value) || DEFAULT_API_VERSION
+      @api_versions = Array(@api_versions).filter_map { |entry| normalize_api_version(entry) }.uniq
+      @api_versions << @default_api_version unless @api_versions.include?(@default_api_version)
+    end
+
+    def version(value)
+      normalized_version = normalize_api_version(value)
+      raise ConfigurationError, "API version name is required" if normalized_version.blank?
+
+      @api_versions = (Array(@api_versions) + [normalized_version]).uniq
+      profile = (@api_version_profiles[normalized_version] ||= ApiVersionProfile.new(normalized_version))
+      yield(profile) if block_given?
+      profile
+    end
+
+    def api_version_profile_for(value)
+      api_version_profiles[normalize_api_version(value)]
     end
 
     def []=(key, value)
@@ -157,6 +198,13 @@ module RecordingStudioApi
       normalized = value.to_s.strip
       normalized = default.to_s if normalized.blank?
       normalized.to_sym
+    end
+
+    def normalize_api_version(value)
+      normalized = value.to_s.strip.downcase
+      return if normalized.blank?
+
+      normalized.start_with?("v") ? normalized : "v#{normalized}"
     end
 
     def validate_access_management_roles!
@@ -180,6 +228,12 @@ module RecordingStudioApi
 
     def valid_access_roles
       ACCESS_ROLE_RANKS.keys
+    end
+
+    def validate_api_versions!
+      return if api_versions.include?(default_api_version)
+
+      raise ConfigurationError, "default_api_version must be included in api_versions"
     end
   end
 end

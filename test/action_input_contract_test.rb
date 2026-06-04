@@ -196,6 +196,12 @@ class ActionInputContractTest < Minitest::Test
     registration = RecordingStudioApi::ActionRegistration.new(
       name: :echo,
       capability: :echoable,
+      version_notes: ["Adds title validation"],
+      deprecation: {
+        deprecated: true,
+        removal_date: "2026-10-01",
+        reason: "Use echo v2"
+      },
       http_verb: :post,
       handler: ->(_context) { true },
       input_contract: {
@@ -208,6 +214,60 @@ class ActionInputContractTest < Minitest::Test
     registration.validate!
 
     assert_kind_of RecordingStudioApi::ActionInputContract, registration.input_contract
+    assert_equal ["Adds title validation"], registration.version_notes
+    assert_equal "2026-10-01", registration.deprecation[:removal_date]
     assert_equal true, registration.as_json[:input_contract][:fields][:title][:required]
+  end
+
+  def test_action_registration_normalizes_single_version_note_to_array
+    registration = RecordingStudioApi::ActionRegistration.new(
+      name: :echo,
+      capability: :echoable,
+      version_notes: "Initial release",
+      http_verb: :post,
+      handler: ->(_context) { true }
+    )
+
+    registration.validate!
+
+    assert_equal ["Initial release"], registration.version_notes
+    assert_equal ["Initial release"], registration.as_json[:version_notes]
+  end
+
+  def test_action_registration_normalizes_grouped_deprecation_metadata
+    registration = RecordingStudioApi::ActionRegistration.new(
+      name: :echo,
+      capability: :echoable,
+      deprecation: {
+        deprecated: true,
+        removal_date: Date.new(2026, 12, 31),
+        reason: "Use echo v2"
+      },
+      http_verb: :post,
+      handler: ->(_context) { true }
+    )
+
+    registration.validate!
+
+    assert_equal true, registration.deprecation[:deprecated]
+    assert_equal "2026-12-31", registration.deprecation[:removal_date]
+    assert_equal "Use echo v2", registration.deprecation[:reason]
+  end
+
+  def test_action_registration_rejects_invalid_deprecation_metadata
+    error = assert_raises(RecordingStudioApi::ConfigurationError) do
+      RecordingStudioApi::ActionRegistration.new(
+        name: :echo,
+        capability: :echoable,
+        deprecation: {
+          deprecated: "yes",
+          removal_date: "31-12-2026"
+        },
+        http_verb: :post,
+        handler: ->(_context) { true }
+      )
+    end
+
+    assert_match(/deprecation/, error.message)
   end
 end

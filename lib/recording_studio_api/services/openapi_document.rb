@@ -9,9 +9,13 @@ module RecordingStudioApi
       OAUTH_TOKEN_PATH = "/recording_studio_api/oauth/token"
 
       class << self
-        def call
-          new.call
+        def call(version: nil)
+          new(version: version).call
         end
+      end
+
+      def initialize(version: nil)
+        @api_version = RecordingStudioApi.resolve_api_version(version)
       end
 
       def call
@@ -46,7 +50,7 @@ module RecordingStudioApi
       end
 
       def all_endpoints
-        catalog = RecordingStudioApi.documentation_catalog
+        catalog = RecordingStudioApi.documentation_catalog(version: @api_version)
         resource_endpoints = catalog.fetch(:resources).flat_map { |section| section.fetch(:endpoints) }
 
         catalog.fetch(:auth_endpoints) + catalog.fetch(:root_endpoints) + resource_endpoints

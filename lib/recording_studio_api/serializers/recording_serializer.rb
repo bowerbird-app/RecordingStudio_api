@@ -4,19 +4,19 @@ module RecordingStudioApi
   module Serializers
     class RecordingSerializer
       class << self
-        def call(recording)
+        def call(recording, version: nil)
           return recording if recording.is_a?(Hash)
 
-          serialize_recording(recording)
+          serialize_recording(recording, version: version)
         end
 
         private
 
-        def serialize_recording(recording)
+        def serialize_recording(recording, version: nil)
           {
             id: recording.id,
             type: resource_type_for(recording.recordable_type),
-            actions: action_names_for(recording.recordable_type),
+            actions: action_names_for(recording.recordable_type, version: version),
             root_id: recording.root_recording_id,
             parent_id: recording.parent_recording_id
           }
@@ -26,10 +26,10 @@ module RecordingStudioApi
           recordable_type.to_s.demodulize.underscore
         end
 
-        def action_names_for(recordable_type)
+        def action_names_for(recordable_type, version: nil)
           return [] unless RecordingStudioApi.respond_to?(:capability_actions_for)
 
-          RecordingStudioApi.capability_actions_for(recordable_type).map(&:name)
+          RecordingStudioApi.capability_actions_for(recordable_type, version: version).map(&:name)
         end
       end
     end

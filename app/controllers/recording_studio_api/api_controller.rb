@@ -2,6 +2,8 @@
 
 module RecordingStudioApi
   class ApiController < ActionController::API
+    API_VERSION_PATH_PATTERN = %r{/api/(?<version>v[^/]+)(?:/|$)}.freeze
+
     include RecordingStudioApi::Concerns::BearerAuthentication
     include RecordingStudioApi::Concerns::RateLimiting
     include RecordingStudioApi::Concerns::RequestLogging
@@ -35,6 +37,14 @@ module RecordingStudioApi
     end
 
     private
+
+    def current_api_version
+      @current_api_version ||= RecordingStudioApi.resolve_api_version(request_api_version)
+    end
+
+    def request_api_version
+      params[:api_version].presence || request.path.match(API_VERSION_PATH_PATTERN)&.[](:version)
+    end
 
     def render_validation_error(record)
       render_error(

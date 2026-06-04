@@ -4,12 +4,15 @@ module RecordingStudioApi
   module Services
     class DocumentationCatalog # rubocop:disable Metrics/ClassLength
       BASE_PATH = "/recording_studio_api"
-      API_ROOT_PATH = "#{BASE_PATH}/api/v1"
 
       class << self
-        def call
-          new.call
+        def call(version: nil)
+          new(version: version).call
         end
+      end
+
+      def initialize(version: nil)
+        @api_version = RecordingStudioApi.resolve_api_version(version)
       end
 
       def call
@@ -45,7 +48,7 @@ module RecordingStudioApi
         [
           {
             verb: "GET",
-            path: API_ROOT_PATH,
+            path: api_root_path,
             action: "resources#index",
             summary: "List API resources",
             description: "List configured API resources.",
@@ -83,7 +86,7 @@ module RecordingStudioApi
           },
           {
             verb: "GET",
-            path: "#{API_ROOT_PATH}/trash",
+            path: "#{api_root_path}/trash",
             action: "resources#trash_index",
             summary: "List trashed",
             description: "List trashed",
@@ -110,7 +113,7 @@ module RecordingStudioApi
           },
           {
             verb: "GET",
-            path: "#{API_ROOT_PATH}/trash/:id",
+            path: "#{api_root_path}/trash/:id",
             action: "resources#trash_show",
             summary: "Get trashed",
             description: "Get trashed",
@@ -124,7 +127,7 @@ module RecordingStudioApi
           },
           {
             verb: "POST",
-            path: "#{API_ROOT_PATH}/trash/:id/restore",
+            path: "#{api_root_path}/trash/:id/restore",
             action: "resources#trash_restore",
             summary: "Restore trashed",
             description: "Restore trashed",
@@ -138,7 +141,7 @@ module RecordingStudioApi
           },
           {
             verb: "DELETE",
-            path: "#{API_ROOT_PATH}/trash/:id",
+            path: "#{api_root_path}/trash/:id",
             action: "resources#trash_destroy",
             summary: "Delete trashed",
             description: "Permanently delete trashed",
@@ -176,7 +179,7 @@ module RecordingStudioApi
         endpoints = [
           {
             verb: "GET",
-            path: "#{API_ROOT_PATH}/#{resource_name}",
+            path: "#{api_root_path}/#{resource_name}",
             action: "resources#index",
             summary: "List #{docs_resource_name}",
             description: "List #{docs_resource_name}",
@@ -193,7 +196,7 @@ module RecordingStudioApi
           },
           {
             verb: "POST",
-            path: "#{API_ROOT_PATH}/#{resource_name}",
+            path: "#{api_root_path}/#{resource_name}",
             action: "resources#create",
             summary: "Create #{docs_resource_name}",
             description: "Create #{docs_resource_name}",
@@ -210,7 +213,7 @@ module RecordingStudioApi
           },
           {
             verb: "GET",
-            path: "#{API_ROOT_PATH}/#{resource_name}/:id",
+            path: "#{api_root_path}/#{resource_name}/:id",
             action: "resources#show",
             summary: "Get #{docs_resource_name}",
             description: "Get #{docs_resource_name}",
@@ -229,7 +232,7 @@ module RecordingStudioApi
           },
           {
             verb: "PATCH",
-            path: "#{API_ROOT_PATH}/#{resource_name}/:id",
+            path: "#{api_root_path}/#{resource_name}/:id",
             action: "resources#update",
             summary: "Update #{docs_resource_name}",
             description: "Update #{docs_resource_name}",
@@ -247,7 +250,7 @@ module RecordingStudioApi
           },
           {
             verb: "DELETE",
-            path: "#{API_ROOT_PATH}/#{resource_name}/:id",
+            path: "#{api_root_path}/#{resource_name}/:id",
             action: "resources#destroy",
             summary: "Delete #{docs_resource_name}",
             description: destroy_description_for(resource_name, recordable_type),
@@ -268,7 +271,7 @@ module RecordingStudioApi
       end
 
       def action_endpoints(resource_name, recordable_type)
-        RecordingStudioApi.capability_actions_for(recordable_type)
+        RecordingStudioApi.capability_actions_for(recordable_type, version: @api_version)
           .sort_by(&:name)
           .map do |action|
             action_openapi = action.respond_to?(:openapi) && action.openapi.is_a?(Hash) ? action.openapi : {}
@@ -276,7 +279,7 @@ module RecordingStudioApi
 
             {
               verb: action.http_verb.to_s.upcase,
-              path: "#{API_ROOT_PATH}/#{resource_name}/:id/actions/#{action.name}",
+              path: "#{api_root_path}/#{resource_name}/:id/actions/#{action.name}",
               action: "member_actions#create",
               summary: action_openapi.fetch(:summary, "Execute #{action.name} for #{docs_resource_name}"),
               description: "Execute the #{action.name} action.",
@@ -298,6 +301,10 @@ module RecordingStudioApi
             override_value
           end
         end
+      end
+
+      def api_root_path
+        RecordingStudioApi.api_base_path(version: @api_version)
       end
 
       def default_action_openapi(resource_name, recordable_type, action)
@@ -612,7 +619,15 @@ module RecordingStudioApi
         response
       end
 
-      def resource_write_request_body(_recordable_type)
+      def resource_write_request_body(recordable_type)
+        parent_id_schema = { type: "string" }
+        required_fields = ["attributes"]
+
+        if root_recordable_type?(recordable_type)
+          parent_id_schema[:nullable] = true
+        else
+          required_fields << "parent_id"
+        end
 
         {
           required: true,
@@ -625,13 +640,17 @@ module RecordingStudioApi
                     type: "object",
                     additionalProperties: true
                   },
-                  parent_id: { type: "string", nullable: true }
+                  parent_id: parent_id_schema
                 },
-                required: ["attributes"]
+                required: required_fields
               }
             }
           }
         }
+      end
+
+      def root_recordable_type?(recordable_type)
+        RecordingStudio::RecordableDeclarations.root_allowed?(recordable_type)
       end
 
       def recording_schema(recordable_type = nil)

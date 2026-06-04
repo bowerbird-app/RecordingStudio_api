@@ -39,12 +39,17 @@ Rails.application.routes.draw do
   get "docs/gem_views", to: "docs#gem_views", as: :docs_gem_views
   get "docs/api_routes", to: "docs#api_routes", as: :docs_api_routes
   get "docs/openapi.json", to: "docs#openapi", as: :docs_openapi
+  get "APIdocs", to: redirect("/APIdocs/#{RecordingStudioApi.default_api_version}"), as: :api_docs_root
+  get "APIdocs/:version", to: "docs#scalar", as: :api_docs
+  get "APIdocs/:version/fullscreen", to: "docs#scalar_fullscreen", as: :api_docs_fullscreen
+  get "APIdocs/:version/openapi.json", to: "docs#openapi", as: :api_docs_openapi
   get "docs/scalar", to: "docs#scalar", as: :docs_scalar
   get "docs/scalar/fullscreen", to: "docs#scalar_fullscreen", as: :docs_scalar_fullscreen
   get "docs/add_capability", to: "docs#add_capability", as: :docs_add_capability
   get "docs/auth", to: "docs#auth", as: :docs_auth
   get "docs/mobile_auth", to: "docs#mobile_auth", as: :docs_mobile_auth
   get "docs/methods", to: "docs#methods", as: :docs_methods
+  get "docs/versions", to: "docs#versions", as: :docs_versions
 
   # Defines the root path route ("/")
   root "home#index"

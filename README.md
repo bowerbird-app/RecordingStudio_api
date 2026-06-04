@@ -15,6 +15,65 @@ This repository now completes the last unfinished agent pass by renaming the liv
 
 The current codebase still ships the template engine mechanics (configuration, hooks, install generator, sample service objects), but the engine now also exposes a real JSON API surface for authenticated resource lookup and capability-backed member actions.
 
+## Versioning Model
+
+RecordingStudioApi separates public API versions from addon contribution contract versions.
+
+- Public API versions are route and documentation labels such as `v1` and `v2`.
+- Addon gems can register multiple contribution contracts for the same action with `version:`.
+- Host apps map each public API version to compatible contribution contracts with `config.version` and `api.use`.
+- Runtime dispatch and OpenAPI generation filter out incompatible contribution versions, then select the newest matching version.
+
+Example host-app profile configuration:
+
+```ruby
+RecordingStudioApi.configure do |config|
+  config.api_versions = %w[v1 v2]
+  config.default_api_version = "v2"
+
+  config.version "v1" do |api|
+    api.use :moveable, "~> 1.23"
+  end
+
+  config.version "v2" do |api|
+    api.use :moveable, "~> 2.0"
+  end
+end
+```
+
+Example addon registration:
+
+```ruby
+RecordingStudioApi.register_capability_action(
+  :move,
+  capability: :movable,
+  version: "1.23.4",
+  version_notes: ["Initial move contract", "Requires parent_id"],
+  deprecation: {
+    deprecated: true,
+    removal_date: "2026-12-31",
+    reason: "Replaced by move v2 with structured conflict errors"
+  },
+  handler: MoveRecordingV1
+)
+
+RecordingStudioApi.register_capability_action(
+  :move,
+  capability: :movable,
+  version: "2.0.0",
+  version_notes: ["Adds destination validation", "Returns structured conflict errors"],
+  handler: MoveRecordingV2
+)
+```
+
+Validation rules:
+
+- Contribution versions must be RubyGems-compatible `Gem::Version` strings.
+- Profile constraints use `Gem::Requirement` syntax.
+- Same action name plus same contribution version is rejected as a duplicate.
+- `version_notes` and grouped `deprecation` metadata are optional and do not affect matching.
+- If no registered contribution matches a profile, that action is omitted for that public API version.
+
 ## API Architecture
 
 ### Core registries
@@ -55,8 +114,9 @@ Each action declares its verb, capability mapping, handler, and serializer so ad
 The runtime should fail fast when:
 
 - an API action points at a capability that is not enabled
-- duplicate action names are registered
+- duplicate action name plus contribution version pairs are registered
 - required handlers or serializers are missing
+- contribution versions or version-profile constraints are malformed
 
 ## Ruby Integration Surface
 
@@ -72,7 +132,18 @@ end
 RecordingStudioApi.configuration
 RecordingStudioApi::Hooks.run(:before_initialize)
 RecordingStudioApi.register_recordable_type_api("Page", serializer: PageSerializer)
-RecordingStudioApi.register_capability_action(:publish, capability: :publishable, handler: PublishRecording)
+RecordingStudioApi.register_capability_action(
+  :publish,
+  capability: :publishable,
+  version: "1.0.0",
+  version_notes: ["Initial publish contract"],
+  deprecation: {
+    deprecated: true,
+    removal_date: "2026-12-31",
+    reason: "Use publish v2"
+  },
+  handler: PublishRecording
+)
 ```
 
 ### Access management role settings
@@ -148,11 +219,11 @@ Authorization: Bearer <access_token>
 
 Each API request is evaluated in this order:
 
-1. If enabled, the API pre-auth limiter throttles `/api/v1` requests by IP before bearer-token lookup.
+1. If enabled, the API pre-auth limiter throttles configured `/api/<version>` requests by IP before bearer-token lookup.
 2. OAuth2 authentication validates the bearer access token.
 3. The engine resolves `current_api_client`, `current_api_credential`, `current_access_recording`, `current_root_recording`, and `current_access_grant`.
 4. If enabled, the authenticated API limiter throttles by API credential/client, split between read and write buckets.
-5. The API controller resolves the requested resource or action and dispatches to the registered handler with the access grant in context.
+5. The API controller resolves the requested public API version, selects the newest compatible contribution contract, and dispatches to the registered handler with the access grant in context.
 6. The capability handler authorizes its own behavior with the passed grant. Simple handlers can call `context.access_grant.authorize!(recording: ..., role: ...)`; complex handlers can check multiple recordings or roles with Recording Studio Accessible.
 
 ## Mobile Integration Guidance
@@ -176,12 +247,14 @@ Addon gems register actions once:
 RecordingStudioApi.register_capability_action(
   :move,
   capability: :movable,
+  version: "2.0.0",
+  version_notes: ["Adds destination validation"],
   http_verb: :post,
   handler: RecordingStudioApi::Services::MoveRecording
 )
 ```
 
-If a recordable type enables `:movable`, the API automatically exposes the `move` action for that resource.
+If a recordable type enables `:movable`, the API automatically exposes the newest compatible `move` contribution selected for the current public API version.
 
 Handlers receive `RecordingStudioApi::ActionContext` or `RecordingStudioApi::ResourceOperationContext`. Custom handlers should authorize through the grant before mutating or exposing sensitive data:
 
@@ -203,16 +276,17 @@ end
 - `GET /recording_studio_api/oauth/authorize` — issue a PKCE authorization code for a public OAuth client
 - `POST /recording_studio_api/oauth/token` — issue or refresh OAuth2 access tokens using `client_credentials`, `authorization_code`, or `refresh_token`
 - `POST /recording_studio_api/oauth/revoke` — revoke a mobile OAuth grant session or token family
-- `GET /recording_studio_api/api/v1` — list available API resources
-- `GET /recording_studio_api/api/v1/:resource` — list recordings of a resource type inside the authenticated root
-- `GET /recording_studio_api/api/v1/:resource/:id` — show one recording
-- `GET /recording_studio_api/api/v1/trash` — list trashed recordings across all resource types in the authenticated root
-- `GET /recording_studio_api/api/v1/trash/:id` — show one trashed recording
-- `POST /recording_studio_api/api/v1/trash/:id/restore` — restore one trashed recording
-- `DELETE /recording_studio_api/api/v1/trash/:id` — permanently delete one trashed recording
-- `GET /recording_studio_api/api/v1/:resource/:id/actions` — list enabled capability actions
-- `POST|PATCH|PUT|DELETE /recording_studio_api/api/v1/:resource/:id/actions/:action_name` — execute a capability-backed action via nested child actions (for example `/folders/:id/actions/move`)
-- `POST|PATCH|PUT|DELETE /recording_studio_api/api/v1/:resource/:id/:action_name` — compatibility alias for existing clients
+- `GET /recording_studio_api/api/<version>` — list available API resources for the selected public API version
+- `GET /recording_studio_api/api/<version>/:resource` — list recordings of a resource type inside the authenticated root
+- `GET /recording_studio_api/api/<version>/:resource/:id` — show one recording
+- `GET /recording_studio_api/api/<version>/trash` — list trashed recordings across all resource types in the authenticated root
+- `GET /recording_studio_api/api/<version>/trash/:id` — show one trashed recording
+- `POST /recording_studio_api/api/<version>/trash/:id/restore` — restore one trashed recording
+- `DELETE /recording_studio_api/api/<version>/trash/:id` — permanently delete one trashed recording
+- `POST|PATCH|PUT|DELETE /recording_studio_api/api/<version>/:resource/:id/actions/:action_name` — execute the newest compatible contribution contract for that public API version
+- `POST|PATCH|PUT|DELETE /recording_studio_api/api/<version>/:resource/:id/:action_name` — compatibility alias for existing clients
+
+Additional configured public API versions currently alias the shared controller implementation while still selecting version-specific contribution contracts and OpenAPI documents.
 
 ## Dummy App
 
@@ -220,6 +294,7 @@ Use `test/dummy/` as the review surface for the completed handoff:
 
 - `/docs/install` documents the renamed install and migration flow
 - `/docs/config` records the current config API plus the capability action registry
+- `/docs/versions` explains public API versions, contribution versions, version notes, deprecation metadata, and validation rules
 - `/docs/api_routes` documents mounted API endpoints and the generated JSON endpoint inventory
 - `/docs/scalar` renders the generated OpenAPI explorer
 - `/docs/auth` explains token exchange, access-grant resolution, and capability-owned authorization

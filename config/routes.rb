@@ -38,5 +38,28 @@ RecordingStudioApi::Engine.routes.draw do
             via: %i[post patch put delete],
             as: :resource_action
     end
+
+    (RecordingStudioApi.api_versions - ["v1"]).each do |api_version|
+      namespace api_version.to_sym do
+        get "/", to: "/recording_studio_api/api/v1/resources#index"
+        get "/trash", to: "/recording_studio_api/api/v1/resources#trash_index", as: :trash_collection
+        get "/trash/:id", to: "/recording_studio_api/api/v1/resources#trash_show", as: :trash
+        post "/trash/:id/restore", to: "/recording_studio_api/api/v1/resources#trash_restore", as: :trash_restore
+        delete "/trash/:id", to: "/recording_studio_api/api/v1/resources#trash_destroy", as: :trash_destroy
+        get "/:resource", to: "/recording_studio_api/api/v1/resources#index", as: :resource_collection
+        post "/:resource", to: "/recording_studio_api/api/v1/resources#create"
+        get "/:resource/:id", to: "/recording_studio_api/api/v1/resources#show", as: :resource
+        patch "/:resource/:id", to: "/recording_studio_api/api/v1/resources#update"
+        delete "/:resource/:id", to: "/recording_studio_api/api/v1/resources#destroy"
+        match "/:resource/:id/:action_name",
+          to: "/recording_studio_api/api/v1/member_actions#create",
+          via: %i[post patch put delete],
+          as: :resource_nested_action
+        match "/:resource/:id/actions/:action_name",
+              to: "/recording_studio_api/api/v1/member_actions#create",
+              via: %i[post patch put delete],
+              as: :resource_action
+      end
+    end
   end
 end

@@ -42,6 +42,10 @@ module RecordingStudioApi
           context.root_recording
         end
 
+        def api_version
+          context.api_version
+        end
+
         def api_client
           context.api_client
         end
@@ -64,7 +68,7 @@ module RecordingStudioApi
         end
 
         def serialize_recording(target_recording)
-          RecordingStudioApi::Serializers::ResourceRecordingSerializer.call(target_recording)
+          RecordingStudioApi::Serializers::ResourceRecordingSerializer.call(target_recording, version: api_version)
         end
 
         def resource_attributes
@@ -93,12 +97,30 @@ module RecordingStudioApi
         end
 
         def parent_recording_for_create
-          return access_scope_recording if params[:parent_id].blank?
+          if params[:parent_id].blank?
+            return access_scope_recording if root_recordable_type?
+
+            raise RecordingStudioApi::InvalidActionInputError.new(
+              "parent_id is required for #{recordable_type}",
+              details: [
+                {
+                  attribute: :parent_id,
+                  message: "is required",
+                  full_message: "Parent is required",
+                  type: :blank
+                }
+              ]
+            )
+          end
 
           parent_recording = scoped_recordings.find_by(id: params[:parent_id])
           raise RecordingStudioApi::NotFoundError, "Parent resource was not found in this API scope" if parent_recording.nil?
 
           parent_recording
+        end
+
+        def root_recordable_type?
+          RecordingStudio::RecordableDeclarations.root_allowed?(recordable_type)
         end
 
         def authorize_access!(target_recording, role:, include_trashed: false)

@@ -124,6 +124,35 @@ module RecordingStudioApi
         refute payload.key?(:attributes)
       end
 
+      def test_call_filters_actions_by_api_version_profile
+        RecordingStudioApi.configuration.api_versions = %w[v1 v2]
+        RecordingStudioApi.configuration.version("v1") { |api| api.use :publishable, "~> 1.0" }
+        RecordingStudioApi.configuration.version("v2") { |api| api.use :publishable }
+        RecordingStudioApi.register_capability_action(
+          :publish,
+          capability: :publishable,
+          version: "2.0.0",
+          handler: ->(_context) { :ok }
+        )
+
+        recording = build_recording(
+          recordable_type: "Page",
+          recordable: RecordableStub.new(
+            id: "page-3",
+            title: "Release Notes",
+            attributes: {
+              "id" => "page-3",
+              "title" => "Release Notes"
+            }
+          )
+        )
+
+        RecordingStudio.stub(:capability_enabled?, ->(capability, **kwargs) { capability == :publishable && kwargs[:for] == "Page" }) do
+          assert_equal [], ResourceRecordingSerializer.call(recording, version: "v1").fetch(:actions)
+          assert_equal ["publish"], ResourceRecordingSerializer.call(recording, version: "v2").fetch(:actions)
+        end
+      end
+
       private
 
       def build_recording(recordable_type:, recordable:)

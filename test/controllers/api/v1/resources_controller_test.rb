@@ -289,6 +289,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
 
   test "returns validation errors when creating a page without a title" do
     post "/recording_studio_api/api/v1/pages", params: {
+      parent_id: @root_recording.id,
       attributes: {
         additionalProperty: "anything"
       }
@@ -303,6 +304,27 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
         "attribute" => "title",
         "message" => "can't be blank",
         "full_message" => "Title can't be blank",
+        "type" => "blank"
+      }
+    ], payload.fetch("details")
+  end
+
+  test "requires parent_id when creating a non-root page resource" do
+    post "/recording_studio_api/api/v1/pages", params: {
+      attributes: {
+        title: "Orphan page"
+      }
+    }, headers: authorization_headers
+
+    assert_response :unprocessable_entity
+
+    payload = JSON.parse(response.body)
+    assert_equal "parent_id is required for Page", payload.fetch("error")
+    assert_equal [
+      {
+        "attribute" => "parent_id",
+        "message" => "is required",
+        "full_message" => "Parent is required",
         "type" => "blank"
       }
     ], payload.fetch("details")

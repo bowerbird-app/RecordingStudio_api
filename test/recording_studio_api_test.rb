@@ -154,6 +154,8 @@ class RecordingStudioApiTest < Minitest::Test
     assert_includes sidebar_source, "main_app.docs_api_hierarchy_path"
     assert_includes sidebar_source, 'label: "Recordings tree"'
     assert_includes sidebar_source, "main_app.docs_recordings_tree_path"
+    assert_includes sidebar_source, 'label: "Versions"'
+    assert_includes sidebar_source, "main_app.docs_versions_path"
     assert_not_includes sidebar_source, 'title: "Addon Template"'
   end
 

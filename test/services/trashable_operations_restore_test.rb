@@ -101,6 +101,7 @@ class TrashableOperationsRestoreTest < ActiveSupport::TestCase
       access_recording: nil,
       access_grant: nil,
       root_recording: nil,
+      api_version: "v1",
       params: {},
       scoped_recordings: nil
     )

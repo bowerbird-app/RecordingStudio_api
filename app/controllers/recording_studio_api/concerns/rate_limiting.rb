@@ -99,7 +99,7 @@ module RecordingStudioApi
         @rate_limit_bucket_override = previous_bucket
       end
 
-      def api_pre_auth_rate_limit_enabled_for_request? = RecordingStudioApi.configuration.rate_limit_api_pre_auth_enabled && api_v1_rate_limited_path?
+      def api_pre_auth_rate_limit_enabled_for_request? = RecordingStudioApi.configuration.rate_limit_api_pre_auth_enabled && api_rate_limited_path?
 
       def rate_limit_enabled_for_request?
         if rate_limit_bucket_override == "api_pre_auth"
@@ -111,7 +111,7 @@ module RecordingStudioApi
 
         return false unless RecordingStudioApi.configuration.rate_limit_api_enabled
 
-        api_v1_rate_limited_path?
+        api_rate_limited_path?
       end
 
       def rate_limit_bucket
@@ -186,12 +186,14 @@ module RecordingStudioApi
         request.path.end_with?("/oauth/token") || request.path.end_with?("/oauth/revoke")
       end
 
-      def api_v1_rate_limited_path?
-        request.path.include?("/api/v1/") || request.path.end_with?("/api/v1")
+      def api_rate_limited_path?
+        RecordingStudioApi.api_versions.any? do |version|
+          request.path.include?("/api/#{version}/") || request.path.end_with?("/api/#{version}")
+        end
       end
 
       def api_read_request?
-        api_v1_rate_limited_path? && request.get?
+        api_rate_limited_path? && request.get?
       end
 
       def rate_limit_redis_client

@@ -1,13 +1,13 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
   <%= render FlatPack::PageTitle::Component.new(
     title: "Scalar API reference",
-    subtitle: "Interactive API explorer backed by the generated OpenAPI JSON document.",
+    subtitle: "Interactive API explorer backed by the generated OpenAPI JSON document for #{@api_version.upcase}.",
     variant: :h1
   ) %>
 
   <div>
     <%= link_to "Full screen",
-      docs_scalar_fullscreen_path,
+      @scalar_fullscreen_path,
       target: "_blank",
       rel: "noopener noreferrer",
       class: "inline-flex items-center rounded-md border border-[var(--surface-border-color)] px-3 py-2 text-sm font-medium text-[var(--surface-content-color)] hover:bg-[var(--surface-muted-background-color)]" %>

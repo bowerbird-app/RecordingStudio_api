@@ -224,9 +224,54 @@ module RecordingStudioApi
         assert_equal %w[draft final], schema.fetch(:properties).fetch("mode").fetch(:enum)
       end
 
+      def test_catalog_uses_configured_default_api_version_in_paths
+        original_version = RecordingStudioApi.configuration.default_api_version
+
+        RecordingStudioApi.configuration.default_api_version = "v2"
+        catalog = with_catalog_stubs(
+          recordable_types: ["Page"],
+          actions_by_type: {
+            "Page" => []
+          }
+        ) do
+          DocumentationCatalog.call
+        end
+
+        assert_equal "/recording_studio_api/api/v2", catalog.fetch(:root_endpoints).first.fetch(:path)
+
+        page_section = catalog.fetch(:resources).find { |section| section.fetch(:resource) == "pages" }
+        endpoint_paths = page_section.fetch(:endpoints).map { |endpoint| endpoint.fetch(:path) }
+        assert_includes endpoint_paths, "/recording_studio_api/api/v2/pages"
+      ensure
+        RecordingStudioApi.configuration.default_api_version = original_version
+      end
+
+      def test_catalog_accepts_explicit_version_argument
+        original_versions = RecordingStudioApi.configuration.api_versions
+        original_version = RecordingStudioApi.configuration.default_api_version
+
+        RecordingStudioApi.configuration.api_versions = %w[v1 v2]
+        RecordingStudioApi.configuration.default_api_version = "v1"
+
+        catalog = with_catalog_stubs(
+          recordable_types: ["Page"],
+          actions_by_type: {
+            "Page" => []
+          }
+        ) do
+          DocumentationCatalog.call(version: "v2")
+        end
+
+        assert_equal "/recording_studio_api/api/v2", catalog.fetch(:root_endpoints).first.fetch(:path)
+      ensure
+        RecordingStudioApi.configuration.api_versions = original_versions
+        RecordingStudioApi.configuration.default_api_version = original_version
+      end
+
       def test_resource_write_request_body_uses_generic_attributes_schema
         catalog = with_catalog_stubs(
           recordable_types: ["Workspace"],
+          root_recordable_types: ["Workspace"],
           actions_by_type: {
             "Workspace" => []
           }
@@ -241,24 +286,98 @@ module RecordingStudioApi
         assert_equal "object", schema.fetch(:properties).fetch(:attributes).fetch(:type)
         assert_equal true, schema.fetch(:properties).fetch(:attributes).fetch(:additionalProperties)
         assert_equal %w[attributes], schema.fetch(:required)
+        assert_equal true, schema.fetch(:properties).fetch(:parent_id).fetch(:nullable)
+      end
+
+      def test_resource_write_request_body_requires_parent_id_for_non_root_recordables
+        catalog = with_catalog_stubs(
+          recordable_types: ["Page"],
+          root_recordable_types: [],
+          actions_by_type: {
+            "Page" => []
+          }
+        ) do
+          DocumentationCatalog.call
+        end
+
+        section = catalog.fetch(:resources).find { |resource| resource.fetch(:resource) == "pages" }
+        create_endpoint = section.fetch(:endpoints).find { |entry| entry.fetch(:verb) == "POST" && entry.fetch(:action) == "resources#create" }
+        schema = create_endpoint.fetch(:openapi).fetch(:request_body).fetch(:content).fetch("application/json").fetch(:schema)
+
+        assert_equal %w[attributes parent_id], schema.fetch(:required)
+        refute schema.fetch(:properties).fetch(:parent_id).key?(:nullable)
+      end
+
+      def test_catalog_selects_action_contract_by_api_version_profile
+        original_configuration = RecordingStudioApi.configuration
+        api_singleton = RecordingStudioApi.singleton_class
+        original_recordable_types = RecordingStudioApi.method(:api_recordable_types)
+
+        RecordingStudioApi.instance_variable_set(:@configuration, RecordingStudioApi::Configuration.new)
+        RecordingStudioApi.configuration.api_versions = %w[v1 v2]
+        RecordingStudioApi.configuration.version("v1") { |api| api.use :publishable, "~> 1.0" }
+        RecordingStudioApi.configuration.version("v2") { |api| api.use :publishable }
+
+        RecordingStudioApi.register_capability_action(
+          :publish,
+          capability: :publishable,
+          version: "1.4.0",
+          http_verb: :post,
+          handler: ->(_context) { :legacy },
+          openapi: { summary: "Publish legacy" }
+        )
+        RecordingStudioApi.register_capability_action(
+          :publish,
+          capability: :publishable,
+          version: "2.0.0",
+          http_verb: :post,
+          handler: ->(_context) { :current },
+          openapi: { summary: "Publish current" }
+        )
+
+        api_singleton.send(:define_method, :api_recordable_types) { ["Page"] }
+
+        RecordingStudio.stub(:capability_enabled?, ->(capability, **kwargs) { capability == :publishable && kwargs[:for] == "Page" }) do
+          v1_catalog = DocumentationCatalog.call(version: "v1")
+          v2_catalog = DocumentationCatalog.call(version: "v2")
+
+          assert_equal "Publish legacy", action_endpoint_summary(v1_catalog, "pages", "publish")
+          assert_equal "Publish current", action_endpoint_summary(v2_catalog, "pages", "publish")
+        end
+      ensure
+        api_singleton.send(:define_method, :api_recordable_types, original_recordable_types) if api_singleton && original_recordable_types
+        RecordingStudioApi.instance_variable_set(:@configuration, original_configuration) if original_configuration
       end
 
       private
 
-      def with_catalog_stubs(recordable_types:, actions_by_type:)
-        singleton = RecordingStudioApi.singleton_class
+      def action_endpoint_summary(catalog, resource_name, action_name)
+        section = catalog.fetch(:resources).find { |resource| resource.fetch(:resource) == resource_name }
+        endpoint = section.fetch(:endpoints).find { |entry| entry.fetch(:path).end_with?("/actions/#{action_name}") }
+
+        endpoint.fetch(:summary)
+      end
+
+      def with_catalog_stubs(recordable_types:, actions_by_type:, root_recordable_types: [])
+        api_singleton = RecordingStudioApi.singleton_class
+        declarations_singleton = RecordingStudio::RecordableDeclarations.singleton_class
         original_recordable_types = RecordingStudioApi.method(:api_recordable_types)
         original_actions_for = RecordingStudioApi.method(:capability_actions_for)
+        original_root_allowed = RecordingStudio::RecordableDeclarations.method(:root_allowed?)
 
-        singleton.send(:define_method, :api_recordable_types) { recordable_types }
-        singleton.send(:define_method, :capability_actions_for) do |recordable_type|
+        api_singleton.send(:define_method, :api_recordable_types) { recordable_types }
+        api_singleton.send(:define_method, :capability_actions_for) do |recordable_type, version: nil|
           actions_by_type.fetch(recordable_type, [])
+        end
+        declarations_singleton.send(:define_method, :root_allowed?) do |recordable_type|
+          root_recordable_types.include?(recordable_type.to_s)
         end
 
         yield
       ensure
-        singleton.send(:define_method, :api_recordable_types, original_recordable_types)
-        singleton.send(:define_method, :capability_actions_for, original_actions_for)
+        api_singleton.send(:define_method, :api_recordable_types, original_recordable_types)
+        api_singleton.send(:define_method, :capability_actions_for, original_actions_for)
+        declarations_singleton.send(:define_method, :root_allowed?, original_root_allowed)
       end
 
       def with_recordable_registration(recordable_type, serializer: nil, openapi:)

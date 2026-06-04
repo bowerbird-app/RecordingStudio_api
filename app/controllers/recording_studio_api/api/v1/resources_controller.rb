@@ -81,7 +81,7 @@ module RecordingStudioApi
         end
 
         def serialize_recording(recording)
-          RecordingStudioApi::Serializers::ResourceRecordingSerializer.call(recording)
+          RecordingStudioApi::Serializers::ResourceRecordingSerializer.call(recording, version: current_api_version)
         end
 
         def trash_resource!(recording)
@@ -193,7 +193,7 @@ module RecordingStudioApi
         end
 
         def resolve_resource_action!(operation_name)
-          operation = RecordingStudioApi.resource_action(operation_name)
+          operation = RecordingStudioApi.resource_action(operation_name, version: current_api_version)
           raise RecordingStudioApi::UnsupportedActionError, "Unknown API resource operation #{operation_name}" if operation.nil?
 
           recordable_type = resolve_recordable_type!
@@ -203,7 +203,7 @@ module RecordingStudioApi
         end
 
         def resolve_capability_action!(action_name, recordable_type:)
-          action = RecordingStudioApi.capability_action(action_name)
+          action = RecordingStudioApi.capability_action(action_name, version: current_api_version)
           raise RecordingStudioApi::UnsupportedActionError, "Unknown API action #{action_name}" if action.nil?
           raise RecordingStudioApi::UnsupportedActionError, "#{action.name} is not enabled for #{recordable_type}" unless action.applicable_to?(recordable_type)
 
@@ -220,6 +220,7 @@ module RecordingStudioApi
             access_recording: current_access_recording,
             access_grant: current_access_grant,
             root_recording: current_root_recording,
+            api_version: current_api_version,
             params: params,
             scoped_recordings: scoped_recordings
           )

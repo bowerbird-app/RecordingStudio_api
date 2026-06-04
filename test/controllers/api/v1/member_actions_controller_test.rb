@@ -69,6 +69,35 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
     assert_equal @page_recording.id, JSON.parse(response.body).fetch("data").fetch("id")
   end
 
+  test "dispatches the contribution version selected by the request api version" do
+    RecordingStudioApi.configuration.api_versions = %w[v1 v2]
+    RecordingStudioApi.configuration.version("v1") { |api| api.use :echoable, "~> 1.0" }
+    RecordingStudioApi.configuration.version("v2") { |api| api.use :echoable }
+
+    RecordingStudioApi.register_capability_action(
+      :versioned_echo,
+      capability: :echoable,
+      version: "1.5.0",
+      http_verb: :post,
+      handler: ->(_context) { { version: "legacy" } },
+      serializer: ->(result) { result }
+    )
+    RecordingStudioApi.register_capability_action(
+      :versioned_echo,
+      capability: :echoable,
+      version: "2.0.0",
+      http_verb: :post,
+      handler: ->(_context) { { version: "current" } },
+      serializer: ->(result) { result }
+    )
+
+    post "/recording_studio_api/api/v1/pages/#{@page_recording.id}/actions/versioned_echo",
+         headers: authorization_headers
+
+    assert_response :success
+    assert_equal "legacy", JSON.parse(response.body).fetch("data").fetch("version")
+  end
+
   test "exposes trash for trashable recordables through the nested resource route" do
     post "/recording_studio_api/api/v1/pages/#{@page_recording.id}/trash",
          headers: authorization_headers

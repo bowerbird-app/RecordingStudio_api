@@ -12,6 +12,16 @@
       RecordingStudioApi.register_capability_action(
         :publish,
         capability: :publishable,
+        version: "1.0.0",
+        version_notes: [
+          "Initial publish contract",
+          "Notifies followers by default"
+        ],
+        deprecation: {
+          deprecated: true,
+          removal_date: "2026-12-31",
+          reason: "Use publish v2 for structured validation errors"
+        },
         http_verb: :post,
         scope: :member,
         # Handles the action logic and returns the value serialized in the API response.

@@ -10,6 +10,7 @@ module RecordingStudioApi
     :access_recording,
     :access_grant,
     :root_recording,
+    :api_version,
     :params,
     :scoped_recordings
   )

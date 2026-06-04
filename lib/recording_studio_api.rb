@@ -58,10 +58,13 @@ module RecordingStudioApi
       yield(configuration) if block_given?
     end
 
-    def register_capability_action(name, capability:, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil)
+    def register_capability_action(name, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil)
       configuration.action_registry.register(
         name,
         capability: capability,
+        version: version,
+        version_notes: version_notes,
+        deprecation: deprecation,
         http_verb: http_verb,
         handler: handler,
         serializer: serializer,
@@ -80,23 +83,23 @@ module RecordingStudioApi
       )
     end
 
-    def capability_action(name)
-      configuration.action_registry[name]
+    def capability_action(name, version: nil)
+      configuration.action_registry.resolve(name, profile: api_version_profile_for(version))
     end
 
-    def capability_actions_for(recordable_type)
-      configuration.action_registry.available_for(recordable_type, scope: :member)
+    def capability_actions_for(recordable_type, version: nil)
+      configuration.action_registry.available_for(recordable_type, scope: :member, profile: api_version_profile_for(version))
     end
 
-    def resource_actions_for(recordable_type, scope: nil)
+    def resource_actions_for(recordable_type, scope: nil, version: nil)
       scopes = Array(scope.presence || %i[collection resource])
       scopes.flat_map do |entry_scope|
-        configuration.action_registry.available_for(recordable_type, scope: entry_scope)
+        configuration.action_registry.available_for(recordable_type, scope: entry_scope, profile: api_version_profile_for(version))
       end.uniq
     end
 
-    def resource_action(name)
-      capability_action("resource_#{name}")
+    def resource_action(name, version: nil)
+      capability_action("resource_#{name}", version: version)
     end
 
     def recordable_registration_for(recordable_type)
@@ -148,6 +151,41 @@ module RecordingStudioApi
       Array(RecordingStudio.configuration.recordable_types).map(&:to_s).uniq.reject do |recordable_type|
         RecordingStudioApi::Engine.internal_recordable_type_names.include?(recordable_type)
       end
+    end
+
+    def api_versions
+      configured_versions = Array(configuration.api_versions).filter_map { |version| normalize_api_version(version) }.uniq
+      configured_versions.presence || [Configuration::DEFAULT_API_VERSION]
+    end
+
+    def default_api_version
+      configured_default = normalize_api_version(configuration.default_api_version)
+      return configured_default if configured_default.present? && api_versions.include?(configured_default)
+
+      api_versions.first
+    end
+
+    def supported_api_version?(version)
+      normalized_version = normalize_api_version(version)
+      normalized_version.present? && api_versions.include?(normalized_version)
+    end
+
+    def resolve_api_version(version)
+      normalized_version = normalize_api_version(version)
+      return default_api_version if normalized_version.blank?
+
+      supported_api_version?(normalized_version) ? normalized_version : default_api_version
+    end
+
+    def api_base_path(version: default_api_version)
+      normalized_version = resolve_api_version(version)
+      "/recording_studio_api/api/#{normalized_version}"
+    end
+
+    def api_version_profile_for(version)
+      return if version.blank?
+
+      configuration.api_version_profile_for(resolve_api_version(version))
     end
 
     def register_default_capability_actions!
@@ -221,6 +259,13 @@ module RecordingStudioApi
     end
 
     private
+
+    def normalize_api_version(value)
+      normalized = value.to_s.strip.downcase
+      return if normalized.blank?
+
+      normalized.start_with?("v") ? normalized : "v#{normalized}"
+    end
 
     def moveable_available?
       defined?(RecordingStudio::Moveable::Capabilities::Moveable) &&

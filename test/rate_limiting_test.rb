@@ -222,12 +222,22 @@ class RateLimitingTest < ActiveSupport::TestCase
     assert_equal "ip:10.0.0.10", api_harness.send(:rate_limit_identifier)
   end
 
-  test "api pre auth limiter is disabled outside api v1 paths" do
+  test "api pre auth limiter is disabled outside configured api version paths" do
     RecordingStudioApi.configuration.rate_limit_api_pre_auth_enabled = true
 
     harness = Harness.new(path: "/recording_studio_api/oauth/token", method: :post)
 
     assert_equal false, harness.send(:api_pre_auth_rate_limit_enabled_for_request?)
+  end
+
+  test "api pre auth limiter recognizes configured api versions" do
+    RecordingStudioApi.configuration.rate_limit_api_pre_auth_enabled = true
+    RecordingStudioApi.configuration.api_versions = ["v2"]
+    RecordingStudioApi.configuration.default_api_version = "v2"
+
+    harness = Harness.new(path: "/recording_studio_api/api/v2/pages", method: :get)
+
+    assert_equal true, harness.send(:api_pre_auth_rate_limit_enabled_for_request?)
   end
 
   test "resolved decision logs and returns unlimited decision when decider raises" do

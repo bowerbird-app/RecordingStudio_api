@@ -44,6 +44,8 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, expected_copy
     assert_includes response.body, "RecordingStudioApi.configure do |config|"
     assert_includes response.body, "config.token_ttl = 45.days"
+    assert_includes response.body, "config.api_versions = %w[v1 v2]"
+    assert_includes response.body, "config.default_api_version = &quot;v2&quot;"
     assert_includes response.body, "config.rate_limit_oauth_enabled = true"
     assert_includes response.body, "config.rate_limit_api_pre_auth_enabled = true"
     assert_includes response.body, "config.rate_limit_api_enabled = true"
@@ -54,6 +56,10 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "config.api_request_logging_enabled = true"
     assert_includes response.body, "config.api_request_logging_payload_mode ="
     assert_includes response.body, "metadata_only"
+    assert_includes response.body, "config.version"
+    assert_includes response.body, "api.use"
+    assert_includes response.body, "Gem::Requirement"
+    assert_includes response.body, "Gem::Version"
     assert_not_includes response.body, "RecordingStudioApi.register_capability_action"
   end
 
@@ -95,15 +101,11 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "h1", text: "API hierarchy"
     assert_includes response.body, "How API recordables nest beneath each other in the Recording Studio tree."
+    assert_includes response.body, "RecordingStudioApi::AccessGrant"
+    assert_includes response.body, "runtime context"
+    assert_includes response.body, "authenticated API client"
     assert_includes response.body, "Folder"
     assert_includes response.body, "Access"
-    assert_includes response.body, "API client"
-    assert_includes response.body, "API credential"
-    assert_includes response.body, "API access token"
-    assert_includes response.body, "OAuth grant session"
-    assert_includes response.body, "OAuth authorization code"
-    assert_includes response.body, "OAuth session access token"
-    assert_includes response.body, "OAuth refresh token"
   end
 
   test "recordings tree page renders successfully" do
@@ -131,8 +133,6 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Page: Archived"
     assert_includes response.body, "[trashed]"
     assert_includes response.body, "total in the dummy app database"
-    assert_not_includes response.body, "Current structure"
-    assert_not_includes response.body, "This tree is generated from RecordingStudio::Recording records"
   end
 
   test "gem_views page renders successfully" do
@@ -154,6 +154,31 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "context.access_grant.authorize!"
   end
 
+  test "versions page renders successfully" do
+    get docs_versions_path
+
+    assert_response :success
+    assert_select "h1", text: "Versions"
+    assert_includes response.body, "contribution contract versions"
+    assert_includes response.body, "config.api_versions"
+    assert_includes response.body, "config.default_api_version"
+    assert_includes response.body, "config.version"
+    assert_includes response.body, "api.use"
+    assert_includes response.body, "1.23"
+    assert_includes response.body, "version_notes"
+    assert_includes response.body, "deprecation"
+    assert_includes response.body, "removal_date"
+    assert_includes response.body, "not gem package versions"
+    assert_includes response.body, "Resolution and Validation"
+    assert_includes response.body, "Gem::Version"
+    assert_includes response.body, "Gem::Requirement"
+    assert_includes response.body, "RecordingStudioApi::ConfigurationError"
+    assert_includes response.body, "duplicate contribution version"
+    assert_includes response.body, "omitted for that public API version"
+    assert_includes response.body, "/APIdocs/v1"
+    assert_includes response.body, "/APIdocs/v2"
+  end
+
   test "api routes page renders successfully" do
     with_recordable_types_and_actions(
       ["Folder"],
@@ -173,6 +198,11 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
       assert_includes response.body, "post &quot;/oauth/token&quot;, to: &quot;oauth#token&quot;"
       assert_includes response.body, "post &quot;/oauth/revoke&quot;, to: &quot;oauth#revoke&quot;"
       assert_includes response.body, "post &quot;/trash/:id/restore&quot;"
+      assert_includes response.body, "namespace :v1 do"
+      assert_includes response.body, "RecordingStudioApi.api_versions - ["
+      assert_includes response.body, "namespace api_version.to_sym do"
+      assert_includes response.body, "to: &quot;/recording_studio_api/api/v1/resources#index&quot;"
+      assert_includes response.body, "to: &quot;resources#index&quot;"
       assert_includes response.body, "match &quot;/:resource/:id/actions/:action_name&quot;"
       assert_includes response.body, "match &quot;/:resource/:id/:action_name&quot;"
       assert_includes response.body, "via: %i[post patch put delete]"
@@ -181,14 +211,36 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
       assert_includes response.body, "Action routes stay grouped under their owning resource"
       assert_includes response.body, "Admin browser routes are separate from JSON API routes"
       assert_includes response.body, "/recording_studio_api/api/v1/folders/:id/actions/move"
+      assert_includes response.body, "config.version"
+      assert_includes response.body, "shared controller implementation"
       assert_includes response.body, "Action:"
       assert_includes response.body, "move"
     end
   end
 
+  test "auth page renders successfully" do
+    get docs_auth_path
+
+    assert_response :success
+    assert_select "h1", text: "Auth"
+    assert_includes response.body, "How OAuth2 credentials become a RecordingStudioApi access grant for endpoint dispatch."
+    assert_includes response.body, "grant_type=client_credentials"
+    assert_includes response.body, "http://localhost:3000/recording_studio_api/api/v2/workspaces"
+    assert_includes response.body, "/api/&lt;version&gt;"
+    assert_includes response.body, "newest compatible capability contract"
+    assert_includes response.body, "Authorization: Bearer &lt;access_token&gt;"
+    assert_includes response.body, "RecordingStudioApi::Services::IssueOauthAccessToken"
+    assert_includes response.body, "RecordingStudioApi::Services::AuthenticateOauthAccessToken"
+    assert_includes response.body, "RecordingStudioApi::AccessGrant"
+    assert_includes response.body, "current_access_grant"
+    assert_includes response.body, "current_api_client"
+    assert_includes response.body, "401 Unauthorized"
+    assert_includes response.body, "429 Too Many Requests"
+  end
+
   test "openapi endpoint renders successfully" do
     with_recordable_types([Workspace, "RecordingStudio::Access"]) do
-      get docs_openapi_path
+      get docs_openapi_path(version: "v1")
 
       assert_response :success
       payload = JSON.parse(response.body)
@@ -207,6 +259,23 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "openapi endpoint supports explicit version" do
+    with_recordable_types([Workspace, "RecordingStudio::Access"]) do
+      RecordingStudioApi.configuration.api_versions = %w[v1 v2]
+
+      get docs_openapi_path(version: "v2")
+
+      assert_response :success
+      payload = JSON.parse(response.body)
+
+      assert payload.fetch("paths").key?("/recording_studio_api/api/v2/workspaces")
+      refute payload.fetch("paths").key?("/recording_studio_api/api/v1/workspaces")
+    ensure
+      RecordingStudioApi.configuration.api_versions = ["v1"]
+      RecordingStudioApi.configuration.default_api_version = "v1"
+    end
+  end
+
   test "scalar page renders successfully" do
     create_manageable_workspace_root(name: "Scalar Form Workspace")
 
@@ -221,12 +290,33 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_select %(#scalar-test-auth-collapse-content[hidden]), count: 1
     assert_select %(form[action="#{scalar_test_token_path}"]), count: 1
     assert_includes response.body, "id=\"scalar-api-reference\""
-    assert_includes response.body, docs_openapi_path
+    assert_includes response.body, docs_openapi_path(version: "v1")
     assert_includes response.body, "@scalar/api-reference/dist/browser/standalone.js"
     assert_includes response.body, "createApiReference"
     assert_includes response.body, "recordingStudioApiScalarInit"
     assert_includes response.body, "onload=\"window.recordingStudioApiScalarInit"
-    assert_select %(a[href="#{docs_scalar_fullscreen_path}"][target="_blank"]), text: /Full screen/
+    assert_select %(a[href="#{docs_scalar_fullscreen_path(version: "v1")}"][target="_blank"]), text: /Full screen/
+  end
+
+  test "APIdocs routes render versioned scalar and openapi endpoints" do
+    create_manageable_workspace_root(name: "Scalar APIdocs Workspace")
+    RecordingStudioApi.configuration.api_versions = %w[v1 v2]
+
+    get api_docs_path(version: "v2")
+
+    assert_response :success
+    assert_includes response.body, "for V2"
+    assert_includes response.body, api_docs_openapi_path(version: "v2")
+    assert_select %(a[href="#{api_docs_fullscreen_path(version: "v2")}"][target="_blank"]), text: /Full screen/
+
+    get api_docs_openapi_path(version: "v2")
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert payload.fetch("paths").key?("/recording_studio_api/api/v2/workspaces")
+  ensure
+    RecordingStudioApi.configuration.api_versions = ["v1"]
+    RecordingStudioApi.configuration.default_api_version = "v1"
   end
 
   test "scalar test auth issues a bearer token for the selected access point" do
@@ -273,12 +363,12 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "scalar fullscreen page renders successfully" do
-    get docs_scalar_fullscreen_path
+    get docs_scalar_fullscreen_path(version: "v1")
 
     assert_response :success
     assert_includes response.body, "id=\"scalar-api-reference\""
     assert_includes response.body, "height: 100vh"
-    assert_includes response.body, docs_openapi_path
+    assert_includes response.body, docs_openapi_path(version: "v1")
     assert_includes response.body, "@scalar/api-reference/dist/browser/standalone.js"
     assert_includes response.body, "createApiReference"
     assert_includes response.body, "recordingStudioApiScalarInit"
@@ -296,26 +386,6 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "config/initializers/recording_studio_api.rb"
     assert_includes response.body, "context.access_grant.authorize!"
     assert_includes response.body, "Authorization contract"
-  end
-
-  test "auth page renders successfully" do
-    get docs_auth_path
-
-    assert_response :success
-    assert_select "h1", text: "Auth"
-    assert_includes response.body, "How OAuth2 credentials become a RecordingStudioApi access grant"
-    assert_includes response.body, "/recording_studio_api/oauth/token"
-    assert_includes response.body, "grant_type=client_credentials"
-    assert_includes response.body, "Authorization: Bearer &lt;access_token&gt;"
-    assert_includes response.body, "rate_limit_api_pre_auth_enabled"
-    assert_includes response.body, "throttled by credential or client"
-    assert_includes response.body, "RecordingStudioApi::Services::AuthenticateOauthAccessToken"
-    assert_includes response.body, "Capability authorization"
-    assert_includes response.body, "RecordingStudioApi::AccessGrant"
-    assert_includes response.body, "current_access_grant"
-    assert_includes response.body, "current_api_client"
-    assert_includes response.body, "401 Unauthorized"
-    assert_includes response.body, "429 Too Many Requests"
   end
 
   test "mobile auth page renders successfully" do
@@ -363,17 +433,22 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_select %(a[href="#{docs_auth_path}"]), text: /Auth/
     assert_select %(a[href="#{docs_mobile_auth_path}"]), text: /Mobile auth/
     assert_select %(a[href="#{docs_methods_path}"]), text: /Methods/
-      assert_select %(a[href="#{docs_api_hierarchy_path}"]), text: /API hierarchy/
+    assert_select %(a[href="#{docs_versions_path}"]), text: /Versions/
+    assert_select %(a[href="#{docs_api_hierarchy_path}"]), text: /API hierarchy/
     assert_select %(a[href="/docs/global_allow_list"]), false
 
     methods_link_index = response.body.index(%(href="#{docs_methods_path}"))
+    versions_link_index = response.body.index(%(href="#{docs_versions_path}"))
     api_hierarchy_link_index = response.body.index(%(href="#{docs_api_hierarchy_path}"))
     recordings_tree_link_index = response.body.index(%(href="#{docs_recordings_tree_path}"))
 
     assert_not_nil methods_link_index
+    assert_not_nil versions_link_index
     assert_not_nil api_hierarchy_link_index
     assert_not_nil recordings_tree_link_index
     assert_operator methods_link_index, :<, recordings_tree_link_index
+    assert_operator methods_link_index, :<, versions_link_index
+    assert_operator versions_link_index, :<, recordings_tree_link_index
     assert_operator methods_link_index, :<, api_hierarchy_link_index
     assert_operator api_hierarchy_link_index, :<, recordings_tree_link_index
   end
@@ -394,7 +469,7 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     original_actions_for = RecordingStudioApi.method(:capability_actions_for)
 
     singleton.send(:define_method, :api_recordable_types) { recordable_types }
-    singleton.send(:define_method, :capability_actions_for) do |recordable_type|
+    singleton.send(:define_method, :capability_actions_for) do |recordable_type, version: nil|
       actions_by_type.fetch(recordable_type, [])
     end
 

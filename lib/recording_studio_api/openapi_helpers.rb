@@ -2,12 +2,12 @@
 
 module RecordingStudioApi
   module OpenapiHelpers
-    def documentation_catalog
-      RecordingStudioApi::Services::DocumentationCatalog.call
+    def documentation_catalog(version: nil)
+      RecordingStudioApi::Services::DocumentationCatalog.call(version: version)
     end
 
-    def openapi_document
-      RecordingStudioApi::Services::OpenapiDocument.call
+    def openapi_document(version: nil)
+      RecordingStudioApi::Services::OpenapiDocument.call(version: version)
     end
 
     def recordable_details_schema_name_for(recordable_type)

@@ -6,8 +6,8 @@ module RecordingStudioApi
       EXCLUDED_DEFAULT_ATTRIBUTES = %w[id created_at updated_at].freeze
 
       class << self
-        def call(recording)
-          base_payload = RecordingSerializer.call(recording)
+        def call(recording, version: nil)
+          base_payload = RecordingSerializer.call(recording, version: version)
           return base_payload if recording.is_a?(Hash)
 
           registration = RecordingStudioApi.recordable_registration_for(recording.recordable_type)

@@ -31,7 +31,7 @@
     language: :bash,
     code: <<~CODE
       curl -H "Authorization: Bearer <access_token>" \
-        http://localhost:3000/recording_studio_api/api/v1/workspaces
+        http://localhost:3000/recording_studio_api/api/v2/workspaces
     CODE
   ) %>
 
@@ -44,7 +44,7 @@
   <%= render FlatPack::Card::Component.new(style: :default) do %>
     <%= render FlatPack::List::Component.new(divider: true) do %>
       <%= render FlatPack::List::Item.new(icon: :adjustments_horizontal) do %>
-        <span>When <code>rate_limit_api_pre_auth_enabled</code> is enabled, <code>/api/v1</code> requests are first throttled by IP before bearer-token lookup.</span>
+        <span>When <code>rate_limit_api_pre_auth_enabled</code> is enabled, configured <code>/api/&lt;version&gt;</code> requests are first throttled by IP before bearer-token lookup.</span>
       <% end %>
       <%= render FlatPack::List::Item.new(icon: :shield_check) do %>
         <span>The token endpoint calls <code>RecordingStudioApi::Services::IssueOauthAccessToken</code> and only accepts <code>grant_type=client_credentials</code>.</span>
@@ -65,7 +65,7 @@
         <span>When <code>rate_limit_api_enabled</code> is enabled, authenticated API requests are then throttled by credential or client using separate read and write buckets.</span>
       <% end %>
       <%= render FlatPack::List::Item.new(icon: :clock) do %>
-        <span>On success, it updates <code>last_used_at</code> and passes authenticated context to the selected resource or capability handler.</span>
+        <span>On success, it updates <code>last_used_at</code>, resolves the requested public API version, and passes authenticated context to the selected resource or newest compatible capability contract.</span>
       <% end %>
     <% end %>
   <% end %>

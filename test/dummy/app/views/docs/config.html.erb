@@ -11,6 +11,16 @@
       RecordingStudioApi.configure do |config|
         config.timeout = 10
         config.token_ttl = 45.days
+        config.api_versions = %w[v1 v2]
+        config.default_api_version = "v2"
+
+        config.version "v1" do |api|
+          api.use :moveable, "~> 1.23"
+        end
+
+        config.version "v2" do |api|
+          api.use :moveable, "~> 2.0"
+        end
 
         # Optional Redis-backed throttling
         config.rate_limit_oauth_enabled = true
@@ -36,4 +46,18 @@
       end
     CODE
   ) %>
+
+  <%= render FlatPack::Card::Component.new(style: :default) do %>
+    <%= render FlatPack::List::Component.new(divider: true) do %>
+      <%= render FlatPack::List::Item.new(icon: :queue_list) do %>
+        <span><code>config.api_versions</code> and <code>config.default_api_version</code> define the public API versions your app exposes.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :adjustments_horizontal) do %>
+        <span><code>config.version</code> profiles map each public API version to compatible addon contribution contracts with <code>api.use</code>.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :sparkles) do %>
+        <span>Constraint matching uses <code>Gem::Requirement</code>, while contribution versions are validated with <code>Gem::Version</code>.</span>
+      <% end %>
+    <% end %>
+  <% end %>
 </div>

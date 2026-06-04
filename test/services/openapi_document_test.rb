@@ -114,6 +114,34 @@ module RecordingStudioApi
         assert_equal "Permanently delete trashed", trash_delete.fetch(:description)
       end
 
+      def test_call_uses_configured_default_api_version_in_paths
+        original_version = RecordingStudioApi.configuration.default_api_version
+
+        RecordingStudioApi.configuration.default_api_version = "v2"
+        document = with_recordable_types(["Workspace"]) { OpenapiDocument.call }
+
+        assert document.fetch(:paths).key?("/recording_studio_api/api/v2")
+        assert document.fetch(:paths).key?("/recording_studio_api/api/v2/workspaces")
+      ensure
+        RecordingStudioApi.configuration.default_api_version = original_version
+      end
+
+      def test_call_accepts_explicit_version_argument
+        original_versions = RecordingStudioApi.configuration.api_versions
+        original_version = RecordingStudioApi.configuration.default_api_version
+
+        RecordingStudioApi.configuration.api_versions = %w[v1 v2]
+        RecordingStudioApi.configuration.default_api_version = "v1"
+
+        document = with_recordable_types(["Workspace"]) { OpenapiDocument.call(version: "v2") }
+
+        assert document.fetch(:paths).key?("/recording_studio_api/api/v2/workspaces")
+        refute document.fetch(:paths).key?("/recording_studio_api/api/v1/workspaces")
+      ensure
+        RecordingStudioApi.configuration.api_versions = original_versions
+        RecordingStudioApi.configuration.default_api_version = original_version
+      end
+
       def test_resource_list_operation_includes_cursor_pagination_contract
         document = with_recordable_types(["Workspace"]) { OpenapiDocument.call }
         list_operation = document.fetch(:paths).fetch("/recording_studio_api/api/v1/workspaces").fetch("get")
@@ -332,7 +360,7 @@ module RecordingStudioApi
         original_actions_for = RecordingStudioApi.method(:capability_actions_for)
 
         singleton.send(:define_method, :api_recordable_types) { recordable_types }
-        singleton.send(:define_method, :capability_actions_for) { |_recordable_type| [] }
+        singleton.send(:define_method, :capability_actions_for) { |_recordable_type, version: nil| [] }
         yield
       ensure
         singleton.send(:define_method, :api_recordable_types, original_recordable_types)
@@ -345,7 +373,7 @@ module RecordingStudioApi
         original_actions_for = RecordingStudioApi.method(:capability_actions_for)
 
         singleton.send(:define_method, :api_recordable_types) { recordable_types }
-        singleton.send(:define_method, :capability_actions_for) do |recordable_type|
+        singleton.send(:define_method, :capability_actions_for) do |recordable_type, version: nil|
           actions_by_type.fetch(recordable_type, [])
         end
         yield
