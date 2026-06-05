@@ -35,8 +35,10 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select %(nav.flat-pack-page-nav a[href="/"][aria-label="Close"]), count: 1
+    assert_select "button", text: "Cancel", count: 0
     assert_includes response.body, "Add API access"
     assert_includes response.body, "Create access"
+    assert_includes response.body, "Access point"
     assert_includes response.body, "Name"
     assert_includes response.body, "Role"
     assert_includes response.body, "Expires"
@@ -53,6 +55,7 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     post "/recording_studio_api/api_clients", params: {
       api_client: {
         root_type: "Workspace",
+        access_point_recording_id: @workspace_root_recording.id,
         role: "admin",
         api_client_name: "UI provisioned client",
         expires_at: ""
@@ -72,7 +75,7 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_not_nil access_recording
     assert_includes eligible_workspace_root_ids, access_recording.root_recording_id
     assert_equal "RecordingStudio::Access", access_recording.recordable_type
-    assert_not_includes response.body, access_recording.root_recording_id.to_s
+    assert_not_includes response.body, access_recording.id.to_s
   end
 
   test "index lists API access including descendant child access" do
@@ -497,8 +500,10 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
   private
 
   def create_api_client_for(parent_recording:, name:, role: :admin)
-    access = RecordingStudio::Access.create!(actor: @user, role: role)
-    access_recording = RecordingStudio::Recording.create!(recordable: access, parent_recording: parent_recording)
+    access_recording = with_access_creation_context do
+      access = RecordingStudio::Access.create!(actor: @user, role: role)
+      RecordingStudio::Recording.create!(recordable: access, parent_recording: parent_recording)
+    end
 
     api_client = RecordingStudioApi::ApiClient.create!(
       name: name,

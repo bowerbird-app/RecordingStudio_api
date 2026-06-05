@@ -50,11 +50,13 @@ class RevokeOauthGrantSessionTest < ActiveSupport::TestCase
 
   def setup_member_mobile_session!
     Current.actor = @member_user
-    member_access = RecordingStudio::Access.create!(actor: @member_user, role: :view)
-    @member_access_recording = RecordingStudio::Recording.create!(
-      recordable: member_access,
-      parent_recording: @root_recording
-    )
+    with_access_creation_context do
+      member_access = RecordingStudio::Access.create!(actor: @member_user, role: :view)
+      @member_access_recording = RecordingStudio::Recording.create!(
+        recordable: member_access,
+        parent_recording: @root_recording
+      )
+    end
 
     @oauth_client = RecordingStudioApi::OauthClient.create!(
       name: "Mobile app",

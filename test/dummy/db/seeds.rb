@@ -19,6 +19,59 @@ def ensure_recording_for(recordable:, parent_recording:)
   )
 end
 
+def ensure_access_recording_for(recording:, actor:, role:, manager_actor: actor)
+  existing_access_recording = RecordingStudioAccessible.access_recordings_for_actor(
+    recording: recording,
+    actor: actor
+  ).first
+  effective_role = stronger_access_role(existing_role: existing_access_recording&.recordable&.role, requested_role: role)
+
+  return revise_access_recording!(existing_access_recording, role: effective_role, manager_actor: manager_actor) if existing_access_recording.present?
+
+  result = RecordingStudioAccessible.grant_access(
+    recording: recording,
+    actor: actor,
+    role: effective_role,
+    manager_actor: manager_actor
+  )
+  return result.value if result.success?
+
+  bootstrap_access_recording!(recording: recording, actor: actor, role: effective_role, manager_actor: manager_actor)
+end
+
+def stronger_access_role(existing_role:, requested_role:)
+  normalized_requested_role = requested_role.to_s
+  normalized_existing_role = existing_role.to_s.presence
+  return normalized_requested_role if normalized_existing_role.blank?
+
+  [normalized_existing_role, normalized_requested_role].max_by do |value|
+    RecordingStudio::Access.roles.fetch(value)
+  end
+end
+
+def revise_access_recording!(access_recording, role:, manager_actor:)
+  return access_recording if access_recording.recordable.role.to_s == role.to_s
+
+  RecordingStudioAccessible::AccessCreationContext.allow do
+    RecordingStudio.root_recording_or_self(access_recording.parent_recording).revise(access_recording, actor: manager_actor) do |access|
+      access.role = role
+    end
+  end
+end
+
+def bootstrap_access_recording!(recording:, actor:, role:, manager_actor:)
+  RecordingStudioAccessible::AccessCreationContext.allow do
+    RecordingStudio.root_recording_or_self(recording).record(
+      RecordingStudio::Access,
+      actor: manager_actor,
+      parent_recording: recording
+    ) do |access|
+      access.actor = actor
+      access.role = role
+    end
+  end
+end
+
 def ensure_api_request_logs_table!
   connection = RecordingStudioApi::ApiRequestLog.connection
   table_name = RecordingStudioApi::ApiRequestLog.table_name
@@ -142,24 +195,25 @@ folder_recording = ensure_recording_for(recordable: folder, parent_recording: ro
 ensure_recording_for(recordable: page, parent_recording: folder_recording)
 
 Current.actor = admin_user
-admin_access = RecordingStudio::Access.find_or_create_by!(actor: admin_user, role: :admin)
-RecordingStudio::Recording.unscoped.find_or_create_by!(
-  recordable: admin_access,
-  root_recording_id: admin_root_recording.id,
-  parent_recording_id: admin_root_recording.id
+ensure_access_recording_for(
+  recording: admin_root_recording,
+  actor: admin_user,
+  role: :admin,
+  manager_actor: admin_user
 )
-admin_access_recording = RecordingStudio::Recording.unscoped.find_or_create_by!(
-  recordable: admin_access,
-  root_recording_id: root_recording.id,
-  parent_recording_id: root_recording.id
+admin_access_recording = ensure_access_recording_for(
+  recording: root_recording,
+  actor: admin_user,
+  role: :admin,
+  manager_actor: admin_user
 )
 
-Current.actor = mobile_user
-mobile_access = RecordingStudio::Access.find_or_create_by!(actor: mobile_user, role: :view)
-mobile_access_recording = RecordingStudio::Recording.unscoped.find_or_create_by!(
-  recordable: mobile_access,
-  root_recording_id: root_recording.id,
-  parent_recording_id: root_recording.id
+Current.actor = admin_user
+mobile_access_recording = ensure_access_recording_for(
+  recording: root_recording,
+  actor: mobile_user,
+  role: :view,
+  manager_actor: admin_user
 )
 
 service_client_name = "Seed Demo Service Client"

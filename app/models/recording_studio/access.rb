@@ -10,7 +10,7 @@ module RecordingStudio
       label: "Access",
       plural_label: "Access",
       root: false,
-      allowed_parent_types: %w[Workspace Folder Page]
+      allowed_parent_types: []
     )
 
     belongs_to :actor, polymorphic: true

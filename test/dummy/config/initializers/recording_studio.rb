@@ -22,8 +22,18 @@ RecordingStudio.configure do |config|
 
   # Built-in capabilities remain disabled until you opt a recordable type into
   # them by including the relevant RecordingStudio capability module.
+  config.enable_capability(:accessible, on: "Workspace")
+  config.enable_capability(:accessible, on: "Folder")
+  config.enable_capability(:accessible, on: "Page")
   config.enable_capability(:movable, on: "Folder")
   config.enable_capability(:trashable, on: "Page")
+end
+
+Rails.application.config.after_initialize do
+  next unless defined?(RecordingStudioAdmin::Admin)
+  next unless RecordingStudio::RecordableDeclarations.declarations.key?("RecordingStudioAdmin::Admin")
+
+  RecordingStudio.enable_capability(:accessible, on: "RecordingStudioAdmin::Admin")
 end
 
 RecordingStudio::Labels.register_formatter(

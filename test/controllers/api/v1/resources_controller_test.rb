@@ -142,8 +142,10 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     scoped_folder_recording = RecordingStudio::Recording.create!(recordable: scoped_folder, parent_recording: root_recording)
     scoped_page = create_page_recording(root_recording: root_recording, parent_recording: scoped_folder_recording)
     sibling_page = create_page_recording(root_recording: root_recording)
-    access = RecordingStudio::Access.create!(actor: user, role: :view)
-    access_recording = RecordingStudio::Recording.create!(recordable: access, parent_recording: scoped_folder_recording)
+    access_recording = with_access_creation_context do
+      access = RecordingStudio::Access.create!(actor: user, role: :view)
+      RecordingStudio::Recording.create!(recordable: access, parent_recording: scoped_folder_recording)
+    end
     token = issue_oauth_access_token_for(access_recording: access_recording, name: "Descendant view token")
 
     get "/recording_studio_api/api/v1/pages", headers: { "Authorization" => "Bearer #{token}" }
@@ -433,8 +435,10 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
   test "view token cannot inherit another access recording owned by the same actor" do
     user = create_user(email: "view-token-other-access@example.com")
     root_recording, view_access_recording = create_access_recording_for(user: user, role: :view)
-    admin_access = RecordingStudio::Access.create!(actor: user, role: :admin)
-    RecordingStudio::Recording.create!(recordable: admin_access, parent_recording: root_recording)
+    with_access_creation_context do
+      admin_access = RecordingStudio::Access.create!(actor: user, role: :admin)
+      RecordingStudio::Recording.create!(recordable: admin_access, parent_recording: root_recording)
+    end
     view_token = issue_oauth_access_token_for(access_recording: view_access_recording, name: "View token with sibling admin")
 
     post "/recording_studio_api/api/v1/workspaces", params: {

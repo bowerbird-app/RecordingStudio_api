@@ -8,6 +8,14 @@ require "rails/test_help"
 module ApiDummyHelpers
   TEST_PASSWORD = "ApiAuthPassword!2026"
 
+  def with_access_creation_context(&block)
+    if defined?(RecordingStudioAccessible::AccessCreationContext)
+      RecordingStudioAccessible::AccessCreationContext.allow(&block)
+    else
+      yield
+    end
+  end
+
   def reset_recording_studio_api_configuration!
     RecordingStudioApi.instance_variable_set(:@configuration, RecordingStudioApi::Configuration.new)
     RecordingStudioApi.register_default_capability_actions!
@@ -20,6 +28,11 @@ module ApiDummyHelpers
     configuration = RecordingStudio.configuration
     configuration.instance_variable_set(:@capabilities, {})
     configuration.instance_variable_set(:@capability_options, {})
+    RecordingStudio.enable_capability(:accessible, on: "Workspace")
+    RecordingStudio.enable_capability(:accessible, on: "Folder")
+    RecordingStudio.enable_capability(:accessible, on: "Page")
+    RecordingStudio.enable_capability(:accessible, on: "RecordingStudioAdmin::Admin") if defined?(RecordingStudioAdmin::Admin)
+    RecordingStudio.enable_capability(:movable, on: "Folder")
     RecordingStudio.enable_capability(:trashable, on: "Page")
   end
 
@@ -35,8 +48,10 @@ module ApiDummyHelpers
     Current.impersonator = nil if defined?(Current) && Current.respond_to?(:impersonator=)
     workspace = Workspace.create!(name: workspace_name)
     root_recording = RecordingStudio::Recording.create!(recordable: workspace)
-    access = RecordingStudio::Access.create!(actor: user, role: role)
-    access_recording = RecordingStudio::Recording.create!(recordable: access, parent_recording: root_recording)
+    access_recording = with_access_creation_context do
+      access = RecordingStudio::Access.create!(actor: user, role: role)
+      RecordingStudio::Recording.create!(recordable: access, parent_recording: root_recording)
+    end
 
     [root_recording, access_recording]
   end

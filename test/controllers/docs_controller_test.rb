@@ -115,8 +115,10 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     folder_recording = RecordingStudio::Recording.create!(recordable: folder, parent_recording: root_recording)
     page = Page.create!(title: "API")
     RecordingStudio::Recording.create!(recordable: page, parent_recording: folder_recording)
-    access = RecordingStudio::Access.create!(actor: @user, role: :admin)
-    RecordingStudio::Recording.create!(recordable: access, parent_recording: root_recording)
+    RecordingStudioAccessible::AccessCreationContext.allow do
+      access = RecordingStudio::Access.create!(actor: @user, role: :admin)
+      RecordingStudio::Recording.create!(recordable: access, parent_recording: root_recording)
+    end
 
     archived_page = Page.create!(title: "Archived")
     archived_recording = RecordingStudio::Recording.create!(recordable: archived_page, parent_recording: root_recording)
@@ -319,7 +321,7 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     RecordingStudioApi.configuration.default_api_version = "v1"
   end
 
-  test "scalar test auth issues a bearer token for the selected access point" do
+  test "scalar test auth reuses the existing direct access role for the selected access point" do
     root_recording = create_manageable_workspace_root(name: "Scalar Workspace")
 
     post scalar_test_token_path, params: {
@@ -335,7 +337,8 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_select %(div[data-controller="flat-pack--collapse"][data-flat-pack--collapse-open-value="true"]), count: 1
     assert_includes response.body, "Scalar test bearer token issued."
     assert_includes response.body, "Bearer rsapi_at_"
-    assert_includes response.body, "Edit"
+    assert_includes response.body, "Admin"
+    assert_select %(select[name="role"] option[value="admin"][selected="selected"]), count: 1
     assert_includes response.body, "Workspace: Scalar Workspace"
     assert_includes response.body, "Scoped sample IDs"
     assert_select %(form[action="#{scalar_test_token_path}"] input[name="_method"][value="delete"]), count: 1
@@ -360,6 +363,30 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "Scalar test bearer token revoked."
     assert_not_includes response.body, "Bearer rsapi_at_"
+  end
+
+  test "scalar test auth reuses the same access recording for repeated issues" do
+    root_recording = create_manageable_workspace_root(name: "Scalar Reissue Workspace")
+
+    post scalar_test_token_path, params: {
+      access_point_recording_id: root_recording.id,
+      role: "admin"
+    }
+
+    first_credential = RecordingStudioApi::ApiCredential.order(created_at: :desc).first
+    first_access_recording = first_credential.access_recording
+
+    post scalar_test_token_path, params: {
+      access_point_recording_id: root_recording.id,
+      role: "admin"
+    }
+
+    second_credential = RecordingStudioApi::ApiCredential.order(created_at: :desc).first
+    direct_access_recordings = RecordingStudioAccessible.access_recordings_for_actor(recording: root_recording, actor: @user)
+
+    assert_equal first_access_recording.id, second_credential.access_recording_id
+    assert_not_nil first_credential.reload.revoked_at
+    assert_equal [first_access_recording.id], direct_access_recordings.map(&:id)
   end
 
   test "scalar fullscreen page renders successfully" do
@@ -520,8 +547,10 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
   def create_manageable_workspace_root(name:)
     workspace = Workspace.create!(name: name)
     root_recording = RecordingStudio::Recording.create!(recordable: workspace)
-    access = RecordingStudio::Access.create!(actor: @user, role: :admin)
-    RecordingStudio::Recording.create!(recordable: access, parent_recording: root_recording)
+    RecordingStudioAccessible::AccessCreationContext.allow do
+      access = RecordingStudio::Access.create!(actor: @user, role: :admin)
+      RecordingStudio::Recording.create!(recordable: access, parent_recording: root_recording)
+    end
 
     root_recording
   end

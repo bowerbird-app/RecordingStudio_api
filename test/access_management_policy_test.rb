@@ -45,14 +45,16 @@ class AccessManagementPolicyTest < ActiveSupport::TestCase
     root_recording = RecordingStudio::Recording.create!(recordable: workspace)
     folder = Folder.create!(name: "Admin API")
     folder_recording = RecordingStudio::Recording.create!(recordable: folder, parent_recording: root_recording)
-    access = RecordingStudio::Access.create!(actor: user, role: :view)
-    access_recording = RecordingStudio::Recording.create!(recordable: access, parent_recording: folder_recording)
+    access_recording = with_access_creation_context do
+      access = RecordingStudio::Access.create!(actor: user, role: :view)
+      RecordingStudio::Recording.create!(recordable: access, parent_recording: folder_recording)
+    end
 
     policy = RecordingStudioApi::AccessManagementPolicy.new(actor: user)
 
     assert_includes policy.visible_access_recordings, access_recording
-    refute_includes policy.visible_root_recordings, root_recording
-    refute policy.can_view_root_recording?(root_recording)
+    assert_includes policy.visible_root_recordings, root_recording
+    assert policy.can_view_root_recording?(root_recording)
     assert policy.authorized_for_access_recording?(access_recording, access_management_role: :view)
   end
 end

@@ -268,12 +268,15 @@ module RecordingStudioApi
       RecordingStudio.configuration.recordable_types = (existing_type_names + available_type_names).uniq
     end
 
-    def self.access_parent_type_names
-      Array(RecordingStudio.configuration.recordable_types).map(&:to_s).uniq - internal_child_recordable_type_names
-    end
-
     def self.internal_child_recordable_type_names
       API_RECORDABLE_TYPE_NAMES + [ADMIN_API_RECORDABLE_TYPE_NAME]
+    end
+
+    def self.access_parent_type_names
+      return [] unless defined?(RecordingStudioAccessible::Compatibility)
+      return [] unless RecordingStudioAccessible::Compatibility.respond_to?(:access_parent_types)
+
+      RecordingStudioAccessible::Compatibility.access_parent_types.to_a.sort
     end
 
     def self.declare_recordable_type!(recordable_type_name, **declaration)

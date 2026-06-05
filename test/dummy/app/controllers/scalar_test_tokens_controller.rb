@@ -37,7 +37,7 @@ class ScalarTestTokensController < ApplicationController
   end
 
   def can_manage_access_point?(recording)
-    access_management_policy.can_manage_root_recording?(root_recording_for(recording))
+    access_management_policy.can_manage_recording?(recording)
   end
 
   def access_management_policy
@@ -74,7 +74,7 @@ class ScalarTestTokensController < ApplicationController
         credential: credential,
         access_token_record: access_token_record,
         access_token: access_token,
-        role: role
+        role: access_recording.recordable.role
       )
     end
 
@@ -82,15 +82,26 @@ class ScalarTestTokensController < ApplicationController
   end
 
   def create_access_recording!(access_point_recording:, role:)
-    access = RecordingStudio::Access.create!(actor: current_user, role: role)
+    result = RecordingStudioAccessible.grant_access(
+      recording: access_point_recording,
+      actor: current_user,
+      role: effective_role_for(access_point_recording, role),
+      manager_actor: current_user
+    )
 
-    RecordingStudio.record!(
-      action: "created",
-      recordable: access,
-      root_recording: root_recording_for(access_point_recording),
-      parent_recording: access_point_recording,
+    raise RecordingStudioApi::Error, result.error if result.failure?
+
+    result.value
+  end
+
+  def effective_role_for(access_point_recording, requested_role)
+    existing_role = RecordingStudioAccessible.access_recordings_for_actor(
+      recording: access_point_recording,
       actor: current_user
-    ).recording
+    ).first&.recordable&.role.to_s.presence
+    return requested_role if existing_role.blank?
+
+    [existing_role, requested_role.to_s].max_by { |value| RecordingStudio::Access.roles.fetch(value) }
   end
 
   def session_payload_for(access_point_recording:, access_recording:, credential:, access_token_record:, access_token:, role:)

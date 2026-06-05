@@ -23,16 +23,42 @@ module RecordingStudioApi
     end
 
     def can_view_root_recording?(root_recording)
-      authorized_for_root_recording?(root_recording, access_management_role: RecordingStudioApi.configuration.access_management_view_role)
+      can_view_recording?(root_recording)
     end
 
     def can_manage_root_recording?(root_recording)
-      authorized_for_root_recording?(root_recording, access_management_role: RecordingStudioApi.configuration.access_management_edit_role)
+      can_manage_recording?(root_recording)
+    end
+
+    def can_view_recording?(recording)
+      authorized_root_recording?(recording, access_management_role: RecordingStudioApi.configuration.access_management_view_role)
+    end
+
+    def can_manage_recording?(recording)
+      authorized_root_recording?(recording, access_management_role: RecordingStudioApi.configuration.access_management_edit_role)
     end
 
     def authorized_for_root_recording?(root_recording, access_management_role:)
+      authorized_for_recording?(root_recording, access_management_role: access_management_role)
+    end
+
+    def authorized_for_recording?(recording, access_management_role:)
+      return false if actor.nil?
+      return false if recording.nil?
+
+      RecordingStudioAccessible.authorized?(
+        actor: actor,
+        recording: recording,
+        role: access_management_role
+      )
+    end
+
+    def authorized_root_recording?(recording, access_management_role:)
+      root_recording = root_recording_for(recording)
+      return false if root_recording.nil?
+
       root_recordings_for(access_management_role: access_management_role).any? do |candidate|
-        candidate.id == root_recording&.id
+        candidate.id == root_recording.id
       end
     end
 
@@ -79,6 +105,12 @@ module RecordingStudioApi
       return nil if access_recording.nil?
 
       access_recording.parent_recording || access_recording.root_recording
+    end
+
+    def root_recording_for(recording)
+      return nil if recording.nil?
+
+      recording.root_recording || recording
     end
 
     def access_recordings

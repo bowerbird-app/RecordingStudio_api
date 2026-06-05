@@ -3,8 +3,8 @@
 module RecordingStudioApi
   module Services
     class ProvisionAccessRequest < BaseService
-      def initialize(root_recording:, actor:, role:, api_client_name:, expires_at: nil)
-        @root_recording = root_recording
+      def initialize(access_point_recording:, actor:, role:, api_client_name:, expires_at: nil)
+        @access_point_recording = access_point_recording
         @actor = actor
         @role = role
         @api_client_name = api_client_name
@@ -13,15 +13,17 @@ module RecordingStudioApi
 
       private
 
-      attr_reader :root_recording, :actor, :role, :api_client_name, :expires_at
+      attr_reader :access_point_recording, :actor, :role, :api_client_name, :expires_at
 
       def perform
-        return failure("Root recording is required") if root_recording.nil?
-        return failure("Root recording must be a top-level API resource") unless valid_root_recording?
+        return failure("Access point recording is required") if access_point_recording.nil?
+        return failure("Access point recording does not allow API access") unless valid_access_point_recording?
         return failure("Actor is required") if actor.nil?
         return failure("Access role is required") if role.blank?
         return failure("API client name is required") if api_client_name.blank?
-        return failure("Actor is not authorized to manage API access for this root recording") unless access_management_policy.can_manage_root_recording?(root_recording)
+        unless access_management_policy.can_manage_recording?(access_point_recording)
+          return failure("Actor is not authorized to manage API access for this recording")
+        end
 
         payload = nil
 
@@ -37,6 +39,7 @@ module RecordingStudioApi
 
           payload = provision_result.value.merge(
             root_recording: root_recording,
+            access_point_recording: access_point_recording,
             access_recording: access_recording
           )
         end
@@ -46,26 +49,48 @@ module RecordingStudioApi
         failure(e)
       end
 
-      def valid_root_recording?
-        root_recording.parent_recording_id.nil? &&
-          RecordingStudioApi.api_recordable_types.include?(root_recording.recordable_type)
+      def valid_access_point_recording?
+        return false unless RecordingStudioApi.api_recordable_types.include?(access_point_recording.recordable_type)
+        return false unless defined?(RecordingStudioAccessible::Compatibility)
+
+        RecordingStudioAccessible::Compatibility.access_parent_allowed?(access_point_recording)
       end
 
       def create_access_recording!
-        access = RecordingStudio::Access.create!(actor: actor, role: role)
+        result = RecordingStudioAccessible.grant_access(
+          recording: access_point_recording,
+          actor: actor,
+          role: effective_role,
+          manager_actor: actor
+        )
 
-        RecordingStudio.record!(
-          action: "created",
-          recordable: access,
-          root_recording: root_recording,
-          parent_recording: root_recording,
+        raise RecordingStudioApi::Error, result.error if result.failure?
+
+        result.value
+      end
+
+      def effective_role
+        existing_role = existing_access_recording&.recordable&.role.to_s.presence
+        requested_role = role.to_s
+        return requested_role if existing_role.blank?
+
+        [existing_role, requested_role].max_by { |value| RecordingStudio::Access.roles.fetch(value) }
+      end
+
+      def existing_access_recording
+        @existing_access_recording ||= RecordingStudioAccessible.access_recordings_for_actor(
+          recording: access_point_recording,
           actor: actor
-        ).recording
+        ).first
+      end
+
+      def root_recording
+        access_point_recording.root_recording || access_point_recording
       end
 
       def service_args
         {
-          root_recording_id: root_recording&.id,
+          access_point_recording_id: access_point_recording&.id,
           actor_id: actor&.id,
           actor_type: actor&.class&.name,
           role: role,

@@ -27,7 +27,7 @@ module RecordingStudioApi
       return render_invalid_form if @errors.any?
 
       result = RecordingStudioApi::Services::ProvisionAccessRequest.call(
-        root_recording: selected_root_recording,
+        access_point_recording: selected_access_point_recording,
         actor: current_request_actor,
         role: @form_values.fetch(:role),
         api_client_name: @form_values.fetch(:api_client_name),
@@ -61,12 +61,12 @@ module RecordingStudioApi
     def load_form_state
       @errors = []
       @root_type = normalized_root_type
-      @root_recordings = available_root_recordings(@root_type)
+      @access_point_recordings = available_access_point_recordings(@root_type)
       @role_options = role_options
-      root_recording = @root_recordings.first
+      access_point_recording = selected_access_point_recording
       @form_values = {
         root_type: @root_type,
-        root_recording_id: root_recording&.id,
+        access_point_recording_id: api_client_params[:access_point_recording_id].presence || access_point_recording&.id,
         role: api_client_params[:role].presence || "admin",
         api_client_name: api_client_params[:api_client_name].presence || default_api_client_name,
         expires_at: api_client_params[:expires_at].to_s
@@ -74,7 +74,7 @@ module RecordingStudioApi
     end
 
     def api_client_params
-      params.fetch(:api_client, params.fetch(:access_request, {})).permit(:root_type, :role, :api_client_name, :expires_at)
+      params.fetch(:api_client, params.fetch(:access_request, {})).permit(:root_type, :access_point_recording_id, :role, :api_client_name, :expires_at)
     end
 
     def api_client_update_params
@@ -96,6 +96,30 @@ module RecordingStudioApi
       manageable_root_recordings.select { |recording| recording.recordable_type == root_type }
     end
 
+    def available_access_point_recordings(root_type)
+      manageable_root_recordings.flat_map do |root_recording|
+        root_recording.subtree_recordings(include_self: true)
+          .includes(:recordable)
+          .where(recordable_type: available_access_point_types(root_type), trashed_at: nil)
+          .reorder(:created_at, :id)
+          .to_a
+      end.uniq { |recording| recording.id }
+    end
+
+    def available_access_point_types(root_type)
+      types = root_type.present? ? [root_type] : allowed_root_types
+      Array(types).select do |type_name|
+        access_point_capable_type?(type_name)
+      end
+    end
+
+    def access_point_capable_type?(type_name)
+      return false if type_name.blank?
+      return false unless defined?(RecordingStudio) && RecordingStudio.respond_to?(:capability_enabled?)
+
+      RecordingStudio.capability_enabled?(:accessible, for: type_name)
+    end
+
     def role_options
       %w[view edit admin].map { |value| [value.humanize, value] }
     end
@@ -104,8 +128,14 @@ module RecordingStudioApi
       "My api access"
     end
 
-    def selected_root_recording
-      @selected_root_recording ||= @root_recordings.first
+    def selected_access_point_recording
+      requested_id = api_client_params[:access_point_recording_id].presence
+
+      @selected_access_point_recording ||= if requested_id.present?
+        @access_point_recordings.find { |recording| recording.id == requested_id }
+      else
+        @access_point_recordings.first
+      end
     end
 
     def current_request_actor
@@ -116,23 +146,23 @@ module RecordingStudioApi
     end
 
     def authorize_access_management_edit_for_new_request!
-      return if access_management_policy.can_manage_root_recording?(selected_root_recording_for_request)
+      return if access_management_policy.can_manage_recording?(selected_access_point_recording_for_request)
 
       raise RecordingStudioApi::AuthorizationError, "API access management requires higher access"
     end
 
     def authorize_access_management_edit_for_loaded_client!
-      root_recording = @api_client&.access_recording&.root_recording
-      return if access_management_policy.can_manage_root_recording?(root_recording)
+      access_point_recording = access_point_recording_for(@api_client&.access_recording)
+      return if access_management_policy.can_manage_recording?(access_point_recording)
 
       raise RecordingStudioApi::AuthorizationError, "API access management requires higher access"
     end
 
-    def selected_root_recording_for_request
+    def selected_access_point_recording_for_request
       root_type = normalized_root_type
       return nil if root_type.blank?
 
-      available_root_recordings(root_type).first
+      available_access_point_recordings(root_type).first
     end
 
     def access_management_policy
@@ -180,7 +210,7 @@ module RecordingStudioApi
     end
 
     def render_invalid_form
-      @errors << "A #{human_root_type.downcase} recording must be selected" if selected_root_recording.nil?
+      @errors << "An access point recording must be selected" if selected_access_point_recording.nil?
       render :new, status: :unprocessable_entity
     end
 
@@ -196,7 +226,7 @@ module RecordingStudioApi
       scoped_recording_ids = scoped_recording_subtree_ids(scoped_recording)
       visible_access_recording_ids = visible_access_recordings.map(&:id)
       @can_manage_access_requests = visible_root_recordings.any? do |recording|
-        access_management_policy.can_manage_root_recording?(recording)
+        access_management_policy.can_manage_recording?(recording)
       end
 
       api_clients = RecordingStudioApi::ApiClient
@@ -300,7 +330,7 @@ module RecordingStudioApi
 
       @access_recording = @api_client.access_recording
       @root_recording = @access_recording&.root_recording
-      @can_manage_access_request = access_management_policy.can_manage_root_recording?(@root_recording)
+      @can_manage_access_request = access_management_policy.can_manage_recording?(access_point_recording_for(@access_recording))
       @latest_credential = @api_client.credentials.max_by { |credential| [credential.created_at.to_i, credential.id.to_i] }
       load_api_token_activity
       load_oauth_activity

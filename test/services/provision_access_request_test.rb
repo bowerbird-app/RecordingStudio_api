@@ -21,7 +21,7 @@ class ProvisionAccessRequestTest < ActiveSupport::TestCase
 
   test "creates access client and credential beneath the root recording" do
     result = RecordingStudioApi::Services::ProvisionAccessRequest.call(
-      root_recording: @root_recording,
+      access_point_recording: @root_recording,
       actor: @user,
       role: :admin,
       api_client_name: "Workspace demo client"
@@ -39,9 +39,9 @@ class ProvisionAccessRequestTest < ActiveSupport::TestCase
     assert_not_empty payload.fetch(:token)
   end
 
-  test "creates distinct access recordings for repeated requests" do
+  test "reuses the same access recording for repeated requests" do
     first_result = RecordingStudioApi::Services::ProvisionAccessRequest.call(
-      root_recording: @root_recording,
+      access_point_recording: @root_recording,
       actor: @user,
       role: :view,
       api_client_name: "First client"
@@ -50,15 +50,17 @@ class ProvisionAccessRequestTest < ActiveSupport::TestCase
     assert first_result.success?, first_result.error
 
     second_result = RecordingStudioApi::Services::ProvisionAccessRequest.call(
-      root_recording: @root_recording,
+      access_point_recording: @root_recording,
       actor: @user,
-      role: :view,
+      role: :admin,
       api_client_name: "Second client"
     )
 
     assert second_result.success?, second_result.error
-    refute_equal first_result.value.fetch(:access_recording).id, second_result.value.fetch(:access_recording).id
+    assert_equal first_result.value.fetch(:access_recording).id, second_result.value.fetch(:access_recording).id
     assert_equal @root_recording.id, second_result.value.fetch(:access_recording).parent_recording_id
+    assert_equal "admin", second_result.value.fetch(:access_recording).recordable.role
+    assert_not_nil first_result.value.fetch(:credential).reload.revoked_at
   end
 
   test "rejects provisioning for view-only access by default" do
@@ -66,13 +68,13 @@ class ProvisionAccessRequestTest < ActiveSupport::TestCase
     view_root_recording, = create_access_recording_for(user: view_user, role: :view)
 
     result = RecordingStudioApi::Services::ProvisionAccessRequest.call(
-      root_recording: view_root_recording,
+      access_point_recording: view_root_recording,
       actor: view_user,
       role: :view,
       api_client_name: "Blocked client"
     )
 
     assert result.failure?
-    assert_equal "Actor is not authorized to manage API access for this root recording", result.error
+    assert_equal "Actor is not authorized to manage API access for this recording", result.error
   end
 end

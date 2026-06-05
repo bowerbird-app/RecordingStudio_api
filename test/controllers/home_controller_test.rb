@@ -3,12 +3,14 @@
 ENV["RAILS_ENV"] = "test"
 require_relative "../test_helper"
 require_relative "../dummy/config/environment"
+require_relative "../support/api_dummy_helpers"
 
 require "devise/test/integration_helpers"
 require "rails/test_help"
 
 class HomeControllerTest < ActionDispatch::IntegrationTest
   include Devise::Test::IntegrationHelpers
+  include ApiDummyHelpers
 
   TEST_PASSWORD = "HomeTestPassword!2026"
 
@@ -24,13 +26,11 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
   test "root page renders the api access demo for workspace roots" do
     workspace = Workspace.create!(name: "Root Workspace")
     workspace_root_recording = RecordingStudio::Recording.create!(recordable: workspace)
-    workspace_access = RecordingStudio::Access.create!(actor: @user, role: :admin)
-    RecordingStudio::Recording.create!(recordable: workspace_access, parent_recording: workspace_root_recording)
+    create_access_recording(parent_recording: workspace_root_recording, user: @user, role: :admin)
 
     folder = Folder.create!(name: "Root Folder")
     folder_recording = RecordingStudio::Recording.create!(recordable: folder, parent_recording: workspace_root_recording)
-    folder_access = RecordingStudio::Access.create!(actor: @user, role: :view)
-    RecordingStudio::Recording.create!(recordable: folder_access, parent_recording: folder_recording)
+    create_access_recording(parent_recording: folder_recording, user: @user, role: :view)
 
     get root_path
 
@@ -59,14 +59,12 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
     admin_root = RecordingStudioAdmin::Admin.create!(name: "Admin", key: SecureRandom.hex(4))
     admin_root_recording = RecordingStudio::Recording.create!(recordable: admin_root)
     admin_api = RecordingStudioApi::AdminApi.create!(key: "api-#{SecureRandom.hex(4)}", name: "Admin API")
-    admin_access = RecordingStudio::Access.create!(actor: @user, role: :admin)
-    RecordingStudio::Recording.create!(recordable: admin_access, parent_recording: admin_root_recording)
+    create_access_recording(parent_recording: admin_root_recording, user: @user, role: :admin)
     RecordingStudio::Recording.create!(recordable: admin_api, parent_recording: admin_root_recording)
 
     workspace = Workspace.create!(name: "Old Workspace")
     workspace_root_recording = RecordingStudio::Recording.create!(recordable: workspace)
-    workspace_access = RecordingStudio::Access.create!(actor: @user, role: :admin)
-    RecordingStudio::Recording.create!(recordable: workspace_access, parent_recording: workspace_root_recording)
+    create_access_recording(parent_recording: workspace_root_recording, user: @user, role: :admin)
 
     get root_path
 
@@ -117,8 +115,7 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
   test "root switch page uses the shared host layout when admin root is current" do
     admin_root = RecordingStudioAdmin::Admin.create!(name: "Admin", key: SecureRandom.hex(4))
     admin_root_recording = RecordingStudio::Recording.create!(recordable: admin_root)
-    admin_access = RecordingStudio::Access.create!(actor: @user, role: :admin)
-    RecordingStudio::Recording.create!(recordable: admin_access, parent_recording: admin_root_recording)
+    create_access_recording(parent_recording: admin_root_recording, user: @user, role: :admin)
 
     get recording_studio_root_switchable.root_switch_path(
       scope: "all_roots",
@@ -133,13 +130,11 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
   test "switching from admin to workspace returns to the host root demo" do
     admin_root = RecordingStudioAdmin::Admin.create!(name: "Admin", key: SecureRandom.hex(4))
     admin_root_recording = RecordingStudio::Recording.create!(recordable: admin_root)
-    admin_access = RecordingStudio::Access.create!(actor: @user, role: :admin)
-    RecordingStudio::Recording.create!(recordable: admin_access, parent_recording: admin_root_recording)
+    create_access_recording(parent_recording: admin_root_recording, user: @user, role: :admin)
 
     workspace = Workspace.create!(name: "Studio Workspace")
     workspace_root_recording = RecordingStudio::Recording.create!(recordable: workspace)
-    workspace_access = RecordingStudio::Access.create!(actor: @user, role: :admin)
-    RecordingStudio::Recording.create!(recordable: workspace_access, parent_recording: workspace_root_recording)
+    create_access_recording(parent_recording: workspace_root_recording, user: @user, role: :admin)
 
     patch recording_studio_root_switchable.root_switch_path(scope: "all_roots"), params: {
       root_switch: {
@@ -162,13 +157,11 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
   test "switching from a nested root switch return target falls back to the host root demo" do
     admin_root = RecordingStudioAdmin::Admin.create!(name: "Admin", key: SecureRandom.hex(4))
     admin_root_recording = RecordingStudio::Recording.create!(recordable: admin_root)
-    admin_access = RecordingStudio::Access.create!(actor: @user, role: :admin)
-    RecordingStudio::Recording.create!(recordable: admin_access, parent_recording: admin_root_recording)
+    create_access_recording(parent_recording: admin_root_recording, user: @user, role: :admin)
 
     workspace = Workspace.create!(name: "Studio Workspace")
     workspace_root_recording = RecordingStudio::Recording.create!(recordable: workspace)
-    workspace_access = RecordingStudio::Access.create!(actor: @user, role: :admin)
-    RecordingStudio::Recording.create!(recordable: workspace_access, parent_recording: workspace_root_recording)
+    create_access_recording(parent_recording: workspace_root_recording, user: @user, role: :admin)
 
     nested_return_to = recording_studio_root_switchable.root_switch_path(
       scope: "all_roots",
@@ -190,5 +183,14 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
     assert_select "h1", text: "Recording Studio API demo"
     assert_includes response.body, "Demo to add and remove API access"
     assert_not_includes response.body, "Change root"
+  end
+
+  private
+
+  def create_access_recording(parent_recording:, user:, role:)
+    with_access_creation_context do
+      access = RecordingStudio::Access.create!(actor: user, role: role)
+      RecordingStudio::Recording.create!(recordable: access, parent_recording: parent_recording)
+    end
   end
 end

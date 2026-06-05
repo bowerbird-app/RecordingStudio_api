@@ -25,6 +25,14 @@
     <%= form.hidden_field :root_type, value: @form_values.fetch(:root_type) %>
 
     <div class="space-y-2">
+      <label for="api_client_access_point_recording_id" class="block text-sm font-medium text-(--surface-content-color)">Access point</label>
+      <%= form.select :access_point_recording_id,
+        options_for_select(@access_point_recordings.map { |recording| [recording_label(recording), recording.id] }, @form_values.fetch(:access_point_recording_id)),
+        {},
+        class: "flat-pack-input w-full rounded-md border bg-[var(--surface-background-color)] px-[var(--form-control-padding)] py-[var(--form-control-padding)] text-sm text-[var(--surface-content-color)] border-[var(--surface-border-color)]" %>
+    </div>
+
+    <div class="space-y-2">
       <label for="api_client_api_client_name" class="block text-sm font-medium text-(--surface-content-color)">Name</label>
       <%= form.text_field :api_client_name,
         value: @form_values.fetch(:api_client_name),
@@ -55,8 +63,6 @@
         size: :md,
         type: "submit"
       ) %>
-
-      <%= button_to "Cancel", page_nav_close_url, method: :get, class: "inline-flex items-center justify-center gap-2 rounded-[var(--button-border-radius)] font-medium cursor-pointer transition-colors duration-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--button-focus-ring-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--button-focus-ring-offset-color)] px-[var(--button-padding-x-md)] py-[var(--button-padding-y-md)] text-sm bg-[var(--surface-background-color)] text-[var(--surface-content-color)] border border-[var(--surface-border-color)]" %>
     </div>
   <% end %>
 </div>

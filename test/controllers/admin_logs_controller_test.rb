@@ -3,12 +3,14 @@
 ENV["RAILS_ENV"] = "test"
 require_relative "../test_helper"
 require_relative "../dummy/config/environment"
+require_relative "../support/api_dummy_helpers"
 
 require "devise/test/integration_helpers"
 require "rails/test_help"
 
 class AdminLogsControllerTest < ActionDispatch::IntegrationTest
   include Devise::Test::IntegrationHelpers
+  include ApiDummyHelpers
 
   TEST_PASSWORD = "AdminLogsPassword!2026"
 
@@ -29,8 +31,7 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
 
     @admin_root = RecordingStudioAdmin::Admin.create!(name: "Admin", key: SecureRandom.hex(4))
     @admin_root_recording = RecordingStudio::Recording.create!(recordable: @admin_root)
-    admin_access = RecordingStudio::Access.create!(actor: @user, role: :admin)
-    RecordingStudio::Recording.create!(recordable: admin_access, parent_recording: @admin_root_recording)
+    create_access_recording(parent_recording: @admin_root_recording, user: @user, role: :admin)
 
     ensure_api_request_logs_table!
 
@@ -87,8 +88,7 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
   test "switching to a workspace root falls back to the host root when the logs path is requested" do
     workspace = Workspace.create!(name: "Workspace root")
     workspace_root_recording = RecordingStudio::Recording.create!(recordable: workspace)
-    workspace_access = RecordingStudio::Access.create!(actor: @user, role: :admin)
-    RecordingStudio::Recording.create!(recordable: workspace_access, parent_recording: workspace_root_recording)
+    create_access_recording(parent_recording: workspace_root_recording, user: @user, role: :admin)
 
     patch recording_studio_root_switchable.root_switch_path(scope: "all_roots"), params: {
       root_switch: {
@@ -108,8 +108,7 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
   test "forbids the logs page when accessed directly from a non-admin root" do
     workspace = Workspace.create!(name: "Workspace root")
     workspace_root_recording = RecordingStudio::Recording.create!(recordable: workspace)
-    workspace_access = RecordingStudio::Access.create!(actor: @user, role: :admin)
-    RecordingStudio::Recording.create!(recordable: workspace_access, parent_recording: workspace_root_recording)
+    create_access_recording(parent_recording: workspace_root_recording, user: @user, role: :admin)
 
     patch recording_studio_root_switchable.root_switch_path(scope: "all_roots"), params: {
       root_switch: {
@@ -138,6 +137,13 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
   end
 
   private
+
+  def create_access_recording(parent_recording:, user:, role:)
+    with_access_creation_context do
+      access = RecordingStudio::Access.create!(actor: user, role: role)
+      RecordingStudio::Recording.create!(recordable: access, parent_recording: parent_recording)
+    end
+  end
 
   def ensure_api_request_logs_table!
     connection = RecordingStudioApi::ApiRequestLog.connection
