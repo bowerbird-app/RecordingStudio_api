@@ -18,7 +18,7 @@ class ProvisionApiClientTest < ActiveSupport::TestCase
     Current.actor = nil if defined?(Current)
   end
 
-  test "provisions an immutable api client beneath the access recording" do
+  test "provisions an api client beneath its own access recording" do
     result = RecordingStudioApi::Services::ProvisionApiClient.call(
       access_recording: @access_recording,
       name: "Primary token"
@@ -28,18 +28,22 @@ class ProvisionApiClientTest < ActiveSupport::TestCase
 
     payload = result.value
     parsed_token = RecordingStudioApi::Token.parse(payload.fetch(:token))
+    client_access_recording = payload.fetch(:access_recording)
 
-    assert_equal @access_recording.id, payload.fetch(:api_client).access_recording_id
-    assert_equal @access_recording.id, payload.fetch(:recording).parent_recording_id
+    refute_equal @access_recording.id, client_access_recording.id
+    assert_equal @root_recording.id, client_access_recording.parent_recording_id
+    assert_equal payload.fetch(:api_client), client_access_recording.recordable.actor
+    assert_equal client_access_recording.id, payload.fetch(:api_client).access_recording_id
+    assert_equal client_access_recording.id, payload.fetch(:recording).parent_recording_id
     assert_equal payload.fetch(:api_client).id, payload.fetch(:credential).api_client_id
-    assert_equal @access_recording.id, payload.fetch(:credential).effective_access_recording_id
+    assert_equal client_access_recording.id, payload.fetch(:credential).effective_access_recording_id
     assert_equal payload.fetch(:recording).id, payload.fetch(:credential).recording.parent_recording_id
     assert_equal "RecordingStudioApi::ApiCredential", payload.fetch(:credential).recording.recordable_type
     assert_equal parsed_token.fetch(:public_id), payload.fetch(:credential).token_public_id
     assert_not_equal payload.fetch(:token), payload.fetch(:credential).token_digest
   end
 
-  test "revokes the previous active credential when rotating the same access recording" do
+  test "keeps existing client credentials active when provisioning another client for the same access" do
     first = RecordingStudioApi::Services::ProvisionApiClient.call(
       access_recording: @access_recording,
       name: "First token"
@@ -52,8 +56,23 @@ class ProvisionApiClientTest < ActiveSupport::TestCase
 
     assert second_result.success?, second_result.error
 
-    assert_not_nil first.fetch(:credential).reload.revoked_at
+    refute_equal first.fetch(:api_client).id, second_result.value.fetch(:api_client).id
+    refute_equal first.fetch(:access_recording).id, second_result.value.fetch(:access_recording).id
+    assert_nil first.fetch(:credential).reload.revoked_at
     assert_nil second_result.value.fetch(:credential).reload.revoked_at
+  end
+
+  test "rejects direct provisioning when the manager cannot manage access" do
+    view_user = create_user(email: "view-direct-provision@example.com")
+    _view_root_recording, view_access_recording = create_access_recording_for(user: view_user, role: :view)
+
+    result = RecordingStudioApi::Services::ProvisionApiClient.call(
+      access_recording: view_access_recording,
+      name: "Blocked direct token"
+    )
+
+    assert result.failure?
+    assert_equal "Not authorized to manage access", result.error
   end
 
   test "applies the configured token ttl when expires_at is omitted" do
@@ -86,6 +105,6 @@ class ProvisionApiClientTest < ActiveSupport::TestCase
     credential = result.value.fetch(:credential)
     credential.update_column(:access_recording_id, other_access_recording.id)
 
-    assert_equal @access_recording.id, credential.reload.effective_access_recording_id
+    assert_equal result.value.fetch(:access_recording).id, credential.reload.effective_access_recording_id
   end
 end

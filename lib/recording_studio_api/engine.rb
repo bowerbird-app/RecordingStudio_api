@@ -9,10 +9,6 @@ module RecordingStudioApi
       RecordingStudioApi::ApiClient
       RecordingStudioApi::ApiCredential
       RecordingStudioApi::ApiAccessToken
-      RecordingStudioApi::OauthAuthorizationCode
-      RecordingStudioApi::OauthGrantSession
-      RecordingStudioApi::OauthSessionAccessToken
-      RecordingStudioApi::OauthRefreshToken
     ].freeze
 
     ADMIN_ROOT_RECORDABLE_TYPE_NAME = "RecordingStudioAdmin::Admin"
@@ -22,11 +18,7 @@ module RecordingStudioApi
       "RecordingStudio::Access" => "recording_studio/access",
       "RecordingStudioApi::ApiClient" => "recording_studio_api/api_client",
       "RecordingStudioApi::ApiCredential" => "recording_studio_api/api_credential",
-      "RecordingStudioApi::ApiAccessToken" => "recording_studio_api/api_access_token",
-      "RecordingStudioApi::OauthAuthorizationCode" => "recording_studio_api/oauth_authorization_code",
-      "RecordingStudioApi::OauthGrantSession" => "recording_studio_api/oauth_grant_session",
-      "RecordingStudioApi::OauthSessionAccessToken" => "recording_studio_api/oauth_session_access_token",
-      "RecordingStudioApi::OauthRefreshToken" => "recording_studio_api/oauth_refresh_token"
+      "RecordingStudioApi::ApiAccessToken" => "recording_studio_api/api_access_token"
     }.freeze
 
     API_RECORDABLE_DECLARATIONS = {
@@ -47,30 +39,6 @@ module RecordingStudioApi
         plural_label: "API Access Tokens",
         root: false,
         allowed_parent_types: ["RecordingStudioApi::ApiCredential"]
-      },
-      "RecordingStudioApi::OauthAuthorizationCode" => {
-        label: "OAuth Authorization Code",
-        plural_label: "OAuth Authorization Codes",
-        root: false,
-        allowed_parent_types: ["RecordingStudio::Access"]
-      },
-      "RecordingStudioApi::OauthGrantSession" => {
-        label: "OAuth Grant Session",
-        plural_label: "OAuth Grant Sessions",
-        root: false,
-        allowed_parent_types: ["RecordingStudio::Access"]
-      },
-      "RecordingStudioApi::OauthSessionAccessToken" => {
-        label: "OAuth Session Access Token",
-        plural_label: "OAuth Session Access Tokens",
-        root: false,
-        allowed_parent_types: ["RecordingStudioApi::OauthGrantSession"]
-      },
-      "RecordingStudioApi::OauthRefreshToken" => {
-        label: "OAuth Refresh Token",
-        plural_label: "OAuth Refresh Tokens",
-        root: false,
-        allowed_parent_types: ["RecordingStudioApi::OauthGrantSession"]
       }
     }.freeze
 

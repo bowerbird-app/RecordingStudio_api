@@ -5,17 +5,14 @@ RecordingStudioApi::Engine.routes.draw do
   get "/admin_api/logs", to: "admin_logs#index", as: :admin_logs
 
   resources :api_clients, controller: "access_requests", only: %i[index show new create edit update] do
+    get :log, on: :member
+    post :revoke, on: :member
+
     resources :api_access_tokens, path: "tokens", only: :index do
       post :revoke, on: :member
     end
   end
-  resources :oauth_grant_sessions, only: :index do
-    post :revoke, on: :member
-  end
-
-  get "/oauth/authorize", to: "oauth_authorizations#new"
   post "/oauth/token", to: "oauth#token"
-  post "/oauth/revoke", to: "oauth#revoke"
 
   namespace :api, defaults: { format: :json } do
     namespace :v1 do

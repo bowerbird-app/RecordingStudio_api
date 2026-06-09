@@ -7,7 +7,7 @@ RecordingStudioApi.configure do |config|
 
   # Optional description shown in generated OpenAPI/Scalar docs.
   # Defaults to: "Add you API intro description in the config file"
-  # config.openapi_description = "Endpoints for the Mobile App integration"
+  # config.openapi_description = "Endpoints for API access and resource operations"
 
   # Timeout in seconds for external calls
   # config.timeout = 5

@@ -75,6 +75,8 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_not_nil access_recording
     assert_includes eligible_workspace_root_ids, access_recording.root_recording_id
     assert_equal "RecordingStudio::Access", access_recording.recordable_type
+    assert_equal api_client, access_recording.recordable.actor
+    refute_equal @workspace_access_recording.id, access_recording.id
     assert_not_includes response.body, access_recording.id.to_s
   end
 
@@ -83,6 +85,10 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
       parent_recording: @workspace_root_recording,
       name: "Direct API client"
     )
+    direct_oauth_client_id = direct_api_client.credentials.max_by(&:created_at).oauth_client_id
+    masked_direct_oauth_client_id = "#{direct_oauth_client_id.first(2)}#{"*" * (direct_oauth_client_id.length - 4)}#{direct_oauth_client_id.last(2)}"
+    direct_expires_at = direct_api_client.credentials.max_by(&:created_at).expires_at.in_time_zone
+    direct_exact_expiry = "#{direct_expires_at.strftime("%B %-d, %Y at %-l:%M %p")} #{direct_expires_at.strftime("%Z")}".strip
 
     child_folder_recording = RecordingStudio::Recording.create!(
       recordable: Folder.create!(name: "Nested Folder"),
@@ -98,20 +104,52 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select %(nav.flat-pack-page-nav a[href="/workspace"][aria-label="Close"]), count: 1
-    assert_includes response.body, "API access list"
+    assert_includes response.body, "API keys"
     assert_includes response.body, "API access below Workspace: UI Workspace."
     assert_includes response.body, "Name"
+    assert_includes response.body, "API key"
     assert_includes response.body, "Access point"
     assert_includes response.body, "Expires"
     assert_not_includes response.body, "Root"
     assert_not_includes response.body, "Access recording"
     assert_not_includes response.body, "Details"
     assert_includes response.body, direct_api_client.name
+    assert_includes response.body, masked_direct_oauth_client_id
+    assert_not_includes response.body, direct_oauth_client_id
     assert_includes response.body, "Workspace"
     assert_includes response.body, nested_api_client.name
     assert_includes response.body, "Nested Folder"
     assert_select %(a[href="/recording_studio_api/api_clients/#{direct_api_client.id}?close_url=%2Fworkspace"]), text: direct_api_client.name
     assert_select %(a[href="/recording_studio_api/api_clients/#{nested_api_client.id}?close_url=%2Fworkspace"]), text: nested_api_client.name
+    assert_match(/in \d+\s+(minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years)/, response.body)
+    assert_includes response.body, direct_exact_expiry
+    assert_select "span.underline.decoration-dotted.underline-offset-2", minimum: 1
+  end
+
+  test "index infinite scroll returns paged table content for xhr page requests" do
+    52.times do |index|
+      create_api_client_for(
+        parent_recording: @workspace_root_recording,
+        name: format("Infinite API client %02d", index + 1)
+      )
+    end
+
+    get "/recording_studio_api/api_clients", params: { root_recording_id: @workspace_root_recording.id }
+
+    assert_response :success
+    assert_includes response.body, "Infinite API client 01"
+    assert_not_includes response.body, "Infinite API client 26"
+    assert_includes response.body, "flat-pack--pagination-infinite"
+    assert_includes response.body, "page=2"
+
+    get "/recording_studio_api/api_clients", params: { root_recording_id: @workspace_root_recording.id, page: 2 }, headers: { "X-Requested-With" => "XMLHttpRequest" }
+
+    assert_response :success
+    assert_not_includes response.body, "API keys"
+    assert_not_includes response.body, "Infinite API client 01"
+    assert_includes response.body, "Infinite API client 26"
+    assert_includes response.body, "Infinite API client 50"
+    assert_includes response.body, "page=3"
   end
 
   test "page nav falls back to the default close url when close url is unsafe" do
@@ -124,7 +162,6 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
 
   test "view-only access can see api access but cannot change it" do
     view_user = create_user(email: "view-access@example.com")
-    sign_out @user
     sign_in view_user
 
     view_root_recording, = create_access_recording_for(user: view_user, role: :view)
@@ -160,6 +197,10 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     )
 
     post "/recording_studio_api/api_clients/#{view_api_client.id}/tokens/#{view_token.id}/revoke"
+
+    assert_response :forbidden
+
+    post "/recording_studio_api/api_clients/#{view_api_client.id}/revoke"
 
     assert_response :forbidden
   end
@@ -235,6 +276,64 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_select %(a[href="/recording_studio_api/api_clients/new?close_url=%2F"]), text: "New", count: 1
   end
 
+  test "index api keys chart uses request log counts for visible clients" do
+    direct_api_client = create_api_client_for(
+      parent_recording: @workspace_root_recording,
+      name: "Chart direct client"
+    )
+
+    nested_folder_recording = RecordingStudio::Recording.create!(
+      recordable: Folder.create!(name: "Chart Folder"),
+      parent_recording: @workspace_root_recording
+    )
+
+    nested_api_client = create_api_client_for(
+      parent_recording: nested_folder_recording,
+      name: "Chart nested client"
+    )
+
+    ensure_api_request_logs_table!
+
+    RecordingStudioApi::ApiRequestLog.where(api_client_id: [direct_api_client.id, nested_api_client.id]).delete_all
+
+    5.times do |index|
+      RecordingStudioApi::ApiRequestLog.create!(
+        occurred_at: Time.current - index.minutes,
+        request_id: "chart-direct-#{index}",
+        request_method: "GET",
+        request_path: "/api/v1/recordings/direct",
+        status_code: 200,
+        duration_ms: 30,
+        api_client_id: direct_api_client.id,
+        api_credential_id: direct_api_client.credentials.max_by(&:created_at).id,
+        access_recording_id: direct_api_client.access_recording_id,
+        root_recording_id: @workspace_root_recording.id
+      )
+    end
+
+    2.times do |index|
+      RecordingStudioApi::ApiRequestLog.create!(
+        occurred_at: Time.current - (index + 10).minutes,
+        request_id: "chart-nested-#{index}",
+        request_method: "POST",
+        request_path: "/oauth/token",
+        status_code: 200,
+        duration_ms: 45,
+        api_client_id: nested_api_client.id,
+        api_credential_id: nested_api_client.credentials.max_by(&:created_at).id,
+        access_recording_id: nested_api_client.access_recording_id,
+        root_recording_id: @workspace_root_recording.id
+      )
+    end
+
+    get "/recording_studio_api/api_clients", params: { root_recording_id: @workspace_root_recording.id }
+
+    assert_response :success
+    assert_match(/API keys.{0,300}\[\s*5\s*,\s*2\s*\]/m, response.body)
+    assert_match(/categories.{0,300}Chart direct client.{0,200}Chart nested client/m, response.body)
+    assert_not_includes response.body, "Key A"
+  end
+
   test "index subtitle falls back to root type label when multiple roots match" do
     another_workspace = Workspace.create!(name: "Another Workspace")
     another_root_recording = RecordingStudio::Recording.create!(recordable: another_workspace)
@@ -271,29 +370,115 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select %(nav.flat-pack-page-nav a[href="/"][aria-label="Close"]), count: 1
     assert_includes response.body, "Details API client"
-    assert_includes response.body, "Field"
-    assert_includes response.body, "Value"
-    assert_includes response.body, "Actions"
-    assert_includes response.body, "Name"
     assert_includes response.body, "API key"
     assert_includes response.body, masked_oauth_client_id
-    assert_not_includes response.body, oauth_client_id
+    assert_no_match(%r{<td[^>]*>\s*#{Regexp.escape(oauth_client_id)}\s*</td>}, response.body)
     assert_includes response.body, "API secret"
     assert_includes response.body, "Hidden after creation"
     assert_includes response.body, "Role"
     assert_includes response.body, "Expiry"
-    assert_includes response.body, "Machine token health"
-    assert_includes response.body, "OAuth2 activity"
-    assert_includes response.body, "Issued tokens"
-    assert_includes response.body, "Active grant sessions"
-    assert_select %(div#machine-token-health[data-controller="flat-pack--section-title-anchor"]), count: 1
-    assert_select %(a[href="#machine-token-health"][data-flat-pack--section-title-anchor-target="link"]), count: 1
-    assert_select %(div#oauth2-activity[data-controller="flat-pack--section-title-anchor"]), count: 1
-    assert_select %(a[href="#oauth2-activity"][data-flat-pack--section-title-anchor-target="link"]), count: 1
-    assert_select %(form[action="/recording_studio_api/api_clients/#{api_client.id}/edit?close_url=%2F"] button), text: "Edit"
-    assert_select %(form[action="/recording_studio_api/api_clients/#{api_client.id}/tokens?close_url=%2F"] button), text: "Tokens"
+    assert_not_includes response.body, "Issued tokens"
+    assert_not_includes response.body, "Active tokens"
+    assert_not_includes response.body, "Revoked tokens"
+    assert_not_includes response.body, "OAuth2 activity"
+    assert_not_includes response.body, "Active grant sessions"
+    assert_select %(div#machine-token-health[data-controller="flat-pack--section-title-anchor"]), count: 0
+    assert_select %(a[href="#machine-token-health"][data-flat-pack--section-title-anchor-target="link"]), count: 0
+    assert_select %(div#oauth2-activity[data-controller="flat-pack--section-title-anchor"]), count: 0
+    assert_select %(a[href="#oauth2-activity"][data-flat-pack--section-title-anchor-target="link"]), count: 0
+    assert_select %(a[href="/recording_studio_api/api_clients/#{api_client.id}/edit?close_url=%2F"]), text: "Edit"
+    assert_select %(a[href="/recording_studio_api/api_clients/#{api_client.id}/tokens?close_url=%2F"]), text: "Tokens"
+    assert_select %(a[href="/recording_studio_api/api_clients/#{api_client.id}/log?close_url=%2F"]), text: "Log"
+    assert_select %(a[href="/recording_studio_api/api_clients/#{api_client.id}/revoke?close_url=%2F"][data-turbo-method="post"][data-turbo-confirm="Revoke this API key?"]), text: "Revoke"
     assert_not_includes response.body, "Back to API access list"
     assert_not_includes response.body, "Back to demo"
+  end
+
+  test "show revokes the latest credential" do
+    api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Revocable API client")
+    latest_credential = api_client.credentials.max_by(&:created_at)
+
+    post "/recording_studio_api/api_clients/#{api_client.id}/revoke"
+
+    assert_redirected_to "/recording_studio_api/api_clients/#{api_client.id}?close_url=%2F"
+    assert_not_nil latest_credential.reload.revoked_at
+
+    get "/recording_studio_api/api_clients/#{api_client.id}"
+
+    assert_response :success
+    assert_includes response.body, "Revoked"
+    assert_select %(a[href="/recording_studio_api/api_clients/#{api_client.id}/revoke?close_url=%2F"]), count: 0
+    assert_select %(button[disabled]), text: "Revoked"
+  end
+
+  test "index shows revoked and expired credentials in the expires column" do
+    revoked_api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Revoked API client")
+    expired_api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Expired API client")
+
+    revoked_api_client.credentials.max_by(&:created_at).revoke!
+    expired_api_client.credentials.max_by(&:created_at).update_columns(
+      expires_at: 1.day.ago,
+      updated_at: Time.current
+    )
+
+    get "/recording_studio_api/api_clients", params: { root_recording_id: @workspace_root_recording.id }
+
+    assert_response :success
+    assert_includes response.body, revoked_api_client.name
+    assert_includes response.body, expired_api_client.name
+    assert_includes response.body, "Revoked"
+    assert_includes response.body, "Expired"
+  end
+
+  test "log lists API request rows for the selected api client only" do
+    api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Logged API client")
+    other_api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Other logged API client")
+
+    ensure_api_request_logs_table!
+
+    RecordingStudioApi::ApiRequestLog.create!(
+      occurred_at: Time.current,
+      request_id: "client-log-1",
+      request_method: "GET",
+      request_path: "/recording_studio_api/api/v1/workspaces",
+      status_code: 200,
+      duration_ms: 31,
+      api_client_id: api_client.id,
+      api_credential_id: api_client.credentials.max_by(&:created_at).id,
+      access_recording_id: api_client.access_recording_id,
+      root_recording_id: @workspace_root_recording.id
+    )
+
+    RecordingStudioApi::ApiRequestLog.create!(
+      occurred_at: Time.current,
+      request_id: "client-log-other",
+      request_method: "POST",
+      request_path: "/recording_studio_api/oauth/token",
+      status_code: 201,
+      duration_ms: 45,
+      api_client_id: other_api_client.id,
+      api_credential_id: other_api_client.credentials.max_by(&:created_at).id,
+      access_recording_id: other_api_client.access_recording_id,
+      root_recording_id: @workspace_root_recording.id
+    )
+
+    get "/recording_studio_api/api_clients/#{api_client.id}/log"
+
+    assert_response :success
+    assert_select %(nav.flat-pack-page-nav a[href="/"][aria-label="Close"]), count: 1
+    assert_includes response.body, "/recording_studio_api/api_clients/#{api_client.id}"
+    assert_includes response.body, "Logged API client"
+    assert_includes response.body, "API call log"
+    assert_includes response.body, "Occurred"
+    assert_includes response.body, "Method"
+    assert_includes response.body, "Path"
+    assert_includes response.body, "Status"
+    assert_includes response.body, "Duration"
+    assert_includes response.body, "Request ID"
+    assert_includes response.body, "client-log-1"
+    assert_not_includes response.body, "client-log-other"
+    assert_includes response.body, "/recording_studio_api/api/v1/workspaces"
+    assert_not_includes response.body, "/recording_studio_api/oauth/token"
   end
 
   test "tokens lists child tokens for the selected api client only" do
@@ -361,10 +546,9 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_select %(form[action="/recording_studio_api/api_clients/#{api_client.id}/tokens/#{token.id}/revoke?close_url=%2F"] button), count: 0
   end
 
-  test "show renders token and oauth activity counts with session link" do
+  test "show does not render token count rows" do
     api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Activity API client")
     latest_credential = api_client.credentials.max_by(&:created_at)
-    access_recording = api_client.access_recording
 
     RecordingStudioApi::ApiAccessToken.create!(
       credential: latest_credential,
@@ -374,59 +558,14 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
       last_used_at: 1.hour.ago
     )
 
-    oauth_client = RecordingStudioApi::OauthClient.create!(
-      name: "Mobile app",
-      client_identifier: "client_#{SecureRandom.hex(8)}",
-      redirect_uri: "https://example.com/callback",
-      public_client: true,
-      active: true
-    )
-
-    oauth_session = RecordingStudioApi::OauthGrantSession.create!(
-      oauth_client: oauth_client,
-      access_recording: access_recording,
-      last_used_at: 30.minutes.ago
-    )
-
-    RecordingStudioApi::OauthSessionAccessToken.create!(
-      oauth_grant_session: oauth_session,
-      token_digest: "oauth_access_digest_#{SecureRandom.hex(16)}",
-      token_prefix: "oat",
-      expires_at: 1.day.from_now,
-      last_used_at: 20.minutes.ago
-    )
-
-    RecordingStudioApi::OauthRefreshToken.create!(
-      oauth_grant_session: oauth_session,
-      token_digest: "oauth_refresh_digest_#{SecureRandom.hex(16)}",
-      token_prefix: "ort",
-      expires_at: 14.days.from_now,
-      last_used_at: 10.minutes.ago
-    )
-
-    RecordingStudioApi::OauthAuthorizationCode.create!(
-      oauth_client: oauth_client,
-      access_recording: access_recording,
-      code_digest: "code_digest_#{SecureRandom.hex(16)}",
-      code_prefix: "oc",
-      code_challenge: "challenge",
-      code_challenge_method: "S256",
-      redirect_uri: "https://example.com/callback",
-      expires_at: 5.minutes.from_now,
-      consumed_at: Time.current
-    )
-
     get "/recording_studio_api/api_clients/#{api_client.id}"
 
     assert_response :success
-    assert_select "td", text: "Issued tokens"
-    assert_select "td", text: "Active grant sessions"
-    assert_match(/Issued tokens<\/td>\s*<td[^>]*>1<\/td>/, response.body)
-    assert_match(/Active grant sessions<\/td>\s*<td[^>]*>1<\/td>/, response.body)
-    assert_match(/Active OAuth access tokens<\/td>\s*<td[^>]*>1<\/td>/, response.body)
-    assert_match(/Active refresh tokens<\/td>\s*<td[^>]*>1<\/td>/, response.body)
-    assert_match(/Auth codes consumed \(7d\)<\/td>\s*<td[^>]*>1<\/td>/, response.body)
-    assert_select %(a[href="/recording_studio_api/oauth_grant_sessions?access_recording_id=#{access_recording.id}"]), text: "View sessions", count: 1
+    assert_not_includes response.body, "Issued tokens"
+    assert_not_includes response.body, "Active tokens"
+    assert_not_includes response.body, "Revoked tokens"
+    assert_not_includes response.body, "OAuth2 activity"
+    assert_not_includes response.body, "Active grant sessions"
   end
 
   test "edit renders form for name and expiry" do
@@ -500,15 +639,26 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
   private
 
   def create_api_client_for(parent_recording:, name:, role: :admin)
-    access_recording = with_access_creation_context do
+    manager_access_recording = with_access_creation_context do
       access = RecordingStudio::Access.create!(actor: @user, role: role)
       RecordingStudio::Recording.create!(recordable: access, parent_recording: parent_recording)
     end
 
     api_client = RecordingStudioApi::ApiClient.create!(
       name: name,
-      access_recording: access_recording
+      access_recording: manager_access_recording
     )
+
+    access_recording = with_access_creation_context do
+      access = RecordingStudio::Access.create!(actor: api_client, role: role)
+      RecordingStudio::Recording.create!(recordable: access, parent_recording: parent_recording)
+    end
+
+    RecordingStudioApi::ApiClient.where(id: api_client.id).update_all(
+      access_recording_id: access_recording.id,
+      updated_at: Time.current
+    )
+    api_client.reload
 
     api_client_recording = RecordingStudio::Recording.create!(
       recordable: api_client,
@@ -530,5 +680,35 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     )
 
     api_client
+  end
+
+  def ensure_api_request_logs_table!
+    connection = RecordingStudioApi::ApiRequestLog.connection
+    table_name = RecordingStudioApi::ApiRequestLog.table_name
+    return if connection.table_exists?(table_name)
+
+    connection.create_table table_name, id: :uuid do |t|
+      t.datetime :occurred_at, null: false
+      t.string :request_id
+      t.string :request_method, null: false
+      t.string :request_path, null: false
+      t.string :route_name
+      t.string :controller_name
+      t.string :action_name
+      t.integer :status_code, null: false
+      t.integer :duration_ms, null: false
+      t.boolean :rate_limited, null: false, default: false
+      t.uuid :api_client_id
+      t.uuid :api_credential_id
+      t.uuid :access_recording_id
+      t.uuid :root_recording_id
+      t.string :remote_ip
+      t.string :user_agent
+      t.string :error_class
+      t.string :error_message
+      t.jsonb :request_params, null: false, default: {}
+
+      t.timestamps
+    end
   end
 end

@@ -76,7 +76,7 @@ class RecordingStudioApiTest < Minitest::Test
     assert_includes standard_root_view_source, "Demo to add and remove API access"
     assert_includes standard_root_view_source, 'title: "Workspace"'
     assert_includes standard_root_view_source, 'title: "Folder"'
-    assert_includes standard_root_view_source, '"API access list"'
+    assert_includes standard_root_view_source, '"API keys"'
     assert_includes admin_root_view_source, 'title: "Admin"'
     assert_includes admin_root_view_source, 'text: "Open Admin API"'
   end

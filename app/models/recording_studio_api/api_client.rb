@@ -41,6 +41,10 @@ module RecordingStudioApi
       access_recording&.recordable
     end
 
+    def readonly?
+      false
+    end
+
     private
 
     def access_recording_must_reference_access

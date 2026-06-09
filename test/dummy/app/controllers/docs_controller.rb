@@ -22,15 +22,7 @@ class DocsController < ApplicationController
                 label: "API client",
                 children: [
                   { label: "API credential", children: [] },
-                  { label: "API access token", children: [] },
-                  {
-                    label: "OAuth grant session",
-                    children: [
-                      { label: "OAuth authorization code", children: [] },
-                      { label: "OAuth session access token", children: [] },
-                      { label: "OAuth refresh token", children: [] }
-                    ]
-                  }
+                  { label: "API access token", children: [] }
                 ]
               }
             ]
@@ -49,7 +41,7 @@ class DocsController < ApplicationController
   end
 
   def recordings_tree
-    recordings = RecordingStudio::Recording.unscoped.includes(:recordable).reorder(:created_at, :id).to_a
+    recordings = RecordingStudio::Recording.unscoped.reorder(:created_at, :id).to_a
     @recording_tree = RecordingTreePresenter.new(recordings: recordings, include_trashed: true).nodes
 
     @recordings_count = recordings.size
@@ -101,9 +93,6 @@ class DocsController < ApplicationController
   end
 
   def auth
-  end
-
-  def mobile_auth
   end
 
   def methods

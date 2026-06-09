@@ -1,40 +1,93 @@
-<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-6">
   <%= render FlatPack::PageNav::Component.new(
     close_url: page_nav_close_url
   ) %>
 
   <%= render FlatPack::PageTitle::Component.new(
-    title: "API access list",
+    title: "API keys",
     subtitle: @access_list_subtitle,
     variant: :h1
   ) %>
 
-  <% if @api_access_rows.any? %>
-    <%= render FlatPack::Table::Component.new(data: @api_access_rows) do |table| %>
-      <% table.column(
-        title: "Name",
-        html: ->(row) { link_to(row.fetch(:name), api_client_path(row.fetch(:id), page_nav_close_param), class: "text-(--surface-content-color) underline decoration-(--surface-border-color) underline-offset-2 hover:decoration-(--surface-content-color)") }
+  <% if @can_manage_access_requests %>
+    <div>
+      <%= render FlatPack::Button::Component.new(
+        text: "New",
+        style: :primary,
+        size: :md,
+        url: new_api_client_path(page_nav_close_param)
       ) %>
-      <% table.column(title: "Access point", html: ->(row) { row.fetch(:access_point) }) %>
-      <% table.column(title: "Role", html: ->(row) { row.fetch(:role) }) %>
-      <% table.column(title: "Expires", html: ->(row) { row.fetch(:expires) }) %>
+    </div>
+
+    <%= render FlatPack::Grid::Component.new(cols: 3, gap: :md, align: :stretch) do %>
+      <%= render FlatPack::Card::Component.new(style: :default) do %>
+        <div class="space-y-4">
+          <%= render FlatPack::SectionTitle::Component.new(
+            title: "Api keys",
+            subtitle: "Most used keys"
+          ) %>
+
+          <%= render FlatPack::Chart::Component.new(
+            card: false,
+            type: :bar,
+            height: 220,
+            series: [
+              { name: "API keys", data: @api_key_chart_series.presence || [0] }
+            ],
+            options: {
+              xaxis: {
+                categories: @api_key_chart_categories.presence || ["No API keys"]
+              }
+            }
+          ) %>
+        </div>
+      <% end %>
+
+      <%= render FlatPack::Card::Component.new(style: :default) do %>
+        <div class="space-y-4">
+          <%= render FlatPack::SectionTitle::Component.new(
+            title: "Requests",
+            subtitle: "Last 7 days"
+          ) %>
+
+          <%= render FlatPack::Chart::Component.new(
+            card: false,
+            type: :bar,
+            height: 220,
+            series: [
+              { name: "Requests", data: [12, 18, 16, 25, 20, 28, 32] }
+            ]
+          ) %>
+        </div>
+      <% end %>
+
+      <%= render FlatPack::Card::Component.new(style: :default) do %>
+        <div class="space-y-4">
+          <%= render FlatPack::SectionTitle::Component.new(
+            title: "Tokens issued",
+            subtitle: "Weekly totals"
+          ) %>
+
+          <%= render FlatPack::Chart::Component.new(
+            card: false,
+            type: :bar,
+            height: 220,
+            series: [
+              { name: "Tokens", data: [4, 6, 3, 7, 5, 8, 9] }
+            ]
+          ) %>
+        </div>
+      <% end %>
     <% end %>
+  <% end %>
+
+  <% if @api_access_rows.any? %>
+    <%= render partial: "table_content" %>
   <% else %>
     <%= render FlatPack::EmptyState::Component.new(
       title: "No API access given yet",
       description: @can_manage_access_requests ? "Create API access from the demo home page to populate this list." : "You can view API access details, but you do not have permission to create new API access.",
       icon: :inbox
-    ) do |empty_state| %>
-      <% if @can_manage_access_requests %>
-        <% empty_state.actions do %>
-          <%= render FlatPack::Button::Component.new(
-            text: "New",
-            style: :primary,
-            size: :md,
-            url: new_api_client_path(page_nav_close_param)
-          ) %>
-        <% end %>
-      <% end %>
-    <% end %>
+    ) %>
   <% end %>
 </div>

@@ -2,17 +2,26 @@
 
 module RecordingStudioApi
   class AccessRequestsController < ApplicationController
+    PER_PAGE = 25
+
     before_action :authenticate_user!, if: -> { respond_to?(:authenticate_user!, true) }
     before_action :authorize_access_management_edit_for_new_request!, only: %i[new create]
     before_action :load_form_state, only: %i[new create]
     before_action :load_api_access_list, only: :index
-    before_action :load_api_access_detail, only: %i[show edit update]
-    before_action :authorize_access_management_edit_for_loaded_client!, only: %i[edit update]
+    before_action :load_api_access_detail, only: %i[show edit update log revoke]
+    before_action :authorize_access_management_edit_for_loaded_client!, only: %i[edit update revoke]
 
     def index
+      return unless infinite_api_access_request?
+
+      render partial: "recording_studio_api/access_requests/table_content"
     end
 
     def show
+    end
+
+    def log
+      @log_rows = load_api_client_log_rows
     end
 
     def edit
@@ -54,6 +63,14 @@ module RecordingStudioApi
 
       @errors << "The API client could not be updated"
       render :edit, status: :unprocessable_entity
+    end
+
+    def revoke
+      return head :not_found if @latest_credential.nil?
+
+      @latest_credential.revoke! if @latest_credential.revoked_at.nil?
+
+      redirect_to api_client_path(@api_client, page_nav_close_param), notice: "API key revoked."
     end
 
     private
@@ -132,10 +149,10 @@ module RecordingStudioApi
       requested_id = api_client_params[:access_point_recording_id].presence
 
       @selected_access_point_recording ||= if requested_id.present?
-        @access_point_recordings.find { |recording| recording.id == requested_id }
-      else
-        @access_point_recordings.first
-      end
+                                             @access_point_recordings.find { |recording| recording.id == requested_id }
+                                           else
+                                             @access_point_recordings.first
+                                           end
     end
 
     def current_request_actor
@@ -171,6 +188,10 @@ module RecordingStudioApi
 
     def visible_access_recordings
       access_management_policy.visible_access_recordings
+    end
+
+    def visible_api_client_access_recordings
+      access_management_policy.visible_api_client_access_recordings
     end
 
     def visible_root_recordings
@@ -217,14 +238,15 @@ module RecordingStudioApi
     def human_root_type
       @root_type.to_s.demodulize.underscore.humanize
     end
-    helper_method :human_root_type, :allowed_root_types, :recording_label, :credential_status_label
+    helper_method :human_root_type, :allowed_root_types, :recording_label, :credential_status_label, :credential_expires_label, :masked_api_key
 
     def load_api_access_list
+      @page = infinite_api_access_request? ? resolved_page : 1
       root_type_filter = params[:root_type].presence
       scoped_recording_filter = params[:recording_id].presence || params[:root_recording_id].presence
       scoped_recording = scoped_access_list_recording(scoped_recording_filter)
       scoped_recording_ids = scoped_recording_subtree_ids(scoped_recording)
-      visible_access_recording_ids = visible_access_recordings.map(&:id)
+      visible_access_recording_ids = visible_api_client_access_recordings.map(&:id)
       @can_manage_access_requests = visible_root_recordings.any? do |recording|
         access_management_policy.can_manage_recording?(recording)
       end
@@ -235,7 +257,7 @@ module RecordingStudioApi
         .reorder(:created_at, :id)
         .to_a
 
-      @api_access_rows = api_clients.filter_map do |api_client|
+      all_api_access_rows = api_clients.filter_map do |api_client|
         access_recording = api_client.access_recording
         next if access_recording.nil?
 
@@ -253,6 +275,7 @@ module RecordingStudioApi
           root_recording: root_recording,
           access_point_recording: access_point_recording,
           name: api_client.name,
+          api_key: masked_api_key(latest_credential),
           access_point: access_point_label(access_point_recording),
           role: access_recording.recordable&.try(:role).to_s.humanize.presence || "Unknown",
           credentials_count: api_client.credentials.size,
@@ -261,11 +284,69 @@ module RecordingStudioApi
         }
       end
 
+      @api_access_rows = paged_rows_for(all_api_access_rows, page: @page)
+      @api_access_has_more = has_more_rows?(all_api_access_rows, page: @page)
+
       @access_list_subtitle = resolve_access_list_subtitle(
-        rows: @api_access_rows,
+        rows: all_api_access_rows,
         scoped_recording: scoped_recording,
         root_type_filter: root_type_filter
       )
+
+      load_api_key_chart_data(all_api_access_rows)
+    end
+
+    def load_api_key_chart_data(rows)
+      chart_rows = top_api_key_chart_rows(rows)
+      @api_key_chart_categories = chart_rows.map { |row| row.fetch(:name) }
+      @api_key_chart_series = chart_rows.map { |row| row.fetch(:request_count) }
+    end
+
+    def resolved_page
+      requested_page = params[:page].to_i
+      requested_page.positive? ? requested_page : 1
+    end
+
+    def paged_rows_for(rows, page:)
+      offset = (page - 1) * PER_PAGE
+      rows.slice(offset, PER_PAGE) || []
+    end
+
+    def has_more_rows?(rows, page:)
+      (page * PER_PAGE) < rows.size
+    end
+
+    def next_api_access_page_url
+      api_clients_path(request.query_parameters.except("page").merge(page: @page + 1))
+    end
+    helper_method :next_api_access_page_url
+
+    def infinite_api_access_request?
+      request.xhr? && params[:page].present?
+    end
+
+    def top_api_key_chart_rows(rows)
+      return [] if rows.blank?
+
+      request_counts_by_client_id = api_request_counts_by_client_id(rows)
+
+      rows.map do |row|
+        {
+          id: row.fetch(:id),
+          name: row.fetch(:name),
+          request_count: request_counts_by_client_id.fetch(row.fetch(:id), 0)
+        }
+      end.sort_by { |row| [-row.fetch(:request_count), row.fetch(:name).downcase] }
+        .first(5)
+    end
+
+    def api_request_counts_by_client_id(rows)
+      return {} unless RecordingStudioApi::ApiRequestLog.table_available?
+
+      client_ids = rows.map { |row| row.fetch(:id) }
+      return {} if client_ids.empty?
+
+      RecordingStudioApi::ApiRequestLog.where(api_client_id: client_ids).group(:api_client_id).count
     end
 
     def resolve_access_list_subtitle(rows:, scoped_recording:, root_type_filter:)
@@ -325,108 +406,52 @@ module RecordingStudioApi
     def load_api_access_detail
       @api_client = RecordingStudioApi::ApiClient
         .includes(credentials: :access_tokens, access_recording: [:recordable, { parent_recording: :parent_recording }])
-        .where(access_recording_id: visible_access_recordings.map(&:id))
+        .where(access_recording_id: visible_api_client_access_recordings.map(&:id))
         .find(params[:id])
 
       @access_recording = @api_client.access_recording
       @root_recording = @access_recording&.root_recording
       @can_manage_access_request = access_management_policy.can_manage_recording?(access_point_recording_for(@access_recording))
       @latest_credential = @api_client.credentials.max_by { |credential| [credential.created_at.to_i, credential.id.to_i] }
-      load_api_token_activity
-      load_oauth_activity
+      load_api_token_counts
     rescue ActiveRecord::RecordNotFound
       head :not_found
     end
 
-    def load_api_token_activity
+    def load_api_token_counts
       all_tokens = @api_client.credentials.flat_map(&:access_tokens)
       active_tokens = all_tokens.select do |token|
         token.revoked_at.nil? && token.expires_at.present? && token.expires_at.future?
       end
 
-      @api_token_activity_rows = [
-        { field: "Issued tokens", value: all_tokens.count.to_s, actions: "" },
-        { field: "Active tokens", value: active_tokens.count.to_s, actions: "" },
-        { field: "Revoked tokens", value: all_tokens.count { |token| token.revoked_at.present? }.to_s, actions: "" },
-        {
-          field: "Next expiry",
-          value: format_activity_timestamp(active_tokens.filter_map(&:expires_at).min, fallback: "No active tokens"),
-          actions: ""
-        },
-        {
-          field: "Last used",
-          value: format_activity_timestamp(all_tokens.filter_map(&:last_used_at).max),
-          actions: ""
-        }
-      ]
+      @issued_token_count = all_tokens.count
+      @active_token_count = active_tokens.count
+      @revoked_token_count = all_tokens.count { |token| token.revoked_at.present? }
     end
 
-    def load_oauth_activity
-      if @access_recording.nil?
-        @oauth_activity_rows = [
-          { field: "Active grant sessions", value: "Unavailable", actions: "" },
-          { field: "Last session use", value: "Unavailable", actions: "" },
-          { field: "Active OAuth access tokens", value: "Unavailable", actions: "" },
-          { field: "Active refresh tokens", value: "Unavailable", actions: "" },
-          { field: "Auth codes consumed (7d)", value: "Unavailable", actions: "" }
-        ]
-        return
-      end
+    def load_api_client_log_rows
+      return [] unless RecordingStudioApi::ApiRequestLog.table_available?
 
-      active_sessions = RecordingStudioApi::OauthGrantSession.where(access_recording_id: @access_recording.id, revoked_at: nil)
-      active_session_ids = active_sessions.pluck(:id)
-      now = Time.current
+      RecordingStudioApi::ApiRequestLog
+        .where(api_client_id: @api_client.id)
+        .order(occurred_at: :desc, id: :desc)
+        .limit(100)
+        .map do |log|
+          {
+            occurred_at: format_log_timestamp(log.occurred_at || log.created_at),
+            method: log.request_method,
+            path: log.request_path,
+            status: log.status_code.to_s,
+            duration: "#{log.duration_ms} ms",
+            request_id: log.request_id.presence || "-"
+          }
+        end
+    end
 
-      active_oauth_access_token_count = if active_session_ids.empty?
-                                          0
-                                        else
-                                          RecordingStudioApi::OauthSessionAccessToken.where(oauth_grant_session_id: active_session_ids, revoked_at: nil)
-                                                                                    .where(RecordingStudioApi::OauthSessionAccessToken.arel_table[:expires_at].gt(now))
-                                                                                    .count
-                                        end
+    def format_log_timestamp(value)
+      return "-" if value.blank?
 
-      active_refresh_token_count = if active_session_ids.empty?
-                                     0
-                                   else
-                                     RecordingStudioApi::OauthRefreshToken.where(
-                                       oauth_grant_session_id: active_session_ids,
-                                       revoked_at: nil,
-                                       consumed_at: nil
-                                     ).where(RecordingStudioApi::OauthRefreshToken.arel_table[:expires_at].gt(now)).count
-                                   end
-
-      consumed_code_count = RecordingStudioApi::OauthAuthorizationCode.where(access_recording_id: @access_recording.id)
-                                                                       .where.not(consumed_at: nil)
-                                                                       .where(RecordingStudioApi::OauthAuthorizationCode.arel_table[:consumed_at].gteq(7.days.ago))
-                                                                       .count
-
-      @oauth_activity_rows = [
-        {
-          field: "Active grant sessions",
-          value: active_sessions.count.to_s,
-          actions: view_context.link_to("View sessions", oauth_grant_sessions_path(access_recording_id: @access_recording.id), class: "text-(--surface-content-color) underline decoration-(--surface-border-color) underline-offset-2 hover:decoration-(--surface-content-color)")
-        },
-        {
-          field: "Last session use",
-          value: format_activity_timestamp(active_sessions.maximum(:last_used_at)),
-          actions: ""
-        },
-        {
-          field: "Active OAuth access tokens",
-          value: active_oauth_access_token_count.to_s,
-          actions: ""
-        },
-        {
-          field: "Active refresh tokens",
-          value: active_refresh_token_count.to_s,
-          actions: ""
-        },
-        {
-          field: "Auth codes consumed (7d)",
-          value: consumed_code_count.to_s,
-          actions: ""
-        }
-      ]
+      value.in_time_zone.strftime("%Y-%m-%d %H:%M:%S")
     end
 
     def format_activity_timestamp(value, fallback: "Never")
@@ -507,9 +532,33 @@ module RecordingStudioApi
 
     def credential_expires_label(credential)
       return "No credentials" if credential.nil?
+      return "Revoked" if credential.revoked_at.present?
+      return "Expired" if credential.expires_at.present? && credential.expires_at.past?
       return "Never" if credential.expires_at.blank?
 
-      human_readable_timestamp(credential.expires_at)
+      relative_timestamp_with_tooltip(credential.expires_at)
+    end
+
+    def relative_timestamp_with_tooltip(value)
+      timestamp = value.in_time_zone
+      distance = view_context.time_ago_in_words(timestamp)
+      relative_time = timestamp.future? ? "in #{distance}" : "#{distance} ago"
+      exact_time = human_readable_timestamp(timestamp)
+
+      view_context.render FlatPack::Tooltip::Component.new(text: exact_time) do
+        view_context.content_tag(:span, relative_time, class: "underline decoration-dotted underline-offset-2")
+      end
+    end
+
+    def masked_api_key(credential)
+      oauth_client_id = credential&.oauth_client_id.to_s
+      return "Unavailable" if oauth_client_id.blank?
+
+      visible_prefix = oauth_client_id.first(2)
+      visible_suffix = oauth_client_id.last(2)
+      masked_length = [oauth_client_id.length - 4, 0].max
+
+      "#{visible_prefix}#{"*" * masked_length}#{visible_suffix}"
     end
 
     def human_readable_timestamp(value)

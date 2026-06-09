@@ -30,7 +30,7 @@ class AuthenticateBearerTokenTest < ActiveSupport::TestCase
     assert result.success?, result.error
     assert_equal @payload.fetch(:api_client).id, result.value.api_client.id
     assert_equal @payload.fetch(:credential).id, result.value.credential.id
-    assert_equal @access_recording.id, result.value.access_recording.id
+    assert_equal @payload.fetch(:access_recording).id, result.value.access_recording.id
     assert_equal @root_recording.id, result.value.root_recording.id
   end
 

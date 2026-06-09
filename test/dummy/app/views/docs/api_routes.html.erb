@@ -40,13 +40,8 @@
             post :revoke, on: :member
           end
         end
-        resources :oauth_grant_sessions, only: :index do
-          post :revoke, on: :member
-        end
 
-        get "/oauth/authorize", to: "oauth_authorizations#new"
         post "/oauth/token", to: "oauth#token"
-        post "/oauth/revoke", to: "oauth#revoke"
 
         namespace :api, defaults: { format: :json } do
           namespace :v1 do

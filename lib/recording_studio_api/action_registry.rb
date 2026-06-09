@@ -27,9 +27,7 @@ module RecordingStudioApi
 
       key = registration.name
       registrations = (@registrations[key] ||= [])
-      if registrations.any? { |existing| existing.version == registration.version }
-        raise ConfigurationError, "API action #{key} version #{registration.version} is already registered"
-      end
+      raise ConfigurationError, "API action #{key} version #{registration.version} is already registered" if registrations.any? { |existing| existing.version == registration.version }
 
       registrations << registration
     end

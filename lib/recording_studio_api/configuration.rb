@@ -17,6 +17,7 @@ module RecordingStudioApi
 
     attr_accessor :timeout,
                   :token_ttl,
+                  :token_authenticators,
                   :access_management_view_role,
                   :access_management_edit_role,
                   :admin_dashboard_path_resolver,
@@ -44,11 +45,12 @@ module RecordingStudioApi
                   :rate_limit_api_write_period_seconds,
                   :api_request_logging_enabled,
                   :api_request_logging_payload_mode
-            attr_reader :hooks, :action_registry, :recordable_registry, :default_api_version, :api_version_profiles
+    attr_reader :hooks, :action_registry, :recordable_registry, :default_api_version, :api_version_profiles
 
     def initialize
       @timeout = 5
       @token_ttl = 30.respond_to?(:days) ? 30.days : 30 * 24 * 60 * 60
+      @token_authenticators = []
       @access_management_view_role = :view
       @access_management_edit_role = :admin
       @admin_dashboard_path_resolver = lambda do |controller:, **|
@@ -92,6 +94,7 @@ module RecordingStudioApi
       {
         timeout: timeout,
         token_ttl: token_ttl,
+        token_authenticators_count: token_authenticators.count,
         admin_dashboard_path_resolver: admin_dashboard_path_resolver.respond_to?(:call),
         admin_logs_path_resolver: admin_logs_path_resolver.respond_to?(:call),
         admin_layout_name: admin_layout_name,

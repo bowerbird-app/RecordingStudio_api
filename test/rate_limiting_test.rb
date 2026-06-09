@@ -215,7 +215,7 @@ class RateLimitingTest < ActiveSupport::TestCase
   end
 
   test "rate limit identifier falls back to remote ip when oauth client id or api credentials are unavailable" do
-    oauth_harness = Harness.new(path: "/recording_studio_api/oauth/revoke", method: :post, remote_ip: "10.0.0.9")
+    oauth_harness = Harness.new(path: "/recording_studio_api/oauth/token", method: :post, remote_ip: "10.0.0.9")
     api_harness = Harness.new(path: "/recording_studio_api/api/v1/pages", method: :get, remote_ip: "10.0.0.10")
 
     assert_equal "ip:10.0.0.9", oauth_harness.send(:rate_limit_identifier)

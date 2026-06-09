@@ -8,9 +8,9 @@ require "rails/test_help"
 module ApiDummyHelpers
   TEST_PASSWORD = "ApiAuthPassword!2026"
 
-  def with_access_creation_context(&block)
+  def with_access_creation_context(&)
     if defined?(RecordingStudioAccessible::AccessCreationContext)
-      RecordingStudioAccessible::AccessCreationContext.allow(&block)
+      RecordingStudioAccessible::AccessCreationContext.allow(&)
     else
       yield
     end
@@ -66,10 +66,7 @@ module ApiDummyHelpers
   end
 
   def issue_oauth_access_token_for(access_recording:, name: "OAuth client")
-    payload = RecordingStudioApi::Services::ProvisionApiClient.call(
-      access_recording: access_recording,
-      name: name
-    ).value
+    payload = provision_api_client_for(access_recording: access_recording, name: name)
 
     token_result = RecordingStudioApi::Services::IssueOauthAccessToken.call(
       grant_type: "client_credentials",
@@ -80,6 +77,40 @@ module ApiDummyHelpers
     raise token_result.error unless token_result.success?
 
     token_result.value.fetch(:access_token)
+  end
+
+  def provision_api_client_for(access_recording:, name: "OAuth client")
+    provision_result = RecordingStudioApi::Services::ProvisionApiClient.call(
+      access_point_recording: access_point_recording_for(access_recording),
+      manager_actor: access_manager_for(access_recording),
+      role: access_recording.recordable.role,
+      name: name
+    )
+
+    raise provision_result.error unless provision_result.success?
+
+    provision_result.value
+  end
+
+  def access_point_recording_for(access_recording)
+    access_recording.parent_recording || access_recording.root_recording
+  end
+
+  def access_manager_for(access_recording)
+    access_point_recording = access_point_recording_for(access_recording)
+    actor = access_recording.recordable.actor
+
+    return actor if RecordingStudioApi::AccessManagementPolicy.new(actor: actor).can_manage_recording?(access_point_recording)
+
+    manager = create_user(email: "api-access-manager-#{SecureRandom.hex(4)}@example.com")
+    with_access_creation_context do
+      access = RecordingStudio::Access.create!(
+        actor: manager,
+        role: RecordingStudioApi.configuration.access_management_edit_role
+      )
+      RecordingStudio::Recording.create!(recordable: access, parent_recording: access_point_recording)
+    end
+    manager
   end
 
   def register_dummy_recordable_type_apis!

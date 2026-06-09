@@ -44,6 +44,38 @@ class RecordingTreePresenter
 
   def node_label(recording)
     trashed_label = include_trashed && recording.trashed_at.present? ? " [trashed]" : ""
-    "#{recording.type_label}: #{recording.name}#{trashed_label}"
+    "#{type_label_for(recording)}: #{identifier_for(safe_recordable(recording))}#{trashed_label}"
+  end
+
+  def type_label_for(recording)
+    recording.recordable_type.to_s.demodulize.underscore.humanize
+  end
+
+  def identifier_for(recordable)
+    return "Unknown recordable" if recordable.nil?
+
+    %i[name title email label slug identifier].each do |attribute|
+      next unless recordable.respond_to?(attribute)
+
+      value = recordable.public_send(attribute)
+      return value if value.present?
+    end
+
+    actor = recordable.actor if recordable.respond_to?(:actor)
+    actor_email = actor.email if actor&.respond_to?(:email) && actor.email.present?
+
+    if recordable.respond_to?(:role) && recordable.role.present? && actor_email.present?
+      return "#{recordable.role.to_s.humanize} for #{actor_email}"
+    end
+
+    return recordable.role.to_s.humanize if recordable.respond_to?(:role) && recordable.role.present?
+
+    "##{recordable.id}"
+  end
+
+  def safe_recordable(recording)
+    recording.recordable
+  rescue NameError
+    nil
   end
 end

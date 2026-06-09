@@ -24,7 +24,7 @@ class HomeController < ApplicationController
   end
 
   def access_recordings_for(root_recordable_type)
-    recordings = RecordingStudio::Recording.includes(:recordable).reorder(:created_at, :id).to_a
+    recordings = RecordingStudio::Recording.reorder(:created_at, :id).to_a
     recordings_by_parent_id = recordings.group_by(&:parent_recording_id)
 
     recordings_by_parent_id.fetch(nil, []).select do |recording|
@@ -53,7 +53,7 @@ class HomeController < ApplicationController
   end
 
   def recording_tree_for(root_recordable_type)
-    recordings = RecordingStudio::Recording.includes(:recordable).reorder(:created_at, :id).to_a
+    recordings = RecordingStudio::Recording.reorder(:created_at, :id).to_a
     recordings_by_parent_id = recordings.group_by(&:parent_recording_id)
 
     recordings_by_parent_id.fetch(nil, []).select do |recording|
@@ -74,7 +74,7 @@ class HomeController < ApplicationController
 
   def recording_label(recording)
     type_label = recording.recordable_type.to_s.demodulize.underscore.humanize
-    identifier = recordable_identifier(recording.recordable)
+    identifier = recordable_identifier(safe_recordable(recording))
 
     "#{type_label}: #{identifier}"
   end
@@ -102,5 +102,11 @@ class HomeController < ApplicationController
       recordable.minimum_role.present?
 
     "##{recordable.id}"
+  end
+
+  def safe_recordable(recording)
+    recording.recordable
+  rescue NameError
+    nil
   end
 end

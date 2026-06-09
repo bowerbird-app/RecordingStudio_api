@@ -57,7 +57,6 @@ module RecordingStudioApi
           api_credential_id: safe_id_for(:current_api_credential),
           access_recording_id: safe_id_for(:current_access_recording),
           root_recording_id: safe_id_for(:current_root_recording),
-          oauth_grant_session_id: params[:oauth_grant_session_id].presence,
           remote_ip: request.remote_ip,
           user_agent: request.user_agent.to_s.first(512),
           error_class: raised_error&.class&.name,

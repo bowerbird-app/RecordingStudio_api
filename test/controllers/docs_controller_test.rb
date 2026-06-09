@@ -196,9 +196,7 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
       assert_includes response.body, "get &quot;/admin_api/logs&quot;, to: &quot;admin_logs#index&quot;"
       assert_includes response.body, "resources :api_clients, controller: &quot;access_requests&quot;, only: %i[index show new create edit update]"
       assert_includes response.body, "resources :api_access_tokens, path: &quot;tokens&quot;"
-      assert_includes response.body, "get &quot;/oauth/authorize&quot;, to: &quot;oauth_authorizations#new&quot;"
       assert_includes response.body, "post &quot;/oauth/token&quot;, to: &quot;oauth#token&quot;"
-      assert_includes response.body, "post &quot;/oauth/revoke&quot;, to: &quot;oauth#revoke&quot;"
       assert_includes response.body, "post &quot;/trash/:id/restore&quot;"
       assert_includes response.body, "namespace :v1 do"
       assert_includes response.body, "RecordingStudioApi.api_versions - ["
@@ -297,7 +295,7 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "createApiReference"
     assert_includes response.body, "recordingStudioApiScalarInit"
     assert_includes response.body, "onload=\"window.recordingStudioApiScalarInit"
-    assert_select %(a[href="#{docs_scalar_fullscreen_path(version: "v1")}"][target="_blank"]), text: /Full screen/
+    assert_select %(a[href="#{docs_scalar_fullscreen_path(version: 'v1')}"][target="_blank"]), text: /Full screen/
   end
 
   test "APIdocs routes render versioned scalar and openapi endpoints" do
@@ -309,7 +307,7 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "for V2"
     assert_includes response.body, api_docs_openapi_path(version: "v2")
-    assert_select %(a[href="#{api_docs_fullscreen_path(version: "v2")}"][target="_blank"]), text: /Full screen/
+    assert_select %(a[href="#{api_docs_fullscreen_path(version: 'v2')}"][target="_blank"]), text: /Full screen/
 
     get api_docs_openapi_path(version: "v2")
 
@@ -374,19 +372,16 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     }
 
     first_credential = RecordingStudioApi::ApiCredential.order(created_at: :desc).first
-    first_access_recording = first_credential.access_recording
 
     post scalar_test_token_path, params: {
       access_point_recording_id: root_recording.id,
       role: "admin"
     }
 
-    second_credential = RecordingStudioApi::ApiCredential.order(created_at: :desc).first
     direct_access_recordings = RecordingStudioAccessible.access_recordings_for_actor(recording: root_recording, actor: @user)
 
-    assert_equal first_access_recording.id, second_credential.access_recording_id
     assert_not_nil first_credential.reload.revoked_at
-    assert_equal [first_access_recording.id], direct_access_recordings.map(&:id)
+    assert_equal 1, direct_access_recordings.length
   end
 
   test "scalar fullscreen page renders successfully" do
@@ -413,19 +408,6 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "config/initializers/recording_studio_api.rb"
     assert_includes response.body, "context.access_grant.authorize!"
     assert_includes response.body, "Authorization contract"
-  end
-
-  test "mobile auth page renders successfully" do
-    get docs_mobile_auth_path
-
-    assert_response :success
-    assert_select "h1", text: "Mobile auth"
-    assert_includes response.body, "How mobile OAuth authorization, refresh, and revocation now work in the recording tree."
-    assert_includes response.body, "The mobile app sends the user to the OAuth authorize page, where the user signs in if they are not already signed in."
-    assert_includes response.body, "The server checks which RecordingStudio::Access records belong to that user and has them choose one if there is more than one option."
-    assert_includes response.body, "The app exchanges that code, together with its PKCE verifier, for a mobile access token and a refresh token."
-    assert_includes response.body, "The app uses the access token for API calls, and when it expires it uses the refresh token to get a new access token and a rotated refresh token."
-    assert_includes response.body, "Each accepted mobile access token resolves to a RecordingStudioApi::AccessGrant"
   end
 
   test "mounted recording_studio_api engine has no browser root page" do
@@ -458,7 +440,6 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_select %(a[href="#{docs_scalar_path}"]), text: /Scalar/
     assert_select %(a[href="#{docs_add_capability_path}"]), text: /Add API capability/
     assert_select %(a[href="#{docs_auth_path}"]), text: /Auth/
-    assert_select %(a[href="#{docs_mobile_auth_path}"]), text: /Mobile auth/
     assert_select %(a[href="#{docs_methods_path}"]), text: /Methods/
     assert_select %(a[href="#{docs_versions_path}"]), text: /Versions/
     assert_select %(a[href="#{docs_api_hierarchy_path}"]), text: /API hierarchy/

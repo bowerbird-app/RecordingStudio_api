@@ -24,7 +24,7 @@ module RecordingStudioApi
     def load_api_client
       @api_client = RecordingStudioApi::ApiClient
         .includes(credentials: :access_tokens, access_recording: [:recordable, { parent_recording: :parent_recording }])
-        .where(access_recording_id: visible_access_recordings.map(&:id))
+        .where(access_recording_id: visible_api_client_access_recordings.map(&:id))
         .find(params[:api_client_id] || params[:access_request_id])
     rescue ActiveRecord::RecordNotFound
       head :not_found
@@ -36,9 +36,9 @@ module RecordingStudioApi
           id: token.id,
           prefix: obfuscated_token_prefix(token.token_prefix),
           status: api_access_token_status(token),
-          expires_at: format_activity_timestamp(token.expires_at, fallback: "Never"),
-          last_used_at: format_activity_timestamp(token.last_used_at),
-          issued_at: format_activity_timestamp(token.created_at),
+          expires_at: relative_timestamp_with_tooltip(token.expires_at, fallback: "Never"),
+          last_used_at: relative_timestamp_with_tooltip(token.last_used_at, fallback: "Never"),
+          issued_at: relative_timestamp_with_tooltip(token.created_at),
           actions: revoke_action_for(token)
         }
       end
@@ -89,6 +89,10 @@ module RecordingStudioApi
       access_management_policy.visible_access_recordings
     end
 
+    def visible_api_client_access_recordings
+      access_management_policy.visible_api_client_access_recordings
+    end
+
     def obfuscated_token_prefix(prefix)
       token_prefix = prefix.to_s
       return "Hidden" if token_prefix.blank?
@@ -106,9 +110,20 @@ module RecordingStudioApi
       "Active"
     end
 
-    def format_activity_timestamp(value, fallback: "Never")
+    def relative_timestamp_with_tooltip(value, fallback: "Never")
       return fallback if value.blank?
 
+      timestamp = value.in_time_zone
+      distance = view_context.time_ago_in_words(timestamp)
+      relative_time = timestamp.future? ? "in #{distance}" : "#{distance} ago"
+      exact_time = human_readable_timestamp(timestamp)
+
+      view_context.render FlatPack::Tooltip::Component.new(text: exact_time) do
+        view_context.content_tag(:span, relative_time, class: "underline decoration-dotted underline-offset-2")
+      end
+    end
+
+    def human_readable_timestamp(value)
       timestamp = value.in_time_zone
       "#{timestamp.strftime("%B %-d, %Y at %-l:%M %p")} #{timestamp.strftime("%Z")}".strip
     end

@@ -28,7 +28,6 @@ Layout/ArgumentAlignment:
 # This cop supports safe autocorrection (--autocorrect).
 Layout/EmptyLineAfterGuardClause:
   Exclude:
-    - 'app/controllers/recording_studio_api/oauth_grant_sessions_controller.rb'
 
 # Offense count: 4
 # This cop supports safe autocorrection (--autocorrect).
@@ -73,7 +72,6 @@ Layout/MultilineMethodCallIndentation:
     - 'app/controllers/recording_studio_api/api/v1/resources_controller.rb'
     - 'app/controllers/recording_studio_api/api_access_tokens_controller.rb'
     - 'lib/recording_studio_api/services/documentation_catalog.rb'
-    - 'lib/recording_studio_api/services/exchange_oauth_authorization_code.rb'
     - 'lib/recording_studio_api/services/provision_api_client.rb'
     - 'test/services/documentation_catalog_test.rb'
     - 'test/services/openapi_document_test.rb'
@@ -100,7 +98,6 @@ Lint/DuplicateMethods:
 # Offense count: 1
 Lint/HashCompareByIdentity:
   Exclude:
-    - 'lib/recording_studio_api/services/revoke_oauth_grant_session.rb'
 
 # Offense count: 3
 Lint/NoReturnInBeginEndBlocks:
@@ -117,7 +114,6 @@ Lint/NoReturnInBeginEndBlocks:
 Lint/RedundantSafeNavigation:
   Exclude:
     - 'app/models/recording_studio_api/log_record.rb'
-    - 'lib/recording_studio_api/services/revoke_oauth_grant_session.rb'
 
 # Offense count: 47
 # Configuration parameters: AllowedMethods, AllowedPatterns, CountRepeatedAttributes.

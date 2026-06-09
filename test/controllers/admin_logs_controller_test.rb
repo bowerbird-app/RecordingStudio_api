@@ -165,7 +165,6 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
       t.uuid :api_credential_id
       t.uuid :access_recording_id
       t.uuid :root_recording_id
-      t.uuid :oauth_grant_session_id
       t.string :remote_ip
       t.string :user_agent
       t.string :error_class

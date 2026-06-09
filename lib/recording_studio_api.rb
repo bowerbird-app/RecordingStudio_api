@@ -7,6 +7,7 @@ require "recording_studio_api/errors"
 require "recording_studio_api/configuration"
 require "recording_studio_api/authenticated_client"
 require "recording_studio_api/access_grant"
+require "recording_studio_api/integration"
 require "recording_studio_api/action_context"
 require "recording_studio_api/resource_operation_context"
 require "recording_studio_api/accessible_recording_scope"
@@ -14,7 +15,6 @@ require "recording_studio_api/access_policy"
 require "recording_studio_api/recordable_registry"
 require "recording_studio_api/token"
 require "recording_studio_api/oauth_access_token"
-require "recording_studio_api/oauth_refresh_token_value"
 require "recording_studio_api/oauth_error_mapper"
 require "recording_studio_api/openapi_helpers"
 require "recording_studio_api/serializers/recording_serializer"
@@ -28,11 +28,6 @@ require "recording_studio_api/services/provision_access_request"
 require "recording_studio_api/services/authenticate_bearer_token"
 require "recording_studio_api/services/issue_oauth_access_token"
 require "recording_studio_api/services/authenticate_oauth_access_token"
-require "recording_studio_api/services/authorize_oauth_client"
-require "recording_studio_api/services/exchange_oauth_authorization_code"
-require "recording_studio_api/services/refresh_oauth_access_token"
-require "recording_studio_api/services/revoke_oauth_token"
-require "recording_studio_api/services/revoke_oauth_grant_session"
 require "recording_studio_api/services/move_recording"
 require "recording_studio_api/services/documentation_catalog"
 require "recording_studio_api/services/openapi_document"
@@ -56,6 +51,49 @@ module RecordingStudioApi
 
     def configure
       yield(configuration) if block_given?
+    end
+
+    def register_token_authenticator(authenticator = nil, &block)
+      resolved = authenticator || block
+      raise ArgumentError, "A callable authenticator is required" unless resolved.respond_to?(:call)
+
+      configuration.token_authenticators << resolved
+      resolved
+    end
+
+    def token_authenticators
+      configuration.token_authenticators
+    end
+
+    def authenticate_authorization_header(authorization_header:)
+      Integration.authenticate_authorization_header(authorization_header: authorization_header)
+    end
+
+    def build_access_grant(authenticated_client:)
+      Integration.build_access_grant(authenticated_client: authenticated_client)
+    end
+
+    def access_grant_from_authorization_header(authorization_header:)
+      Integration.access_grant_from_authorization_header(authorization_header: authorization_header)
+    end
+
+    def actor_access_recordings(actor:)
+      Integration.actor_access_recordings(actor: actor)
+    end
+
+    def resolve_access_recording_for_actor(actor:, requested_access_recording_id: nil)
+      Integration.resolve_access_recording_for_actor(
+        actor: actor,
+        requested_access_recording_id: requested_access_recording_id
+      )
+    end
+
+    def oauth_error_payload(error)
+      Integration.oauth_error_payload(error)
+    end
+
+    def oauth_error_status(error)
+      Integration.oauth_error_status(error)
     end
 
     def register_capability_action(name, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil)

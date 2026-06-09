@@ -1,9 +1,6 @@
 # frozen_string_literal: true
 
 require_relative "../support/api_dummy_helpers"
-require "base64"
-require "digest"
-
 class AuthenticateOauthAccessTokenTest < ActiveSupport::TestCase
   include ApiDummyHelpers
 
@@ -25,6 +22,7 @@ class AuthenticateOauthAccessTokenTest < ActiveSupport::TestCase
 
     @access_token = token_result.value.fetch(:access_token)
     @credential = payload.fetch(:credential)
+    @client_access_recording = payload.fetch(:access_recording)
   end
 
   teardown do
@@ -41,7 +39,7 @@ class AuthenticateOauthAccessTokenTest < ActiveSupport::TestCase
     assert result.success?, result.error
     assert_equal @credential.api_client_id, result.value.api_client.id
     assert_equal @credential.id, result.value.credential.id
-    assert_equal @access_recording.id, result.value.access_recording.id
+    assert_equal @client_access_recording.id, result.value.access_recording.id
     assert_equal @root_recording.id, result.value.root_recording.id
   end
 
@@ -96,43 +94,67 @@ class AuthenticateOauthAccessTokenTest < ActiveSupport::TestCase
     assert_equal "Bearer access token is invalid", result.error
   end
 
-  test "authenticates mobile oauth session access token" do
-    oauth_client = RecordingStudioApi::OauthClient.create!(
-      name: "Mobile app",
-      client_identifier: "mobile-auth-client",
-      redirect_uri: "myapp://oauth/callback"
+  test "authenticates through registered token authenticator" do
+    custom_token = RecordingStudioApi::OauthAccessToken.generate.fetch(:token)
+
+    RecordingStudioApi.register_token_authenticator(
+      lambda do |token:|
+        next if token != custom_token
+
+        { credential: @credential }
+      end
     )
-
-    code_verifier = SecureRandom.urlsafe_base64(64, false).first(96)
-    code_challenge = Base64.urlsafe_encode64(Digest::SHA256.digest(code_verifier), padding: false)
-
-    authorize_result = RecordingStudioApi::Services::AuthorizeOauthClient.call(
-      response_type: "code",
-      client_id: oauth_client.client_identifier,
-      redirect_uri: oauth_client.redirect_uri,
-      code_challenge: code_challenge,
-      code_challenge_method: "S256",
-      access_recording_id: @access_recording.id
-    )
-
-    exchange_result = RecordingStudioApi::Services::ExchangeOauthAuthorizationCode.call(
-      grant_type: "authorization_code",
-      client_id: oauth_client.client_identifier,
-      code: authorize_result.value.fetch(:code),
-      redirect_uri: oauth_client.redirect_uri,
-      code_verifier: code_verifier
-    )
-
-    mobile_token = exchange_result.value.fetch(:access_token)
 
     result = RecordingStudioApi::Services::AuthenticateOauthAccessToken.call(
-      authorization_header: "Bearer #{mobile_token}"
+      authorization_header: "Bearer #{custom_token}"
     )
 
     assert result.success?, result.error
-    assert_equal oauth_client.id, result.value.api_client.id
-    assert_equal @access_recording.id, result.value.access_recording.id
-    assert_not_nil result.value.credential
-    assert_instance_of RecordingStudioApi::OauthGrantSession, result.value.credential
+    assert_equal @credential.api_client_id, result.value.api_client.id
+    assert_equal @credential.id, result.value.credential.id
+    assert_equal @client_access_recording.id, result.value.access_recording.id
+  end
+
+  test "authenticates custom token format accepted by registered authenticator" do
+    custom_token = "rsapp_at_#{SecureRandom.urlsafe_base64(32)}"
+    credential = @credential
+
+    authenticator = Class.new do
+      define_method(:valid_format?) do |token|
+        token.to_s.start_with?("rsapp_at_")
+      end
+
+      define_method(:call) do |token:|
+        { credential: credential } if token == custom_token
+      end
+    end.new
+
+    RecordingStudioApi.register_token_authenticator(authenticator)
+
+    result = RecordingStudioApi::Services::AuthenticateOauthAccessToken.call(
+      authorization_header: "Bearer #{custom_token}"
+    )
+
+    assert result.success?, result.error
+    assert_equal @credential.api_client_id, result.value.api_client.id
+    assert_equal @credential.id, result.value.credential.id
+    assert_equal @client_access_recording.id, result.value.access_recording.id
+  end
+
+  test "rejects custom token format without registered format acceptance" do
+    custom_token = "rsapp_at_#{SecureRandom.urlsafe_base64(32)}"
+
+    RecordingStudioApi.register_token_authenticator(
+      lambda do |token:|
+        { credential: @credential } if token == custom_token
+      end
+    )
+
+    result = RecordingStudioApi::Services::AuthenticateOauthAccessToken.call(
+      authorization_header: "Bearer #{custom_token}"
+    )
+
+    assert result.failure?
+    assert_equal "Bearer access token format is invalid", result.error
   end
 end

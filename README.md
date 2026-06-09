@@ -226,18 +226,78 @@ Each API request is evaluated in this order:
 5. The API controller resolves the requested public API version, selects the newest compatible contribution contract, and dispatches to the registered handler with the access grant in context.
 6. The capability handler authorizes its own behavior with the passed grant. Simple handlers can call `context.access_grant.authorize!(recording: ..., role: ...)`; complex handlers can check multiple recordings or roles with Recording Studio Accessible.
 
-## Mobile Integration Guidance
+### External auth gem integration contract
 
-The engine supports OAuth2 `client_credentials` for machine-to-machine access and Authorization Code + PKCE for public mobile clients. For mobile apps that can use a backend-for-frontend pattern, prefer it first:
+This gem exposes a small integration surface so a separate app-auth gem can authenticate bearer tokens and reuse RecordingStudioApi authorization without duplicating access-grant logic.
 
-1. Mobile app authenticates the user with host-app auth.
-2. Mobile app calls your backend.
-3. Backend exchanges/uses API credentials and calls RecordingStudioApi.
-4. Backend returns scoped data to the app.
+#### Public integration methods
 
-This keeps API secrets off-device while preserving workspace-scoped auditability in the Recording Studio tree.
+- `RecordingStudioApi.authenticate_authorization_header(authorization_header:)`
+  - Authenticates a `Bearer` header and returns a service result whose `value` is a `RecordingStudioApi::AuthenticatedClient`.
+- `RecordingStudioApi.build_access_grant(authenticated_client:)`
+  - Builds a `RecordingStudioApi::AccessGrant` from an authenticated client context.
+- `RecordingStudioApi.access_grant_from_authorization_header(authorization_header:)`
+  - One-step helper that authenticates and returns an `AccessGrant` in the result `value`.
+- `RecordingStudioApi.actor_access_recordings(actor:)`
+  - Returns active access recordings available to an actor.
+- `RecordingStudioApi.resolve_access_recording_for_actor(actor:, requested_access_recording_id: nil)`
+  - Resolves access selection for multi-workspace actors and returns `{ recording:, candidates:, error: }`.
+- `RecordingStudioApi.oauth_error_payload(error)` and `RecordingStudioApi.oauth_error_status(error)`
+  - Maps OAuth-style errors to normalized payloads and HTTP statuses.
 
-If direct mobile-to-API OAuth is required, register a public OAuth client with an exact redirect URI, send users through `/recording_studio_api/oauth/authorize`, and let the token endpoint exchange authorization codes or refresh tokens. The same access-grant dispatch model is used after the mobile access token is presented to the JSON API.
+#### Token authenticator extension point
+
+External gems can register additional bearer-token authenticators. If the external gem uses this gem's `rsapi_at_...` access-token format, the authenticator only needs to implement `call`. If it uses a different token prefix or shape, it should also implement `valid_format?` so the API gem knows to let it inspect that token.
+
+```ruby
+class MyAppAccess::TokenAuthenticator
+  def self.valid_format?(token)
+    token.to_s.start_with?("rsapp_at_")
+  end
+
+  def self.call(token:)
+    session = MyAppAccess::Session.find_by_raw_token(token)
+    return if session.nil?
+
+    {
+      credential: session.access_credential,
+      token_record: session
+    }
+  end
+end
+
+RecordingStudioApi.register_token_authenticator(MyAppAccess::TokenAuthenticator)
+```
+
+Registered authenticators are evaluated by `RecordingStudioApi::Services::AuthenticateOauthAccessToken` after built-in API access-token checks.
+
+Authenticator method contract:
+
+- `valid_format?(token)` is optional for authenticators that use the built-in `RecordingStudioApi::OauthAccessToken` format.
+- `valid_format?(token)` is required when the external gem uses its own token prefix or shape.
+- `call(token:)` resolves an accepted token to an access context.
+
+Accepted authenticator return values:
+
+- `nil` to indicate no match.
+- `Hash` with `credential:` and optional `token_record:`.
+- `Array` in `[credential, token_record]` shape.
+- Any credential-like object as shorthand (`token_record` defaults to that same object).
+
+Credential contract required by token authentication:
+
+- `active_for_authentication?`
+- `effective_access_recording`
+- `effective_access_recording_id`
+- `api_client`
+- writable `last_used_at` column (updated with `update_column`)
+
+Token-record contract (if provided):
+
+- `active_for_authentication?`
+- writable `last_used_at` column (updated with `update_column`)
+
+Both credential and token record must have active, non-trashed RecordingStudio recordables so scope resolution can derive the root recording.
 
 ### Capability-backed actions
 
@@ -273,9 +333,7 @@ end
 
 - `GET /recording_studio_api/admin_api` — browser admin dashboard for configured API access
 - `GET /recording_studio_api/admin_api/logs` — browser admin request-log view
-- `GET /recording_studio_api/oauth/authorize` — issue a PKCE authorization code for a public OAuth client
-- `POST /recording_studio_api/oauth/token` — issue or refresh OAuth2 access tokens using `client_credentials`, `authorization_code`, or `refresh_token`
-- `POST /recording_studio_api/oauth/revoke` — revoke a mobile OAuth grant session or token family
+- `POST /recording_studio_api/oauth/token` — issue OAuth2 bearer access tokens using `client_credentials`
 - `GET /recording_studio_api/api/<version>` — list available API resources for the selected public API version
 - `GET /recording_studio_api/api/<version>/:resource` — list recordings of a resource type inside the authenticated root
 - `GET /recording_studio_api/api/<version>/:resource/:id` — show one recording

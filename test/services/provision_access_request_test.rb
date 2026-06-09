@@ -39,7 +39,7 @@ class ProvisionAccessRequestTest < ActiveSupport::TestCase
     assert_not_empty payload.fetch(:token)
   end
 
-  test "reuses the same access recording for repeated requests" do
+  test "creates a separate access recording for each api client" do
     first_result = RecordingStudioApi::Services::ProvisionAccessRequest.call(
       access_point_recording: @root_recording,
       actor: @user,
@@ -57,10 +57,12 @@ class ProvisionAccessRequestTest < ActiveSupport::TestCase
     )
 
     assert second_result.success?, second_result.error
-    assert_equal first_result.value.fetch(:access_recording).id, second_result.value.fetch(:access_recording).id
+    refute_equal first_result.value.fetch(:access_recording).id, second_result.value.fetch(:access_recording).id
+    assert_equal first_result.value.fetch(:api_client), first_result.value.fetch(:access_recording).recordable.actor
+    assert_equal second_result.value.fetch(:api_client), second_result.value.fetch(:access_recording).recordable.actor
     assert_equal @root_recording.id, second_result.value.fetch(:access_recording).parent_recording_id
     assert_equal "admin", second_result.value.fetch(:access_recording).recordable.role
-    assert_not_nil first_result.value.fetch(:credential).reload.revoked_at
+    assert_nil first_result.value.fetch(:credential).reload.revoked_at
   end
 
   test "rejects provisioning for view-only access by default" do

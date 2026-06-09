@@ -15,12 +15,6 @@ Rails.application.routes.draw do
   get "/folder", to: "home#folder", as: :folder
   get "/admin/api", to: "recording_studio_api/admin_dashboards#show", as: :admin_api
   get "/admin/api/logs", to: "recording_studio_api/admin_logs#index", as: :admin_api_logs
-  resource :mobile_app_demo, only: :show do
-    post :start
-    get :callback
-    post :refresh
-    post :revoke
-  end
   resource :scalar_test_token, only: %i[create destroy]
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
@@ -47,7 +41,6 @@ Rails.application.routes.draw do
   get "docs/scalar/fullscreen", to: "docs#scalar_fullscreen", as: :docs_scalar_fullscreen
   get "docs/add_capability", to: "docs#add_capability", as: :docs_add_capability
   get "docs/auth", to: "docs#auth", as: :docs_auth
-  get "docs/mobile_auth", to: "docs#mobile_auth", as: :docs_mobile_auth
   get "docs/methods", to: "docs#methods", as: :docs_methods
   get "docs/versions", to: "docs#versions", as: :docs_versions
 

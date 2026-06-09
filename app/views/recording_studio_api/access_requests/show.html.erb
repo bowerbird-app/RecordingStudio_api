@@ -1,67 +1,86 @@
-<div class="flex w-full flex-col gap-6">
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
   <%= render FlatPack::PageNav::Component.new(
     close_url: page_nav_close_url
   ) %>
 
   <%= render FlatPack::PageTitle::Component.new(
     title: @api_client.name,
-    subtitle: "API credentials",
+    subtitle: "API key",
     variant: :h1
   ) %>
 
   <div class="flex flex-wrap gap-3">
     <% if @can_manage_access_request %>
-      <%= button_to "Edit", edit_api_client_path(@api_client, page_nav_close_param), method: :get, class: "inline-flex items-center justify-center gap-2 rounded-[var(--button-border-radius)] font-medium cursor-pointer transition-colors duration-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--button-focus-ring-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--button-focus-ring-offset-color)] px-[var(--button-padding-x-md)] py-[var(--button-padding-y-md)] text-sm bg-[var(--button-primary-background-color)] text-[var(--button-primary-text-color)] border border-[var(--button-primary-border-color)] shadow-[var(--button-shadow)]" %>
+      <%= render FlatPack::Button::Component.new(
+        text: "Edit",
+        style: :primary,
+        size: :md,
+        url: edit_api_client_path(@api_client, page_nav_close_param)
+      ) %>
     <% end %>
-    <%= button_to "Tokens", api_client_api_access_tokens_path(@api_client, page_nav_close_param), method: :get, class: "inline-flex items-center justify-center gap-2 rounded-[var(--button-border-radius)] font-medium cursor-pointer transition-colors duration-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--button-focus-ring-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--button-focus-ring-offset-color)] px-[var(--button-padding-x-md)] py-[var(--button-padding-y-md)] text-sm bg-[var(--surface-background-color)] text-[var(--surface-content-color)] border border-[var(--surface-border-color)]" %>
+    <%= render FlatPack::Button::Component.new(
+      text: "Tokens",
+      style: :default,
+      size: :md,
+      url: api_client_api_access_tokens_path(@api_client, page_nav_close_param)
+    ) %>
+    <%= render FlatPack::Button::Component.new(
+      text: "Log",
+      style: :default,
+      size: :md,
+      url: log_api_client_path(@api_client, page_nav_close_param)
+    ) %>
+    <% if @can_manage_access_request %>
+      <% if @latest_credential&.revoked_at.nil? %>
+        <%= render FlatPack::Button::Component.new(
+          text: "Revoke",
+          style: :warning,
+          size: :md,
+          url: revoke_api_client_path(@api_client, page_nav_close_param),
+          data: { turbo_method: :post, turbo_confirm: "Revoke this API key?" }
+        ) %>
+      <% else %>
+        <%= render FlatPack::Button::Component.new(
+          text: "Revoked",
+          style: :warning,
+          size: :md,
+          disabled: true
+        ) %>
+      <% end %>
+    <% end %>
   </div>
 
-  <% oauth_client_id = @latest_credential&.oauth_client_id.to_s %>
-  <% masked_oauth_client_id = if oauth_client_id.length > 4
-                                "#{oauth_client_id.first(2)}#{"*" * (oauth_client_id.length - 4)}#{oauth_client_id.last(2)}"
+  <% api_key_value = masked_api_key(@latest_credential) %>
+  <% expiry_value = credential_expires_label(@latest_credential) %>
+  <% access_point_recording = if @access_recording&.parent_recording.present?
+                                @access_recording.parent_recording
                               else
-                                oauth_client_id
+                                @access_recording&.root_recording
                               end %>
+  <% access_point_label = access_point_recording.present? ? recording_label(access_point_recording) : "Unknown" %>
+  <% access_point_value = render FlatPack::Tooltip::Component.new(
+       text: "This API key will have access to all items below this point."
+     ) do %>
+    <span class="underline decoration-dotted underline-offset-2"><%= access_point_label %></span>
+  <% end %>
+  <% role_label = @access_recording&.recordable&.try(:role).to_s.humanize.presence || "Unknown" %>
+  <% role_value = render FlatPack::Tooltip::Component.new(
+       text: "This API key will have #{role_label} access."
+     ) do %>
+    <span class="underline decoration-dotted underline-offset-2"><%= role_label %></span>
+  <% end %>
   <% detail_rows = [
-    { field: "Name", value: @api_client.name, actions: "" },
-    { field: "API key", value: (masked_oauth_client_id.presence || "Unavailable"), actions: "" },
-    { field: "API secret", value: "Hidden after creation", actions: "" },
-    { field: "Role", value: (@access_recording&.recordable&.try(:role).to_s.humanize.presence || "Unknown"), actions: "" },
-    { field: "Expiry", value: (@latest_credential&.expires_at&.in_time_zone&.strftime("%Y-%m-%d %H:%M %Z") || "None"), actions: "" }
+    { field: "Name", value: @api_client.name },
+    { field: "API key", value: api_key_value },
+    { field: "API secret", value: "Hidden after creation" },
+    { field: "Access point", value: access_point_value },
+    { field: "Role", value: role_value },
+    { field: "Expiry", value: expiry_value }
   ] %>
 
   <%= render FlatPack::Table::Component.new(data: detail_rows) do |table| %>
     <% table.column(title: "Field", html: ->(row) { row.fetch(:field) }) %>
     <% table.column(title: "Value", html: ->(row) { row.fetch(:value) }) %>
-    <% table.column(title: "Actions", html: ->(row) { row.fetch(:actions) }) %>
   <% end %>
-
-  <div class="space-y-3">
-    <%= render FlatPack::SectionTitle::Component.new(
-      title: "Machine token health",
-      subtitle: "Operational snapshot for issued machine-to-machine access tokens.",
-      anchor_link: true
-    ) %>
-
-    <%= render FlatPack::Table::Component.new(data: @api_token_activity_rows) do |table| %>
-      <% table.column(title: "Field", html: ->(row) { row.fetch(:field) }) %>
-      <% table.column(title: "Value", html: ->(row) { row.fetch(:value) }) %>
-      <% table.column(title: "Actions", html: ->(row) { row.fetch(:actions) }) %>
-    <% end %>
-  </div>
-
-  <div class="space-y-3">
-    <%= render FlatPack::SectionTitle::Component.new(
-      title: "OAuth2 activity",
-      subtitle: "Session and token activity for this access branch.",
-      anchor_link: true
-    ) %>
-
-    <%= render FlatPack::Table::Component.new(data: @oauth_activity_rows) do |table| %>
-      <% table.column(title: "Field", html: ->(row) { row.fetch(:field) }) %>
-      <% table.column(title: "Value", html: ->(row) { row.fetch(:value) }) %>
-      <% table.column(title: "Actions", html: ->(row) { row.fetch(:actions) }) %>
-    <% end %>
-  </div>
 
 </div>

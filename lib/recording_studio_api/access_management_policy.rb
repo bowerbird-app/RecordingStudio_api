@@ -22,6 +22,14 @@ module RecordingStudioApi
       access_recordings_for(access_management_role: RecordingStudioApi.configuration.access_management_edit_role)
     end
 
+    def visible_api_client_access_recordings
+      api_client_access_recordings_for(access_management_role: RecordingStudioApi.configuration.access_management_view_role)
+    end
+
+    def manageable_api_client_access_recordings
+      api_client_access_recordings_for(access_management_role: RecordingStudioApi.configuration.access_management_edit_role)
+    end
+
     def can_view_root_recording?(root_recording)
       can_view_recording?(root_recording)
     end
@@ -92,6 +100,12 @@ module RecordingStudioApi
       end
     end
 
+    def api_client_access_recordings_for(access_management_role:)
+      api_client_access_recordings.select do |recording|
+        authorized_for_access_recording?(recording, access_management_role: access_management_role)
+      end
+    end
+
     def root_recordings_for(access_management_role:)
       return [] if actor.nil?
 
@@ -123,6 +137,13 @@ module RecordingStudioApi
                                   .where(recordable_type: "RecordingStudio::Access", recordable_id: access_ids, trashed_at: nil)
                                   .to_a
       end
+    end
+
+    def api_client_access_recordings
+      @api_client_access_recordings ||= RecordingStudio::Recording.unscoped
+                                                                  .includes(:recordable)
+                                                                  .where(id: RecordingStudioApi::ApiClient.select(:access_recording_id), recordable_type: "RecordingStudio::Access", trashed_at: nil)
+                                                                  .to_a
     end
   end
 end

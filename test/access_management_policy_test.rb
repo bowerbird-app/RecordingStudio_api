@@ -57,4 +57,27 @@ class AccessManagementPolicyTest < ActiveSupport::TestCase
     assert policy.can_view_root_recording?(root_recording)
     assert policy.authorized_for_access_recording?(access_recording, access_management_role: :view)
   end
+
+  test "api client access recordings are visible to managers of their access point" do
+    user = create_user(email: "policy-api-client@example.com")
+    root_recording, manager_access_recording = create_access_recording_for(user: user, role: :admin)
+
+    result = RecordingStudioApi::Services::ProvisionApiClient.call(
+      access_recording: manager_access_recording,
+      name: "Managed API client"
+    )
+
+    assert result.success?, result.error
+
+    api_client_access_recording = result.value.fetch(:access_recording)
+    policy = RecordingStudioApi::AccessManagementPolicy.new(actor: user)
+
+    assert_equal result.value.fetch(:api_client), api_client_access_recording.recordable.actor
+    assert_includes policy.visible_api_client_access_recordings, api_client_access_recording
+    assert_includes policy.manageable_api_client_access_recordings, api_client_access_recording
+    assert_includes policy.visible_access_recordings, manager_access_recording
+    refute_includes policy.visible_access_recordings, api_client_access_recording
+    assert policy.authorized_for_access_recording?(api_client_access_recording, access_management_role: :admin)
+    assert_equal root_recording.id, api_client_access_recording.root_recording_id
+  end
 end

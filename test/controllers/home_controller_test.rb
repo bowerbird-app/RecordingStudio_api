@@ -38,17 +38,13 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
     assert_select "h1", text: "Recording Studio API demo"
     assert_includes response.body, "Demo to add and remove API access"
     assert_includes response.body, "RecordingStudio API"
-    assert_includes response.body, "Root Workspace"
     assert_includes response.body, "Workspace"
     assert_includes response.body, "Folder"
-    assert_includes response.body, "API access list"
+    assert_includes response.body, "API keys"
+    assert_not_includes response.body, "Child access recording"
     assert_select %(a[href="#{docs_install_path}"]), count: 1
-    assert_select %(form[action="/mobile_app_demo"] button), text: "Mobile app demo"
-    assert_select %(form[action="/recording_studio_api/api_clients/new?close_url=%2F&root_type=Workspace"] button), text: "Add"
-    assert_select %(form[action="/recording_studio_api/api_clients/new?close_url=%2F&root_type=Folder"] button), text: "Add"
-    assert_select %(form[action="/recording_studio_api/api_clients?close_url=%2F&include_children=1&root_type=Workspace"] button), text: "API access list"
-    assert_select %(form[action="/recording_studio_api/api_clients?close_url=%2F&include_children=1&root_type=Folder"] button), text: "API access list"
-    assert_includes response.body, "Admin for"
+    assert_select %(form[action="/recording_studio_api/api_clients?close_url=%2F&include_children=1&root_type=Workspace"] button), text: "API keys"
+    assert_select %(form[action="/recording_studio_api/api_clients?close_url=%2F&include_children=1&root_type=Folder"] button), text: "API keys"
     assert_not_includes response.body, "Open admin"
     assert_not_includes response.body, "Manage users"
     assert_not_includes response.body, "Open tree"
@@ -150,7 +146,7 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "h1", text: "Recording Studio API demo"
     assert_includes response.body, "Demo to add and remove API access"
-    assert_includes response.body, "API access list"
+    assert_includes response.body, "API keys"
     assert_not_includes response.body, "<h1>Admin</h1>"
   end
 

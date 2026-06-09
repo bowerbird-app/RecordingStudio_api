@@ -47,8 +47,8 @@ module RecordingStudioApi
       return Gem::Requirement.default if value.nil? || value.to_s.strip.empty?
 
       Gem::Requirement.new(*Array(value))
-    rescue ArgumentError => error
-      raise ConfigurationError, "Invalid API contribution requirement for #{contribution}: #{error.message}"
+    rescue ArgumentError => e
+      raise ConfigurationError, "Invalid API contribution requirement for #{contribution}: #{e.message}"
     end
   end
 end

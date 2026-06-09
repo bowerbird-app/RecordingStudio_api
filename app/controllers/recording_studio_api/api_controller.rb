@@ -2,7 +2,7 @@
 
 module RecordingStudioApi
   class ApiController < ActionController::API
-    API_VERSION_PATH_PATTERN = %r{/api/(?<version>v[^/]+)(?:/|$)}.freeze
+    API_VERSION_PATH_PATTERN = %r{/api/(?<version>v[^/]+)(?:/|$)}
 
     include RecordingStudioApi::Concerns::BearerAuthentication
     include RecordingStudioApi::Concerns::RateLimiting

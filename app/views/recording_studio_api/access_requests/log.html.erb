@@ -1,0 +1,31 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <%= render FlatPack::PageNav::Component.new(
+    entries: [
+      { label: "Back", url: api_client_path(@api_client, page_nav_close_param), icon: :arrow_left }
+    ],
+    close_url: page_nav_close_url
+  ) %>
+
+  <%= render FlatPack::PageTitle::Component.new(
+    title: @api_client.name,
+    subtitle: "API call log",
+    variant: :h1
+  ) %>
+
+  <% if @log_rows.any? %>
+    <%= render FlatPack::Table::Component.new(data: @log_rows) do |table| %>
+      <% table.column(title: "Occurred", html: ->(row) { row.fetch(:occurred_at) }) %>
+      <% table.column(title: "Method", html: ->(row) { row.fetch(:method) }) %>
+      <% table.column(title: "Path", html: ->(row) { row.fetch(:path) }) %>
+      <% table.column(title: "Status", html: ->(row) { row.fetch(:status) }) %>
+      <% table.column(title: "Duration", html: ->(row) { row.fetch(:duration) }) %>
+      <% table.column(title: "Request ID", html: ->(row) { row.fetch(:request_id) }) %>
+    <% end %>
+  <% else %>
+    <%= render FlatPack::EmptyState::Component.new(
+      title: "No API logs yet",
+      description: "This API client has not made any logged API requests yet.",
+      icon: :inbox
+    ) %>
+  <% end %>
+</div>

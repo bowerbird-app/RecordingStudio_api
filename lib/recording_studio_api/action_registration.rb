@@ -12,7 +12,7 @@ module RecordingStudioApi
 
     attr_reader :name, :capability, :version, :version_notes, :deprecation, :http_verb, :handler, :serializer, :scope, :openapi, :input_contract
 
-    def initialize(name:, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb:, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil)
+    def initialize(name:, capability:, http_verb:, handler:, version: nil, version_notes: nil, deprecation: nil, serializer: nil, scope: :member, openapi: nil, input_contract: nil)
       @name = name.to_s
       @capability = capability&.to_sym
       @version = normalize_version(version)
@@ -71,8 +71,8 @@ module RecordingStudioApi
       raise ConfigurationError, "API action version is required for #{name}" if raw_version.empty?
 
       Gem::Version.new(raw_version)
-    rescue ArgumentError => error
-      raise ConfigurationError, "Invalid API action version for #{name}: #{error.message}"
+    rescue ArgumentError => e
+      raise ConfigurationError, "Invalid API action version for #{name}: #{e.message}"
     end
 
     def normalize_version_notes(value)
@@ -96,9 +96,7 @@ module RecordingStudioApi
       removal_date = normalized[:removal_date]
       reason = normalized[:reason]
 
-      unless deprecated.nil? || deprecated == true || deprecated == false
-        raise ConfigurationError, "deprecation[:deprecated] must be true or false for #{name}"
-      end
+      raise ConfigurationError, "deprecation[:deprecated] must be true or false for #{name}" unless deprecated.nil? || deprecated == true || deprecated == false
 
       if removal_date.present?
         parsed_date = Date.iso8601(removal_date.to_s)
@@ -113,8 +111,8 @@ module RecordingStudioApi
       end
 
       normalized.slice(:deprecated, :removal_date, :reason)
-    rescue Date::Error, ArgumentError => error
-      raise ConfigurationError, "Invalid deprecation metadata for #{name}: #{error.message}"
+    rescue Date::Error, ArgumentError => e
+      raise ConfigurationError, "Invalid deprecation metadata for #{name}: #{e.message}"
     end
 
     def capability_enabled_for?(recordable_type)

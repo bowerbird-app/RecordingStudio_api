@@ -172,9 +172,10 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
 
     payload = JSON.parse(response.body).fetch("data")
-    assert_equal @access_recording.id, payload.fetch("access_recording_id")
-    assert_equal @access_recording.id, payload.fetch("access_grant_recording_id")
-    assert_equal @user.id, payload.fetch("actor_id")
+    api_client = RecordingStudioApi::ApiClient.find_by!(name: "Integration token")
+    assert_equal api_client.access_recording.id, payload.fetch("access_recording_id")
+    assert_equal api_client.access_recording.id, payload.fetch("access_grant_recording_id")
+    assert_equal api_client.id, payload.fetch("actor_id")
   end
 
   test "scopes capability action execution to the authenticated root recording" do
@@ -182,16 +183,7 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
     in_scope_page = create_page_recording(root_recording: root_recording)
     other_root_recording, = create_access_recording_for(user: create_user(email: "other-root-actions@example.com"))
     out_of_scope_page = create_page_recording(root_recording: other_root_recording)
-    scoped_token = RecordingStudioApi::Services::ProvisionApiClient.call(
-      access_recording: access_recording,
-      name: "Scoped token"
-    ).value
-
-    scoped_oauth_token = RecordingStudioApi::Services::IssueOauthAccessToken.call(
-      grant_type: "client_credentials",
-      client_id: scoped_token.fetch(:credential).oauth_client_id,
-      client_secret: scoped_token.fetch(:token)
-    ).value.fetch(:access_token)
+    scoped_oauth_token = issue_oauth_access_token_for(access_recording: access_recording, name: "Scoped token")
 
     post "/recording_studio_api/api/v1/pages/#{in_scope_page.id}/actions/echo",
         headers: { "Authorization" => "Bearer #{scoped_oauth_token}" }
@@ -211,16 +203,7 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
     )
     other_root_recording, = create_access_recording_for(user: create_user(email: "outside-member-actions@example.com"))
     hidden_page = create_page_recording(root_recording: other_root_recording)
-    restricted_token = RecordingStudioApi::Services::ProvisionApiClient.call(
-      access_recording: restricted_access_recording,
-      name: "Restricted token"
-    ).value
-
-    restricted_oauth_token = RecordingStudioApi::Services::IssueOauthAccessToken.call(
-      grant_type: "client_credentials",
-      client_id: restricted_token.fetch(:credential).oauth_client_id,
-      client_secret: restricted_token.fetch(:token)
-    ).value.fetch(:access_token)
+    restricted_oauth_token = issue_oauth_access_token_for(access_recording: restricted_access_recording, name: "Restricted token")
 
     post "/recording_studio_api/api/v1/pages/#{hidden_page.id}/actions/echo",
          headers: { "Authorization" => "Bearer #{restricted_oauth_token}" }

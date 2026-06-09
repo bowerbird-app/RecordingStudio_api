@@ -36,6 +36,7 @@ class ConfigurationTest < Minitest::Test
     configuration = RecordingStudioApi::Configuration.new
 
     assert_equal 5, configuration.timeout
+    assert_equal [], configuration.token_authenticators
     assert_equal :view, configuration.access_management_view_role
     assert_equal :admin, configuration.access_management_edit_role
     assert_respond_to configuration.admin_dashboard_path_resolver, :call
@@ -60,6 +61,24 @@ class ConfigurationTest < Minitest::Test
     assert_equal false, configuration.api_request_logging_enabled
     assert_equal "metadata_only", configuration.api_request_logging_payload_mode
     assert_instance_of RecordingStudioApi::Hooks, configuration.hooks
+  end
+
+  def test_register_token_authenticator_adds_callable_to_configuration
+    authenticator = ->(token:) {}
+
+    RecordingStudioApi.register_token_authenticator(authenticator)
+
+    assert_includes RecordingStudioApi.token_authenticators, authenticator
+  ensure
+    RecordingStudioApi.instance_variable_set(:@configuration, RecordingStudioApi::Configuration.new)
+  end
+
+  def test_register_token_authenticator_requires_callable
+    error = assert_raises(ArgumentError) do
+      RecordingStudioApi.register_token_authenticator(nil)
+    end
+
+    assert_includes error.message, "callable"
   end
 
   def test_merge_updates_rate_limit_and_logging_settings

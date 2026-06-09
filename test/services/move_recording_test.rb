@@ -18,10 +18,7 @@ class MoveRecordingTest < ActiveSupport::TestCase
     reset_recording_studio_capabilities!
     @user = create_user
     @root_recording, @access_recording = create_access_recording_for(user: @user, role: :edit)
-    @payload = RecordingStudioApi::Services::ProvisionApiClient.call(
-      access_recording: @access_recording,
-      name: "Move token"
-    ).value
+    @payload = provision_api_client_for(access_recording: @access_recording, name: "Move token")
   end
 
   teardown do
