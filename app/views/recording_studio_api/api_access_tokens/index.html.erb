@@ -1,11 +1,11 @@
 <div class="flex w-full flex-col gap-6">
   <%= render FlatPack::PageNav::Component.new(
-    close_url: page_nav_close_url
+    anchor_url: page_nav_close_url
   ) %>
 
   <%= render FlatPack::PageTitle::Component.new(
     title: "Tokens",
-    subtitle: @api_client.name,
+    subtitle: "#{@api_client.name}. A token is a temporary pass that lets this API key make requests.",
     variant: :h1
   ) %>
 
@@ -20,8 +20,8 @@
     <% end %>
   <% else %>
     <%= render FlatPack::EmptyState::Component.new(
-      title: "No child tokens",
-      description: "This API client has not issued any child access tokens yet.",
+      title: "No tokens yet",
+      description: "This API client has not issued any access tokens yet.",
       icon: :inbox
     ) %>
   <% end %>

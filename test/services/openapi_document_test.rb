@@ -360,7 +360,9 @@ module RecordingStudioApi
         original_actions_for = RecordingStudioApi.method(:capability_actions_for)
 
         singleton.send(:define_method, :api_recordable_types) { recordable_types }
-        singleton.send(:define_method, :capability_actions_for) { |_recordable_type, version: nil| [] }
+        singleton.send(:define_method, :capability_actions_for) do |_recordable_type, **|
+          []
+        end
         yield
       ensure
         singleton.send(:define_method, :api_recordable_types, original_recordable_types)
@@ -373,7 +375,7 @@ module RecordingStudioApi
         original_actions_for = RecordingStudioApi.method(:capability_actions_for)
 
         singleton.send(:define_method, :api_recordable_types) { recordable_types }
-        singleton.send(:define_method, :capability_actions_for) do |recordable_type, version: nil|
+        singleton.send(:define_method, :capability_actions_for) do |recordable_type, **|
           actions_by_type.fetch(recordable_type, [])
         end
         yield

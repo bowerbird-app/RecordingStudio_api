@@ -171,14 +171,15 @@ class RecordingStudioApiTest < Minitest::Test
     assert_not_includes sidebar_source, "icon: :code\n"
   end
 
-  def test_dummy_top_nav_keeps_root_switch_button_without_center_label
+  def test_dummy_top_nav_uses_root_switchable_dropdown_without_center_label
     top_nav_path = File.expand_path("dummy/app/views/layouts/flat_pack/_top_nav.html.erb", __dir__)
     top_nav_source = File.read(top_nav_path)
 
     assert_not_includes top_nav_source, "nav.center"
-    assert_includes top_nav_source, "text: \"\#{current_root_name} - Change\""
-    assert_includes top_nav_source, 'recording_studio_root_switchable.root_switch_path('
+    assert_includes top_nav_source, "recording_studio_root_switch_dropdown("
     assert_includes top_nav_source, 'return_to: request.fullpath'
+    assert_not_includes top_nav_source, "\#{current_root_name} - Change"
+    assert_not_includes top_nav_source, 'recording_studio_root_switchable.root_switch_path('
   end
 
   def test_dummy_application_controller_exposes_root_switchable_support

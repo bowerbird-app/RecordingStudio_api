@@ -86,7 +86,6 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
       name: "Direct API client"
     )
     direct_oauth_client_id = direct_api_client.credentials.max_by(&:created_at).oauth_client_id
-    masked_direct_oauth_client_id = "#{direct_oauth_client_id.first(2)}#{"*" * (direct_oauth_client_id.length - 4)}#{direct_oauth_client_id.last(2)}"
     direct_expires_at = direct_api_client.credentials.max_by(&:created_at).expires_at.in_time_zone
     direct_exact_expiry = "#{direct_expires_at.strftime("%B %-d, %Y at %-l:%M %p")} #{direct_expires_at.strftime("%Z")}".strip
 
@@ -105,6 +104,8 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select %(nav.flat-pack-page-nav a[href="/workspace"][aria-label="Close"]), count: 1
     assert_includes response.body, "API keys"
+    assert_includes response.body, "Total API keys"
+    assert_match(/Total API keys.{0,300}>\s*2\s*</m, response.body)
     assert_includes response.body, "API access below Workspace: UI Workspace."
     assert_includes response.body, "Name"
     assert_includes response.body, "API key"
@@ -114,16 +115,86 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "Access recording"
     assert_not_includes response.body, "Details"
     assert_includes response.body, direct_api_client.name
-    assert_includes response.body, masked_direct_oauth_client_id
-    assert_not_includes response.body, direct_oauth_client_id
+    assert_includes response.body, direct_oauth_client_id
     assert_includes response.body, "Workspace"
     assert_includes response.body, nested_api_client.name
     assert_includes response.body, "Nested Folder"
+    assert_select %(a[href="/recording_studio_api/api_clients/requests_chart?close_url=%2Fworkspace&root_recording_id=#{@workspace_root_recording.id}"]), text: "Full screen", count: 1
     assert_select %(a[href="/recording_studio_api/api_clients/#{direct_api_client.id}?close_url=%2Fworkspace"]), text: direct_api_client.name
     assert_select %(a[href="/recording_studio_api/api_clients/#{nested_api_client.id}?close_url=%2Fworkspace"]), text: nested_api_client.name
     assert_match(/in \d+\s+(minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years)/, response.body)
     assert_includes response.body, direct_exact_expiry
+    expected_day_labels = (6.days.ago.to_date..Date.current).map { |day| day.strftime("%a") }
+    expected_day_labels.each do |day_label|
+      assert_includes response.body, day_label
+    end
     assert_select "span.underline.decoration-dotted.underline-offset-2", minimum: 1
+  end
+
+  test "requests chart page renders full-screen chart and links back to api clients" do
+    get "/recording_studio_api/api_clients/requests_chart", params: {
+      root_recording_id: @workspace_root_recording.id,
+      close_url: "/workspace"
+    }
+
+    assert_response :success
+    assert_includes response.body, "API requests"
+    assert_includes response.body, "Last 7 days"
+    assert_match(/\[\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\]/, response.body)
+    assert_select "turbo-frame#requests-chart-frame", count: 1
+    assert_includes response.body, "flat-pack--auto-submit"
+    assert_includes response.body, "Date Range"
+    assert_includes response.body, "All statuses"
+    assert_select %(nav.flat-pack-page-nav a[href="/workspace"][aria-label="Close"]), count: 1
+  end
+
+  test "requests chart filters series by date range and status" do
+    api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Filtered chart client")
+
+    ensure_api_request_logs_table!
+
+    RecordingStudioApi::ApiRequestLog.where(api_client_id: api_client.id).delete_all
+
+    request_dates = [2.days.ago.to_date, 1.day.ago.to_date, Date.current]
+    request_dates.each_with_index do |request_date, index|
+      RecordingStudioApi::ApiRequestLog.create!(
+        occurred_at: request_date.in_time_zone.change(hour: 10),
+        request_id: "chart-filter-success-#{index}",
+        request_method: "GET",
+        request_path: "/api/v1/recordings",
+        status_code: 200,
+        duration_ms: 40,
+        api_client_id: api_client.id,
+        api_credential_id: api_client.credentials.max_by(&:created_at).id,
+        access_recording_id: api_client.access_recording_id,
+        root_recording_id: @workspace_root_recording.id
+      )
+    end
+
+    RecordingStudioApi::ApiRequestLog.create!(
+      occurred_at: 1.day.ago.in_time_zone.change(hour: 16),
+      request_id: "chart-filter-client-error",
+      request_method: "GET",
+      request_path: "/api/v1/recordings",
+      status_code: 404,
+      duration_ms: 45,
+      api_client_id: api_client.id,
+      api_credential_id: api_client.credentials.max_by(&:created_at).id,
+      access_recording_id: api_client.access_recording_id,
+      root_recording_id: @workspace_root_recording.id
+    )
+
+    get "/recording_studio_api/api_clients/requests_chart", params: {
+      root_recording_id: @workspace_root_recording.id,
+      start_date: 2.days.ago.to_date.iso8601,
+      end_date: Date.current.iso8601,
+      status: "success"
+    }
+
+    assert_response :success
+    assert_match(/\[\s*1\s*,\s*1\s*,\s*1\s*\]/, response.body)
+    refute_match(/\[\s*1\s*,\s*2\s*,\s*1\s*\]/, response.body)
+    assert_includes response.body, "value=\"success\""
   end
 
   test "index infinite scroll returns paged table content for xhr page requests" do
@@ -276,7 +347,7 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_select %(a[href="/recording_studio_api/api_clients/new?close_url=%2F"]), text: "New", count: 1
   end
 
-  test "index api keys chart uses request log counts for visible clients" do
+  test "index api keys list uses request log counts for visible clients" do
     direct_api_client = create_api_client_for(
       parent_recording: @workspace_root_recording,
       name: "Chart direct client"
@@ -329,8 +400,15 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     get "/recording_studio_api/api_clients", params: { root_recording_id: @workspace_root_recording.id }
 
     assert_response :success
-    assert_match(/API keys.{0,300}\[\s*5\s*,\s*2\s*\]/m, response.body)
-    assert_match(/categories.{0,300}Chart direct client.{0,200}Chart nested client/m, response.body)
+    list_node = Nokogiri::HTML(response.body).at_css("#most-used-api-keys")
+    refute_nil list_node
+
+    list_text = list_node.text.gsub(/\s+/, " ").strip
+    assert_includes list_text, "Chart direct client"
+    assert_includes list_text, "5 requests"
+    assert_includes list_text, "Chart nested client"
+    assert_includes list_text, "2 requests"
+    assert_operator list_text.index("Chart direct client"), :<, list_text.index("Chart nested client")
     assert_not_includes response.body, "Key A"
   end
 
@@ -363,7 +441,6 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
   test "show renders API access details" do
     api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Details API client")
     oauth_client_id = api_client.credentials.max_by(&:created_at).oauth_client_id
-    masked_oauth_client_id = "#{oauth_client_id.first(2)}#{"*" * (oauth_client_id.length - 4)}#{oauth_client_id.last(2)}"
 
     get "/recording_studio_api/api_clients/#{api_client.id}"
 
@@ -371,8 +448,7 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_select %(nav.flat-pack-page-nav a[href="/"][aria-label="Close"]), count: 1
     assert_includes response.body, "Details API client"
     assert_includes response.body, "API key"
-    assert_includes response.body, masked_oauth_client_id
-    assert_no_match(%r{<td[^>]*>\s*#{Regexp.escape(oauth_client_id)}\s*</td>}, response.body)
+    assert_includes response.body, oauth_client_id
     assert_includes response.body, "API secret"
     assert_includes response.body, "Hidden after creation"
     assert_includes response.body, "Role"
@@ -406,9 +482,9 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     get "/recording_studio_api/api_clients/#{api_client.id}"
 
     assert_response :success
-    assert_includes response.body, "Revoked"
+    assert_select %(div[data-page-nav-right-slot="revoked-badge"]), count: 1
+    assert_select %(div[data-page-nav-right-slot="revoked-badge"] span), text: "Revoked", count: 1
     assert_select %(a[href="/recording_studio_api/api_clients/#{api_client.id}/revoke?close_url=%2F"]), count: 0
-    assert_select %(button[disabled]), text: "Revoked"
   end
 
   test "index shows revoked and expired credentials in the expires column" do

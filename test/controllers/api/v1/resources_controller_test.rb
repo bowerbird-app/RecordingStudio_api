@@ -332,6 +332,32 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     ], payload.fetch("details")
   end
 
+  test "rejects create when parent type is not allowed and rolls back recordable creation" do
+    page_recording = create_page_recording(root_recording: @root_recording, page_title: "Invalid parent")
+    folders_before = Folder.count
+
+    post "/recording_studio_api/api/v1/folders", params: {
+      parent_id: page_recording.id,
+      attributes: {
+        name: "Invalid Child Folder"
+      }
+    }, headers: authorization_headers
+
+    assert_response :unprocessable_entity
+
+    payload = JSON.parse(response.body)
+    assert_equal "Folder cannot be recorded under Page", payload.fetch("error")
+    assert_equal folders_before, Folder.count
+    assert_equal [
+      {
+        "attribute" => "parent_id",
+        "message" => "is not allowed for Folder",
+        "full_message" => "Folder cannot be recorded under Page",
+        "type" => "invalid"
+      }
+    ], payload.fetch("details")
+  end
+
   test "returns validation errors when updating a page with a blank title" do
     page_recording = create_page_recording(root_recording: @root_recording)
 

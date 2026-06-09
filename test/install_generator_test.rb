@@ -245,6 +245,8 @@ class InstallGeneratorTest < Minitest::Test
     install_guide = File.read(INSTALL_TEMPLATE_PATH)
 
     assert_includes install_guide, "flat_pack"
+    assert_includes install_guide, "recording_studio_recordable(...)"
+    assert_includes install_guide, "RecordingStudio.enable_capability(:accessible"
     assert_includes install_guide, "bin/rails generate recording_studio_api:migrations"
     assert_includes install_guide, "bin/rails db:migrate"
     assert_includes install_guide, "auth, layout, and current actor integration"

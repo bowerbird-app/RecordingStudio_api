@@ -3,7 +3,7 @@
     entries: [
       { label: "Back", url: api_client_path(@api_client, page_nav_close_param), icon: :arrow_left }
     ],
-    close_url: page_nav_close_url
+    anchor_url: page_nav_close_url
   ) %>
 
   <%= render FlatPack::PageTitle::Component.new(

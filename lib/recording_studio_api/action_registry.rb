@@ -9,6 +9,7 @@ module RecordingStudioApi
       @registrations = {}
     end
 
+    # rubocop:disable Metrics/ParameterLists
     def register(name, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil)
       registration = ActionRegistration.new(
         name: name,
@@ -31,6 +32,7 @@ module RecordingStudioApi
 
       registrations << registration
     end
+    # rubocop:enable Metrics/ParameterLists
 
     def fetch(name, profile: nil)
       registration = resolve(name, profile: profile)

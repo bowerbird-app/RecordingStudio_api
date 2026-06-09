@@ -41,6 +41,7 @@ require "recording_studio_api/services/resource_operations/destroy"
 require "recording_studio_api/services/trashable_operations/restore"
 require "recording_studio_api/services/trashable_operations/destroy"
 
+# rubocop:disable Metrics/ModuleLength
 module RecordingStudioApi
   class << self
     include OpenapiHelpers
@@ -96,6 +97,7 @@ module RecordingStudioApi
       Integration.oauth_error_status(error)
     end
 
+    # rubocop:disable Metrics/ParameterLists
     def register_capability_action(name, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil)
       configuration.action_registry.register(
         name,
@@ -111,6 +113,7 @@ module RecordingStudioApi
         input_contract: input_contract
       )
     end
+    # rubocop:enable Metrics/ParameterLists
 
     def register_recordable_type_api(recordable_type, serializer: nil, openapi: nil, sortable_attributes: nil)
       configuration.recordable_registry.register(
@@ -311,3 +314,4 @@ module RecordingStudioApi
     end
   end
 end
+# rubocop:enable Metrics/ModuleLength

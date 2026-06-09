@@ -2,6 +2,8 @@
 
 module RecordingStudioApi
   class AdminApi < ApplicationRecord
+    include RecordingStudio::Recordable
+
     self.table_name = "recording_studio_api_admin_apis"
 
     recording_studio_recordable(

@@ -1,0 +1,56 @@
+<div class="mx-auto flex w-full max-w-7xl flex-col gap-6 pb-6">
+  <%= render FlatPack::PageNav::Component.new(
+    entries: [
+      {
+        label: "Back",
+        url: api_clients_path(requests_chart_back_params),
+        icon: :arrow_left
+      }
+    ],
+    anchor_url: page_nav_close_url
+  ) %>
+
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "API requests",
+    subtitle: "Last 7 days",
+    variant: :h1
+  ) %>
+
+  <turbo-frame id="requests-chart-frame">
+    <%= form_with(
+      url: requests_chart_api_clients_path(requests_chart_filter_form_params),
+      method: :get,
+      class: "mb-4",
+      data: {
+        turbo_frame: "requests-chart-frame",
+        controller: "flat-pack--auto-submit",
+        action: "input->flat-pack--auto-submit#queueSubmit change->flat-pack--auto-submit#queueSubmit",
+        flat_pack__auto_submit_delay_value: 250
+      }
+    ) do %>
+      <%= render FlatPack::Chart::DefaultFilterComponent.new(
+        start_date_value: @requests_chart_start_date,
+        end_date_value: @requests_chart_end_date,
+        status: @requests_chart_status,
+        status_lists: @requests_chart_status_lists,
+        status_placeholder: "All statuses"
+      ) %>
+    <% end %>
+
+    <%= render FlatPack::Card::Component.new(style: :default) do %>
+      <%= render FlatPack::Chart::Component.new(
+        card: false,
+        type: :bar,
+        height: 560,
+        series: [
+          { name: "API requests", data: @requests_chart_series }
+        ],
+        options: {
+          xaxis: {
+            categories: @requests_chart_categories
+          }
+        }
+      ) %>
+    <% end %>
+  </turbo-frame>
+</div>

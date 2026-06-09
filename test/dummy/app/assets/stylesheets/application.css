@@ -8,3 +8,9 @@
  *
  * Consider organizing styles into separate files for maintainability.
  */
+
+[data-controller~="flat-pack--chart"],
+[data-controller~="flat-pack--chart"] .apexcharts-canvas,
+[data-controller~="flat-pack--chart"] .apexcharts-svg {
+	touch-action: pan-y pinch-zoom !important;
+}

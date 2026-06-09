@@ -366,7 +366,7 @@ module RecordingStudioApi
         original_root_allowed = RecordingStudio::RecordableDeclarations.method(:root_allowed?)
 
         api_singleton.send(:define_method, :api_recordable_types) { recordable_types }
-        api_singleton.send(:define_method, :capability_actions_for) do |recordable_type, version: nil|
+        api_singleton.send(:define_method, :capability_actions_for) do |recordable_type, **|
           actions_by_type.fetch(recordable_type, [])
         end
         declarations_singleton.send(:define_method, :root_allowed?) do |recordable_type|

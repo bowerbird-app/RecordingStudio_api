@@ -125,13 +125,37 @@ def ensure_api_client_with_credential!(access_recording:, name:, expires_at: nil
 
     api_client = provision_result.value.fetch(:api_client)
     credential = provision_result.value.fetch(:credential)
-    credential.update_columns(revoked_at: revoked_at, updated_at: Time.current) if revoked_at.present?
   end
+
+  credential.update_columns(
+    expires_at: expires_at,
+    revoked_at: revoked_at,
+    updated_at: Time.current
+  )
 
   {
     api_client: api_client,
     credential: credential
   }
+end
+
+def seeded_api_client_status_attributes(index)
+  if index <= 5
+    {
+      expires_at: Time.current + 6.months,
+      revoked_at: 1.day.ago
+    }
+  elsif index.even?
+    {
+      expires_at: 2.weeks.ago,
+      revoked_at: nil
+    }
+  else
+    {
+      expires_at: Time.current + 6.months,
+      revoked_at: nil
+    }
+  end
 end
 
 def deduplicate_seeded_api_clients!(name:)
@@ -265,11 +289,10 @@ admin_access_recording = ensure_access_recording_for(
 Current.actor = admin_user
 service_client_name = "Seed Demo Service Client"
 deduplicate_seeded_api_clients!(name: service_client_name)
-service_credential = RecordingStudioApi::ApiCredential.joins(:api_client)
-  .where(recording_studio_api_api_clients: { access_recording_id: admin_access_recording.id, name: service_client_name })
-  .where(revoked_at: nil)
-  .order(created_at: :desc)
-  .first
+service_client = RecordingStudioApi::ApiClient.where(name: service_client_name).detect do |client|
+  client.access_recording&.recordable&.actor_type == "RecordingStudioApi::ApiClient"
+end
+service_credential = service_client&.credentials&.where(revoked_at: nil)&.order(created_at: :desc)&.first
 
 service_plain_secret = nil
 if service_credential.nil?
@@ -298,18 +321,20 @@ if service_token.nil? && service_plain_secret.present?
 end
 
 seeded_api_client_names = [service_client_name] + (1..49).map { |index| format("Seed API Key %02d", index) }
-seeded_api_clients = seeded_api_client_names.map do |name|
+seeded_api_clients = seeded_api_client_names.map.with_index do |name, index|
   if name == service_client_name
     {
       api_client: service_credential.api_client,
       credential: service_credential
     }
   else
+    status_attributes = seeded_api_client_status_attributes(index)
+
     ensure_api_client_with_credential!(
       access_recording: admin_access_recording,
       name: name,
-      expires_at: Time.current + 6.months,
-      revoked_at: 1.day.ago
+      expires_at: status_attributes.fetch(:expires_at),
+      revoked_at: status_attributes.fetch(:revoked_at)
     )
   end
 end

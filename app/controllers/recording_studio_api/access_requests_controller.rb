@@ -1,13 +1,19 @@
 # frozen_string_literal: true
 
 module RecordingStudioApi
+  # rubocop:disable Metrics/ClassLength
   class AccessRequestsController < ApplicationController
     PER_PAGE = 25
+    REQUESTS_CHART_STATUS_LISTS = [
+      ["Successful (2xx)", "success"],
+      ["Client errors (4xx)", "client_error"],
+      ["Server errors (5xx)", "server_error"]
+    ].freeze
 
     before_action :authenticate_user!, if: -> { respond_to?(:authenticate_user!, true) }
     before_action :authorize_access_management_edit_for_new_request!, only: %i[new create]
     before_action :load_form_state, only: %i[new create]
-    before_action :load_api_access_list, only: :index
+    before_action :load_api_access_list, only: %i[index requests_chart]
     before_action :load_api_access_detail, only: %i[show edit update log revoke]
     before_action :authorize_access_management_edit_for_loaded_client!, only: %i[edit update revoke]
 
@@ -18,6 +24,9 @@ module RecordingStudioApi
     end
 
     def show
+    end
+
+    def requests_chart
     end
 
     def log
@@ -114,13 +123,15 @@ module RecordingStudioApi
     end
 
     def available_access_point_recordings(root_type)
-      manageable_root_recordings.flat_map do |root_recording|
+      recordings = manageable_root_recordings.flat_map do |root_recording|
         root_recording.subtree_recordings(include_self: true)
           .includes(:recordable)
           .where(recordable_type: available_access_point_types(root_type), trashed_at: nil)
           .reorder(:created_at, :id)
           .to_a
-      end.uniq { |recording| recording.id }
+      end
+
+      recordings.uniq { |recording| recording.id }
     end
 
     def available_access_point_types(root_type)
@@ -240,6 +251,7 @@ module RecordingStudioApi
     end
     helper_method :human_root_type, :allowed_root_types, :recording_label, :credential_status_label, :credential_expires_label, :masked_api_key
 
+    # rubocop:disable Metrics/AbcSize
     def load_api_access_list
       @page = infinite_api_access_request? ? resolved_page : 1
       root_type_filter = params[:root_type].presence
@@ -275,7 +287,7 @@ module RecordingStudioApi
           root_recording: root_recording,
           access_point_recording: access_point_recording,
           name: api_client.name,
-          api_key: masked_api_key(latest_credential),
+          api_key: latest_credential&.oauth_client_id || "Unknown",
           access_point: access_point_label(access_point_recording),
           role: access_recording.recordable&.try(:role).to_s.humanize.presence || "Unknown",
           credentials_count: api_client.credentials.size,
@@ -285,7 +297,7 @@ module RecordingStudioApi
       end
 
       @api_access_rows = paged_rows_for(all_api_access_rows, page: @page)
-      @api_access_has_more = has_more_rows?(all_api_access_rows, page: @page)
+      @api_access_has_more = more_rows?(all_api_access_rows, page: @page)
 
       @access_list_subtitle = resolve_access_list_subtitle(
         rows: all_api_access_rows,
@@ -295,12 +307,98 @@ module RecordingStudioApi
 
       load_api_key_chart_data(all_api_access_rows)
     end
+    # rubocop:enable Metrics/AbcSize
 
     def load_api_key_chart_data(rows)
-      chart_rows = top_api_key_chart_rows(rows)
-      @api_key_chart_categories = chart_rows.map { |row| row.fetch(:name) }
-      @api_key_chart_series = chart_rows.map { |row| row.fetch(:request_count) }
+      @most_used_api_keys = top_api_key_chart_rows(rows)
+      @total_api_keys = rows.size
+      load_requests_chart_data(rows: rows)
     end
+
+    def load_requests_chart_data(rows:)
+      initialize_requests_chart_filters
+      date_window = @requests_chart_start_date..@requests_chart_end_date
+      @requests_chart_categories = date_window.map { |day| day.strftime("%a") }
+
+      if rows.blank? || !RecordingStudioApi::ApiRequestLog.table_available?
+        @requests_chart_series = Array.new(@requests_chart_categories.length, 0)
+        return
+      end
+
+      client_ids = rows.map { |row| row.fetch(:id) }
+
+      if client_ids.blank?
+        @requests_chart_series = Array.new(@requests_chart_categories.length, 0)
+        return
+      end
+
+      counts_by_date = filtered_requests_chart_scope(client_ids: client_ids)
+        .group("DATE(occurred_at)")
+        .count
+
+      @requests_chart_series = date_window.map do |day|
+        counts_by_date.fetch(day, counts_by_date.fetch(day.to_s, 0))
+      end
+    end
+
+    def initialize_requests_chart_filters
+      @requests_chart_start_date = parsed_requests_chart_date(params[:start_date]) || 6.days.ago.to_date
+      @requests_chart_end_date = parsed_requests_chart_date(params[:end_date]) || Date.current
+
+      if @requests_chart_start_date > @requests_chart_end_date
+        @requests_chart_start_date, @requests_chart_end_date = @requests_chart_end_date, @requests_chart_start_date
+      end
+
+      @requests_chart_status_lists = REQUESTS_CHART_STATUS_LISTS
+      @requests_chart_status = normalized_requests_chart_status
+    end
+
+    def parsed_requests_chart_date(raw_date)
+      return nil if raw_date.blank?
+
+      Date.iso8601(raw_date.to_s)
+    rescue ArgumentError
+      nil
+    end
+
+    def normalized_requests_chart_status
+      requested_status = params[:status].to_s
+      allowed_statuses = REQUESTS_CHART_STATUS_LISTS.map { |(_label, value)| value }
+      allowed_statuses.include?(requested_status) ? requested_status : nil
+    end
+
+    def filtered_requests_chart_scope(client_ids:)
+      scope = RecordingStudioApi::ApiRequestLog.where(
+        api_client_id: client_ids,
+        occurred_at: @requests_chart_start_date.beginning_of_day..@requests_chart_end_date.end_of_day
+      )
+
+      case @requests_chart_status
+      when "success"
+        scope.where(status_code: 200..299)
+      when "client_error"
+        scope.where(status_code: 400..499)
+      when "server_error"
+        scope.where(status_code: 500..599)
+      else
+        scope
+      end
+    end
+
+    def requests_chart_link_params
+      page_nav_close_param.merge(request.query_parameters.slice("root_type", "root_recording_id", "recording_id", "include_children", "start_date", "end_date", "status"))
+    end
+    helper_method :requests_chart_link_params
+
+    def requests_chart_filter_form_params
+      requests_chart_link_params.except(:start_date, :end_date, :status, "start_date", "end_date", "status")
+    end
+    helper_method :requests_chart_filter_form_params
+
+    def requests_chart_back_params
+      requests_chart_link_params.except(:close_url).merge(page_nav_close_param)
+    end
+    helper_method :requests_chart_back_params
 
     def resolved_page
       requested_page = params[:page].to_i
@@ -312,7 +410,7 @@ module RecordingStudioApi
       rows.slice(offset, PER_PAGE) || []
     end
 
-    def has_more_rows?(rows, page:)
+    def more_rows?(rows, page:)
       (page * PER_PAGE) < rows.size
     end
 
@@ -330,13 +428,16 @@ module RecordingStudioApi
 
       request_counts_by_client_id = api_request_counts_by_client_id(rows)
 
-      rows.map do |row|
+      chart_rows = rows.map do |row|
         {
           id: row.fetch(:id),
           name: row.fetch(:name),
           request_count: request_counts_by_client_id.fetch(row.fetch(:id), 0)
         }
-      end.sort_by { |row| [-row.fetch(:request_count), row.fetch(:name).downcase] }
+      end
+
+      chart_rows
+        .sort_by { |row| [-row.fetch(:request_count), row.fetch(:name).downcase] }
         .first(5)
     end
 
@@ -595,4 +696,5 @@ module RecordingStudioApi
       "Unknown recordable"
     end
   end
+  # rubocop:enable Metrics/ClassLength
 end

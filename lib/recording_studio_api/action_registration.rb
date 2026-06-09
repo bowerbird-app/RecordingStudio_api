@@ -12,6 +12,7 @@ module RecordingStudioApi
 
     attr_reader :name, :capability, :version, :version_notes, :deprecation, :http_verb, :handler, :serializer, :scope, :openapi, :input_contract
 
+    # rubocop:disable Metrics/ParameterLists
     def initialize(name:, capability:, http_verb:, handler:, version: nil, version_notes: nil, deprecation: nil, serializer: nil, scope: :member, openapi: nil, input_contract: nil)
       @name = name.to_s
       @capability = capability&.to_sym
@@ -25,6 +26,7 @@ module RecordingStudioApi
       @openapi = normalize_openapi(openapi)
       @input_contract = normalize_input_contract(input_contract)
     end
+    # rubocop:enable Metrics/ParameterLists
 
     def validate!
       raise ConfigurationError, "API action name is required" if name.blank?
@@ -111,8 +113,8 @@ module RecordingStudioApi
       end
 
       normalized.slice(:deprecated, :removal_date, :reason)
-    rescue Date::Error, ArgumentError => e
-      raise ConfigurationError, "Invalid deprecation metadata for #{name}: #{e.message}"
+    rescue ArgumentError
+      raise ConfigurationError, "Invalid deprecation metadata for #{name}: #{$ERROR_INFO.message}"
     end
 
     def capability_enabled_for?(recordable_type)

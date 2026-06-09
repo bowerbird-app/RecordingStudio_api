@@ -62,6 +62,34 @@ class ProvisionApiClientTest < ActiveSupport::TestCase
     assert_nil second_result.value.fetch(:credential).reload.revoked_at
   end
 
+  test "accessible grants upsert duplicate direct access for the same actor and recording" do
+    target_user = create_user(email: "duplicate-access-target@example.com")
+
+    first_result = RecordingStudioAccessible.grant_access(
+      recording: @root_recording,
+      actor: target_user,
+      role: :view,
+      manager_actor: @user
+    )
+
+    assert first_result.success?, first_result.error
+
+    second_result = RecordingStudioAccessible.grant_access(
+      recording: @root_recording,
+      actor: target_user,
+      role: :admin,
+      manager_actor: @user
+    )
+
+    assert second_result.success?, second_result.error
+    assert_equal first_result.value.id, second_result.value.id
+    assert_equal "admin", second_result.value.reload.recordable.role
+    assert_equal 1, RecordingStudioAccessible.access_recordings_for_actor(
+      recording: @root_recording,
+      actor: target_user
+    ).count
+  end
+
   test "rejects direct provisioning when the manager cannot manage access" do
     view_user = create_user(email: "view-direct-provision@example.com")
     _view_root_recording, view_access_recording = create_access_recording_for(user: view_user, role: :view)

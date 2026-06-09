@@ -84,10 +84,12 @@ Validation rules:
 - actions backed by Recording Studio capabilities
 - addon-owned handlers and serializers registered against those actions
 
-Recording Studio 2.x requires every configured ActiveRecord recordable to declare its hierarchy with
-`recording_studio_recordable(...)`. The dummy app marks `Workspace` and `Folder` as root-capable, keeps `Page` as a
-child recordable, and the API engine registers its internal `RecordingStudio::Access`, API client, credential, token,
-OAuth, and admin API recordables with explicit parent rules.
+Recording Studio 3.x requires every configured ActiveRecord recordable to declare its hierarchy with
+`recording_studio_recordable(...)`. Host apps must mark real roots with `root: true`, declare
+`allowed_parent_types` for child-capable recordables, and enable `RecordingStudio.enable_capability(:accessible, on: ...)`
+for every recordable that can own direct access grants. The dummy app marks `Workspace` and `Folder` as root-capable,
+keeps `Page` as a child recordable, and the API engine registers its internal `RecordingStudio::Access`, API client,
+credential, token, OAuth, and admin API recordables with explicit parent rules.
 
 Each action declares its verb, capability mapping, handler, and serializer so addon gems can register an API action once and let the API expose it automatically for any recordable type that enables the capability.
 

@@ -5,6 +5,7 @@ RecordingStudioApi::Engine.routes.draw do
   get "/admin_api/logs", to: "admin_logs#index", as: :admin_logs
 
   resources :api_clients, controller: "access_requests", only: %i[index show new create edit update] do
+    get :requests_chart, on: :collection
     get :log, on: :member
     post :revoke, on: :member
 
