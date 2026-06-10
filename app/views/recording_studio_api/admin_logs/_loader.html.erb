@@ -1,8 +1,8 @@
 <% if has_more %>
   <div class="flex justify-center py-4" data-controller="auto-load" data-auto-load-delay-value="150">
-    <%= link_to RecordingStudioApi.admin_logs_path(controller: self, page: next_page),
+    <%= link_to RecordingStudioApi.admin_logs_path(controller: self, page: next_page, sort: sort, direction: direction, close_url: params[:close_url]),
       data: {
-        turbo_frame: "admin_api_logs_content",
+        turbo_frame: "sortable_table",
         auto_load_target: "link"
       },
       class: "inline-flex" do %>

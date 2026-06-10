@@ -42,17 +42,6 @@
       size: :md,
       url: log_api_client_path(@api_client, page_nav_close_param)
     ) %>
-    <% if @can_manage_access_request %>
-      <% if @latest_credential&.revoked_at.nil? %>
-        <%= render FlatPack::Button::Component.new(
-          text: "Revoke",
-          style: :warning,
-          size: :md,
-          url: revoke_api_client_path(@api_client, page_nav_close_param),
-          data: { turbo_method: :post, turbo_confirm: "Revoke this API key?" }
-        ) %>
-      <% end %>
-    <% end %>
   </div>
 
   <% api_key_value = @latest_credential&.oauth_client_id || "Unknown" %>

@@ -173,57 +173,91 @@ def deduplicate_seeded_api_clients!(name:)
   end
 end
 
+def pick_weighted_index(random, weights)
+  total_weight = weights.sum
+  threshold = random.rand(total_weight)
+  running_total = 0
+
+  weights.each_with_index do |weight, index|
+    running_total += weight
+    return index if threshold < running_total
+  end
+
+  weights.length - 1
+end
+
 def seed_api_request_logs!(admin_root_recording:, admin_access_recording:, seeded_api_clients:)
   ensure_api_request_logs_table!
+  now = Time.current
 
   RecordingStudioApi::ApiRequestLog.where("request_id LIKE ?", "seed-log-%").delete_all
 
   seeded_api_clients.each_with_index do |seeded_client, client_index|
     api_client = seeded_client.fetch(:api_client)
     api_credential = seeded_client.fetch(:credential)
-    weekly_request_count = seeded_api_clients.length - client_index
+    baseline_weekly_request_count = seeded_api_clients.length - client_index
+    weekday_weights = [24, 27, 22, 19, 16, 9, 7]
 
     14.times do |week_index|
-      window_start = Time.current.beginning_of_day - ((13 - week_index) * 7).days - (client_index % 4).hours
+      week_seed = ((client_index + 1) * 10_000) + ((week_index + 1) * 97)
+      week_random = Random.new(week_seed)
+      week_start = (Date.current.beginning_of_week - (13 - week_index).weeks).beginning_of_day
+      variability = ((week_random.rand - 0.5) * (baseline_weekly_request_count * 0.5)).round
+      weekly_request_count = [baseline_weekly_request_count + variability, 1].max
 
       weekly_request_count.times do |request_index|
         request_number = request_index + 1
+        request_seed = (week_seed * 1000) + request_number
+        request_random = Random.new(request_seed)
+        day_offset = pick_weighted_index(request_random, weekday_weights)
+        occurred_at = week_start + day_offset.days + (7 + request_random.rand(13)).hours + request_random.rand(60).minutes + request_random.rand(60).seconds
+          occurred_at = now - request_random.rand(6.hours).seconds if occurred_at > now
+        method = request_random.rand < 0.7 ? "GET" : "POST"
+        path = if method == "GET"
+                 "/api/v1/recordings/#{client_index + request_number + day_offset}"
+               else
+                 ["/oauth/token", "/api/v1/search", "/api/v1/recordings"].sample(random: request_random)
+               end
+        status_roll = request_random.rand(100)
+        status_code = if status_roll < 72
+                        200
+                      elsif status_roll < 82
+                        201
+                      elsif status_roll < 88
+                        204
+                      elsif status_roll < 94
+                        401
+                      elsif status_roll < 98
+                        429
+                      else
+                        500
+                      end
         request_id = format(
           "seed-log-client-%02d-week-%02d-request-%02d",
           client_index + 1,
           week_index + 1,
           request_number
         )
-        occurred_at = window_start + ((request_number - 1) * 45).minutes
-        method = request_number.even? ? "GET" : "POST"
-        path = request_number.even? ? "/api/v1/recordings/#{client_index + request_number}" : "/oauth/token"
-        status_code = if request_number % 11 == 0
-                        429
-                      elsif request_number % 7 == 0
-                        401
-                      else
-                        200
-                      end
 
         RecordingStudioApi::ApiRequestLog.create!(
           occurred_at: occurred_at,
           request_id: request_id,
           request_method: method,
           request_path: path,
-          route_name: request_number.even? ? "recording" : "oauth_token",
-          controller_name: request_number.even? ? "recording_studio_api/api/recordings" : "recording_studio_api/oauth/tokens",
-          action_name: request_number.even? ? "show" : "create",
+          route_name: method == "GET" ? "recording" : "oauth_token",
+          controller_name: method == "GET" ? "recording_studio_api/api/recordings" : "recording_studio_api/oauth/tokens",
+          action_name: method == "GET" ? "show" : "create",
           status_code: status_code,
-          duration_ms: 80 + (client_index * 11) + (request_number * 7),
+          duration_ms: 75 + (client_index * 9) + request_random.rand(250),
           rate_limited: status_code == 429,
           api_client_id: api_client.id,
-          api_credential_id: api_credential.id,
+          api_credential_id: api_credential&.id,
           access_recording_id: admin_access_recording.id,
           root_recording_id: admin_root_recording.id,
-          remote_ip: "192.168.10.#{((client_index * 3) + request_number) % 200}",
-          user_agent: "#{api_client.name}/#{(week_index % 3) + 1}.0",
-          error_class: status_code == 401 ? "RecordingStudioApi::Unauthorized" : nil,
-          error_message: status_code == 401 ? "Seeded unauthorized response" : nil,
+          remote_ip: "192.168.10.#{((client_index * 5) + request_random.rand(220)) % 220}",
+          user_agent: "#{api_client.name}/#{request_random.rand(1..3)}.#{request_random.rand(0..9)}",
+          error_class: ([401, 429, 500].include?(status_code) ? "RecordingStudioApi::RequestFailure" : nil),
+          error_message: (status_code >= 400 ? "Seeded #{status_code} response" : nil),
           request_params: {
             sample: true,
             page: request_number,
@@ -338,6 +372,34 @@ seeded_api_clients = seeded_api_client_names.map.with_index do |name, index|
     )
   end
 end
+
+seeded_client_ids = seeded_api_clients.map { |entry| entry.fetch(:api_client).id }
+
+supplemental_seeded_api_clients = RecordingStudioApi::ApiClient
+  .where(access_recording_id: admin_access_recording.id)
+  .where.not(id: seeded_client_ids)
+  .order(created_at: :asc, id: :asc)
+  .map do |api_client|
+    {
+      api_client: api_client,
+      credential: api_client.credentials.order(created_at: :desc).detect(&:recording)
+    }
+  end
+
+seeded_api_clients.concat(supplemental_seeded_api_clients)
+
+service_name_variant_clients = RecordingStudioApi::ApiClient
+  .where("name ILIKE ?", "#{service_client_name}%")
+  .where.not(id: seeded_api_clients.map { |entry| entry.fetch(:api_client).id })
+  .order(created_at: :asc, id: :asc)
+  .map do |api_client|
+    {
+      api_client: api_client,
+      credential: api_client.credentials.order(created_at: :desc).detect(&:recording)
+    }
+  end
+
+seeded_api_clients.concat(service_name_variant_clients)
 
 puts "Seeded users: admin@admin.com (password: Password)"
 puts "Seeded admin root: #{admin_root.name}"

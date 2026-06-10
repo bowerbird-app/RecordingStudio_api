@@ -1,11 +1,56 @@
+<% status_badge = lambda do |row|
+     status_text = row.fetch(:status).to_s
+     status_code = Integer(status_text, exception: false)
+
+     style = case status_code
+             when 200..299 then :success
+             when 300..399 then :info
+             when 400..499 then :warning
+             when 500..599 then :primary
+             else :default
+             end
+
+     render FlatPack::Badge::Component.new(
+       text: status_text,
+       style: style,
+       size: :sm
+     )
+   end %>
+
+<% rate_limited_badge = lambda do |row|
+     is_rate_limited = row.fetch(:rate_limited) == "Yes"
+
+     if is_rate_limited
+       content_tag(:span, class: "inline-flex items-center text-red-600", title: "Rate limited", aria: { label: "Rate limited" }) do
+         render FlatPack::Shared::IconComponent.new(name: "x-circle", size: :md, variant: :outline)
+       end
+     else
+       ""
+     end
+   end %>
+
+<% occurred_with_tooltip = lambda do |row|
+     full_timestamp = row.fetch(:occurred_at_full)
+     relative_timestamp = row.fetch(:occurred_at_relative)
+
+     if full_timestamp == "-"
+       "-"
+     else
+       render FlatPack::Tooltip::Component.new(text: full_timestamp) do
+         content_tag(:span, relative_timestamp, class: "underline decoration-dotted underline-offset-2")
+       end
+     end
+   end %>
+
 <% if log_rows.any? %>
-  <%= render FlatPack::Table::Component.new(data: log_rows) do |table| %>
-    <% table.column(title: "Occurred", html: ->(row) { row.fetch(:occurred_at) }) %>
-    <% table.column(title: "Method", html: ->(row) { row.fetch(:method) }) %>
-    <% table.column(title: "Path", html: ->(row) { row.fetch(:path) }) %>
-    <% table.column(title: "Status", html: ->(row) { row.fetch(:status) }) %>
-    <% table.column(title: "Duration", html: ->(row) { row.fetch(:duration) }) %>
-    <% table.column(title: "Request ID", html: ->(row) { row.fetch(:request_id) }) %>
+  <%= render FlatPack::Table::Component.new(data: log_rows, sort: sort, direction: direction, base_url: table_base_url) do |table| %>
+    <% table.column(title: "Occurred", sortable: true, sort_key: :occurred_at, html: occurred_with_tooltip) %>
+    <% table.column(title: "Method", sortable: true, sort_key: :request_method, html: ->(row) { row.fetch(:method) }) %>
+    <% table.column(title: "Path", sortable: true, sort_key: :request_path, html: ->(row) { row.fetch(:path) }) %>
+    <% table.column(title: "Status", sortable: true, sort_key: :status_code, html: status_badge) %>
+    <% table.column(title: "Rate limited", html: rate_limited_badge) %>
+    <% table.column(title: "IP address", sortable: true, sort_key: :remote_ip, html: ->(row) { row.fetch(:ip_address) }) %>
+    <% table.column(title: "Duration", sortable: true, sort_key: :duration_ms, html: ->(row) { row.fetch(:duration) }) %>
   <% end %>
 <% else %>
   <%= render FlatPack::EmptyState::Component.new(

@@ -197,6 +197,7 @@ class RecordingStudioApiTest < Minitest::Test
     assert_includes routes_source, 'mount RecordingStudioAccessible::Engine, at: "/recording_studio_accessible"'
     assert_includes routes_source, 'mount RecordingStudioRootSwitchable::Engine, at: "/recording_studio_root_switchable"'
     assert_includes routes_source, 'get "/admin/api", to: "recording_studio_api/admin_dashboards#show", as: :admin_api'
+    assert_includes routes_source, 'get "/admin/api/requests", to: "recording_studio_api/admin_requests#index", as: :admin_api_requests'
     assert_not_includes routes_source, 'mount RecordingStudioAdmin::Engine, at: "/admin"'
   end
 
@@ -225,14 +226,18 @@ class RecordingStudioApiTest < Minitest::Test
 
     assert_includes initializer_source, 'config.admin_layout_name = "flat_pack_sidebar"'
     assert_includes initializer_source, "config.admin_dashboard_path_resolver"
+    assert_includes initializer_source, "config.admin_requests_path_resolver"
     assert_includes initializer_source, "controller.main_app.admin_api_path"
+    assert_includes initializer_source, "controller.main_app.admin_api_requests_path"
   end
 
   def test_engine_ships_admin_api_dashboard_view_and_model
     dashboard_view = File.expand_path("../app/views/recording_studio_api/admin_dashboards/show.html.erb", __dir__)
+    admin_requests_view = File.expand_path("../app/views/recording_studio_api/admin_requests/index.html.erb", __dir__)
     model_path = File.expand_path("../app/models/recording_studio_api/admin_api.rb", __dir__)
 
     assert File.exist?(dashboard_view)
+    assert File.exist?(admin_requests_view)
     assert File.exist?(model_path)
   end
 

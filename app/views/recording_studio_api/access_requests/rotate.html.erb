@@ -1,0 +1,38 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <%= render FlatPack::PageNav::Component.new(
+    anchor_url: page_nav_close_url
+  ) %>
+
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "API key rotated",
+    subtitle: "The previous credential was revoked and a new client secret was issued.",
+    variant: :h1
+  ) %>
+
+  <div class="space-y-6">
+    <div class="space-y-3">
+      <%= render FlatPack::SectionTitle::Component.new(
+        title: "New client secret",
+        subtitle: "This token is only shown once. Update any integrations that still use the revoked key."
+      ) %>
+      <pre class="overflow-x-auto rounded-md border border-(--surface-border-color) bg-(--surface-background-color) p-4 text-sm text-(--surface-content-color)"><%= @payload.fetch(:token) %></pre>
+    </div>
+
+    <div class="space-y-3">
+      <%= render FlatPack::SectionTitle::Component.new(
+        title: "New API key",
+        subtitle: "This is the public client identifier for the replacement credential."
+      ) %>
+      <pre class="overflow-x-auto rounded-md border border-(--surface-border-color) bg-(--surface-background-color) p-4 text-sm text-(--surface-content-color)"><%= @payload.fetch(:credential).oauth_client_id %></pre>
+    </div>
+  </div>
+
+  <div class="flex flex-wrap gap-3">
+    <%= render FlatPack::Button::Component.new(
+      text: "Finish",
+      style: :primary,
+      size: :md,
+      url: api_client_path(@payload.fetch(:api_client), page_nav_close_param)
+    ) %>
+  </div>
+</div>

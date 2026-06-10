@@ -21,6 +21,9 @@ module RecordingStudioApi
                   :access_management_view_role,
                   :access_management_edit_role,
                   :admin_dashboard_path_resolver,
+                  :admin_settings_path_resolver,
+                  :admin_rate_limiting_path_resolver,
+                  :admin_requests_path_resolver,
                   :admin_logs_path_resolver,
                   :admin_layout_name,
                   :openapi_title,
@@ -55,6 +58,15 @@ module RecordingStudioApi
       @access_management_edit_role = :admin
       @admin_dashboard_path_resolver = lambda do |controller:, **|
         controller.recording_studio_api.admin_dashboard_path
+      end
+      @admin_settings_path_resolver = lambda do |controller:, **params|
+        controller.recording_studio_api.admin_settings_path(params)
+      end
+      @admin_rate_limiting_path_resolver = lambda do |controller:, **params|
+        controller.recording_studio_api.admin_rate_limiting_path(params)
+      end
+      @admin_requests_path_resolver = lambda do |controller:, **params|
+        controller.recording_studio_api.admin_requests_path(params)
       end
       @admin_logs_path_resolver = lambda do |controller:, **params|
         controller.recording_studio_api.admin_logs_path(params)
@@ -96,6 +108,9 @@ module RecordingStudioApi
         token_ttl: token_ttl,
         token_authenticators_count: token_authenticators.count,
         admin_dashboard_path_resolver: admin_dashboard_path_resolver.respond_to?(:call),
+        admin_settings_path_resolver: admin_settings_path_resolver.respond_to?(:call),
+        admin_rate_limiting_path_resolver: admin_rate_limiting_path_resolver.respond_to?(:call),
+        admin_requests_path_resolver: admin_requests_path_resolver.respond_to?(:call),
         admin_logs_path_resolver: admin_logs_path_resolver.respond_to?(:call),
         admin_layout_name: admin_layout_name,
         api_versions: api_versions,

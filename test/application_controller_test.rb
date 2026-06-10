@@ -9,12 +9,14 @@ class RecordingStudioApiApplicationControllerTest < Minitest::Test
     @original_layout_name = RecordingStudioApi.configuration.layout_name
     @original_admin_layout_name = RecordingStudioApi.configuration.admin_layout_name
     @original_admin_dashboard_path_resolver = RecordingStudioApi.configuration.admin_dashboard_path_resolver
+    @original_admin_requests_path_resolver = RecordingStudioApi.configuration.admin_requests_path_resolver
   end
 
   def teardown
     RecordingStudioApi.configuration.layout_name = @original_layout_name
     RecordingStudioApi.configuration.admin_layout_name = @original_admin_layout_name
     RecordingStudioApi.configuration.admin_dashboard_path_resolver = @original_admin_dashboard_path_resolver
+    RecordingStudioApi.configuration.admin_requests_path_resolver = @original_admin_requests_path_resolver
   end
 
   def test_layout_uses_configured_layout_name
@@ -58,5 +60,14 @@ class RecordingStudioApiApplicationControllerTest < Minitest::Test
     RecordingStudioApi.configuration.admin_dashboard_path_resolver = ->(controller:, **) { controller.main_app.admin_api_path }
 
     assert_equal "/admin/api", RecordingStudioApi.admin_dashboard_path(controller: controller)
+  end
+
+  def test_admin_requests_path_uses_configured_resolver
+    main_app = Struct.new(:admin_api_requests_path).new("/admin/api/requests")
+    controller = Struct.new(:main_app, :recording_studio_api).new(main_app, nil)
+
+    RecordingStudioApi.configuration.admin_requests_path_resolver = ->(controller:, **) { controller.main_app.admin_api_requests_path }
+
+    assert_equal "/admin/api/requests", RecordingStudioApi.admin_requests_path(controller: controller)
   end
 end

@@ -25,6 +25,7 @@ require "recording_studio_api/access_management_policy"
 require "recording_studio_api/services/example_service"
 require "recording_studio_api/services/provision_api_client"
 require "recording_studio_api/services/provision_access_request"
+require "recording_studio_api/services/rotate_api_credential"
 require "recording_studio_api/services/authenticate_bearer_token"
 require "recording_studio_api/services/issue_oauth_access_token"
 require "recording_studio_api/services/authenticate_oauth_access_token"
@@ -169,6 +170,39 @@ module RecordingStudioApi
       end
 
       controller.recording_studio_api.admin_dashboard_path
+    end
+
+    def admin_settings_path(controller:, **params)
+      resolver = configuration.admin_settings_path_resolver
+
+      if resolver.respond_to?(:call)
+        path = resolver.call(controller: controller, **params)
+        return path if path.present?
+      end
+
+      controller.recording_studio_api.admin_settings_path(params)
+    end
+
+    def admin_rate_limiting_path(controller:, **params)
+      resolver = configuration.admin_rate_limiting_path_resolver
+
+      if resolver.respond_to?(:call)
+        path = resolver.call(controller: controller, **params)
+        return path if path.present?
+      end
+
+      controller.recording_studio_api.admin_rate_limiting_path(params)
+    end
+
+    def admin_requests_path(controller:, **params)
+      resolver = configuration.admin_requests_path_resolver
+
+      if resolver.respond_to?(:call)
+        path = resolver.call(controller: controller, **params)
+        return path if path.present?
+      end
+
+      controller.recording_studio_api.admin_requests_path(params)
     end
 
     def admin_logs_path(controller:, **params)

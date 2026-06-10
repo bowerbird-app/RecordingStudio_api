@@ -4,9 +4,17 @@ RecordingStudioApi.configure do |config|
   # Configure timeout, token_ttl, hooks, and action registration here.
 
   config.admin_layout_name = "flat_pack_sidebar"
+  config.rate_limit_api_pre_auth_enabled = true
+  config.rate_limit_api_enabled = true
+  config.rate_limit_redis_url = ENV.fetch("RECORDING_STUDIO_API_RATE_LIMIT_REDIS_URL", "redis://127.0.0.1:6379/0")
+  config.api_request_logging_enabled = true
 
   config.admin_dashboard_path_resolver = lambda do |controller:, **|
     controller.main_app.admin_api_path
+  end
+
+  config.admin_requests_path_resolver = lambda do |controller:, **params|
+    controller.main_app.admin_api_requests_path(params)
   end
 
   config.admin_logs_path_resolver = lambda do |controller:, **params|

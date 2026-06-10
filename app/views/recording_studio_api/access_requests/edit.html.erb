@@ -9,6 +9,30 @@
     variant: :h1
   ) %>
 
+  <% if @latest_credential&.revoked_at.nil? %>
+    <div class="flex flex-wrap gap-3">
+      <%= render FlatPack::Tooltip::Component.new(text: "Create a new secret and api key") do %>
+        <%= render FlatPack::Button::Component.new(
+          text: "Rotate key",
+          style: :warning,
+          size: :md,
+          url: rotate_api_client_path(@api_client, page_nav_close_param),
+          data: { turbo_method: :post, turbo_confirm: "Rotate this API key? This will revoke the current key." }
+        ) %>
+      <% end %>
+      <%= render FlatPack::Tooltip::Component.new(text: "Revoke this API key") do %>
+        <%= render FlatPack::Button::Component.new(
+          text: "Revoke",
+          style: :warning,
+          size: :md,
+          url: revoke_api_client_path(@api_client, page_nav_close_param),
+          data: { turbo_method: :post, turbo_confirm: "Revoke this API key?" }
+        ) %>
+      <% end %>
+    </div>
+    <hr class="border-(--surface-border-color)">
+  <% end %>
+
   <% if @errors.any? %>
     <%= render FlatPack::Card::Component.new(style: :default) do %>
       <div class="space-y-2">

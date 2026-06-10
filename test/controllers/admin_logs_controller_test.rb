@@ -43,7 +43,9 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
         request_method: index.even? ? "GET" : "POST",
         request_path: "/recordings/#{index}",
         status_code: 200 + (index % 2),
-        duration_ms: 100 + index
+        duration_ms: 100 + index,
+        rate_limited: index.zero?,
+        remote_ip: "10.0.0.#{index + 1}"
       )
     end
   end
@@ -61,28 +63,49 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "API logs"
     assert_includes response.body, "Request log entries recorded by the API logging database."
     assert_includes response.body, "Occurred"
-    assert_includes response.body, "Request ID"
-    assert_includes response.body, "req-0"
-    assert_includes response.body, "admin_api_logs_content"
+    assert_includes response.body, "Rate limited"
+    assert_includes response.body, "IP address"
+    assert_includes response.body, "10.0.0.1"
+    assert_includes response.body, 'aria-label="Rate limited"'
+    assert_includes response.body, "sortable_table"
     assert_includes response.body, 'data-controller="auto-load"'
     assert_includes response.body, "Loading more logs..."
     assert_includes response.body, "page=2"
+    assert_includes response.body, "sort=request_method"
+    assert_includes response.body, 'data-turbo-frame="sortable_table"'
   end
 
   test "frame request replaces the logs content with additional rows" do
-    get admin_api_logs_path(page: 2), headers: { "Turbo-Frame" => "admin_api_logs_content" }
+    get admin_api_logs_path(page: 2), headers: { "Turbo-Frame" => "sortable_table" }
 
     assert_response :success
     assert_equal Mime[:html].to_s, response.media_type
-    assert_includes response.body, '<turbo-frame id="admin_api_logs_content">'
-    assert_includes response.body, "req-29"
+    assert_includes response.body, '<turbo-frame id="sortable_table">'
+    assert_includes response.body, "10.0.0.30"
+  end
+
+  test "supports sortable headers and applies sorting to loaded rows" do
+    get admin_api_logs_path(sort: "duration_ms", direction: "desc")
+
+    assert_response :success
+    assert_includes response.body, "sort=duration_ms"
+    assert_includes response.body, "direction=asc"
+    assert_includes response.body, "page=2"
+    assert_includes response.body, "direction=desc"
+
+    first_row_position = response.body.index("10.0.0.30")
+    last_row_position = response.body.index("10.0.0.6")
+
+    refute_nil first_row_position
+    refute_nil last_row_position
+    assert_operator first_row_position, :<, last_row_position
   end
 
   test "turbo stream requests redirect back to html logs page" do
     get admin_api_logs_path(format: :turbo_stream), params: { page: 2 }
 
     assert_response :see_other
-    assert_redirected_to admin_api_logs_path(page: 2)
+    assert_redirected_to admin_api_logs_path(page: 2, sort: "occurred_at", direction: "desc")
   end
 
   test "switching to a workspace root falls back to the host root when the logs path is requested" do

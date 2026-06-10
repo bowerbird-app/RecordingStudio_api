@@ -2,12 +2,16 @@
 
 RecordingStudioApi::Engine.routes.draw do
   get "/admin_api", to: "admin_dashboards#show", as: :admin_dashboard
+  get "/admin_api/settings", to: "admin_settings#show", as: :admin_settings
+  get "/admin_api/rate_limiting", to: "admin_rate_limitings#show", as: :admin_rate_limiting
+  get "/admin_api/requests", to: "admin_requests#index", as: :admin_requests
   get "/admin_api/logs", to: "admin_logs#index", as: :admin_logs
 
   resources :api_clients, controller: "access_requests", only: %i[index show new create edit update] do
     get :requests_chart, on: :collection
     get :log, on: :member
     post :revoke, on: :member
+    post :rotate, on: :member
 
     resources :api_access_tokens, path: "tokens", only: :index do
       post :revoke, on: :member

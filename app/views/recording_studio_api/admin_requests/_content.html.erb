@@ -1,0 +1,60 @@
+<turbo-frame id="admin-api-requests-chart-frame">
+  <%= form_with(
+    url: RecordingStudioApi.admin_requests_path(controller: self, **admin_requests_filter_form_params),
+    method: :get,
+    class: "mb-4",
+    data: {
+      turbo_frame: "admin-api-requests-chart-frame",
+      controller: "flat-pack--auto-submit",
+      action: "change->flat-pack--auto-submit#queueSubmit",
+      flat_pack__auto_submit_delay_value: 250
+    }
+  ) do %>
+    <div class="mb-4 flex flex-wrap items-end gap-3">
+      <%= render FlatPack::Chart::DefaultFilterComponent.new(
+        start_date_value: @requests_chart_start_date,
+        end_date_value: @requests_chart_end_date,
+        status: @requests_chart_status,
+        status_lists: [["All statuses", ""]] + @requests_chart_status_lists,
+        status_placeholder: nil
+      ) %>
+    </div>
+  <% end %>
+
+  <%= render FlatPack::Card::Component.new(style: :default) do %>
+    <div class="requests-chart-gridlines">
+      <%= render FlatPack::Chart::Component.new(
+        card: false,
+        type: :line,
+        height: 620,
+        series: [
+          { name: "API requests", data: @requests_chart_series }
+        ],
+        options: {
+          stroke: {
+            curve: "smooth",
+            width: 3
+          },
+          xaxis: {
+            categories: @requests_chart_categories,
+            axisBorder: {
+              show: true,
+              color: "var(--surface-border-color)",
+              height: 1
+            },
+            axisTicks: {
+              show: false
+            }
+          },
+          yaxis: {
+            min: 0,
+            forceNiceScale: true
+          },
+          dataLabels: {
+            enabled: false
+          }
+        }
+      ) %>
+    </div>
+  <% end %>
+</turbo-frame>

@@ -5,7 +5,21 @@
     variant: :h1
   ) %>
 
-  <div>
+  <div class="flex flex-wrap items-center gap-3">
+    <%= render FlatPack::Button::Component.new(
+      text: "Settings",
+      style: :default,
+      size: :md,
+      url: RecordingStudioApi.admin_settings_path(controller: self, close_url: request.fullpath)
+    ) %>
+
+    <%= render FlatPack::Button::Component.new(
+      text: "Rate limiting",
+      style: :default,
+      size: :md,
+      url: RecordingStudioApi.admin_rate_limiting_path(controller: self, close_url: request.fullpath)
+    ) %>
+
     <%= render FlatPack::Button::Component.new(
       text: "Logs",
       style: :default,
@@ -14,91 +28,140 @@
     ) %>
   </div>
 
-  <% chart_points = @log_chart_points || [] %>
-  <% max_count = [chart_points.map { |point| point[:count] }.max.to_i, 1].max %>
-  <% x_step = chart_points.length > 1 ? 100.0 / (chart_points.length - 1) : 100.0 %>
-  <% chart_path = chart_points.each_with_index.map do |point, index| %>
-    <% x = index * x_step %>
-    <% y = 100.0 - ((point[:count].to_f / max_count) * 100.0) %>
-    <% "#{index.zero? ? 'M' : 'L'} #{x.round(2)} #{y.round(2)}" %>
-  <% end.join(' ') %>
-  <% chart_area = if chart_path.present? %>
-    <% "#{chart_path} L 100 100 L 0 100 Z" %>
-  <% end %>
-  <% peak_hour = @log_peak_hour %>
-
-  <%= render FlatPack::Grid::Component.new(cols: 3, class: "items-start gap-6") do %>
+  <%= render FlatPack::Grid::Component.new(cols: 2, class: "items-start gap-6") do %>
     <%= render FlatPack::Card::Component.new(style: :default, class: "h-full") do %>
       <div class="flex h-full flex-col gap-4">
-        <div>
+        <div class="flex items-start justify-between gap-4">
           <%= render FlatPack::SectionTitle::Component.new(
-            title: "API logs over time",
-            subtitle: "Hourly request volume across the last 24 hours."
+            title: "Last 24 hours",
+            subtitle: "API requests",
+            class: "my-0"
           ) %>
-        </div>
 
-        <div class="rounded-xl bg-(--surface-subtle-color) p-4">
-          <svg viewBox="0 0 100 100" class="h-48 w-full" role="img" aria-labelledby="api-log-chart-title api-log-chart-desc" preserveAspectRatio="none">
-            <title id="api-log-chart-title">API log volume over the last 24 hours</title>
-            <desc id="api-log-chart-desc">Hourly counts of API request logs from the last 24 hours.</desc>
-            <line x1="0" y1="100" x2="100" y2="100" stroke="var(--surface-border-color)" stroke-width="1" />
-            <line x1="0" y1="0" x2="0" y2="100" stroke="var(--surface-border-color)" stroke-width="1" />
-            <% if chart_area.present? %>
-              <path d="<%= chart_area %>" fill="color-mix(in srgb, var(--brand-color) 18%, transparent)" />
-              <path d="<%= chart_path %>" fill="none" stroke="var(--brand-color)" stroke-width="2" vector-effect="non-scaling-stroke" />
-            <% end %>
-          </svg>
-
-          <div class="mt-3 flex items-center justify-between text-xs text-(--surface-muted-content-color)">
-            <span><%= chart_points.first&.dig(:label) || "24h ago" %></span>
-            <span>Now</span>
-          </div>
-        </div>
-      </div>
-    <% end %>
-
-    <%= render FlatPack::Card::Component.new(style: :default, class: "h-full") do %>
-      <div class="flex h-full flex-col gap-4">
-        <%= render FlatPack::SectionTitle::Component.new(
-          title: "Last 24 hours",
-          subtitle: "At-a-glance API activity from the request log."
-        ) %>
-
-        <dl class="grid gap-4">
-          <div>
-            <dt class="text-sm text-(--surface-muted-content-color)">Total requests</dt>
-            <dd class="text-3xl font-semibold text-(--surface-content-color)"><%= @log_volume_last_24_hours %></dd>
-          </div>
-          <div>
-            <dt class="text-sm text-(--surface-muted-content-color)">Peak hour</dt>
-            <dd class="text-lg font-medium text-(--surface-content-color)">
-              <%= peak_hour.present? ? "#{peak_hour[:label]} (#{peak_hour[:count]})" : "No log data" %>
-            </dd>
-          </div>
-        </dl>
-      </div>
-    <% end %>
-
-    <%= render FlatPack::Card::Component.new(style: :default, class: "h-full") do %>
-      <div class="flex h-full flex-col gap-4">
-        <%= render FlatPack::SectionTitle::Component.new(
-          title: "Monitoring",
-          subtitle: "Use the log index for detailed request inspection."
-        ) %>
-
-        <p class="text-sm leading-6 text-(--surface-muted-content-color)">
-          The dashboard groups request logs by hour so you can spot traffic changes quickly before drilling into individual entries.
-        </p>
-
-        <div>
           <%= render FlatPack::Button::Component.new(
-            text: "Open full log view",
+            text: "Full screen",
             style: :default,
-            size: :md,
-            url: RecordingStudioApi.admin_logs_path(controller: self, close_url: request.fullpath)
+            size: :sm,
+            url: @last_24_hours_requests_path
           ) %>
         </div>
+
+        <%= render FlatPack::Chart::Component.new(
+          card: false,
+          type: :line,
+          height: 260,
+          series: [
+            { name: "API requests", data: @log_chart_series }
+          ],
+          options: {
+            stroke: {
+              curve: "smooth",
+              width: 3
+            },
+            xaxis: {
+              categories: @log_chart_categories,
+              labels: {
+                rotate: 0,
+                hideOverlappingLabels: true
+              }
+            },
+            yaxis: {
+              min: 0,
+              forceNiceScale: true
+            },
+            dataLabels: {
+              enabled: false
+            }
+          }
+        ) %>
       </div>
     <% end %>
+
+    <%= render FlatPack::Card::Component.new(style: :default, class: "h-full") do %>
+      <div class="flex h-full flex-col gap-4">
+        <div class="flex items-start justify-between gap-4">
+          <%= render FlatPack::SectionTitle::Component.new(
+            title: "Last 30 days",
+            subtitle: "API requests",
+            class: "my-0"
+          ) %>
+
+          <%= render FlatPack::Button::Component.new(
+            text: "Full screen",
+            style: :default,
+            size: :sm,
+            url: @last_30_days_requests_path
+          ) %>
+        </div>
+
+        <%= render FlatPack::Chart::Component.new(
+          card: false,
+          type: :line,
+          height: 260,
+          series: [
+            { name: "API requests", data: @log_chart_series_last_30_days }
+          ],
+          options: {
+            stroke: {
+              curve: "smooth",
+              width: 3
+            },
+            xaxis: {
+              categories: @log_chart_categories_last_30_days,
+              labels: {
+                rotate: 0,
+                hideOverlappingLabels: true
+              }
+            },
+            yaxis: {
+              min: 0,
+              forceNiceScale: true
+            },
+            dataLabels: {
+              enabled: false
+            }
+          }
+        ) %>
+      </div>
+    <% end %>
+  <% end %>
+
+  <%= render FlatPack::Card::Component.new(style: :default, class: "h-full") do %>
+    <div class="flex h-full flex-col gap-4">
+      <%= render FlatPack::SectionTitle::Component.new(
+        title: "Rate limiting (last 30 days)",
+        subtitle: "Rate-limited requests per day",
+        class: "my-0"
+      ) %>
+
+      <%= render FlatPack::Chart::Component.new(
+        card: false,
+        type: :line,
+        height: 260,
+        series: [
+          { name: "Rate-limited requests", data: @rate_limited_chart_series_last_30_days }
+        ],
+        options: {
+          stroke: {
+            curve: "smooth",
+            width: 3
+          },
+          xaxis: {
+            categories: @rate_limited_chart_categories_last_30_days,
+            labels: {
+              rotate: 0,
+              hideOverlappingLabels: true
+            }
+          },
+          yaxis: {
+            min: 0,
+            forceNiceScale: true
+          },
+          dataLabels: {
+            enabled: false
+          }
+        }
+      ) %>
+    </div>
   <% end %>
 </div>

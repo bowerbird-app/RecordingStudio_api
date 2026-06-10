@@ -16,8 +16,20 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
 
   setup do
     @original_admin_dashboard_path_resolver = RecordingStudioApi.configuration.admin_dashboard_path_resolver
+    @original_admin_settings_path_resolver = RecordingStudioApi.configuration.admin_settings_path_resolver
+    @original_admin_rate_limiting_path_resolver = RecordingStudioApi.configuration.admin_rate_limiting_path_resolver
+    @original_admin_requests_path_resolver = RecordingStudioApi.configuration.admin_requests_path_resolver
     @original_admin_logs_path_resolver = RecordingStudioApi.configuration.admin_logs_path_resolver
     RecordingStudioApi.configuration.admin_dashboard_path_resolver = ->(controller:, **) { controller.main_app.admin_api_path }
+    RecordingStudioApi.configuration.admin_settings_path_resolver = lambda do |controller:, **params|
+      controller.main_app.admin_api_settings_path(params)
+    end
+    RecordingStudioApi.configuration.admin_rate_limiting_path_resolver = lambda do |controller:, **params|
+      controller.main_app.admin_api_rate_limiting_path(params)
+    end
+    RecordingStudioApi.configuration.admin_requests_path_resolver = lambda do |controller:, **params|
+      controller.main_app.admin_api_requests_path(params)
+    end
     RecordingStudioApi.configuration.admin_logs_path_resolver = lambda do |controller:, **params|
       controller.main_app.admin_api_logs_path(params)
     end
@@ -50,10 +62,65 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
         )
       end
     end
+
+    [3, 5].each_with_index do |count, index|
+      day_offset = index.zero? ? 2 : 15
+
+      count.times do |occurrence|
+        RecordingStudioApi::ApiRequestLog.create!(
+          occurred_at: Time.current.beginning_of_day - day_offset.days + occurrence.hours,
+          request_id: "dash-day-#{index}-#{occurrence}",
+          request_method: "GET",
+          request_path: "/admin/api",
+          status_code: 200,
+          duration_ms: 50
+        )
+      end
+    end
+
+    4.times do |occurrence|
+      RecordingStudioApi::ApiRequestLog.create!(
+        occurred_at: Time.current.beginning_of_day - 35.days + occurrence.hours,
+        request_id: "dash-outside-#{occurrence}",
+        request_method: "GET",
+        request_path: "/admin/api",
+        status_code: 200,
+        duration_ms: 50
+      )
+    end
+
+    [2, 1].each_with_index do |count, index|
+      day_offset = index.zero? ? 1 : 10
+
+      count.times do |occurrence|
+        RecordingStudioApi::ApiRequestLog.create!(
+          occurred_at: Time.current.beginning_of_day - day_offset.days + occurrence.hours,
+          request_id: "dash-rate-limited-#{index}-#{occurrence}",
+          request_method: "GET",
+          request_path: "/admin/api",
+          status_code: 429,
+          duration_ms: 50,
+          rate_limited: true
+        )
+      end
+    end
+
+    RecordingStudioApi::ApiRequestLog.create!(
+      occurred_at: Time.current.beginning_of_day - 45.days,
+      request_id: "dash-rate-limited-outside",
+      request_method: "GET",
+      request_path: "/admin/api",
+      status_code: 429,
+      duration_ms: 50,
+      rate_limited: true
+    )
   end
 
   teardown do
     RecordingStudioApi.configuration.admin_dashboard_path_resolver = @original_admin_dashboard_path_resolver
+    RecordingStudioApi.configuration.admin_settings_path_resolver = @original_admin_settings_path_resolver
+    RecordingStudioApi.configuration.admin_rate_limiting_path_resolver = @original_admin_rate_limiting_path_resolver
+    RecordingStudioApi.configuration.admin_requests_path_resolver = @original_admin_requests_path_resolver
     RecordingStudioApi.configuration.admin_logs_path_resolver = @original_admin_logs_path_resolver
   end
 
@@ -63,17 +130,51 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "Admin API"
     assert_includes response.body, "Gem-provided starting point for admin API tooling under the current admin root."
+    assert_includes response.body, "Settings"
+    assert_includes response.body, "Rate limiting"
     assert_includes response.body, "Logs"
+    assert_includes response.body, admin_api_settings_path
+    assert_includes response.body, admin_api_rate_limiting_path
     assert_includes response.body, admin_api_logs_path
-    assert_includes response.body, "API logs over time"
-    assert_includes response.body, "Hourly request volume across the last 24 hours."
+    assert_includes response.body, admin_api_requests_path
     assert_includes response.body, "Last 24 hours"
-    assert_includes response.body, "Open full log view"
-    assert_includes response.body, "API log volume over the last 24 hours"
+    assert_includes response.body, "Last 30 days"
+    assert_includes response.body, "Rate limiting (last 30 days)"
+    assert_includes response.body, "Rate-limited requests per day"
+    assert_includes response.body, "Rate-limited requests"
+    assert_includes response.body, "Full screen"
+    assert_includes response.body, "flat-pack--chart"
+    assert_not_includes response.body, "Peak hour"
+    assert_select %(a[href="#{admin_api_settings_path(close_url: admin_api_path)}"]), text: "Settings", count: 1
+    assert_select %(a[href="#{admin_api_rate_limiting_path(close_url: admin_api_path)}"]), text: "Rate limiting", count: 1
     assert_select %(a[href="#{admin_api_logs_path(close_url: admin_api_path)}"]), text: "Logs", count: 1
-    assert_select %(a[href="#{admin_api_logs_path(close_url: admin_api_path)}"]), text: "Open full log view", count: 1
+    assert_select %(a[href="#{admin_api_requests_path(close_url: admin_api_path, start_date: 1.day.ago.to_date.iso8601, end_date: Date.current.iso8601)}"]), text: "Full screen", count: 1
+    assert_select %(a[href="#{admin_api_requests_path(close_url: admin_api_path, start_date: 29.days.ago.to_date.iso8601, end_date: Date.current.iso8601)}"]), text: "Full screen", count: 1
     assert_not_includes response.body, "Admin API views start here"
     assert_not_includes response.body, "Section key"
+  end
+
+  test "renders the dedicated admin api requests page with filters" do
+    get "/admin/api/requests"
+
+    assert_response :success
+    assert_includes response.body, "Admin API requests"
+    assert_includes response.body, "Filter and inspect admin API request volume."
+    assert_includes response.body, "admin-api-requests-chart-frame"
+    assert_includes response.body, "flat-pack--auto-submit"
+    assert_includes response.body, "All statuses"
+    assert_includes response.body, "Success (2xx)"
+    assert_includes response.body, "Client errors (4xx)"
+    assert_includes response.body, "Server errors (5xx)"
+    assert_select %(a[href="#{admin_api_path}"]), minimum: 1
+  end
+
+  test "frame request updates only the dedicated admin requests chart frame" do
+    get admin_api_requests_path(status: "server_error"), headers: { "Turbo-Frame" => "admin-api-requests-chart-frame" }
+
+    assert_response :success
+    assert_equal Mime[:html].to_s, response.media_type
+    assert_includes response.body, '<turbo-frame id="admin-api-requests-chart-frame">'
   end
 
   test "creates the admin api section when it is missing for the current admin root" do
@@ -97,6 +198,33 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
     assert_not_nil created_recording
     assert_equal @admin_root_recording.id, created_recording.root_recording_id
     assert_equal "api", created_recording.recordable.key
+  end
+
+  test "renders the admin api settings page from the configured host route" do
+    get "/admin/api/settings"
+
+    assert_response :success
+    assert_includes response.body, "Admin API settings"
+    assert_includes response.body, "Read-only view of the current API configuration loaded for this environment."
+    assert_includes response.body, "Current configuration"
+    assert_includes response.body, "API versions"
+    assert_includes response.body, "Default API version"
+    assert_not_includes response.body, "Rate limit API enabled"
+    assert_includes response.body, "API request logging enabled"
+    assert_select %(a[href="#{admin_api_path}"]), minimum: 1
+  end
+
+  test "renders the admin api rate limiting page from the configured host route" do
+    get "/admin/api/rate-limiting"
+
+    assert_response :success
+    assert_includes response.body, "Rate limiting"
+    assert_includes response.body, "Read-only view of the current rate-limiting configuration."
+    assert_includes response.body, "Rate limit OAuth enabled"
+    assert_includes response.body, "Rate limit API pre-auth enabled"
+    assert_includes response.body, "Rate limit API enabled"
+    assert_includes response.body, "Rate limit Redis namespace"
+    assert_select %(a[href="#{admin_api_path}"]), minimum: 1
   end
 
   test "switching to a workspace root falls back to the host root when the admin dashboard path is requested" do

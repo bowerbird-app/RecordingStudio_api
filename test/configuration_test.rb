@@ -40,6 +40,7 @@ class ConfigurationTest < Minitest::Test
     assert_equal :view, configuration.access_management_view_role
     assert_equal :admin, configuration.access_management_edit_role
     assert_respond_to configuration.admin_dashboard_path_resolver, :call
+    assert_respond_to configuration.admin_requests_path_resolver, :call
     assert_respond_to configuration.admin_logs_path_resolver, :call
     assert_nil configuration.admin_layout_name
     assert_equal ["v1"], configuration.api_versions
@@ -178,6 +179,14 @@ class ConfigurationTest < Minitest::Test
     @configuration.merge!(admin_logs_path_resolver: resolver)
 
     assert_equal resolver, @configuration.admin_logs_path_resolver
+  end
+
+  def test_merge_updates_admin_requests_path_resolver
+    resolver = ->(controller:, **) { controller.main_app.admin_api_requests_path }
+
+    @configuration.merge!(admin_requests_path_resolver: resolver)
+
+    assert_equal resolver, @configuration.admin_requests_path_resolver
   end
 
   def test_to_h_reports_registered_hook_counts

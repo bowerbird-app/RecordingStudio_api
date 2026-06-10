@@ -104,14 +104,14 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select %(nav.flat-pack-page-nav a[href="/workspace"][aria-label="Close"]), count: 1
     assert_includes response.body, "API keys"
-    assert_includes response.body, "Total API keys"
-    assert_match(/Total API keys.{0,300}>\s*2\s*</m, response.body)
+    assert_not_includes response.body, "Most used keys"
+    assert_not_includes response.body, "Total API keys"
     assert_includes response.body, "API access below Workspace: UI Workspace."
     assert_includes response.body, "Name"
     assert_includes response.body, "API key"
     assert_includes response.body, "Access point"
     assert_includes response.body, "Expires"
-    assert_not_includes response.body, "Root"
+    assert_select "th", text: "Root", count: 0
     assert_not_includes response.body, "Access recording"
     assert_not_includes response.body, "Details"
     assert_includes response.body, direct_api_client.name
@@ -131,6 +131,16 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_select "span.underline.decoration-dotted.underline-offset-2", minimum: 1
   end
 
+  test "index hides request charts when there are no api keys yet" do
+    get "/recording_studio_api/api_clients", params: { root_recording_id: @workspace_root_recording.id, close_url: "/workspace" }
+
+    assert_response :success
+    assert_not_includes response.body, "Most used keys"
+    assert_not_includes response.body, "Full screen"
+    assert_not_includes response.body, "API requests"
+    assert_not_includes response.body, "Total API keys"
+  end
+
   test "requests chart page renders full-screen chart and links back to api clients" do
     get "/recording_studio_api/api_clients/requests_chart", params: {
       root_recording_id: @workspace_root_recording.id,
@@ -139,21 +149,37 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_includes response.body, "API requests"
-    assert_includes response.body, "Last 7 days"
-    assert_match(/\[\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\]/, response.body)
+    assert_match(/\[(\s*0\s*,){29}\s*0\s*\]/, response.body)
     assert_select "turbo-frame#requests-chart-frame", count: 1
     assert_includes response.body, "flat-pack--auto-submit"
+    assert_includes response.body, "API key"
+    assert_includes response.body, "All API keys"
     assert_includes response.body, "Date Range"
     assert_includes response.body, "All statuses"
+    assert_select %(input[type="hidden"][name="api_client_id"]), count: 1
+    assert_select %(button[data-action="flat-pack--select#toggle"]), minimum: 1
+    assert_select %(select[name="status"] option[value=""]:not([disabled])), text: "All statuses", count: 1
     assert_select %(nav.flat-pack-page-nav a[href="/workspace"][aria-label="Close"]), count: 1
   end
 
-  test "requests chart filters series by date range and status" do
+  # rubocop:disable Metrics/BlockLength
+  test "requests chart filters series by date range status and api key within the scoped recordings" do
     api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Filtered chart client")
+
+    nested_folder_recording = RecordingStudio::Recording.create!(
+      recordable: Folder.create!(name: "Requests chart nested folder"),
+      parent_recording: @workspace_root_recording
+    )
+
+    nested_api_client = create_api_client_for(parent_recording: nested_folder_recording, name: "Nested chart client")
+
+    outside_workspace = Workspace.create!(name: "Outside Workspace")
+    outside_root_recording = RecordingStudio::Recording.create!(recordable: outside_workspace)
+    outside_api_client = create_api_client_for(parent_recording: outside_root_recording, name: "Outside chart client")
 
     ensure_api_request_logs_table!
 
-    RecordingStudioApi::ApiRequestLog.where(api_client_id: api_client.id).delete_all
+    RecordingStudioApi::ApiRequestLog.where(api_client_id: [api_client.id, nested_api_client.id, outside_api_client.id]).delete_all
 
     request_dates = [2.days.ago.to_date, 1.day.ago.to_date, Date.current]
     request_dates.each_with_index do |request_date, index|
@@ -168,6 +194,32 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
         api_credential_id: api_client.credentials.max_by(&:created_at).id,
         access_recording_id: api_client.access_recording_id,
         root_recording_id: @workspace_root_recording.id
+      )
+
+      RecordingStudioApi::ApiRequestLog.create!(
+        occurred_at: request_date.in_time_zone.change(hour: 12),
+        request_id: "chart-filter-nested-#{index}",
+        request_method: "GET",
+        request_path: "/api/v1/recordings",
+        status_code: 200,
+        duration_ms: 50,
+        api_client_id: nested_api_client.id,
+        api_credential_id: nested_api_client.credentials.max_by(&:created_at).id,
+        access_recording_id: nested_api_client.access_recording_id,
+        root_recording_id: @workspace_root_recording.id
+      )
+
+      RecordingStudioApi::ApiRequestLog.create!(
+        occurred_at: request_date.in_time_zone.change(hour: 14),
+        request_id: "chart-filter-outside-#{index}",
+        request_method: "GET",
+        request_path: "/api/v1/recordings",
+        status_code: 200,
+        duration_ms: 55,
+        api_client_id: outside_api_client.id,
+        api_credential_id: outside_api_client.credentials.max_by(&:created_at).id,
+        access_recording_id: outside_api_client.access_recording_id,
+        root_recording_id: outside_root_recording.id
       )
     end
 
@@ -186,6 +238,9 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
 
     get "/recording_studio_api/api_clients/requests_chart", params: {
       root_recording_id: @workspace_root_recording.id,
+      parent_recording_id: @workspace_root_recording.id,
+      include_children: "1",
+      api_client_id: api_client.id,
       start_date: 2.days.ago.to_date.iso8601,
       end_date: Date.current.iso8601,
       status: "success"
@@ -194,8 +249,17 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_match(/\[\s*1\s*,\s*1\s*,\s*1\s*\]/, response.body)
     refute_match(/\[\s*1\s*,\s*2\s*,\s*1\s*\]/, response.body)
+    refute_match(/\[\s*2\s*,\s*2\s*,\s*2\s*\]/, response.body)
     assert_includes response.body, "value=\"success\""
+    assert_includes response.body, "Filtered chart client"
+    assert_includes response.body, "Nested chart client"
+    assert_not_includes response.body, "Outside chart client"
+    assert_select %(input[type="hidden"][name="api_client_id"][value="#{api_client.id}"]), count: 1
+    assert_select %(div[role="option"][data-value="#{nested_api_client.id}"]), text: /Nested chart client/
+    assert_select %(div[role="option"][data-value="#{outside_api_client.id}"]), count: 0
+    assert_select %(select[name="status"] option[value=""]:not([disabled])), text: "All statuses", count: 1
   end
+  # rubocop:enable Metrics/BlockLength
 
   test "index infinite scroll returns paged table content for xhr page requests" do
     52.times do |index|
@@ -334,6 +398,70 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, direct_api_client.name
   end
 
+  test "index parent scope includes descendants by default" do
+    direct_api_client = create_api_client_for(
+      parent_recording: @workspace_root_recording,
+      name: "Root default scope client"
+    )
+
+    nested_folder_recording = RecordingStudio::Recording.create!(
+      recordable: Folder.create!(name: "Default include folder"),
+      parent_recording: @workspace_root_recording
+    )
+
+    nested_api_client = create_api_client_for(
+      parent_recording: nested_folder_recording,
+      name: "Nested default scope client"
+    )
+
+    get "/recording_studio_api/api_clients", params: {
+      root_recording_id: @workspace_root_recording.id,
+      parent_recording_id: @workspace_root_recording.id
+    }
+
+    assert_response :success
+    assert_includes response.body, direct_api_client.name
+    assert_includes response.body, nested_api_client.name
+  end
+
+  test "index parent scope can exclude descendants" do
+    direct_api_client = create_api_client_for(
+      parent_recording: @workspace_root_recording,
+      name: "Root only scope client"
+    )
+
+    nested_folder_recording = RecordingStudio::Recording.create!(
+      recordable: Folder.create!(name: "Exclude children folder"),
+      parent_recording: @workspace_root_recording
+    )
+
+    nested_api_client = create_api_client_for(
+      parent_recording: nested_folder_recording,
+      name: "Nested excluded client"
+    )
+
+    get "/recording_studio_api/api_clients", params: {
+      root_recording_id: @workspace_root_recording.id,
+      parent_recording_id: @workspace_root_recording.id,
+      include_children: "0"
+    }
+
+    assert_response :success
+    assert_includes response.body, direct_api_client.name
+    assert_not_includes response.body, nested_api_client.name
+  end
+
+  test "index scope params require accessible recordings" do
+    outsider_user = create_user(email: "scope-outsider@example.com")
+    outsider_root_recording, = create_access_recording_for(user: outsider_user, role: :admin)
+
+    get "/recording_studio_api/api_clients", params: { root_recording_id: outsider_root_recording.id }
+    assert_response :forbidden
+
+    get "/recording_studio_api/api_clients", params: { parent_recording_id: outsider_root_recording.id }
+    assert_response :forbidden
+  end
+
   test "index shows empty state when no access has been given yet" do
     RecordingStudioApi::ApiAccessToken.delete_all
     RecordingStudioApi::ApiCredential.delete_all
@@ -345,71 +473,6 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "No API access given yet"
     assert_includes response.body, "Create API access from the demo home page to populate this list."
     assert_select %(a[href="/recording_studio_api/api_clients/new?close_url=%2F"]), text: "New", count: 1
-  end
-
-  test "index api keys list uses request log counts for visible clients" do
-    direct_api_client = create_api_client_for(
-      parent_recording: @workspace_root_recording,
-      name: "Chart direct client"
-    )
-
-    nested_folder_recording = RecordingStudio::Recording.create!(
-      recordable: Folder.create!(name: "Chart Folder"),
-      parent_recording: @workspace_root_recording
-    )
-
-    nested_api_client = create_api_client_for(
-      parent_recording: nested_folder_recording,
-      name: "Chart nested client"
-    )
-
-    ensure_api_request_logs_table!
-
-    RecordingStudioApi::ApiRequestLog.where(api_client_id: [direct_api_client.id, nested_api_client.id]).delete_all
-
-    5.times do |index|
-      RecordingStudioApi::ApiRequestLog.create!(
-        occurred_at: Time.current - index.minutes,
-        request_id: "chart-direct-#{index}",
-        request_method: "GET",
-        request_path: "/api/v1/recordings/direct",
-        status_code: 200,
-        duration_ms: 30,
-        api_client_id: direct_api_client.id,
-        api_credential_id: direct_api_client.credentials.max_by(&:created_at).id,
-        access_recording_id: direct_api_client.access_recording_id,
-        root_recording_id: @workspace_root_recording.id
-      )
-    end
-
-    2.times do |index|
-      RecordingStudioApi::ApiRequestLog.create!(
-        occurred_at: Time.current - (index + 10).minutes,
-        request_id: "chart-nested-#{index}",
-        request_method: "POST",
-        request_path: "/oauth/token",
-        status_code: 200,
-        duration_ms: 45,
-        api_client_id: nested_api_client.id,
-        api_credential_id: nested_api_client.credentials.max_by(&:created_at).id,
-        access_recording_id: nested_api_client.access_recording_id,
-        root_recording_id: @workspace_root_recording.id
-      )
-    end
-
-    get "/recording_studio_api/api_clients", params: { root_recording_id: @workspace_root_recording.id }
-
-    assert_response :success
-    list_node = Nokogiri::HTML(response.body).at_css("#most-used-api-keys")
-    refute_nil list_node
-
-    list_text = list_node.text.gsub(/\s+/, " ").strip
-    assert_includes list_text, "Chart direct client"
-    assert_includes list_text, "5 requests"
-    assert_includes list_text, "Chart nested client"
-    assert_includes list_text, "2 requests"
-    assert_operator list_text.index("Chart direct client"), :<, list_text.index("Chart nested client")
-    assert_not_includes response.body, "Key A"
   end
 
   test "index subtitle falls back to root type label when multiple roots match" do
@@ -465,9 +528,31 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_select %(a[href="/recording_studio_api/api_clients/#{api_client.id}/edit?close_url=%2F"]), text: "Edit"
     assert_select %(a[href="/recording_studio_api/api_clients/#{api_client.id}/tokens?close_url=%2F"]), text: "Tokens"
     assert_select %(a[href="/recording_studio_api/api_clients/#{api_client.id}/log?close_url=%2F"]), text: "Log"
-    assert_select %(a[href="/recording_studio_api/api_clients/#{api_client.id}/revoke?close_url=%2F"][data-turbo-method="post"][data-turbo-confirm="Revoke this API key?"]), text: "Revoke"
+    assert_not_includes response.body, "Create a new secret and api key"
+    assert_select %(a[href="/recording_studio_api/api_clients/#{api_client.id}/rotate?close_url=%2F"]), count: 0
+    assert_select %(a[href="/recording_studio_api/api_clients/#{api_client.id}/revoke?close_url=%2F"]), count: 0
     assert_not_includes response.body, "Back to API access list"
     assert_not_includes response.body, "Back to demo"
+  end
+
+  test "rotate revokes the latest credential and shows the new secret" do
+    api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Rotatable API client")
+    previous_credential = api_client.credentials.max_by(&:created_at)
+
+    post "/recording_studio_api/api_clients/#{api_client.id}/rotate"
+
+    assert_response :created
+    assert_includes response.body, "API key rotated"
+    assert_includes response.body, "New client secret"
+    assert_includes response.body, "New API key"
+    assert_includes response.body, "Finish"
+
+    api_client.reload
+    new_credential = api_client.credentials.max_by(&:created_at)
+
+    assert_not_equal previous_credential.id, new_credential.id
+    assert_not_nil previous_credential.reload.revoked_at
+    assert_includes response.body, new_credential.oauth_client_id
   end
 
   test "show revokes the latest credential" do
@@ -544,7 +629,7 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_select %(nav.flat-pack-page-nav a[href="/"][aria-label="Close"]), count: 1
     assert_includes response.body, "/recording_studio_api/api_clients/#{api_client.id}"
     assert_includes response.body, "Logged API client"
-    assert_includes response.body, "API call log"
+    assert_includes response.body, "API request log"
     assert_includes response.body, "Occurred"
     assert_includes response.body, "Method"
     assert_includes response.body, "Path"
@@ -585,6 +670,7 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "Tokens"
     assert_includes response.body, "Token parent client"
+    assert_select "p.text-sm.text-slate-600", text: "A token is a temporary pass that lets this API key make requests.", count: 1
     assert_includes response.body, "Prefix"
     assert_includes response.body, "Status"
     assert_includes response.body, "****main"
@@ -654,6 +740,9 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Name"
     assert_includes response.body, "Expires"
     assert_includes response.body, "Save changes"
+    assert_includes response.body, "Create a new secret and api key"
+    assert_select %(a[href="/recording_studio_api/api_clients/#{api_client.id}/rotate?close_url=%2F"][data-turbo-method="post"][data-turbo-confirm="Rotate this API key? This will revoke the current key."]), text: "Rotate key"
+    assert_select %(a[href="/recording_studio_api/api_clients/#{api_client.id}/revoke?close_url=%2F"][data-turbo-method="post"][data-turbo-confirm="Revoke this API key?"]), text: "Revoke"
     assert_select %(nav.flat-pack-page-nav a[href="/"][aria-label="Close"]), count: 1
     assert_select %(form[action="/recording_studio_api/api_clients/#{api_client.id}?close_url=%2F"]), count: 1
   end

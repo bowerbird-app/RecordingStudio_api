@@ -21,13 +21,70 @@ class HomeController < ApplicationController
   def load_standard_root_data
     @workspace_access_recordings = access_recordings_for("Workspace")
     @folder_access_recordings = access_recordings_for("Folder")
+    @workspace_api_keys_params = workspace_api_keys_params
+    @folder_api_keys_params = folder_api_keys_params
+  end
+
+  def workspace_api_keys_params
+    root_recording = root_recordings.find { |recording| recording.recordable_type == "Workspace" }
+    return default_api_keys_params if root_recording.nil?
+
+    default_api_keys_params.merge(
+      root_recording_id: root_recording.id,
+      parent_recording_id: root_recording.id,
+      include_children: "1"
+    )
+  end
+
+  def folder_api_keys_params
+    folder_parent_recording = recordings.find do |recording|
+      recording.recordable_type == "Folder" && recording.parent_recording_id.present?
+    end
+
+    folder_scope = if folder_parent_recording.present?
+                     {
+                       root_recording: folder_parent_recording.root_recording || folder_parent_recording,
+                       parent_recording: folder_parent_recording
+                     }
+                   end
+
+    if folder_scope.nil?
+      folder_root = root_recordings.find { |recording| recording.recordable_type == "Folder" }
+      return default_api_keys_params if folder_root.nil?
+
+      folder_scope = {
+        root_recording: folder_root,
+        parent_recording: folder_root
+      }
+    end
+
+    default_api_keys_params.merge(
+      root_recording_id: folder_scope.fetch(:root_recording).id,
+      parent_recording_id: folder_scope.fetch(:parent_recording).id,
+      include_children: "1"
+    )
+  end
+
+  def default_api_keys_params
+    {
+      close_url: root_path
+    }
+  end
+
+  def recordings
+    @recordings ||= RecordingStudio::Recording.reorder(:created_at, :id).to_a
+  end
+
+  def recordings_by_parent_id
+    @recordings_by_parent_id ||= recordings.group_by(&:parent_recording_id)
+  end
+
+  def root_recordings
+    recordings_by_parent_id.fetch(nil, [])
   end
 
   def access_recordings_for(root_recordable_type)
-    recordings = RecordingStudio::Recording.reorder(:created_at, :id).to_a
-    recordings_by_parent_id = recordings.group_by(&:parent_recording_id)
-
-    recordings_by_parent_id.fetch(nil, []).select do |recording|
+    root_recordings.select do |recording|
       recording.recordable_type == root_recordable_type
     end.flat_map do |root_recording|
       child_access_recordings(root_recording, recordings_by_parent_id).map do |access_recording|
@@ -53,10 +110,7 @@ class HomeController < ApplicationController
   end
 
   def recording_tree_for(root_recordable_type)
-    recordings = RecordingStudio::Recording.reorder(:created_at, :id).to_a
-    recordings_by_parent_id = recordings.group_by(&:parent_recording_id)
-
-    recordings_by_parent_id.fetch(nil, []).select do |recording|
+    root_recordings.select do |recording|
       recording.recordable_type == root_recordable_type
     end.map do |recording|
       build_recording_node(recording, recordings_by_parent_id)

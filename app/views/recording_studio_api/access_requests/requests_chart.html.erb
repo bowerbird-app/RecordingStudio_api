@@ -12,7 +12,6 @@
 
   <%= render FlatPack::PageTitle::Component.new(
     title: "API requests",
-    subtitle: "Last 7 days",
     variant: :h1
   ) %>
 
@@ -24,30 +23,57 @@
       data: {
         turbo_frame: "requests-chart-frame",
         controller: "flat-pack--auto-submit",
-        action: "input->flat-pack--auto-submit#queueSubmit change->flat-pack--auto-submit#queueSubmit",
+        action: "change->flat-pack--auto-submit#queueSubmit",
         flat_pack__auto_submit_delay_value: 250
       }
     ) do %>
-      <%= render FlatPack::Chart::DefaultFilterComponent.new(
-        start_date_value: @requests_chart_start_date,
-        end_date_value: @requests_chart_end_date,
-        status: @requests_chart_status,
-        status_lists: @requests_chart_status_lists,
-        status_placeholder: "All statuses"
-      ) %>
+      <div class="mb-4 flex flex-wrap items-end gap-3">
+        <%= render FlatPack::Select::Component.new(
+          name: "api_client_id",
+          options: @requests_chart_api_client_options,
+          value: @requests_chart_api_client_id,
+          placeholder: "All API keys",
+          label: "API key",
+          searchable: true,
+          class: "w-[220px]"
+        ) %>
+
+        <%= render FlatPack::Chart::DefaultFilterComponent.new(
+          start_date_value: @requests_chart_start_date,
+          end_date_value: @requests_chart_end_date,
+          status: @requests_chart_status,
+          status_lists: [["All statuses", ""]] + @requests_chart_status_lists,
+          status_placeholder: nil
+        ) %>
+      </div>
     <% end %>
 
     <%= render FlatPack::Card::Component.new(style: :default) do %>
       <%= render FlatPack::Chart::Component.new(
         card: false,
-        type: :bar,
+        type: :line,
         height: 560,
         series: [
           { name: "API requests", data: @requests_chart_series }
         ],
         options: {
+          stroke: {
+            curve: "smooth",
+            width: 3
+          },
           xaxis: {
-            categories: @requests_chart_categories
+            categories: @requests_chart_categories,
+            labels: {
+              rotate: 0,
+              hideOverlappingLabels: true
+            }
+          },
+          yaxis: {
+            min: 0,
+            forceNiceScale: true
+          },
+          dataLabels: {
+            enabled: false
           }
         }
       ) %>

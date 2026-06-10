@@ -1,0 +1,19 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <%= render FlatPack::PageNav::Component.new(
+    entries: [
+      { label: "Back", url: RecordingStudioApi.admin_dashboard_path(controller: self), icon: :arrow_left }
+    ],
+    anchor_url: page_nav_close_url
+  ) %>
+
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "Rate limiting",
+    subtitle: "Read-only view of the current rate-limiting configuration.",
+    variant: :h1
+  ) %>
+
+  <%= render FlatPack::Table::Component.new(data: @rate_limit_rows) do |table| %>
+    <% table.column(title: "Setting", html: ->(row) { row.fetch(:setting) }) %>
+    <% table.column(title: "Value", html: ->(row) { row.fetch(:value) }) %>
+  <% end %>
+</div>

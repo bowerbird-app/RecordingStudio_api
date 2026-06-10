@@ -1,4 +1,4 @@
-<turbo-frame id="admin_api_logs_content">
-  <%= render partial: "table", locals: { log_rows: @log_rows } %>
-  <%= render partial: "loader", locals: { has_more: @has_more, next_page: @page + 1 } %>
+<turbo-frame id="sortable_table">
+  <%= render partial: "table", locals: { log_rows: @log_rows, sort: @sort, direction: @direction, table_base_url: @table_base_url } %>
+  <%= render partial: "loader", locals: { has_more: @has_more, next_page: @page + 1, sort: @sort, direction: @direction } %>
 </turbo-frame>

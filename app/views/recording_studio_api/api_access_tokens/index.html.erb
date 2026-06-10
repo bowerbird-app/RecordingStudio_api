@@ -5,9 +5,13 @@
 
   <%= render FlatPack::PageTitle::Component.new(
     title: "Tokens",
-    subtitle: "#{@api_client.name}. A token is a temporary pass that lets this API key make requests.",
+    subtitle: @api_client.name,
     variant: :h1
   ) %>
+
+  <p class="text-sm text-slate-600">
+    A token is a temporary pass that lets this API key make requests.
+  </p>
 
   <% if @token_rows.any? %>
     <%= render FlatPack::Table::Component.new(data: @token_rows) do |table| %>
