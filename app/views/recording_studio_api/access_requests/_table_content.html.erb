@@ -10,7 +10,16 @@
     <% table.column(title: "API key", html: ->(row) { row.fetch(:api_key) }) %>
     <% table.column(title: "Access point", html: ->(row) { row.fetch(:access_point) }) %>
     <% table.column(title: "Role", html: ->(row) { row.fetch(:role) }) %>
-    <% table.column(title: "Expires", html: ->(row) { row.fetch(:expires) }) %>
+    <% table.column(title: "Expires", html: lambda { |row|
+         expires_at = row.fetch(:expires_at)
+         expires_text = row.fetch(:expires_text)
+
+         if expires_at.present?
+           render FlatPack::Timestamp::Component.new(timestamp: expires_at, fallback_text: expires_text)
+         else
+           expires_text
+         end
+       }) %>
   <% end %>
 
   <%= render FlatPack::Pagination::Component.new(

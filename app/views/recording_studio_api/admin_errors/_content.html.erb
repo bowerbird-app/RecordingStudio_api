@@ -1,0 +1,69 @@
+<turbo-frame id="admin-api-errors-chart-frame">
+  <%= form_with(
+    url: RecordingStudioApi.admin_errors_path(controller: self, **admin_errors_filter_form_params),
+    method: :get,
+    class: "mb-4",
+    data: {
+      turbo_frame: "admin-api-errors-chart-frame",
+      controller: "flat-pack--auto-submit",
+      action: "change->flat-pack--auto-submit#queueSubmit",
+      flat_pack__auto_submit_delay_value: 250
+    }
+  ) do %>
+    <div class="mb-4 flex flex-wrap items-end gap-3">
+      <%= render FlatPack::Chart::DefaultFilterComponent.new(
+        start_date_value: @errors_chart_start_date,
+        end_date_value: @errors_chart_end_date,
+        status_lists: [],
+        status_name: nil
+      ) %>
+
+      <%= render FlatPack::Select::Component.new(
+        name: "error_type",
+        options: @errors_chart_error_type_options,
+        value: @errors_chart_error_type,
+        placeholder: "All error types",
+        label: "Error type",
+        searchable: true,
+        class: "w-[280px]"
+      ) %>
+    </div>
+  <% end %>
+
+  <%= render FlatPack::Card::Component.new(style: :default) do %>
+    <div class="requests-chart-gridlines">
+      <%= render FlatPack::Chart::Component.new(
+        card: false,
+        type: :line,
+        height: 620,
+        series: [
+          { name: "Error requests", data: @errors_chart_series }
+        ],
+        options: {
+          stroke: {
+            curve: "smooth",
+            width: 3
+          },
+          xaxis: {
+            categories: @errors_chart_categories,
+            axisBorder: {
+              show: true,
+              color: "var(--surface-border-color)",
+              height: 1
+            },
+            axisTicks: {
+              show: false
+            }
+          },
+          yaxis: {
+            min: 0,
+            forceNiceScale: true
+          },
+          dataLabels: {
+            enabled: false
+          }
+        }
+      ) %>
+    </div>
+  <% end %>
+</turbo-frame>

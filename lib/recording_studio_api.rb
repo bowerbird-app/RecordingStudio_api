@@ -205,6 +205,17 @@ module RecordingStudioApi
       controller.recording_studio_api.admin_requests_path(params)
     end
 
+    def admin_errors_path(controller:, **params)
+      resolver = configuration.admin_errors_path_resolver
+
+      if resolver.respond_to?(:call)
+        path = resolver.call(controller: controller, **params)
+        return path if path.present?
+      end
+
+      controller.recording_studio_api.admin_errors_path(params)
+    end
+
     def admin_logs_path(controller:, **params)
       resolver = configuration.admin_logs_path_resolver
 

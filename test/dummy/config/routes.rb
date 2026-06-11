@@ -17,6 +17,7 @@ Rails.application.routes.draw do
   get "/admin/api/settings", to: "recording_studio_api/admin_settings#show", as: :admin_api_settings
   get "/admin/api/rate-limiting", to: "recording_studio_api/admin_rate_limitings#show", as: :admin_api_rate_limiting
   get "/admin/api/requests", to: "recording_studio_api/admin_requests#index", as: :admin_api_requests
+  get "/admin/api/errors", to: "recording_studio_api/admin_errors#index", as: :admin_api_errors
   get "/admin/api/logs", to: "recording_studio_api/admin_logs#index", as: :admin_api_logs
   resource :scalar_test_token, only: %i[create destroy]
 

@@ -87,7 +87,6 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     )
     direct_oauth_client_id = direct_api_client.credentials.max_by(&:created_at).oauth_client_id
     direct_expires_at = direct_api_client.credentials.max_by(&:created_at).expires_at.in_time_zone
-    direct_exact_expiry = "#{direct_expires_at.strftime("%B %-d, %Y at %-l:%M %p")} #{direct_expires_at.strftime("%Z")}".strip
 
     child_folder_recording = RecordingStudio::Recording.create!(
       recordable: Folder.create!(name: "Nested Folder"),
@@ -122,13 +121,13 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_select %(a[href="/recording_studio_api/api_clients/requests_chart?close_url=%2Fworkspace&root_recording_id=#{@workspace_root_recording.id}"]), text: "Full screen", count: 1
     assert_select %(a[href="/recording_studio_api/api_clients/#{direct_api_client.id}?close_url=%2Fworkspace"]), text: direct_api_client.name
     assert_select %(a[href="/recording_studio_api/api_clients/#{nested_api_client.id}?close_url=%2Fworkspace"]), text: nested_api_client.name
-    assert_match(/in \d+\s+(minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years)/, response.body)
-    assert_includes response.body, direct_exact_expiry
+    assert_match(/\d+\s+(minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years)\s+(ago|from now)/, response.body)
+    assert_includes response.body, %(datetime="#{direct_expires_at.iso8601}")
     expected_day_labels = (6.days.ago.to_date..Date.current).map { |day| day.strftime("%a") }
     expected_day_labels.each do |day_label|
       assert_includes response.body, day_label
     end
-    assert_select "span.underline.decoration-dotted.underline-offset-2", minimum: 1
+    assert_select "time.flat-pack-timestamp.cursor-help", minimum: 1
   end
 
   test "index hides request charts when there are no api keys yet" do
@@ -152,9 +151,7 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_match(/\[(\s*0\s*,){29}\s*0\s*\]/, response.body)
     assert_select "turbo-frame#requests-chart-frame", count: 1
     assert_includes response.body, "flat-pack--auto-submit"
-    assert_includes response.body, "API key"
     assert_includes response.body, "All API keys"
-    assert_includes response.body, "Date Range"
     assert_includes response.body, "All statuses"
     assert_select %(input[type="hidden"][name="api_client_id"]), count: 1
     assert_select %(button[data-action="flat-pack--select#toggle"]), minimum: 1

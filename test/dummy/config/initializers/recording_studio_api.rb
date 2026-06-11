@@ -17,6 +17,10 @@ RecordingStudioApi.configure do |config|
     controller.main_app.admin_api_requests_path(params)
   end
 
+  config.admin_errors_path_resolver = lambda do |controller:, **params|
+    controller.main_app.admin_api_errors_path(params)
+  end
+
   config.admin_logs_path_resolver = lambda do |controller:, **params|
     controller.main_app.admin_api_logs_path(params)
   end

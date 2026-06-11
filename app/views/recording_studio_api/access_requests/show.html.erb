@@ -45,7 +45,17 @@
   </div>
 
   <% api_key_value = @latest_credential&.oauth_client_id || "Unknown" %>
-  <% expiry_value = credential_expires_label(@latest_credential) %>
+  <% expiry_value = if @latest_credential.nil?
+                      "No credentials"
+                    elsif @latest_credential.revoked_at.present?
+                      "Revoked"
+                    elsif @latest_credential.expires_at.present? && @latest_credential.expires_at.past?
+                      "Expired"
+                    elsif @latest_credential.expires_at.blank?
+                      "Never"
+                    else
+                      render FlatPack::Timestamp::Component.new(timestamp: @latest_credential.expires_at, fallback_text: "Never")
+                    end %>
   <% access_point_recording = if @access_recording&.parent_recording.present?
                                 @access_recording.parent_recording
                               else

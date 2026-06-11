@@ -270,8 +270,6 @@ module RecordingStudioApi
     helper_method :human_root_type,
                   :allowed_root_types,
                   :recording_label,
-                  :credential_status_label,
-                  :credential_expires_label,
                   :masked_api_key
 
     # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
@@ -312,6 +310,20 @@ module RecordingStudioApi
 
         latest_credential = api_client.credentials.max_by { |credential| [credential.created_at.to_i, credential.id.to_i] }
 
+        expires_at_value = nil
+        expires_text = if latest_credential.nil?
+                         "No credentials"
+                       elsif latest_credential.revoked_at.present?
+                         "Revoked"
+                       elsif latest_credential.expires_at.present? && latest_credential.expires_at.past?
+                         "Expired"
+                       elsif latest_credential.expires_at.blank?
+                         "Never"
+                       else
+                         expires_at_value = latest_credential.expires_at
+                         "Never"
+                       end
+
         {
           id: api_client.id,
           root_recording: root_recording,
@@ -321,7 +333,8 @@ module RecordingStudioApi
           access_point: access_point_label(access_point_recording),
           role: access_recording.recordable&.try(:role).to_s.humanize.presence || "Unknown",
           credentials_count: api_client.credentials.size,
-          expires: credential_expires_label(latest_credential),
+          expires_at: expires_at_value,
+          expires_text: expires_text,
           latest_credential_status: credential_status_label(latest_credential)
         }
       end
@@ -641,7 +654,7 @@ module RecordingStudioApi
         .limit(100)
         .map do |log|
           {
-            occurred_at: format_log_timestamp(log.occurred_at || log.created_at),
+            occurred_at: log.occurred_at || log.created_at,
             method: log.request_method,
             path: log.request_path,
             status: log.status_code.to_s,
@@ -649,18 +662,6 @@ module RecordingStudioApi
             request_id: log.request_id.presence || "-"
           }
         end
-    end
-
-    def format_log_timestamp(value)
-      return "-" if value.blank?
-
-      value.in_time_zone.strftime("%Y-%m-%d %H:%M:%S")
-    end
-
-    def format_activity_timestamp(value, fallback: "Never")
-      return fallback if value.blank?
-
-      human_readable_timestamp(value)
     end
 
     def load_edit_form_state
@@ -733,26 +734,6 @@ module RecordingStudioApi
       "Active"
     end
 
-    def credential_expires_label(credential)
-      return "No credentials" if credential.nil?
-      return "Revoked" if credential.revoked_at.present?
-      return "Expired" if credential.expires_at.present? && credential.expires_at.past?
-      return "Never" if credential.expires_at.blank?
-
-      relative_timestamp_with_tooltip(credential.expires_at)
-    end
-
-    def relative_timestamp_with_tooltip(value)
-      timestamp = value.in_time_zone
-      distance = view_context.time_ago_in_words(timestamp)
-      relative_time = timestamp.future? ? "in #{distance}" : "#{distance} ago"
-      exact_time = human_readable_timestamp(timestamp)
-
-      view_context.render FlatPack::Tooltip::Component.new(text: exact_time) do
-        view_context.content_tag(:span, relative_time, class: "underline decoration-dotted underline-offset-2")
-      end
-    end
-
     def masked_api_key(credential)
       oauth_client_id = credential&.oauth_client_id.to_s
       return "Unavailable" if oauth_client_id.blank?
@@ -762,11 +743,6 @@ module RecordingStudioApi
       masked_length = [oauth_client_id.length - 4, 0].max
 
       "#{visible_prefix}#{"*" * masked_length}#{visible_suffix}"
-    end
-
-    def human_readable_timestamp(value)
-      timestamp = value.in_time_zone
-      "#{timestamp.strftime("%B %-d, %Y at %-l:%M %p")} #{timestamp.strftime("%Z")}".strip
     end
 
     def recording_label(recording)

@@ -17,9 +17,15 @@
     <%= render FlatPack::Table::Component.new(data: @token_rows) do |table| %>
       <% table.column(title: "Prefix", html: ->(row) { row.fetch(:prefix) }) %>
       <% table.column(title: "Status", html: ->(row) { row.fetch(:status) }) %>
-      <% table.column(title: "Expires", html: ->(row) { row.fetch(:expires_at) }) %>
-      <% table.column(title: "Last used", html: ->(row) { row.fetch(:last_used_at) }) %>
-      <% table.column(title: "Issued", html: ->(row) { row.fetch(:issued_at) }) %>
+      <% table.column(title: "Expires", html: lambda { |row|
+           render FlatPack::Timestamp::Component.new(timestamp: row.fetch(:expires_at), fallback_text: "Never")
+         }) %>
+      <% table.column(title: "Last used", html: lambda { |row|
+           render FlatPack::Timestamp::Component.new(timestamp: row.fetch(:last_used_at), fallback_text: "Never")
+         }) %>
+      <% table.column(title: "Issued", html: lambda { |row|
+           render FlatPack::Timestamp::Component.new(timestamp: row.fetch(:issued_at), fallback_text: "-")
+         }) %>
       <% table.column(title: "Actions", html: ->(row) { row.fetch(:actions) }) %>
     <% end %>
   <% else %>

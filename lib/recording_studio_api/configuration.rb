@@ -24,6 +24,7 @@ module RecordingStudioApi
                   :admin_settings_path_resolver,
                   :admin_rate_limiting_path_resolver,
                   :admin_requests_path_resolver,
+                  :admin_errors_path_resolver,
                   :admin_logs_path_resolver,
                   :admin_layout_name,
                   :openapi_title,
@@ -68,6 +69,9 @@ module RecordingStudioApi
       @admin_requests_path_resolver = lambda do |controller:, **params|
         controller.recording_studio_api.admin_requests_path(params)
       end
+      @admin_errors_path_resolver = lambda do |controller:, **params|
+        controller.recording_studio_api.admin_errors_path(params)
+      end
       @admin_logs_path_resolver = lambda do |controller:, **params|
         controller.recording_studio_api.admin_logs_path(params)
       end
@@ -111,6 +115,7 @@ module RecordingStudioApi
         admin_settings_path_resolver: admin_settings_path_resolver.respond_to?(:call),
         admin_rate_limiting_path_resolver: admin_rate_limiting_path_resolver.respond_to?(:call),
         admin_requests_path_resolver: admin_requests_path_resolver.respond_to?(:call),
+        admin_errors_path_resolver: admin_errors_path_resolver.respond_to?(:call),
         admin_logs_path_resolver: admin_logs_path_resolver.respond_to?(:call),
         admin_layout_name: admin_layout_name,
         api_versions: api_versions,

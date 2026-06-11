@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./flat_pack/application.css";
 
 /* Include RecordingStudioRootSwitchable engine views for Tailwind CSS */
 @source "../../vendor/bundle/**/recording_studio_root_switchable/app/views/**/*.erb";

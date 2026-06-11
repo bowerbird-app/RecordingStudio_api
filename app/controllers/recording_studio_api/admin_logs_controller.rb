@@ -18,11 +18,14 @@ module RecordingStudioApi
       @page = resolved_page
       @sort = resolved_sort
       @direction = resolved_direction
+      initialize_date_filters
       @visible_limit = @page * PER_PAGE
       @table_base_url = RecordingStudioApi.admin_logs_path(
         controller: self,
         close_url: params[:close_url],
-        page: @page
+        page: @page,
+        start_date: @logs_start_date&.iso8601,
+        end_date: @logs_end_date&.iso8601
       )
 
       if log_source_available?
@@ -41,7 +44,9 @@ module RecordingStudioApi
           page: @page,
           sort: @sort,
           direction: @direction,
-          close_url: params[:close_url]
+          close_url: params[:close_url],
+          start_date: @logs_start_date&.iso8601,
+          end_date: @logs_end_date&.iso8601
         ), status: :see_other
         return
       end
@@ -59,7 +64,30 @@ module RecordingStudioApi
     end
 
     def log_scope
-      @log_scope ||= RecordingStudioApi::ApiRequestLog.order(current_sort_column => @direction.to_sym, id: @direction.to_sym)
+      @log_scope ||= begin
+        scope = RecordingStudioApi::ApiRequestLog.order(current_sort_column => @direction.to_sym, id: @direction.to_sym)
+        scope = scope.where("occurred_at >= ?", @logs_start_date.beginning_of_day) if @logs_start_date.present?
+        scope = scope.where("occurred_at <= ?", @logs_end_date.end_of_day) if @logs_end_date.present?
+        scope
+      end
+    end
+
+    def initialize_date_filters
+      @logs_start_date = parsed_date(params[:start_date])
+      @logs_end_date = parsed_date(params[:end_date])
+
+      return unless @logs_start_date.present? && @logs_end_date.present?
+      return unless @logs_start_date > @logs_end_date
+
+      @logs_start_date, @logs_end_date = @logs_end_date, @logs_start_date
+    end
+
+    def parsed_date(raw_date)
+      return nil if raw_date.blank?
+
+      Date.iso8601(raw_date.to_s)
+    rescue ArgumentError
+      nil
     end
 
     def resolved_sort
@@ -85,8 +113,7 @@ module RecordingStudioApi
         occurred_at = log.occurred_at || log.created_at
 
         {
-          occurred_at_relative: relative_timestamp(occurred_at),
-          occurred_at_full: full_timestamp(occurred_at),
+          occurred_at: occurred_at,
           method: log.request_method,
           path: log.request_path,
           status: log.status_code.to_s,
@@ -98,21 +125,17 @@ module RecordingStudioApi
       end
     end
 
-    def full_timestamp(value)
-      return "-" if value.blank?
-
-      value.in_time_zone.strftime("%Y-%m-%d %H:%M:%S")
-    end
-
-    def relative_timestamp(value)
-      return "-" if value.blank?
-
-      distance = helpers.time_ago_in_words(value)
-      value <= Time.current ? "#{distance} ago" : "in #{distance}"
-    end
-
     def turbo_stream_request?
       params[:format].to_s == "turbo_stream" || request.headers["Accept"].to_s.include?("turbo-stream")
     end
+
+    def admin_logs_filter_form_params
+      {
+        close_url: params[:close_url],
+        sort: @sort,
+        direction: @direction
+      }.compact
+    end
+    helper_method :admin_logs_filter_form_params
   end
 end

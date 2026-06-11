@@ -33,7 +33,7 @@
       </div>
       <div>
         <dt class="text-sm font-medium text-(--surface-muted-content-color)">Credential expiry</dt>
-        <dd class="text-sm text-(--surface-content-color)"><%= @payload.fetch(:credential).expires_at&.iso8601 || "Uses configured token TTL" %></dd>
+        <dd class="text-sm text-(--surface-content-color)"><%= render FlatPack::Timestamp::Component.new(timestamp: @payload.fetch(:credential).expires_at, fallback_text: "Uses configured token TTL") %></dd>
       </div>
     </dl>
   <% end %>

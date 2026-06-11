@@ -11,12 +11,28 @@
     }
   ) do %>
     <div class="mb-4 flex flex-wrap items-end gap-3">
-      <%= render FlatPack::Chart::DefaultFilterComponent.new(
-        start_date_value: @requests_chart_start_date,
-        end_date_value: @requests_chart_end_date,
-        status: @requests_chart_status,
-        status_lists: [["All statuses", ""]] + @requests_chart_status_lists,
-        status_placeholder: nil
+      <%= render FlatPack::DateRangeInput::Component.new(
+        start_name: "start_date",
+        end_name: "end_date",
+        start_value: @requests_chart_start_date,
+        end_value: @requests_chart_end_date,
+        label: nil
+      ) %>
+
+      <%= render FlatPack::Select::Component.new(
+        name: "status",
+        options: [["All statuses", ""]] + @requests_chart_status_lists,
+        value: @requests_chart_status,
+        label: nil,
+        class: "w-[200px]"
+      ) %>
+
+      <%= render FlatPack::Select::Component.new(
+        name: "group_by",
+        options: @requests_chart_group_by_options,
+        value: @requests_chart_group_by,
+        label: nil,
+        class: "w-[160px]"
       ) %>
     </div>
   <% end %>
@@ -57,4 +73,13 @@
       ) %>
     </div>
   <% end %>
+
+  <div class="mt-4">
+    <%= render partial: "recording_studio_api/admin_logs/table", locals: {
+      log_rows: @request_log_rows,
+      sort: @sort,
+      direction: @direction,
+      table_base_url: @requests_table_base_url
+    } %>
+  </div>
 </turbo-frame>

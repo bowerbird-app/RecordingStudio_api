@@ -73,6 +73,41 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "page=2"
     assert_includes response.body, "sort=request_method"
     assert_includes response.body, 'data-turbo-frame="sortable_table"'
+    assert_includes response.body, "Date Range"
+    assert_includes response.body, "admin-logs-date-range-submit"
+    assert_includes response.body, "click-&gt;admin-logs-date-range-submit#submitOnApply"
+  end
+
+  test "filters logs by date range and preserves date params in pagination links" do
+    old_log = RecordingStudioApi::ApiRequestLog.create!(
+      occurred_at: 10.days.ago,
+      request_id: "req-old",
+      request_method: "GET",
+      request_path: "/recordings/old",
+      status_code: 200,
+      duration_ms: 90,
+      rate_limited: false,
+      remote_ip: "10.99.0.1"
+    )
+
+    recent_log = RecordingStudioApi::ApiRequestLog.create!(
+      occurred_at: Time.current,
+      request_id: "req-recent",
+      request_method: "GET",
+      request_path: "/recordings/recent",
+      status_code: 200,
+      duration_ms: 80,
+      rate_limited: false,
+      remote_ip: "10.99.0.2"
+    )
+
+    get admin_api_logs_path(start_date: Date.current.iso8601, end_date: Date.current.iso8601)
+
+    assert_response :success
+    assert_includes response.body, recent_log.remote_ip
+    assert_not_includes response.body, old_log.remote_ip
+    assert_includes response.body, "start_date=#{Date.current.iso8601}"
+    assert_includes response.body, "end_date=#{Date.current.iso8601}"
   end
 
   test "frame request replaces the logs content with additional rows" do

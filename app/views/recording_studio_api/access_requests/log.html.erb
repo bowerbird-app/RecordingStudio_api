@@ -33,7 +33,9 @@
 
   <% if @log_rows.any? %>
     <%= render FlatPack::Table::Component.new(data: @log_rows) do |table| %>
-      <% table.column(title: "Occurred", html: ->(row) { row.fetch(:occurred_at) }) %>
+      <% table.column(title: "Occurred", html: lambda { |row|
+           render FlatPack::Timestamp::Component.new(timestamp: row.fetch(:occurred_at), fallback_text: "-")
+         }) %>
       <% table.column(title: "Method", html: ->(row) { row.fetch(:method) }) %>
       <% table.column(title: "Path", html: ->(row) { row.fetch(:path) }) %>
       <% table.column(title: "Status", html: status_badge) %>

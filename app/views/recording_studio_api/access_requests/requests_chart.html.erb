@@ -33,7 +33,7 @@
           options: @requests_chart_api_client_options,
           value: @requests_chart_api_client_id,
           placeholder: "All API keys",
-          label: "API key",
+          label: nil,
           searchable: true,
           class: "w-[220px]"
         ) %>
@@ -43,6 +43,9 @@
           end_date_value: @requests_chart_end_date,
           status: @requests_chart_status,
           status_lists: [["All statuses", ""]] + @requests_chart_status_lists,
+          start_date_label: nil,
+          end_date_label: nil,
+          status_label: nil,
           status_placeholder: nil
         ) %>
       </div>
