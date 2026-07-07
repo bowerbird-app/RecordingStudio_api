@@ -5,7 +5,8 @@ RecordingStudioRootSwitchable.configure do |config|
     Current.actor || controller.current_user
   end
 
-  config.layout = :application_layout
+  # config.layout is no longer needed — the gem now defaults to
+  # "recording_studio/default_layout" from Recording Studio core (v3.0.2).
 
   # For production hosts, enable secure cookies and force SSL in the host app.
   # config.device_key_cookie_options = config.device_key_cookie_options.merge(secure: Rails.env.production?)
@@ -32,7 +33,7 @@ RecordingStudioRootSwitchable.configure do |config|
     end
 
     resolved_return_to_path = URI.parse(resolved_return_to).path
-    non_admin_root = !root_recording.recordable.is_a?(RecordingStudioAdmin::Admin)
+    non_admin_root = root_recording.recordable_type != "AdminRoot"
 
     if non_admin_root && resolved_return_to_path.start_with?("/admin")
       controller.main_app.root_path
@@ -50,7 +51,7 @@ RecordingStudioRootSwitchable.configure do |config|
       RecordingStudioAccessible.root_recordings_for(actor: actor, minimum_role: :view)
     end
     scope.default_root = lambda do |roots:, **|
-      roots.find { |recording| recording.recordable.is_a?(RecordingStudioAdmin::Admin) } || roots.first
+      roots.find { |recording| recording.recordable_type == "AdminRoot" } || roots.first
     end
   end
 end

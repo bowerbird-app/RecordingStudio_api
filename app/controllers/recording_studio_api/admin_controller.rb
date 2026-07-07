@@ -23,7 +23,7 @@ module RecordingStudioApi
     def require_admin_root!
       root_recording = current_root_recording
       raise RecordingStudioApi::AuthorizationError, "Admin API is only available from the admin root" if root_recording.nil?
-      return if root_recording.recordable.is_a?(RecordingStudioAdmin::Admin)
+      return if recording_studio_api_admin_root_recording?(root_recording)
 
       raise RecordingStudioApi::AuthorizationError, "Admin API is only available from the admin root"
     end

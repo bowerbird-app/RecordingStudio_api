@@ -1,10 +1,11 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
-  <%= render FlatPack::PageNav::Component.new(
-    anchor_url: page_nav_close_url
+  <% recording_studio_page_nav(
+    title: "Create API key",
+    page_nav_anchor_url: page_nav_close_url
   ) %>
 
   <%= render FlatPack::PageTitle::Component.new(
-    title: "Add API access",
+    title: "Create API key",
     variant: :h1
   ) %>
 
@@ -24,41 +25,42 @@
   <%= form_with url: api_clients_path(page_nav_close_param), scope: :api_client, method: :post, class: "space-y-6" do |form| %>
     <%= form.hidden_field :root_type, value: @form_values.fetch(:root_type) %>
 
-    <div class="space-y-2">
-      <label for="api_client_access_point_recording_id" class="block text-sm font-medium text-(--surface-content-color)">Access point</label>
-      <%= form.select :access_point_recording_id,
-        options_for_select(@access_point_recordings.map { |recording| [recording_label(recording), recording.id] }, @form_values.fetch(:access_point_recording_id)),
-        {},
-        class: "flat-pack-input w-full rounded-md border bg-[var(--surface-background-color)] px-[var(--form-control-padding)] py-[var(--form-control-padding)] text-sm text-[var(--surface-content-color)] border-[var(--surface-border-color)]" %>
-    </div>
+    <%= render FlatPack::TextInput::Component.new(
+      name: "api_client[api_client_name]",
+      value: @form_values.fetch(:api_client_name),
+      label: "Name",
+      class: "w-full"
+    ) %>
 
-    <div class="space-y-2">
-      <label for="api_client_api_client_name" class="block text-sm font-medium text-(--surface-content-color)">Name</label>
-      <%= form.text_field :api_client_name,
-        value: @form_values.fetch(:api_client_name),
-        class: "flat-pack-input w-full rounded-md border bg-[var(--surface-background-color)] px-[var(--form-control-padding)] py-[var(--form-control-padding)] text-sm text-[var(--surface-content-color)] border-[var(--surface-border-color)]" %>
-    </div>
+    <%= render FlatPack::Select::Component.new(
+      name: "api_client[access_point_recording_id]",
+      options: @access_point_recordings.map { |recording| [recording_label(recording), recording.id] },
+      value: @form_values.fetch(:access_point_recording_id),
+      label: "Access point",
+      class: "w-full"
+    ) %>
 
-    <div class="space-y-2">
-      <label for="api_client_role" class="block text-sm font-medium text-(--surface-content-color)">Role</label>
-      <%= form.select :role,
-        options_for_select(@role_options, @form_values.fetch(:role)),
-        {},
-        class: "flat-pack-input w-full rounded-md border bg-[var(--surface-background-color)] px-[var(--form-control-padding)] py-[var(--form-control-padding)] text-sm text-[var(--surface-content-color)] border-[var(--surface-border-color)]" %>
-    </div>
+    <%= render FlatPack::Select::Component.new(
+      name: "api_client[role]",
+      options: @role_options,
+      value: @form_values.fetch(:role),
+      label: "Role",
+      class: "w-full"
+    ) %>
 
-    <div class="space-y-2">
-      <label for="api_client_expires_at" class="block text-sm font-medium text-(--surface-content-color)">Expires</label>
-      <%= form.datetime_local_field :expires_at,
-        value: @form_values.fetch(:expires_at),
-        placeholder: "Never",
-        class: "flat-pack-input w-full rounded-md border bg-[var(--surface-background-color)] px-[var(--form-control-padding)] py-[var(--form-control-padding)] text-sm text-[var(--surface-content-color)] border-[var(--surface-border-color)]" %>
-      <p class="text-sm text-(--surface-muted-content-color)">Leave blank to use the configured token TTL.</p>
-    </div>
+    <p class="text-sm text-(--surface-muted-content-color)">This will determine the access level of the api key.</p>
+
+    <%= render FlatPack::DateInput::Component.new(
+      name: "api_client[expires_at]",
+      value: @form_values.fetch(:expires_at),
+      placeholder: "Never",
+      label: "Expires (optional)",
+      class: "w-full"
+    ) %>
 
     <div class="flex flex-wrap gap-3">
       <%= render FlatPack::Button::Component.new(
-        text: "Create access",
+        text: "Create",
         style: :primary,
         size: :md,
         type: "submit"

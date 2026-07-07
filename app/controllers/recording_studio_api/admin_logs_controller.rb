@@ -15,6 +15,11 @@ module RecordingStudioApi
     SORT_DIRECTIONS = %w[asc desc].freeze
 
     def index
+      if recording_studio_admin_logs_screen_available?
+        redirect_to recording_studio_admin_logs_screen_path, status: :see_other
+        return
+      end
+
       @page = resolved_page
       @sort = resolved_sort
       @direction = resolved_direction
@@ -57,6 +62,15 @@ module RecordingStudioApi
     end
 
     private
+
+    def recording_studio_admin_logs_screen_available?
+      defined?(RecordingStudioAdmin) && RecordingStudioApi::Admin.available?
+    end
+
+    def recording_studio_admin_logs_screen_path
+      mount_path = RecordingStudioAdmin.configuration.default_mount_path.to_s.chomp("/")
+      "#{mount_path}/screens/api_logs"
+    end
 
     def resolved_page
       requested_page = params[:page].to_i

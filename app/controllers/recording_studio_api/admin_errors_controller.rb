@@ -4,10 +4,10 @@ module RecordingStudioApi
   class AdminErrorsController < AdminController
     NO_EXCEPTION_VALUE = "__none__"
     GROUP_BY_OPTIONS = [
-      ["Day", "day"],
-      ["Week", "week"],
-      ["Month", "month"],
-      ["Year", "year"]
+      %w[Day day],
+      %w[Week week],
+      %w[Month month],
+      %w[Year year]
     ].freeze
 
     def index
@@ -25,9 +25,7 @@ module RecordingStudioApi
       @errors_chart_start_date = parsed_date(params[:start_date]) || 29.days.ago.to_date
       @errors_chart_end_date = parsed_date(params[:end_date]) || Date.current
 
-      if @errors_chart_start_date > @errors_chart_end_date
-        @errors_chart_start_date, @errors_chart_end_date = @errors_chart_end_date, @errors_chart_start_date
-      end
+      @errors_chart_start_date, @errors_chart_end_date = @errors_chart_end_date, @errors_chart_start_date if @errors_chart_start_date > @errors_chart_end_date
 
       @errors_chart_error_type_options = error_type_options
       @errors_chart_error_type = normalized_error_type
@@ -170,7 +168,7 @@ module RecordingStudioApi
     def chart_bucket_label(bucket_start)
       case @errors_chart_group_by
       when "week"
-        "Week of #{bucket_start.strftime("%b %-d")}" 
+        "Week of #{bucket_start.strftime('%b %-d')}"
       when "month"
         bucket_start.strftime("%b %Y")
       when "year"

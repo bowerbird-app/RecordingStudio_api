@@ -9,6 +9,7 @@ require "devise/test/integration_helpers"
 require "rails/test_help"
 
 class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
+  # rubocop:disable Metrics/BlockLength
   include Devise::Test::IntegrationHelpers
   include ApiDummyHelpers
 
@@ -45,12 +46,15 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
 
     sign_in @user
 
-    @admin_root = RecordingStudioAdmin::Admin.create!(name: "Admin", key: SecureRandom.hex(4))
-    @admin_root_recording = RecordingStudio::Recording.create!(recordable: @admin_root)
+    @admin_root, @admin_root_recording = create_admin_root_recording
     create_access_recording(parent_recording: @admin_root_recording, user: @user, role: :admin)
 
     @admin_api = RecordingStudioApi::AdminApi.create!(key: "api-#{SecureRandom.hex(4)}", name: "Admin API")
-    @admin_api_recording = RecordingStudio::Recording.create!(recordable: @admin_api, parent_recording: @admin_root_recording)
+    @admin_api_recording = RecordingStudio::Recording.unscoped.find_or_create_by!(
+      recordable: @admin_api,
+      root_recording_id: @admin_root_recording.id,
+      parent_recording_id: @admin_root_recording.id
+    )
 
     ensure_api_request_logs_table!
     RecordingStudioApi::ApiRequestLog.delete_all
@@ -164,7 +168,7 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
       error_class: "RecordingStudioApi::Error",
       error_message: "Unexpected API error"
     )
-    
+
     RecordingStudioApi::ApiRequestLog.create!(
       occurred_at: Time.current.beginning_of_day - 3.days,
       request_id: "dash-errors-api-endpoint",
@@ -192,7 +196,7 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_includes response.body, "Admin API"
-    assert_includes response.body, "Gem-provided starting point for admin API tooling under the current admin root."
+    assert_includes response.body, "Manage API access"
     assert_includes response.body, "Settings"
     assert_includes response.body, "Rate limiting"
     assert_includes response.body, "Logs"
@@ -222,8 +226,8 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
     assert_select %(a[href="#{admin_api_settings_path(close_url: admin_api_path)}"]), text: "Settings", count: 1
     assert_select %(a[href="#{admin_api_rate_limiting_path(close_url: admin_api_path)}"]), text: "Rate limiting", count: 1
     assert_select %(a[href="#{admin_api_logs_path(close_url: admin_api_path)}"]), text: "Logs", count: 1
-    assert_select %(a[href="#{admin_api_requests_path(close_url: admin_api_path, range: "last_24_hours", group_by: "hour")}"]), text: "Full screen", count: 1
-    assert_select %(a[href="#{admin_api_requests_path(close_url: admin_api_path, start_date: 29.days.ago.to_date.iso8601, end_date: Date.current.iso8601, group_by: "day")}"]), text: "Full screen", count: 1
+    assert_select %(a[href="#{admin_api_requests_path(close_url: admin_api_path, range: 'last_24_hours', group_by: 'hour')}"]), text: "Full screen", count: 1
+    assert_select %(a[href="#{admin_api_requests_path(close_url: admin_api_path, start_date: 29.days.ago.to_date.iso8601, end_date: Date.current.iso8601, group_by: 'day')}"]), text: "Full screen", count: 1
     assert_select %(a[href="#{admin_api_errors_path(close_url: admin_api_path, start_date: 29.days.ago.to_date.iso8601, end_date: Date.current.iso8601)}"]), text: "Full screen", count: 1
     assert_not_includes response.body, "Admin API views start here"
     assert_not_includes response.body, "Section key"
@@ -344,8 +348,12 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "creates the admin api section when it is missing for the current admin root" do
-    RecordingStudio::Recording.unscoped.where(id: @admin_api_recording.id).delete_all
-    RecordingStudioApi::AdminApi.where(id: @admin_api.id).delete_all
+    admin_api_recordings = RecordingStudio::Recording.unscoped.where(
+      parent_recording_id: @admin_root_recording.id,
+      recordable_type: "RecordingStudioApi::AdminApi"
+    )
+    RecordingStudioApi::AdminApi.where(id: admin_api_recordings.select(:recordable_id)).delete_all
+    admin_api_recordings.delete_all
 
     assert_nil RecordingStudio::Recording.unscoped.find_by(
       parent_recording_id: @admin_root_recording.id,
@@ -412,6 +420,8 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "h1", text: "Recording Studio API demo"
   end
+
+  # rubocop:enable Metrics/BlockLength
 
   test "forbids the dashboard when accessed directly from a non-admin root" do
     workspace = Workspace.create!(name: "Workspace root")

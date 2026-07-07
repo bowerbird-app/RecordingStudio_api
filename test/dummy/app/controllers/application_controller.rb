@@ -28,6 +28,6 @@ class ApplicationController < ActionController::Base
 
   def admin_root_current?
     current_root = current_root_recording
-    current_root.present? && RecordingStudioAdmin.admin_root_recording?(current_root)
+    current_root.present? && current_root.recordable_type == "AdminRoot"
   end
 end

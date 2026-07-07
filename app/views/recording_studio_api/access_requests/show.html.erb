@@ -1,11 +1,12 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
-  <div class="relative">
-    <%= render FlatPack::PageNav::Component.new(
-      anchor_url: page_nav_close_url
-    ) %>
+  <% recording_studio_page_nav(
+    title: @api_client.name,
+    page_nav_anchor_url: page_nav_close_url
+  ) %>
 
-    <% if @latest_credential&.revoked_at.present? %>
-      <div class="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2" data-page-nav-right-slot="revoked-badge">
+  <% if @latest_credential&.revoked_at.present? %>
+    <% recording_studio_page_nav_right do %>
+      <div data-page-nav-right-slot="revoked-badge">
         <%= render FlatPack::Badge::Component.new(
           text: "Revoked",
           style: :warning,
@@ -13,7 +14,7 @@
         ) %>
       </div>
     <% end %>
-  </div>
+  <% end %>
 
   <%= render FlatPack::PageTitle::Component.new(
     title: @api_client.name,

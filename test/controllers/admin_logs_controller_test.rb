@@ -29,8 +29,7 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
 
     sign_in @user
 
-    @admin_root = RecordingStudioAdmin::Admin.create!(name: "Admin", key: SecureRandom.hex(4))
-    @admin_root_recording = RecordingStudio::Recording.create!(recordable: @admin_root)
+    @admin_root, @admin_root_recording = create_admin_root_recording
     create_access_recording(parent_recording: @admin_root_recording, user: @user, role: :admin)
 
     ensure_api_request_logs_table!
@@ -56,26 +55,35 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "renders the logs page with a lazy frame-targeted loader" do
+    without_admin_v1_logs_screen do
+      get "/admin/api/logs"
+
+      assert_response :success
+      assert_select %(a[href="#{admin_api_path}"]), minimum: 1
+      assert_includes response.body, "API logs"
+      assert_includes response.body, "Request log entries recorded by the API logging database."
+      assert_includes response.body, "Occurred"
+      assert_includes response.body, "Rate limited"
+      assert_includes response.body, "IP address"
+      assert_includes response.body, "10.0.0.1"
+      assert_includes response.body, 'aria-label="Rate limited"'
+      assert_includes response.body, "sortable_table"
+      assert_includes response.body, 'data-controller="auto-load"'
+      assert_includes response.body, "Loading more logs..."
+      assert_includes response.body, "page=2"
+      assert_includes response.body, "sort=request_method"
+      assert_includes response.body, 'data-turbo-frame="sortable_table"'
+      assert_includes response.body, "Date Range"
+      assert_includes response.body, "admin-logs-date-range-submit"
+      assert_includes response.body, "click-&gt;admin-logs-date-range-submit#submitOnApply"
+    end
+  end
+
+  test "redirects legacy logs route to the RecordingStudioAdmin API logs screen" do
     get "/admin/api/logs"
 
-    assert_response :success
-    assert_select %(nav.flat-pack-page-nav a[href="#{admin_api_path}"]), count: 1
-    assert_includes response.body, "API logs"
-    assert_includes response.body, "Request log entries recorded by the API logging database."
-    assert_includes response.body, "Occurred"
-    assert_includes response.body, "Rate limited"
-    assert_includes response.body, "IP address"
-    assert_includes response.body, "10.0.0.1"
-    assert_includes response.body, 'aria-label="Rate limited"'
-    assert_includes response.body, "sortable_table"
-    assert_includes response.body, 'data-controller="auto-load"'
-    assert_includes response.body, "Loading more logs..."
-    assert_includes response.body, "page=2"
-    assert_includes response.body, "sort=request_method"
-    assert_includes response.body, 'data-turbo-frame="sortable_table"'
-    assert_includes response.body, "Date Range"
-    assert_includes response.body, "admin-logs-date-range-submit"
-    assert_includes response.body, "click-&gt;admin-logs-date-range-submit#submitOnApply"
+    assert_response :see_other
+    assert_redirected_to "/admin/screens/api_logs"
   end
 
   test "filters logs by date range and preserves date params in pagination links" do
@@ -101,46 +109,54 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
       remote_ip: "10.99.0.2"
     )
 
-    get admin_api_logs_path(start_date: Date.current.iso8601, end_date: Date.current.iso8601)
+    without_admin_v1_logs_screen do
+      get admin_api_logs_path(start_date: Date.current.iso8601, end_date: Date.current.iso8601)
 
-    assert_response :success
-    assert_includes response.body, recent_log.remote_ip
-    assert_not_includes response.body, old_log.remote_ip
-    assert_includes response.body, "start_date=#{Date.current.iso8601}"
-    assert_includes response.body, "end_date=#{Date.current.iso8601}"
+      assert_response :success
+      assert_includes response.body, recent_log.remote_ip
+      assert_not_includes response.body, old_log.remote_ip
+      assert_includes response.body, "start_date=#{Date.current.iso8601}"
+      assert_includes response.body, "end_date=#{Date.current.iso8601}"
+    end
   end
 
   test "frame request replaces the logs content with additional rows" do
-    get admin_api_logs_path(page: 2), headers: { "Turbo-Frame" => "sortable_table" }
+    without_admin_v1_logs_screen do
+      get admin_api_logs_path(page: 2), headers: { "Turbo-Frame" => "sortable_table" }
 
-    assert_response :success
-    assert_equal Mime[:html].to_s, response.media_type
-    assert_includes response.body, '<turbo-frame id="sortable_table">'
-    assert_includes response.body, "10.0.0.30"
+      assert_response :success
+      assert_equal Mime[:html].to_s, response.media_type
+      assert_includes response.body, '<turbo-frame id="sortable_table">'
+      assert_includes response.body, "10.0.0.30"
+    end
   end
 
   test "supports sortable headers and applies sorting to loaded rows" do
-    get admin_api_logs_path(sort: "duration_ms", direction: "desc")
+    without_admin_v1_logs_screen do
+      get admin_api_logs_path(sort: "duration_ms", direction: "desc")
 
-    assert_response :success
-    assert_includes response.body, "sort=duration_ms"
-    assert_includes response.body, "direction=asc"
-    assert_includes response.body, "page=2"
-    assert_includes response.body, "direction=desc"
+      assert_response :success
+      assert_includes response.body, "sort=duration_ms"
+      assert_includes response.body, "direction=asc"
+      assert_includes response.body, "page=2"
+      assert_includes response.body, "direction=desc"
 
-    first_row_position = response.body.index("10.0.0.30")
-    last_row_position = response.body.index("10.0.0.6")
+      first_row_position = response.body.index("10.0.0.30")
+      last_row_position = response.body.index("10.0.0.6")
 
-    refute_nil first_row_position
-    refute_nil last_row_position
-    assert_operator first_row_position, :<, last_row_position
+      refute_nil first_row_position
+      refute_nil last_row_position
+      assert_operator first_row_position, :<, last_row_position
+    end
   end
 
   test "turbo stream requests redirect back to html logs page" do
-    get admin_api_logs_path(format: :turbo_stream), params: { page: 2 }
+    without_admin_v1_logs_screen do
+      get admin_api_logs_path(format: :turbo_stream), params: { page: 2 }
 
-    assert_response :see_other
-    assert_redirected_to admin_api_logs_path(page: 2, sort: "occurred_at", direction: "desc")
+      assert_response :see_other
+      assert_redirected_to admin_api_logs_path(page: 2, sort: "occurred_at", direction: "desc")
+    end
   end
 
   test "switching to a workspace root falls back to the host root when the logs path is requested" do
@@ -175,9 +191,11 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
       }
     }
 
-    get "/admin/api/logs"
+    without_admin_v1_logs_screen do
+      get "/admin/api/logs"
 
-    assert_response :forbidden
+      assert_response :forbidden
+    end
   end
 
   test "renders the empty state when the logging table is missing" do
@@ -185,11 +203,13 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
     table_name = RecordingStudioApi::ApiRequestLog.table_name
     connection.drop_table(table_name) if connection.table_exists?(table_name)
 
-    get admin_api_logs_path
+    without_admin_v1_logs_screen do
+      get admin_api_logs_path
 
-    assert_response :success
-    assert_includes response.body, "No API logs yet"
-    assert_includes response.body, "API request logging has not produced any rows yet."
+      assert_response :success
+      assert_includes response.body, "No API logs yet"
+      assert_includes response.body, "API request logging has not produced any rows yet."
+    end
   ensure
     ensure_api_request_logs_table!
   end
@@ -231,5 +251,9 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
 
       t.timestamps
     end
+  end
+
+  def without_admin_v1_logs_screen(&)
+    RecordingStudioApi::Admin.stub(:available?, false, &)
   end
 end

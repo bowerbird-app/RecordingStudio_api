@@ -36,8 +36,8 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select %(nav.flat-pack-page-nav a[href="/"][aria-label="Close"]), count: 1
     assert_select "button", text: "Cancel", count: 0
-    assert_includes response.body, "Add API access"
-    assert_includes response.body, "Create access"
+    assert_includes response.body, "Create API key"
+    assert_includes response.body, "Create"
     assert_includes response.body, "Access point"
     assert_includes response.body, "Name"
     assert_includes response.body, "Role"
@@ -121,13 +121,13 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_select %(a[href="/recording_studio_api/api_clients/requests_chart?close_url=%2Fworkspace&root_recording_id=#{@workspace_root_recording.id}"]), text: "Full screen", count: 1
     assert_select %(a[href="/recording_studio_api/api_clients/#{direct_api_client.id}?close_url=%2Fworkspace"]), text: direct_api_client.name
     assert_select %(a[href="/recording_studio_api/api_clients/#{nested_api_client.id}?close_url=%2Fworkspace"]), text: nested_api_client.name
-    assert_match(/\d+\s+(minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years)\s+(ago|from now)/, response.body)
+    assert_match(/(\d+\s+(minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years)\s+ago|In\s+\d+\s+(minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years))/, response.body)
     assert_includes response.body, %(datetime="#{direct_expires_at.iso8601}")
     expected_day_labels = (6.days.ago.to_date..Date.current).map { |day| day.strftime("%a") }
     expected_day_labels.each do |day_label|
       assert_includes response.body, day_label
     end
-    assert_select "time.flat-pack-timestamp.cursor-help", minimum: 1
+    assert_includes response.body, 'class="flat-pack-timestamp'
   end
 
   test "index hides request charts when there are no api keys yet" do

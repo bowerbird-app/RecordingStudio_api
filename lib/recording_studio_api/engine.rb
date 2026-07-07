@@ -11,7 +11,6 @@ module RecordingStudioApi
       RecordingStudioApi::ApiAccessToken
     ].freeze
 
-    ADMIN_ROOT_RECORDABLE_TYPE_NAME = "RecordingStudioAdmin::Admin"
     ADMIN_API_RECORDABLE_TYPE_NAME = "RecordingStudioApi::AdminApi"
 
     RECORDABLE_MODEL_DEPENDENCIES = {
@@ -164,6 +163,12 @@ module RecordingStudioApi
       end
     end
 
+    initializer "recording_studio_api.register_recording_studio_admin", after: "recording_studio_api.after_initialize" do
+      config.to_prepare do
+        RecordingStudioApi.register_recording_studio_admin!
+      end
+    end
+
     def self.register_recordable_types!
       return unless defined?(RecordingStudio) && RecordingStudio.respond_to?(:configuration)
       return unless defined?(RecordingStudio::RecordableDeclarations)
@@ -183,13 +188,13 @@ module RecordingStudioApi
         declare_recordable_type!(recordable_type_name, **declaration)
       end
 
-      if admin_root_recordable_available?
+      if admin_root_recordable_type_names.any?
         declare_recordable_type!(
           ADMIN_API_RECORDABLE_TYPE_NAME,
           label: "Admin API",
           plural_label: "Admin APIs",
           root: false,
-          allowed_parent_types: [ADMIN_ROOT_RECORDABLE_TYPE_NAME]
+          allowed_parent_types: admin_root_recordable_type_names
         )
       end
 
@@ -205,27 +210,16 @@ module RecordingStudioApi
     end
 
     def self.internal_recordable_type_names
-      API_RECORDABLE_TYPE_NAMES + [ADMIN_ROOT_RECORDABLE_TYPE_NAME, ADMIN_API_RECORDABLE_TYPE_NAME]
+      API_RECORDABLE_TYPE_NAMES + admin_root_recordable_type_names + [ADMIN_API_RECORDABLE_TYPE_NAME]
     end
 
     def self.register_admin_root_recordable!
-      return unless admin_root_recordable_available?
-
-      register_recordable_type_names!([ADMIN_ROOT_RECORDABLE_TYPE_NAME])
-      return if declaration_defined?(ADMIN_ROOT_RECORDABLE_TYPE_NAME)
-
-      declare_recordable_type!(
-        ADMIN_ROOT_RECORDABLE_TYPE_NAME,
-        label: "Admin",
-        plural_label: "Admin",
-        root: true,
-        allowed_parent_types: []
-      )
+      register_recordable_type_names!(admin_root_recordable_type_names)
     end
 
     def self.recordable_type_names_to_register
       type_names = API_RECORDABLE_TYPE_NAMES.dup
-      type_names << ADMIN_API_RECORDABLE_TYPE_NAME if admin_root_recordable_available?
+      type_names << ADMIN_API_RECORDABLE_TYPE_NAME if admin_root_recordable_type_names.any?
       type_names
     end
 
@@ -258,8 +252,10 @@ module RecordingStudioApi
       RecordingStudio::RecordableDeclarations.declarations.key?(recordable_type_name)
     end
 
-    def self.admin_root_recordable_available?
-      ADMIN_ROOT_RECORDABLE_TYPE_NAME.safe_constantize.present?
+    def self.admin_root_recordable_type_names
+      Array(RecordingStudioApi.configuration.admin_root_recordable_type_names).map(&:to_s).select do |recordable_type_name|
+        recordable_type_name.safe_constantize.present?
+      end
     end
   end
 end

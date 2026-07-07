@@ -20,11 +20,11 @@ module RecordingStudioApi
     }.freeze
     SORT_DIRECTIONS = %w[asc desc].freeze
     GROUP_BY_OPTIONS = [
-      ["Hour", "hour"],
-      ["Day", "day"],
-      ["Week", "week"],
-      ["Month", "month"],
-      ["Year", "year"]
+      %w[Hour hour],
+      %w[Day day],
+      %w[Week week],
+      %w[Month month],
+      %w[Year year]
     ].freeze
 
     def index
@@ -63,9 +63,7 @@ module RecordingStudioApi
         @requests_chart_start_date = parsed_date(params[:start_date]) || 29.days.ago.to_date
         @requests_chart_end_date = parsed_date(params[:end_date]) || Date.current
 
-        if @requests_chart_start_date > @requests_chart_end_date
-          @requests_chart_start_date, @requests_chart_end_date = @requests_chart_end_date, @requests_chart_start_date
-        end
+        @requests_chart_start_date, @requests_chart_end_date = @requests_chart_end_date, @requests_chart_start_date if @requests_chart_start_date > @requests_chart_end_date
 
         @requests_chart_start_time = @requests_chart_start_date.beginning_of_day
         @requests_chart_end_time = @requests_chart_end_date.end_of_day
@@ -96,22 +94,22 @@ module RecordingStudioApi
       end
 
       @request_log_rows = filtered_requests_scope
-        .order(current_sort_column => @direction.to_sym, id: @direction.to_sym)
-        .limit(TABLE_LIMIT)
-        .map do |log|
-          occurred_at = log.occurred_at || log.created_at
+                          .order(current_sort_column => @direction.to_sym, id: @direction.to_sym)
+                          .limit(TABLE_LIMIT)
+                          .map do |log|
+        occurred_at = log.occurred_at || log.created_at
 
-          {
-            occurred_at: occurred_at,
-            method: log.request_method,
-            path: log.request_path,
-            status: log.status_code.to_s,
-            rate_limited: log.rate_limited? ? "Yes" : "No",
-            ip_address: log.remote_ip.to_s.presence || "-",
-            duration: "#{log.duration_ms} ms",
-            request_id: log.request_id.presence || "-"
-          }
-        end
+        {
+          occurred_at: occurred_at,
+          method: log.request_method,
+          path: log.request_path,
+          status: log.status_code.to_s,
+          rate_limited: log.rate_limited? ? "Yes" : "No",
+          ip_address: log.remote_ip.to_s.presence || "-",
+          duration: "#{log.duration_ms} ms",
+          request_id: log.request_id.presence || "-"
+        }
+      end
     end
 
     def parsed_date(raw_date)
@@ -194,13 +192,12 @@ module RecordingStudioApi
       if last_24_hours_range?
         previous_end_time = @requests_chart_start_time
         previous_start_time = previous_end_time - 24.hours
-        [previous_start_time, previous_end_time]
       else
         day_count = (@requests_chart_end_date - @requests_chart_start_date).to_i + 1
         previous_end_time = @requests_chart_start_date.beginning_of_day
         previous_start_time = previous_end_time - day_count.days
-        [previous_start_time, previous_end_time]
       end
+      [previous_start_time, previous_end_time]
     end
 
     def percentage_difference(current_total:, previous_total:)
@@ -306,7 +303,7 @@ module RecordingStudioApi
       when "hour"
         bucket_start.strftime("%b %-d %l %p").squish
       when "week"
-        "Week of #{bucket_start.strftime("%b %-d")}"
+        "Week of #{bucket_start.strftime('%b %-d')}"
       when "month"
         bucket_start.strftime("%b %Y")
       when "year"

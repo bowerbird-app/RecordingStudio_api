@@ -187,7 +187,7 @@ class RecordingStudioApiTest < Minitest::Test
     controller_source = File.read(controller_path)
 
     assert_includes controller_source, "include RecordingStudio::RootSwitchable::ControllerSupport"
-    assert_includes controller_source, "RecordingStudioAdmin.admin_root_recording?"
+    assert_includes controller_source, 'current_root.recordable_type == "AdminRoot"'
   end
 
   def test_dummy_routes_mount_admin_accessible_and_root_switchable_engines
@@ -196,6 +196,9 @@ class RecordingStudioApiTest < Minitest::Test
 
     assert_includes routes_source, 'mount RecordingStudioAccessible::Engine, at: "/recording_studio_accessible"'
     assert_includes routes_source, 'mount RecordingStudioRootSwitchable::Engine, at: "/recording_studio_root_switchable"'
+    assert_includes routes_source, 'mount RecordingStudioAccessible::Engine, at: "/admin/access", as: :recording_studio_admin_access'
+    assert_includes routes_source, 'recording_studio_admin_for :api, at: "/api/dashboard", root_section: :api'
+    assert_includes routes_source, 'recording_studio_admin_for :admin, at: "/admin", root_section: :api_admin'
     assert_includes routes_source, 'get "/admin/api", to: "recording_studio_api/admin_dashboards#show", as: :admin_api'
     assert_includes routes_source, 'get "/admin/api/requests", to: "recording_studio_api/admin_requests#index", as: :admin_api_requests'
     assert_includes routes_source, 'get "/admin/api/errors", to: "recording_studio_api/admin_errors#index", as: :admin_api_errors'
@@ -206,9 +209,9 @@ class RecordingStudioApiTest < Minitest::Test
     initializer_path = File.expand_path("dummy/config/initializers/recording_studio_root_switchable.rb", __dir__)
     initializer_source = File.read(initializer_path)
 
-    assert_includes initializer_source, "config.layout = :application_layout"
+    assert_includes initializer_source, 'recording_studio/default_layout'
     assert_includes initializer_source, "config.scope :all_roots"
-    assert_includes initializer_source, "RecordingStudioAdmin::Admin"
+    assert_includes initializer_source, 'recording.recordable_type == "AdminRoot"'
     assert_includes initializer_source, "nested_return_to = Rack::Utils.parse_nested_query"
     assert_includes initializer_source, 'resolved_return_to_path.start_with?("/admin")'
   end
@@ -217,8 +220,9 @@ class RecordingStudioApiTest < Minitest::Test
     initializer_path = File.expand_path("dummy/config/initializers/recording_studio_admin.rb", __dir__)
     initializer_source = File.read(initializer_path)
 
-    assert_includes initializer_source, "config.current_root_recording_resolver"
-    assert_includes initializer_source, "controller.current_root_recording"
+    assert_includes initializer_source, "config.access_recording_resolver"
+    assert_includes initializer_source, 'AdminRoot.find_by(name: "Admin")'
+    assert_includes initializer_source, "config.site_admin_recording_resolver = config.access_recording_resolver"
   end
 
   def test_dummy_api_initializer_configures_admin_dashboard_path_resolver
@@ -229,9 +233,11 @@ class RecordingStudioApiTest < Minitest::Test
     assert_includes initializer_source, "config.admin_dashboard_path_resolver"
     assert_includes initializer_source, "config.admin_requests_path_resolver"
     assert_includes initializer_source, "config.admin_errors_path_resolver"
+    assert_includes initializer_source, "config.admin_logs_path_resolver"
     assert_includes initializer_source, "controller.main_app.admin_api_path"
     assert_includes initializer_source, "controller.main_app.admin_api_requests_path"
     assert_includes initializer_source, "controller.main_app.admin_api_errors_path"
+    assert_includes initializer_source, "controller.main_app.admin_api_logs_path"
   end
 
   def test_engine_ships_admin_api_dashboard_view_and_model

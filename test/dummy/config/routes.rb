@@ -8,6 +8,7 @@ Rails.application.routes.draw do
   mount RecordingStudioAccessible::Engine, at: "/recording_studio_accessible"
   mount RecordingStudioApi::Engine, at: "/recording_studio_api"
   mount RecordingStudioRootSwitchable::Engine, at: "/recording_studio_root_switchable"
+  mount RecordingStudioAccessible::Engine, at: "/admin/access", as: :recording_studio_admin_access
 
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
@@ -19,6 +20,8 @@ Rails.application.routes.draw do
   get "/admin/api/requests", to: "recording_studio_api/admin_requests#index", as: :admin_api_requests
   get "/admin/api/errors", to: "recording_studio_api/admin_errors#index", as: :admin_api_errors
   get "/admin/api/logs", to: "recording_studio_api/admin_logs#index", as: :admin_api_logs
+  recording_studio_admin_for :api, at: "/api/dashboard", root_section: :api
+  recording_studio_admin_for :admin, at: "/admin", root_section: :api_admin
   resource :scalar_test_token, only: %i[create destroy]
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.

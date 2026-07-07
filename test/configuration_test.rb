@@ -48,7 +48,7 @@ class ConfigurationTest < Minitest::Test
     assert_equal "v1", configuration.default_api_version
     assert_nil configuration.openapi_title
     assert_nil configuration.openapi_description
-    assert_equal "application", configuration.layout_name
+    assert_equal "recording_studio/default_layout", configuration.layout_name
     assert_equal false, configuration.rate_limit_oauth_enabled
     assert_equal false, configuration.rate_limit_api_enabled
     assert_equal "recording_studio_api", configuration.rate_limit_redis_namespace

@@ -5,6 +5,7 @@ require "fileutils"
 require "tmpdir"
 require "generators/recording_studio_api/install/install_generator"
 require "generators/recording_studio_api/migrations/migrations_generator"
+require "generators/recording_studio_api/admin_screens/admin_screens_generator"
 
 class InstallGeneratorTest < Minitest::Test
   INSTALL_TEMPLATE_PATH = File.expand_path(
@@ -21,6 +22,14 @@ class InstallGeneratorTest < Minitest::Test
 
   def build_generator(destination_root, options = {})
     RecordingStudioApi::Generators::InstallGenerator.new(
+      [],
+      options,
+      destination_root: destination_root
+    )
+  end
+
+  def build_admin_screens_generator(destination_root, options = {})
+    RecordingStudioApi::Generators::AdminScreensGenerator.new(
       [],
       options,
       destination_root: destination_root
@@ -142,6 +151,69 @@ class InstallGeneratorTest < Minitest::Test
 
     assert File.exist?(generator_path)
     assert_equal RecordingStudioApi::Generators::MigrationsGenerator, RecordingStudioApi::Generators::MigrationsGenerator
+  end
+
+  def test_admin_screens_generator_adds_admin_route
+    generator = build_admin_screens_generator("/tmp", admin_mount_path: "/ops")
+    routes = []
+
+    generator.stub(:route, ->(value) { routes << value }) do
+      generator.add_admin_route
+    end
+
+    assert_equal ['recording_studio_admin_for :admin, at: "/ops", root_section: :api_admin'], routes
+  end
+
+  def test_admin_screens_generator_adds_api_dashboard_route
+    generator = build_admin_screens_generator("/tmp", api_dashboard_mount_path: "/api/dashboard")
+    routes = []
+
+    generator.stub(:route, ->(value) { routes << value }) do
+      generator.add_api_dashboard_route
+    end
+
+    assert_equal ['recording_studio_admin_for :api, at: "/api/dashboard", root_section: :api'], routes
+  end
+
+  def test_admin_screens_generator_wires_user_and_admin_root_sections
+    with_temp_app do |destination_root|
+      FileUtils.mkdir_p(File.join(destination_root, "app/models"))
+      File.write(File.join(destination_root, "app/models/workspace.rb"), <<~RUBY)
+        class Workspace < ApplicationRecord
+          recording_studio_recordable label: "Workspace", root: true
+        end
+      RUBY
+      File.write(File.join(destination_root, "app/models/admin_root.rb"), <<~RUBY)
+        class AdminRoot < ApplicationRecord
+          include RecordingStudioAdmin::AllowsAdminSections
+
+          recording_studio_admin_sections do
+            section :existing
+          end
+        end
+      RUBY
+
+      generator = build_admin_screens_generator(
+        destination_root,
+        user_roots: ["Workspace"],
+        admin_root: "AdminRoot"
+      )
+
+      generator.stub(:say, nil) do
+        generator.add_user_api_access_sections
+        generator.add_site_api_admin_section
+      end
+
+      workspace_source = File.read(File.join(destination_root, "app/models/workspace.rb"))
+      assert_includes workspace_source, "include RecordingStudioAdmin::AllowsAdminSections"
+      assert_includes workspace_source, "recording_studio_admin_sections do"
+      assert_includes workspace_source, "section :api"
+
+      admin_source = File.read(File.join(destination_root, "app/models/admin_root.rb"))
+      assert_includes admin_source, "section :existing"
+      assert_includes admin_source, "section :api_admin"
+      assert_equal 1, admin_source.scan("include RecordingStudioAdmin::AllowsAdminSections").count
+    end
   end
 
   def test_migrations_generator_reports_when_source_directory_is_missing

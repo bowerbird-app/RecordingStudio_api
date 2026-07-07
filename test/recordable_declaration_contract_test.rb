@@ -34,10 +34,10 @@ class RecordableDeclarationContractTest < ActiveSupport::TestCase
     assert_equal %w[Workspace Folder], RecordingStudio.allowed_parent_types_for("Folder")
     assert_includes RecordingStudio.allowed_parent_types_for("RecordingStudio::Access"), "Workspace"
     assert_includes RecordingStudio.allowed_parent_types_for("RecordingStudio::Access"), "Folder"
-    assert_includes RecordingStudio.allowed_parent_types_for("RecordingStudio::Access"), "RecordingStudioAdmin::Admin"
+    assert_includes RecordingStudio.allowed_parent_types_for("RecordingStudio::Access"), "AdminRoot"
     assert_equal ["RecordingStudio::Access"], RecordingStudio.allowed_parent_types_for("RecordingStudioApi::ApiClient")
     assert_equal ["RecordingStudioApi::ApiClient"], RecordingStudio.allowed_parent_types_for("RecordingStudioApi::ApiCredential")
     assert_equal ["RecordingStudioApi::ApiCredential"], RecordingStudio.allowed_parent_types_for("RecordingStudioApi::ApiAccessToken")
-    assert_equal ["RecordingStudioAdmin::Admin"], RecordingStudio.allowed_parent_types_for("RecordingStudioApi::AdminApi")
+    assert_equal ["AdminRoot"], RecordingStudio.allowed_parent_types_for("RecordingStudioApi::AdminApi")
   end
 end

@@ -5,6 +5,15 @@
     variant: :h1
   ) %>
 
+  <div class="-mt-3 flex flex-wrap justify-start gap-3">
+    <%= render FlatPack::Button::Component.new(
+      text: "API",
+      style: :default,
+      size: :md,
+      url: @api_admin_path
+    ) %>
+  </div>
+
   <%= render FlatPack::SectionTitle::Component.new(
     title: "Workspace",
     subtitle: "Current child access recordings where workspace access has been provided."
@@ -15,7 +24,7 @@
         text: "API keys",
         style: :default,
         size: :md,
-        url: recording_studio_api.api_clients_path(@workspace_api_keys_params)
+        url: @workspace_api_keys_path
       ) %>
   </div>
 
@@ -29,7 +38,7 @@
         text: "API keys",
         style: :default,
         size: :md,
-        url: recording_studio_api.api_clients_path(@folder_api_keys_params)
+        url: @folder_api_keys_path
       ) %>
   </div>
 

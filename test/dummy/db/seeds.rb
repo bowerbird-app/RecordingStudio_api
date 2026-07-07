@@ -275,9 +275,7 @@ admin_user = User.find_or_create_by!(email: "admin@admin.com") do |user|
   user.password_confirmation = "Password"
 end
 
-admin_root = RecordingStudioAdmin::Admin.find_or_create_by!(key: "admin") do |record|
-  record.name = "Admin"
-end
+admin_root = AdminRoot.find_or_create_by!(name: "Admin")
 
 admin_api = RecordingStudioApi::AdminApi.find_or_create_by!(key: "api") do |record|
   record.name = "Admin API"

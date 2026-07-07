@@ -10,7 +10,7 @@ module RecordingStudioApi
       label: "Admin API",
       plural_label: "Admin APIs",
       root: false,
-      allowed_parent_types: ["RecordingStudioAdmin::Admin"]
+      allowed_parent_types: RecordingStudioApi.configuration.admin_root_recordable_type_names
     )
 
     validates :key, presence: true, uniqueness: true

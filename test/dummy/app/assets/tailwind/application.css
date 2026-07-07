@@ -15,6 +15,8 @@
 /* Include RecordingStudioAdmin engine views for Tailwind CSS */
 @source "../../vendor/bundle/**/recording_studio_admin/app/views/**/*.erb";
 @source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/recording_studio_admin-*/app/views/**/*.erb";
+@source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/recording_studio_admin-*/lib/**/*.rb";
+@source inline("text-[var(--color-success-background-color)] text-[var(--color-danger-background-color)]");
 
 /* Include FlatPack component sources for Tailwind CSS */
 @source "../../vendor/bundle/**/flat_pack/app/components/**/*.{rb,erb}";

@@ -31,7 +31,7 @@ module ApiDummyHelpers
     RecordingStudio.enable_capability(:accessible, on: "Workspace")
     RecordingStudio.enable_capability(:accessible, on: "Folder")
     RecordingStudio.enable_capability(:accessible, on: "Page")
-    RecordingStudio.enable_capability(:accessible, on: "RecordingStudioAdmin::Admin") if defined?(RecordingStudioAdmin::Admin)
+    RecordingStudio.enable_capability(:accessible, on: "AdminRoot") if defined?(AdminRoot)
     RecordingStudio.enable_capability(:movable, on: "Folder")
     RecordingStudio.enable_capability(:trashable, on: "Page")
   end
@@ -41,6 +41,35 @@ module ApiDummyHelpers
       user.password = TEST_PASSWORD
       user.password_confirmation = TEST_PASSWORD
     end
+  end
+
+  def create_admin_root_recording(name: "Admin")
+    ensure_admin_root_tables!
+    admin_root = AdminRoot.find_or_create_by!(name: name)
+
+    [admin_root, RecordingStudio::Recording.find_or_create_by!(recordable: admin_root)]
+  end
+
+  def ensure_admin_root_tables!
+    connection = ActiveRecord::Base.connection
+
+    unless connection.table_exists?(:admin_roots)
+      connection.create_table :admin_roots, id: :uuid, default: -> { "gen_random_uuid()" } do |t|
+        t.string :name, null: false
+
+        t.timestamps
+      end
+    end
+
+    return if connection.table_exists?(:admin_sections)
+
+    connection.create_table :admin_sections, id: :uuid, default: -> { "gen_random_uuid()" } do |t|
+      t.string :key, null: false
+      t.string :name, null: false
+
+      t.timestamps
+    end
+    connection.add_index :admin_sections, :key, unique: true
   end
 
   def create_access_recording_for(user:, workspace_name: "Workspace #{SecureRandom.hex(4)}", role: :admin)

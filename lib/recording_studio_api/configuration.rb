@@ -27,6 +27,7 @@ module RecordingStudioApi
                   :admin_errors_path_resolver,
                   :admin_logs_path_resolver,
                   :admin_layout_name,
+                  :admin_root_recordable_type_names,
                   :openapi_title,
                   :openapi_description,
                   :layout_name,
@@ -51,6 +52,7 @@ module RecordingStudioApi
                   :api_request_logging_payload_mode
     attr_reader :hooks, :action_registry, :recordable_registry, :default_api_version, :api_version_profiles
 
+    # rubocop:disable Metrics/AbcSize
     def initialize
       @timeout = 5
       @token_ttl = 30.respond_to?(:days) ? 30.days : 30 * 24 * 60 * 60
@@ -76,12 +78,13 @@ module RecordingStudioApi
         controller.recording_studio_api.admin_logs_path(params)
       end
       @admin_layout_name = nil
+      @admin_root_recordable_type_names = ["AdminRoot"]
       @api_versions = [DEFAULT_API_VERSION]
       @default_api_version = DEFAULT_API_VERSION
       @api_version_profiles = {}
       @openapi_title = nil
       @openapi_description = nil
-      @layout_name = "application"
+      @layout_name = "recording_studio/default_layout"
       @pagination_default_limit = 50
       @pagination_max_limit = 100
       @rate_limit_oauth_enabled = false
@@ -105,6 +108,7 @@ module RecordingStudioApi
       @action_registry = ActionRegistry.new
       @recordable_registry = RecordableRegistry.new
     end
+    # rubocop:enable Metrics/AbcSize
 
     def to_h
       {
@@ -118,6 +122,7 @@ module RecordingStudioApi
         admin_errors_path_resolver: admin_errors_path_resolver.respond_to?(:call),
         admin_logs_path_resolver: admin_logs_path_resolver.respond_to?(:call),
         admin_layout_name: admin_layout_name,
+        admin_root_recordable_type_names: admin_root_recordable_type_names,
         api_versions: api_versions,
         default_api_version: default_api_version,
         api_version_profiles: api_version_profiles.transform_values(&:as_json),

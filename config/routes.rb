@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+# rubocop:disable Metrics/BlockLength
 RecordingStudioApi::Engine.routes.draw do
   get "/admin_api", to: "admin_dashboards#show", as: :admin_dashboard
   get "/admin_api/settings", to: "admin_settings#show", as: :admin_settings
@@ -66,3 +67,4 @@ RecordingStudioApi::Engine.routes.draw do
     end
   end
 end
+# rubocop:enable Metrics/BlockLength

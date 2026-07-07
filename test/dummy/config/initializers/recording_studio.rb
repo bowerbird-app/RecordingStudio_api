@@ -2,7 +2,7 @@
 
 RecordingStudio.configure do |config|
   # Host app recordables; addon engines append their own internal recordables.
-  config.recordable_types = [ "Workspace", "Folder", "Page" ]
+  config.recordable_types = [ "Workspace", "Folder", "Page", "AdminRoot", "AdminSection" ]
   config.require_recordable_declarations = true
 
   # Actor resolver for events when no actor is explicitly supplied
@@ -25,15 +25,9 @@ RecordingStudio.configure do |config|
   config.enable_capability(:accessible, on: "Workspace")
   config.enable_capability(:accessible, on: "Folder")
   config.enable_capability(:accessible, on: "Page")
+  config.enable_capability(:accessible, on: "AdminRoot")
   config.enable_capability(:movable, on: "Folder")
   config.enable_capability(:trashable, on: "Page")
-end
-
-Rails.application.config.after_initialize do
-  next unless defined?(RecordingStudioAdmin::Admin)
-  next unless RecordingStudio::RecordableDeclarations.declarations.key?("RecordingStudioAdmin::Admin")
-
-  RecordingStudio.enable_capability(:accessible, on: "RecordingStudioAdmin::Admin")
 end
 
 RecordingStudio::Labels.register_formatter(

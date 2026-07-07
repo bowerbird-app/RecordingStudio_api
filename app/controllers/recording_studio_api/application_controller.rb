@@ -4,6 +4,8 @@ module RecordingStudioApi
   class ApplicationController < ActionController::Base
     include RecordingStudio::RootSwitchable::ControllerSupport if defined?(RecordingStudio::RootSwitchable::ControllerSupport)
 
+    helper RecordingStudio::LayoutHelper if defined?(RecordingStudio::LayoutHelper)
+
     helper_method :admin_root_current?
     helper_method :current_root_name
     helper_method :page_nav_close_url
@@ -29,9 +31,31 @@ module RecordingStudioApi
     def admin_root_current?
       current_root = current_root_recording if respond_to?(:current_root_recording, true)
       return false if current_root.blank?
-      return false unless defined?(RecordingStudioAdmin) && RecordingStudioAdmin.respond_to?(:admin_root_recording?)
 
-      RecordingStudioAdmin.admin_root_recording?(current_root)
+      recording_studio_api_admin_root_recording?(current_root)
+    end
+
+    def recording_studio_api_admin_root_recording?(recording)
+      return false unless defined?(RecordingStudioAdmin)
+
+      recordable = recording.recordable if recording.respond_to?(:recordable)
+      return false unless recordable&.class.respond_to?(:recording_studio_admin_section_keys_for)
+
+      context = RecordingStudioAdmin::Context.new(
+        params: {},
+        current_actor: recording_studio_api_current_actor,
+        controller: self,
+        routes: self
+      )
+      keys = recordable.class.recording_studio_admin_section_keys_for(recordable, recording, context)
+      Array(keys).map(&:to_s).include?("api_admin")
+    end
+
+    def recording_studio_api_current_actor
+      return current_user if respond_to?(:current_user, true) && current_user.present?
+      return Current.actor if defined?(Current) && Current.respond_to?(:actor)
+
+      nil
     end
 
     def current_root_name

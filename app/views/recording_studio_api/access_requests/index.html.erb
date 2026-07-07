@@ -1,6 +1,7 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-6">
-  <%= render FlatPack::PageNav::Component.new(
-    anchor_url: page_nav_close_url
+  <% recording_studio_page_nav(
+    title: "API keys",
+    page_nav_anchor_url: page_nav_close_url
   ) %>
 
   <%= render FlatPack::PageTitle::Component.new(

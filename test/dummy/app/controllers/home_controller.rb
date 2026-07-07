@@ -23,10 +23,23 @@ class HomeController < ApplicationController
     @folder_access_recordings = access_recordings_for("Folder")
     @workspace_api_keys_params = workspace_api_keys_params
     @folder_api_keys_params = folder_api_keys_params
+    @workspace_api_keys_path = api_access_clients_admin_screen_path(@workspace_api_keys_params)
+    @folder_api_keys_path = api_access_clients_admin_screen_path(@folder_api_keys_params)
+    @api_admin_path = api_admin_path
+  end
+
+  def api_admin_path
+    ["/api/dashboard", { anchor_url: root_path }.to_query].join("?")
+  end
+
+  def api_access_clients_admin_screen_path(params)
+    query = params.compact.to_query
+    mount_path = "/api/dashboard"
+    ["#{mount_path}/screens/api_access_clients", query.presence].compact.join("?")
   end
 
   def workspace_api_keys_params
-    root_recording = root_recordings.find { |recording| recording.recordable_type == "Workspace" }
+    root_recording = current_root_for_type("Workspace") || root_recordings.find { |recording| recording.recordable_type == "Workspace" }
     return default_api_keys_params if root_recording.nil?
 
     default_api_keys_params.merge(
@@ -37,6 +50,15 @@ class HomeController < ApplicationController
   end
 
   def folder_api_keys_params
+    current_folder_root = current_root_for_type("Folder")
+    if current_folder_root.present?
+      return default_api_keys_params.merge(
+        root_recording_id: current_folder_root.id,
+        parent_recording_id: current_folder_root.id,
+        include_children: "1"
+      )
+    end
+
     folder_parent_recording = recordings.find do |recording|
       recording.recordable_type == "Folder" && recording.parent_recording_id.present?
     end
@@ -67,8 +89,14 @@ class HomeController < ApplicationController
 
   def default_api_keys_params
     {
-      close_url: root_path
+      close_url: root_path,
+      anchor_url: root_path
     }
+  end
+
+  def current_root_for_type(recordable_type)
+    current_root = current_root_recording if respond_to?(:current_root_recording, true)
+    current_root if current_root&.recordable_type == recordable_type
   end
 
   def recordings

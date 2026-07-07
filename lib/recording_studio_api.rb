@@ -41,6 +41,7 @@ require "recording_studio_api/services/resource_operations/update"
 require "recording_studio_api/services/resource_operations/destroy"
 require "recording_studio_api/services/trashable_operations/restore"
 require "recording_studio_api/services/trashable_operations/destroy"
+require "recording_studio_api/admin"
 
 # rubocop:disable Metrics/ModuleLength
 module RecordingStudioApi
@@ -123,6 +124,10 @@ module RecordingStudioApi
         openapi: openapi,
         sortable_attributes: sortable_attributes
       )
+    end
+
+    def register_recording_studio_admin!
+      Admin.register!
     end
 
     def capability_action(name, version: nil)

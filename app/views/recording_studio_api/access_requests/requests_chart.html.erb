@@ -1,13 +1,9 @@
 <div class="mx-auto flex w-full max-w-7xl flex-col gap-6 pb-6">
-  <%= render FlatPack::PageNav::Component.new(
-    entries: [
-      {
-        label: "Back",
-        url: api_clients_path(requests_chart_back_params),
-        icon: :arrow_left
-      }
-    ],
-    anchor_url: page_nav_close_url
+  <% recording_studio_page_nav(
+    title: "API requests",
+    page_nav_back_url: api_clients_path(requests_chart_back_params),
+    page_nav_back_label: "Back",
+    page_nav_anchor_url: page_nav_close_url
   ) %>
 
   <%= render FlatPack::PageTitle::Component.new(
