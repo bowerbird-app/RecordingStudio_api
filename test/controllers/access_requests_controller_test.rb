@@ -41,6 +41,7 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Access point"
     assert_includes response.body, "Name"
     assert_includes response.body, "Role"
+    assert_includes response.body, "Controls what this API key can access and change"
     assert_includes response.body, "Expires"
     assert_select %(input[name="api_client[expires_at]"][placeholder="Never"]), count: 1
     assert_not_includes response.body, "Access role"

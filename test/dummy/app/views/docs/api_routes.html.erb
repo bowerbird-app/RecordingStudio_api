@@ -18,8 +18,7 @@
       Rails.application.routes.draw do
         mount RecordingStudioApi::Engine, at: "/recording_studio_api"
         mount RecordingStudioAccessible::Engine, at: "/admin/access", as: :recording_studio_admin_access
-        recording_studio_admin_for :api, at: "/api/dashboard", root_section: :api
-        recording_studio_admin_for :admin, at: "/admin", root_section: :api_admin
+        recording_studio_admin_for :api, at: "/api", root_section: :api
       end
     CODE
   ) %>
@@ -89,17 +88,17 @@
   ) %>
 
   <%= render FlatPack::SectionTitle::Component.new(
-    title: "Admin V1 API screens",
-    subtitle: "When RecordingStudioAdmin is mounted, the API gem registers an API Admin section and an API logs screen.",
+    title: "API admin screens",
+    subtitle: "When RecordingStudioAdmin is mounted, the API gem registers workspace API key and request screens.",
     anchor_link: true,
   ) %>
 
   <%= render FlatPack::CodeBlock::Component.new(
     language: :text,
     code: <<~'CODE'
-      GET /admin/sections/api_admin
-      GET /admin/screens/api_logs
-      GET /admin/screens/api_logs/table
+      GET /api/sections/api
+      GET /api/screens/api_keys
+      GET /api/screens/api_requests
     CODE
   ) %>
 

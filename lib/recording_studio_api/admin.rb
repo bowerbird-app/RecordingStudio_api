@@ -6,15 +6,16 @@ rescue LoadError
   nil
 end
 
+require "recording_studio_api/admin/select_filter_default_patch"
+
 module RecordingStudioApi
   module Admin
     DEFINITION_FILES = %w[
+      recording_studio_api/admin/api_request_log_helpers
       recording_studio_api/admin/queries/api_access_clients_query
-      recording_studio_api/admin/api_access_section
-      recording_studio_api/admin/api_access_clients_screen
+      recording_studio_api/admin/api_section
+      recording_studio_api/admin/api_keys_screen
       recording_studio_api/admin/api_access_requests_screen
-      recording_studio_api/admin/api_admin_section
-      recording_studio_api/admin/api_logs_screen
     ].freeze
 
     module_function
@@ -28,11 +29,9 @@ module RecordingStudioApi
       return false unless available?
 
       load_definitions!
-      ::RecordingStudioAdmin.register_section(ApiAccessSection)
-      ::RecordingStudioAdmin.register_section(ApiAdminSection)
-      ::RecordingStudioAdmin.register_screen(ApiAccessClientsScreen)
+      ::RecordingStudioAdmin.register_section(ApiSection)
+      ::RecordingStudioAdmin.register_screen(ApiKeysScreen)
       ::RecordingStudioAdmin.register_screen(ApiAccessRequestsScreen)
-      ::RecordingStudioAdmin.register_screen(ApiLogsScreen)
       true
     end
     # rubocop:enable Naming/PredicateMethod

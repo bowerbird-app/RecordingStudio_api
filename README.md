@@ -334,8 +334,9 @@ end
 ### API endpoints
 
 - `GET /recording_studio_api/admin_api` — browser admin dashboard for configured API access
-- `GET /admin/screens/api_logs` — RecordingStudioAdmin V1 API request-log screen when the host mounts the admin surface
-- `GET /recording_studio_api/admin_api/logs` — legacy browser admin request-log route; redirects to the Admin V1 screen when RecordingStudioAdmin is available
+- `GET /api/screens/api_keys` — RecordingStudioAdmin API key screen when the host mounts the API surface
+- `GET /api/screens/api_requests` — RecordingStudioAdmin API request screen when the host mounts the API surface
+- `GET /recording_studio_api/admin_api/logs` — browser admin request-log route
 - `POST /recording_studio_api/oauth/token` — issue OAuth2 bearer access tokens using `client_credentials`
 - `GET /recording_studio_api/api/<version>` — list available API resources for the selected public API version
 - `GET /recording_studio_api/api/<version>/:resource` — list recordings of a resource type inside the authenticated root

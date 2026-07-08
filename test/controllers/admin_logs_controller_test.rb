@@ -79,11 +79,11 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "redirects legacy logs route to the RecordingStudioAdmin API logs screen" do
+  test "renders legacy logs route directly" do
     get "/admin/api/logs"
 
-    assert_response :see_other
-    assert_redirected_to "/admin/screens/api_logs"
+    assert_response :success
+    assert_includes response.body, "API logs"
   end
 
   test "filters logs by date range and preserves date params in pagination links" do

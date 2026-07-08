@@ -45,10 +45,9 @@
       options: @role_options,
       value: @form_values.fetch(:role),
       label: "Role",
+      help_text: "Controls what this API key can access and change",
       class: "w-full"
     ) %>
-
-    <p class="text-sm text-(--surface-muted-content-color)">This will determine the access level of the api key.</p>
 
     <%= render FlatPack::DateInput::Component.new(
       name: "api_client[expires_at]",

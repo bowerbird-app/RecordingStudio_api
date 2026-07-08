@@ -2,8 +2,8 @@
 
 module RecordingStudioApi
   module Admin
-    class ApiAccessClientsScreen < ::RecordingStudioAdmin::Screen
-      key "api_access_clients"
+    class ApiKeysScreen < ::RecordingStudioAdmin::Screen
+      key "api_keys"
       icon :key
       title "API keys"
       subtitle do |context|
@@ -14,7 +14,7 @@ module RecordingStudioApi
         RecordingStudioApi::Admin::Queries::ApiAccessClientsQuery.call(context)
       end
 
-      filter :status, values: %w[active expired revoked missing], apply: lambda { |rows, value, _context|
+      filter :status, values: %w[active expired revoked missing], default: "active", apply: lambda { |rows, value, _context|
         case value.to_s
         when "active" then rows.select { |row| row.status == "Active" }
         when "expired" then rows.select { |row| row.status == "Expired" }
@@ -48,7 +48,7 @@ module RecordingStudioApi
                title: "Status",
                sortable: false,
                display: :badge,
-               display_options: ->(_row, _context, value) { RecordingStudioApi::Admin::ApiAccessClientsScreen.status_badge_options(value) }
+               display_options: ->(_row, _context, value) { RecordingStudioApi::Admin::ApiKeysScreen.status_badge_options(value) }
         column :request_count, title: "Requests", sortable: false
         column :last_requested_at, title: "Last request", sortable: false
         column :expires_text, title: "Expires", sortable: false
@@ -59,7 +59,7 @@ module RecordingStudioApi
                text: "View requests",
                icon: "queue-list",
                url: lambda { |row, context|
-                 "#{context.admin_screen_path('api_access_requests')}?api_client_id=#{row.id}"
+                 "#{context.admin_screen_path('api_requests')}?api_credential_id=#{row.api_credential.id}"
                }
 
         action :edit,
@@ -67,8 +67,8 @@ module RecordingStudioApi
                icon: "pencil-square",
                url: lambda { |row, context|
                  context.controller.recording_studio_api.edit_api_client_path(
-                   row.id,
-                   close_url: context.admin_screen_path("api_access_clients")
+                   row.api_client.id,
+                   close_url: context.admin_screen_path("api_keys")
                  )
                }
 
@@ -79,12 +79,12 @@ module RecordingStudioApi
                confirm: "Rotate this API key? The new secret will only be shown once.",
                url: lambda { |row, context|
                  context.controller.recording_studio_api.rotate_api_client_path(
-                   row.id,
-                   close_url: context.admin_screen_path("api_access_clients")
+                   row.api_client.id,
+                   close_url: context.admin_screen_path("api_keys")
                  )
                },
                visible_if: lambda { |row, context|
-                 RecordingStudioApi::Admin::ApiAccessClientsScreen.manageable?(row, context)
+                 RecordingStudioApi::Admin::ApiKeysScreen.manageable?(row, context)
                }
 
         action :revoke,
@@ -95,12 +95,12 @@ module RecordingStudioApi
                destructive: true,
                url: lambda { |row, context|
                  context.controller.recording_studio_api.revoke_api_client_path(
-                   row.id,
-                   close_url: context.admin_screen_path("api_access_clients")
+                   row.api_client.id,
+                   close_url: context.admin_screen_path("api_keys")
                  )
                },
                visible_if: lambda { |row, context|
-                 RecordingStudioApi::Admin::ApiAccessClientsScreen.manageable?(row, context) && row.status == "Active"
+                 RecordingStudioApi::Admin::ApiKeysScreen.manageable?(row, context) && row.status == "Active"
                }
       end
       # rubocop:enable Metrics/BlockLength

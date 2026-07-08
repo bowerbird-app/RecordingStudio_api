@@ -23,19 +23,19 @@ class HomeController < ApplicationController
     @folder_access_recordings = access_recordings_for("Folder")
     @workspace_api_keys_params = workspace_api_keys_params
     @folder_api_keys_params = folder_api_keys_params
-    @workspace_api_keys_path = api_access_clients_admin_screen_path(@workspace_api_keys_params)
-    @folder_api_keys_path = api_access_clients_admin_screen_path(@folder_api_keys_params)
+    @workspace_api_keys_path = api_keys_admin_screen_path(@workspace_api_keys_params)
+    @folder_api_keys_path = api_keys_admin_screen_path(@folder_api_keys_params)
     @api_admin_path = api_admin_path
   end
 
   def api_admin_path
-    ["/api/dashboard", { anchor_url: root_path }.to_query].join("?")
+    ["/api", { anchor_url: root_path }.to_query].join("?")
   end
 
-  def api_access_clients_admin_screen_path(params)
+  def api_keys_admin_screen_path(params)
     query = params.compact.to_query
-    mount_path = "/api/dashboard"
-    ["#{mount_path}/screens/api_access_clients", query.presence].compact.join("?")
+    mount_path = "/api"
+    ["#{mount_path}/screens/api_keys", query.presence].compact.join("?")
   end
 
   def workspace_api_keys_params

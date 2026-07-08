@@ -25,6 +25,10 @@ Metrics/ClassLength:
     - 'test/**/*'
     - 'lib/recording_studio_api/hooks.rb'
 
+Metrics/BlockLength:
+  Exclude:
+    - 'test/**/*'
+
 Metrics/MethodLength:
   Exclude:
     - 'test/**/*'

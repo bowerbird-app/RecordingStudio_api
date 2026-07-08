@@ -2,7 +2,7 @@
 
 module RecordingStudioApi
   module Admin
-    class ApiAccessSection < ::RecordingStudioAdmin::Section
+    class ApiSection < ::RecordingStudioAdmin::Section
       key "api"
       icon :key
       title "API"
@@ -13,22 +13,20 @@ module RecordingStudioApi
            url: lambda { |context|
              context.controller.recording_studio_api.new_api_client_path(
                root_recording_id: context.root_recording&.id,
-               close_url: context.admin_screen_path("api_access_clients")
+               close_url: context.admin_screen_path("api_keys")
              )
            },
            style: :primary
 
       link :clients,
            text: "View API keys",
-           url: ->(context) { context.admin_screen_path("api_access_clients") },
+           url: ->(context) { context.admin_screen_path("api_keys") },
            style: :default
 
       link :requests,
            text: "View requests",
-           url: ->(context) { context.admin_screen_path("api_access_requests") },
+           url: ->(context) { context.admin_screen_path("api_requests") },
            style: :secondary
-
-      widget "api_access_requests.widgets.total_requests", view_variant: :card, params: { preset_key: :this_month }
     end
   end
 end

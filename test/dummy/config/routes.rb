@@ -20,8 +20,7 @@ Rails.application.routes.draw do
   get "/admin/api/requests", to: "recording_studio_api/admin_requests#index", as: :admin_api_requests
   get "/admin/api/errors", to: "recording_studio_api/admin_errors#index", as: :admin_api_errors
   get "/admin/api/logs", to: "recording_studio_api/admin_logs#index", as: :admin_api_logs
-  recording_studio_admin_for :api, at: "/api/dashboard", root_section: :api
-  recording_studio_admin_for :admin, at: "/admin", root_section: :api_admin
+  recording_studio_admin_for :api, at: "/api", root_section: :api
   resource :scalar_test_token, only: %i[create destroy]
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.

@@ -6,6 +6,7 @@ module RecordingStudioApi
       class ApiAccessClientsQuery
         Row = Struct.new(
           :id,
+          :api_credential,
           :api_client,
           :access_point_recording,
           :name,
@@ -32,50 +33,82 @@ module RecordingStudioApi
         end
 
         def call
-          rows.sort_by { |row| [row.name.to_s.downcase, row.id.to_s] }
+          filtered_rows.sort_by { |row| [row.name.to_s.downcase, row.id.to_s] }
         end
 
         private
 
         attr_reader :context
 
+        def filtered_rows
+          case status_filter_value
+          when "active"
+            rows.select { |row| row.status == "Active" }
+          when "expired"
+            rows.select { |row| row.status == "Expired" }
+          when "revoked"
+            rows.select { |row| row.status == "Revoked" }
+          when "missing"
+            rows.select { |row| row.status == "No credentials" }
+          else
+            rows
+          end
+        end
+
+        def status_filter_value
+          context.params[:status].presence || context.params["status"].presence || "active"
+        end
+
         def rows
-          api_clients.filter_map do |api_client|
+          api_credentials.filter_map do |api_credential|
+            api_client = api_credential.api_client
             access_recording = api_client.access_recording
             next if access_recording.nil?
 
             root_recording = access_recording.root_recording
             next if root_recording.nil?
 
-            latest_credential = latest_credential_for(api_client)
             access_point_recording = access_point_recording_for(access_recording)
             Row.new(
-              id: api_client.id,
+              id: api_credential.id,
+              api_credential: api_credential,
               api_client: api_client,
               access_point_recording: access_point_recording,
               name: api_client.name,
-              api_key: latest_credential&.oauth_client_id || "Unknown",
+              api_key: api_credential.oauth_client_id || "Unknown",
               access_point: access_point_label(access_point_recording),
               role: access_recording.recordable&.try(:role).to_s.humanize.presence || "Unknown",
               credentials_count: api_client.credentials.size,
-              expires_at: expires_at_for(latest_credential),
-              expires_text: expires_text_for(latest_credential),
-              status: credential_status_label(latest_credential),
-              request_count: request_count_for(api_client),
-              last_requested_at: last_requested_at_for(api_client)
+              expires_at: expires_at_for(api_credential),
+              expires_text: expires_text_for(api_credential),
+              status: credential_status_label(api_credential),
+              request_count: request_count_for(api_credential),
+              last_requested_at: last_requested_at_for(api_credential)
             )
           end
         end
 
-        def api_clients
-          @api_clients ||= RecordingStudioApi::ApiClient
-                           .includes(
-                             :credentials,
-                             access_recording: [:recordable, :root_recording, { parent_recording: [:recordable, :parent_recording] }]
-                           )
-                           .where(access_recording_id: visible_api_client_access_recordings.select(:id))
-                           .reorder(:created_at, :id)
-                           .to_a
+        def api_credentials
+          @api_credentials ||= RecordingStudioApi::ApiCredential
+                               .includes(
+                                 api_client: [
+                                   :credentials,
+                                   { access_recording: [:recordable, :root_recording, { parent_recording: [:recordable, :parent_recording] }] }
+                                 ]
+                               )
+                               .where(api_client_id: visible_api_clients.select(:id))
+                               .reorder(:created_at, :id)
+                               .to_a
+        end
+
+        def visible_api_clients
+          @visible_api_clients ||= RecordingStudioApi::ApiClient
+                                   .includes(
+                                     :credentials,
+                                     access_recording: [:recordable, :root_recording, { parent_recording: [:recordable, :parent_recording] }]
+                                   )
+                                   .where(access_recording_id: visible_api_client_access_recordings.select(:id))
+                                   .reorder(:created_at, :id)
         end
 
         def visible_api_client_access_recordings
@@ -206,10 +239,6 @@ module RecordingStudioApi
           RecordingStudio::Recording.connection
         end
 
-        def latest_credential_for(api_client)
-          api_client.credentials.max_by { |credential| [credential.created_at.to_i, credential.id.to_s] }
-        end
-
         def expires_at_for(credential)
           return if credential.nil?
           return if credential.revoked_at.present?
@@ -236,30 +265,30 @@ module RecordingStudioApi
           "Active"
         end
 
-        def request_count_for(api_client)
-          request_counts_by_client_id.fetch(api_client.id, 0)
+        def request_count_for(api_credential)
+          request_counts_by_credential_id.fetch(api_credential.id, 0)
         end
 
-        def last_requested_at_for(api_client)
-          last_requests_by_client_id.fetch(api_client.id, nil)
+        def last_requested_at_for(api_credential)
+          last_requests_by_credential_id.fetch(api_credential.id, nil)
         end
 
-        def request_counts_by_client_id
+        def request_counts_by_credential_id
           return {} unless RecordingStudioApi::ApiRequestLog.table_available?
 
-          @request_counts_by_client_id ||= RecordingStudioApi::ApiRequestLog
-                                           .where(api_client_id: api_clients.map(&:id))
-                                           .group(:api_client_id)
-                                           .count
+          @request_counts_by_credential_id ||= RecordingStudioApi::ApiRequestLog
+                                               .where(api_credential_id: api_credentials.map(&:id))
+                                               .group(:api_credential_id)
+                                               .count
         end
 
-        def last_requests_by_client_id
+        def last_requests_by_credential_id
           return {} unless RecordingStudioApi::ApiRequestLog.table_available?
 
-          @last_requests_by_client_id ||= RecordingStudioApi::ApiRequestLog
-                                          .where(api_client_id: api_clients.map(&:id))
-                                          .group(:api_client_id)
-                                          .maximum(:occurred_at)
+          @last_requests_by_credential_id ||= RecordingStudioApi::ApiRequestLog
+                                              .where(api_credential_id: api_credentials.map(&:id))
+                                              .group(:api_credential_id)
+                                              .maximum(:occurred_at)
         end
 
         def access_point_recording_for(access_recording)

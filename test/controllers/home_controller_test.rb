@@ -41,11 +41,11 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Workspace"
     assert_includes response.body, "Folder"
     assert_includes response.body, "API keys"
-    assert_includes response.body, "/api/dashboard"
-    assert_select %(a[href="/api/dashboard?anchor_url=%2F"]), text: "API", count: 1
+    assert_includes response.body, "/api"
+    assert_select %(a[href="/api?anchor_url=%2F"]), text: "API", count: 1
     assert_not_includes response.body, "Child access recording"
     assert_select %(a[href="#{docs_install_path}"]), count: 1
-    api_keys_links = Nokogiri::HTML(response.body).css('a[href*="/api/dashboard/screens/api_access_clients"]')
+    api_keys_links = Nokogiri::HTML(response.body).css('a[href*="/api/screens/api_keys"]')
     api_keys_query_params = api_keys_links.map do |link|
       uri = URI.parse(link["href"])
       Rack::Utils.parse_nested_query(uri.query.to_s)

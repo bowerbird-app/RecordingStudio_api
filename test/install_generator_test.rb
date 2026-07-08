@@ -153,29 +153,18 @@ class InstallGeneratorTest < Minitest::Test
     assert_equal RecordingStudioApi::Generators::MigrationsGenerator, RecordingStudioApi::Generators::MigrationsGenerator
   end
 
-  def test_admin_screens_generator_adds_admin_route
-    generator = build_admin_screens_generator("/tmp", admin_mount_path: "/ops")
+  def test_admin_screens_generator_adds_api_route
+    generator = build_admin_screens_generator("/tmp", api_mount_path: "/api")
     routes = []
 
     generator.stub(:route, ->(value) { routes << value }) do
-      generator.add_admin_route
+      generator.add_api_route
     end
 
-    assert_equal ['recording_studio_admin_for :admin, at: "/ops", root_section: :api_admin'], routes
+    assert_equal ['recording_studio_admin_for :api, at: "/api", root_section: :api'], routes
   end
 
-  def test_admin_screens_generator_adds_api_dashboard_route
-    generator = build_admin_screens_generator("/tmp", api_dashboard_mount_path: "/api/dashboard")
-    routes = []
-
-    generator.stub(:route, ->(value) { routes << value }) do
-      generator.add_api_dashboard_route
-    end
-
-    assert_equal ['recording_studio_admin_for :api, at: "/api/dashboard", root_section: :api'], routes
-  end
-
-  def test_admin_screens_generator_wires_user_and_admin_root_sections
+  def test_admin_screens_generator_wires_user_api_sections
     with_temp_app do |destination_root|
       FileUtils.mkdir_p(File.join(destination_root, "app/models"))
       File.write(File.join(destination_root, "app/models/workspace.rb"), <<~RUBY)
@@ -183,36 +172,20 @@ class InstallGeneratorTest < Minitest::Test
           recording_studio_recordable label: "Workspace", root: true
         end
       RUBY
-      File.write(File.join(destination_root, "app/models/admin_root.rb"), <<~RUBY)
-        class AdminRoot < ApplicationRecord
-          include RecordingStudioAdmin::AllowsAdminSections
-
-          recording_studio_admin_sections do
-            section :existing
-          end
-        end
-      RUBY
 
       generator = build_admin_screens_generator(
         destination_root,
-        user_roots: ["Workspace"],
-        admin_root: "AdminRoot"
+        user_roots: ["Workspace"]
       )
 
       generator.stub(:say, nil) do
-        generator.add_user_api_access_sections
-        generator.add_site_api_admin_section
+        generator.add_user_api_sections
       end
 
       workspace_source = File.read(File.join(destination_root, "app/models/workspace.rb"))
       assert_includes workspace_source, "include RecordingStudioAdmin::AllowsAdminSections"
       assert_includes workspace_source, "recording_studio_admin_sections do"
       assert_includes workspace_source, "section :api"
-
-      admin_source = File.read(File.join(destination_root, "app/models/admin_root.rb"))
-      assert_includes admin_source, "section :existing"
-      assert_includes admin_source, "section :api_admin"
-      assert_equal 1, admin_source.scan("include RecordingStudioAdmin::AllowsAdminSections").count
     end
   end
 

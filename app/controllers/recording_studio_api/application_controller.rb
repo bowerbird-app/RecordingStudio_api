@@ -36,19 +36,8 @@ module RecordingStudioApi
     end
 
     def recording_studio_api_admin_root_recording?(recording)
-      return false unless defined?(RecordingStudioAdmin)
-
-      recordable = recording.recordable if recording.respond_to?(:recordable)
-      return false unless recordable&.class.respond_to?(:recording_studio_admin_section_keys_for)
-
-      context = RecordingStudioAdmin::Context.new(
-        params: {},
-        current_actor: recording_studio_api_current_actor,
-        controller: self,
-        routes: self
-      )
-      keys = recordable.class.recording_studio_admin_section_keys_for(recordable, recording, context)
-      Array(keys).map(&:to_s).include?("api_admin")
+      admin_root_types = RecordingStudioApi.configuration.admin_root_recordable_type_names
+      Array(admin_root_types).map(&:to_s).include?(recording.recordable_type.to_s)
     end
 
     def recording_studio_api_current_actor

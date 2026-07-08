@@ -15,44 +15,20 @@ module RecordingStudioApi
       )
 
       class_option(
-        :admin_root,
+        :api_mount_path,
         type: :string,
-        default: nil,
-        desc: "Admin root recordable model that should expose site-wide API admin screens"
+        default: "/api",
+        desc: "Route prefix used by the user-facing API admin surface"
       )
 
-      class_option(
-        :admin_mount_path,
-        type: :string,
-        default: "/admin",
-        desc: "Route prefix used by recording_studio_admin_for"
-      )
-
-      class_option(
-        :api_dashboard_mount_path,
-        type: :string,
-        default: "/api/dashboard",
-        desc: "Route prefix used by the user-facing API dashboard"
-      )
-
-      def add_api_dashboard_route
-        route %(recording_studio_admin_for :api, at: "#{options[:api_dashboard_mount_path]}", root_section: :api)
+      def add_api_route
+        route %(recording_studio_admin_for :api, at: "#{options[:api_mount_path]}", root_section: :api)
       end
 
-      def add_admin_route
-        route %(recording_studio_admin_for :admin, at: "#{options[:admin_mount_path]}", root_section: :api_admin)
-      end
-
-      def add_user_api_access_sections
+      def add_user_api_sections
         user_root_names.each do |model_name|
           add_section_to_model(model_name, :api)
         end
-      end
-
-      def add_site_api_admin_section
-        return if admin_root_name.blank?
-
-        add_section_to_model(admin_root_name, :api_admin)
       end
 
       def show_readme
@@ -64,10 +40,6 @@ module RecordingStudioApi
 
       def user_root_names
         Array(options[:user_roots]).flat_map { |entry| entry.to_s.split(",") }.map(&:strip).reject(&:blank?)
-      end
-
-      def admin_root_name
-        options[:admin_root].to_s.strip.presence
       end
 
       def add_section_to_model(model_name, section_key)
