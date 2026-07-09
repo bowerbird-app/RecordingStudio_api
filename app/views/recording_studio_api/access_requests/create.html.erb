@@ -1,56 +1,20 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
   <% recording_studio_page_nav(
-    title: "#{human_root_type} API access created",
+    title: "Copy secret",
     page_nav_anchor_url: page_nav_close_url
   ) %>
 
   <%= render FlatPack::PageTitle::Component.new(
-    title: "#{human_root_type} API access created",
-    subtitle: "The access recording, API client, and API credential were created successfully.",
+    title: "Copy secret",
+    subtitle: "This is only shown once. Use it to access the API.",
     variant: :h1
   ) %>
 
-  <%= render FlatPack::Card::Component.new(style: :default) do %>
-    <dl class="grid gap-4 md:grid-cols-2">
-      <div>
-        <dt class="text-sm font-medium text-(--surface-muted-content-color)">Root recording</dt>
-        <dd class="text-sm text-(--surface-content-color)"><%= recording_label(@payload.fetch(:root_recording)) %></dd>
-      </div>
-      <div>
-        <dt class="text-sm font-medium text-(--surface-muted-content-color)">Access point</dt>
-        <dd class="text-sm text-(--surface-content-color)"><%= recording_label(@payload.fetch(:access_point_recording)) %></dd>
-      </div>
-      <div>
-        <dt class="text-sm font-medium text-(--surface-muted-content-color)">Access role</dt>
-        <dd class="text-sm text-(--surface-content-color)"><%= @payload.fetch(:access_recording).recordable.role.to_s.humanize %></dd>
-      </div>
-      <div>
-        <dt class="text-sm font-medium text-(--surface-muted-content-color)">API client</dt>
-        <dd class="text-sm text-(--surface-content-color)"><%= @payload.fetch(:api_client).name %></dd>
-      </div>
-      <div>
-        <dt class="text-sm font-medium text-(--surface-muted-content-color)">Client ID</dt>
-        <dd class="text-sm text-(--surface-content-color)"><%= @payload.fetch(:credential).oauth_client_id %></dd>
-      </div>
-      <div>
-        <dt class="text-sm font-medium text-(--surface-muted-content-color)">Credential expiry</dt>
-        <dd class="text-sm text-(--surface-content-color)"><%= render FlatPack::Timestamp::Component.new(timestamp: @payload.fetch(:credential).expires_at, fallback_text: "Uses configured token TTL") %></dd>
-      </div>
-    </dl>
-  <% end %>
+  <pre class="overflow-x-auto rounded-md border border-(--surface-border-color) bg-(--surface-background-color) p-4 text-sm text-(--surface-content-color)" data-secret-reveal-target="secret"><%= @payload.fetch(:token) %></pre>
 
-  <%= render FlatPack::Card::Component.new(style: :default) do %>
-    <div class="space-y-3">
-      <%= render FlatPack::SectionTitle::Component.new(
-        title: "Client secret",
-        subtitle: "This token is only shown once. Use it with the client ID against /oauth/token."
-      ) %>
-      <pre class="overflow-x-auto rounded-md border border-(--surface-border-color) bg-(--surface-background-color) p-4 text-sm text-(--surface-content-color)"><%= @payload.fetch(:token) %></pre>
-    </div>
-  <% end %>
+  <%= render "recording_studio_api/access_requests/secret_reveal_scrubber" %>
 
   <div class="flex flex-wrap gap-3">
-    <%= button_to "Back to demo", page_nav_close_url, method: :get, class: "inline-flex items-center justify-center gap-2 rounded-[var(--button-border-radius)] font-medium cursor-pointer transition-colors duration-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--button-focus-ring-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--button-focus-ring-offset-color)] px-[var(--button-padding-x-md)] py-[var(--button-padding-y-md)] text-sm bg-[var(--button-primary-background-color)] text-[var(--button-primary-text-color)] border border-[var(--button-primary-border-color)] shadow-[var(--button-shadow)]" %>
-    <%= button_to "Add another", new_api_client_path({ root_type: @form_values.fetch(:root_type), access_point_recording_id: @form_values.fetch(:access_point_recording_id) }.merge(page_nav_close_param)), method: :get, class: "inline-flex items-center justify-center gap-2 rounded-[var(--button-border-radius)] font-medium cursor-pointer transition-colors duration-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--button-focus-ring-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--button-focus-ring-offset-color)] px-[var(--button-padding-x-md)] py-[var(--button-padding-y-md)] text-sm bg-[var(--surface-background-color)] text-[var(--surface-content-color)] border border-[var(--surface-border-color)]" %>
+    <%= button_to "Finish", page_nav_close_url, method: :get, class: "inline-flex items-center justify-center gap-2 rounded-[var(--button-border-radius)] font-medium cursor-pointer transition-colors duration-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--button-focus-ring-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--button-focus-ring-offset-color)] px-[var(--button-padding-x-md)] py-[var(--button-padding-y-md)] text-sm bg-[var(--button-primary-background-color)] text-[var(--button-primary-text-color)] border border-[var(--button-primary-border-color)] shadow-[var(--button-shadow)]" %>
   </div>
 </div>

@@ -23,7 +23,7 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
     sign_in @user
   end
 
-  test "root page renders the api access demo for workspace roots" do
+  test "root page renders the api access demo with the API admin link" do
     workspace = Workspace.create!(name: "Root Workspace")
     workspace_root_recording = RecordingStudio::Recording.create!(recordable: workspace)
     create_access_recording(parent_recording: workspace_root_recording, user: @user, role: :admin)
@@ -38,38 +38,10 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
     assert_select "h1", text: "Recording Studio API demo"
     assert_includes response.body, "Demo to add and remove API access"
     assert_includes response.body, "RecordingStudio API"
-    assert_includes response.body, "Workspace"
-    assert_includes response.body, "Folder"
-    assert_includes response.body, "API keys"
-    assert_includes response.body, "/api"
     assert_select %(a[href="/api?anchor_url=%2F"]), text: "API", count: 1
+    assert_not_includes response.body, "API keys"
     assert_not_includes response.body, "Child access recording"
     assert_select %(a[href="#{docs_install_path}"]), count: 1
-    api_keys_links = Nokogiri::HTML(response.body).css('a[href*="/api/screens/api_keys"]')
-    api_keys_query_params = api_keys_links.map do |link|
-      uri = URI.parse(link["href"])
-      Rack::Utils.parse_nested_query(uri.query.to_s)
-    end
-
-    workspace_scope = api_keys_query_params.find do |query_params|
-      query_params["root_recording_id"] == query_params["parent_recording_id"]
-    end
-    refute_nil workspace_scope
-    assert_equal "/", workspace_scope.fetch("close_url")
-    assert_equal "/", workspace_scope.fetch("anchor_url")
-    assert_equal "1", workspace_scope.fetch("include_children")
-
-    folder_scope = api_keys_query_params.find do |query_params|
-      query_params["root_recording_id"] != query_params["parent_recording_id"]
-    end
-    refute_nil folder_scope
-    assert_equal "/", folder_scope.fetch("close_url")
-    assert_equal "/", folder_scope.fetch("anchor_url")
-    assert_equal "1", folder_scope.fetch("include_children")
-
-    folder_parent_recording = RecordingStudio::Recording.find(folder_scope.fetch("parent_recording_id"))
-    assert_equal "Folder", folder_parent_recording.recordable_type
-    assert_equal folder_scope.fetch("root_recording_id"), folder_parent_recording.root_recording_id
     assert_not_includes response.body, "Open admin"
     assert_not_includes response.body, "Manage users"
     assert_not_includes response.body, "Open tree"
@@ -170,7 +142,6 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "h1", text: "Recording Studio API demo"
     assert_includes response.body, "Demo to add and remove API access"
-    assert_includes response.body, "API keys"
     assert_not_includes response.body, "<h1>Admin</h1>"
   end
 

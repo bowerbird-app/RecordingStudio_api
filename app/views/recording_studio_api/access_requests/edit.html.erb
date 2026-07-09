@@ -1,12 +1,11 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
   <% recording_studio_page_nav(
-    title: "Edit API access",
+    title: "Edit API key",
     page_nav_anchor_url: page_nav_close_url
   ) %>
 
   <%= render FlatPack::PageTitle::Component.new(
-    title: "Edit API access",
-    subtitle: "Update the API name, role, and credential expiry for this access entry.",
+    title: "Edit API key",
     variant: :h1
   ) %>
 
@@ -15,7 +14,7 @@
       <%= render FlatPack::Tooltip::Component.new(text: "Create a new secret and api key") do %>
         <%= render FlatPack::Button::Component.new(
           text: "Rotate key",
-          style: :warning,
+          style: :danger,
           size: :md,
           url: rotate_api_client_path(@api_client, page_nav_close_param),
           data: { turbo_method: :post, turbo_confirm: "Rotate this API key? This will revoke the current key." }
@@ -24,14 +23,13 @@
       <%= render FlatPack::Tooltip::Component.new(text: "Revoke this API key") do %>
         <%= render FlatPack::Button::Component.new(
           text: "Revoke",
-          style: :warning,
+          style: :danger,
           size: :md,
           url: revoke_api_client_path(@api_client, page_nav_close_param),
           data: { turbo_method: :post, turbo_confirm: "Revoke this API key?" }
         ) %>
       <% end %>
     </div>
-    <hr class="border-(--surface-border-color)">
   <% end %>
 
   <% if @errors.any? %>
@@ -48,36 +46,12 @@
   <% end %>
 
   <%= form_with url: api_client_path(@api_client, page_nav_close_param), scope: :api_client, method: :patch, class: "space-y-6" do |form| %>
-    <div class="space-y-2">
-      <label for="api_client_api_client_name" class="block text-sm font-medium text-(--surface-content-color)">Name</label>
-      <%= form.text_field :api_client_name,
-        value: @form_values.fetch(:api_client_name),
-        class: "flat-pack-input w-full rounded-md border bg-[var(--surface-background-color)] px-[var(--form-control-padding)] py-[var(--form-control-padding)] text-sm text-(--surface-content-color) border-[var(--surface-border-color)]" %>
-    </div>
-
-    <div class="space-y-2">
-      <label for="api_client_role" class="block text-sm font-medium text-(--surface-content-color)">Role</label>
-      <%= form.select :role,
-        options_for_select(@role_options, @form_values.fetch(:role)),
-        {},
-        class: "flat-pack-input w-full rounded-md border bg-[var(--surface-background-color)] px-[var(--form-control-padding)] py-[var(--form-control-padding)] text-sm text-(--surface-content-color) border-[var(--surface-border-color)]" %>
-    </div>
-
-    <div class="space-y-2">
-      <label for="api_client_expires_at" class="block text-sm font-medium text-(--surface-content-color)">Expires</label>
-      <%= form.datetime_local_field :expires_at,
-        value: @form_values.fetch(:expires_at),
-        class: "flat-pack-input w-full rounded-md border bg-[var(--surface-background-color)] px-[var(--form-control-padding)] py-[var(--form-control-padding)] text-sm text-(--surface-content-color) border-[var(--surface-border-color)]" %>
-      <p class="text-sm text-(--surface-muted-content-color)">Leave blank to remove expiry from the latest credential.</p>
-    </div>
-
-    <div class="flex flex-wrap gap-3">
-      <%= render FlatPack::Button::Component.new(
-        text: "Save changes",
-        style: :primary,
-        size: :md,
-        type: "submit"
-      ) %>
-    </div>
+    <%= render 'form_fields',
+      form: form,
+      form_values: @form_values,
+      role_options: @role_options,
+      access_point_recordings: @access_point_recordings,
+      show_root_hidden: false,
+      submit_text: "Save changes" %>
   <% end %>
 </div>

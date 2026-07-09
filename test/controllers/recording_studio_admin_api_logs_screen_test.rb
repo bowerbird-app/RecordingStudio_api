@@ -49,6 +49,8 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     )
     payload = provision_api_client_for(access_recording: access_recording, name: "Workspace API key")
     api_client = payload.fetch(:api_client)
+    popular_payload = provision_api_client_for(access_recording: access_recording, name: "Popular API key")
+    popular_api_client = popular_payload.fetch(:api_client)
     rotation_result = RecordingStudioApi::Services::RotateApiCredential.call(api_client: api_client, actor: @user)
 
     assert rotation_result.success?
@@ -69,6 +71,23 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
       remote_ip: "10.20.0.1"
     )
 
+    3.times do |i|
+      RecordingStudioApi::ApiRequestLog.create!(
+        occurred_at: i.days.ago,
+        request_id: "rs-admin-popular-log-#{i}",
+        request_method: "GET",
+        request_path: "/recording_studio_api/api/v1/popular-workspaces",
+        status_code: 200,
+        duration_ms: 45,
+        rate_limited: false,
+        api_client_id: popular_api_client.id,
+        api_credential_id: popular_payload.fetch(:credential).id,
+        access_recording_id: access_recording.id,
+        root_recording_id: workspace_root_recording.id,
+        remote_ip: "10.20.0.2"
+      )
+    end
+
     switch_to_root(workspace_root_recording)
 
     get "/api/sections/api"
@@ -77,13 +96,36 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "API"
     assert_includes response.body, "/api/screens/api_keys"
     assert_includes response.body, "/api/screens/api_requests"
+    assert_includes response.body, "widgets.recording_studio_api.requests_last_four_weeks"
+    assert_includes response.body, "widgets.recording_studio_api.most_used_keys"
     section_links = Nokogiri::HTML(response.body).css("a").select do |link|
-      ["Create API key", "View API keys", "View requests"].include?(link.text.strip)
+      ["Create API key", "API keys", "API requests"].include?(link.text.strip)
     end
 
-    assert_equal(["Create API key", "View API keys", "View requests"], section_links.map { |link| link.text.strip })
+    assert_equal(["Create API key", "API keys", "API requests"], section_links.map { |link| link.text.strip })
     assert_includes section_links[0]["class"], "--button-primary-background-color"
     assert_includes section_links[1]["class"], "--button-default-background-color"
+
+    get "/api/sections/api/widgets/widgets.recording_studio_api.requests_last_four_weeks", params: { anchor_url: "/" }
+
+    assert_response :success
+    assert_includes response.body, "API requests"
+    assert_includes response.body, "Last 4 weeks"
+    assert_includes response.body, "flat-pack--chart"
+    assert_includes response.body, "column"
+    assert_includes response.body, "/api/screens/api_requests"
+    assert_includes response.body, "group_by=day"
+
+    get "/api/sections/api/widgets/widgets.recording_studio_api.most_used_keys", params: { anchor_url: "/" }
+
+    assert_response :success
+    assert_includes response.body, "Most used keys"
+    assert_includes response.body, "Last 4 weeks"
+    assert_includes response.body, "Popular API key"
+    assert_includes response.body, "3 requests"
+    assert_includes response.body, "Workspace API key"
+    assert_includes response.body, "1 request"
+    assert_includes response.body, "/api/screens/api_keys"
 
     get "/api/screens/api_keys"
 
@@ -96,12 +138,13 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_select %(nav.flat-pack-page-nav a[href="/api"]), count: 1
     refute_includes response.body, "return_to=%2Fadmin"
 
-    get "/recording_studio_api/api_clients/#{api_client.id}/edit", params: { close_url: "/api/screens/api_keys" }
+    get "/recording_studio_api/api_clients/#{api_client.id}/edit", params: { anchor_url: "/", close_url: "/api/screens/api_keys" }
 
     assert_response :success
     assert_includes response.body, 'data-recording-studio-default-layout="true"'
     refute_includes response.body, 'data-controller="flat-pack--sidebar-layout"'
-    assert_includes response.body, "Edit API access"
+    assert_includes response.body, "Edit API key"
+    assert_select %(nav.flat-pack-page-nav a[href="/"][aria-label="Close"]), count: 1
 
     get "/api/screens/api_keys/table"
 
@@ -109,7 +152,7 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Workspace API key"
     assert_includes response.body, rotated_credential.oauth_client_id
     assert_includes response.body, "Active"
-    assert_includes response.body, "View requests"
+    assert_includes response.body, "API requests"
     assert_includes response.body, "Rotate key"
     assert_includes response.body, "Revoke key"
 
@@ -123,6 +166,10 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     get "/api/screens/api_requests/table", params: { api_credential_id: rotated_credential.id }
 
     assert_response :success
+    table_headers = css_select("thead th").map { |header| header.text.squish }
+    assert_includes table_headers.first, "Occurred"
+    assert_includes table_headers.second, "Name"
+    assert_includes response.body, "Workspace API key"
     assert_includes response.body, "/recording_studio_api/api/v1/workspaces"
     assert_includes response.body, "api_credential_id=#{rotated_credential.id}"
   end
@@ -135,6 +182,8 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     )
     payload = provision_api_client_for(access_recording: access_recording, name: "Analytics API key")
     api_client = payload.fetch(:api_client)
+    other_payload = provision_api_client_for(access_recording: access_recording, name: "Other API key")
+    other_api_client = other_payload.fetch(:api_client)
 
     2.times do |i|
       RecordingStudioApi::ApiRequestLog.create!(
@@ -170,13 +219,63 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
       )
     end
 
+    RecordingStudioApi::ApiRequestLog.create!(
+      occurred_at: Time.current,
+      request_id: "rs-analytics-other",
+      request_method: "GET",
+      request_path: "/recording_studio_api/api/v1/other-pages",
+      status_code: 200,
+      duration_ms: 75,
+      rate_limited: false,
+      api_client_id: other_api_client.id,
+      api_credential_id: other_payload.fetch(:credential).id,
+      access_recording_id: access_recording.id,
+      root_recording_id: workspace_root_recording.id,
+      remote_ip: "10.30.0.3"
+    )
+
     switch_to_root(workspace_root_recording)
 
     get "/api/screens/api_requests", params: { api_client_id: api_client.id }
 
     assert_response :success
+    assert_select %(select[name="group_by"]), count: 1
+    assert_select %(select[name="group_by"] option[value="day"][selected]), text: "Day", count: 1
+    assert_select %(select[name="api_client_name"]), count: 1
+    assert_select %(select[name="api_client_name"] option[value=""]:not([disabled])), text: "All API keys", count: 1
+    assert_select %(select[name="api_client_name"] option[value="Analytics API key"]), count: 1
+    assert_select %(select[name="status"] option[value=""][disabled][selected]), text: "Status", count: 1
     refute_includes response.body, "Avg duration"
     refute_includes response.body, "Error rate"
+
+    get "/api/screens/api_requests/table", params: { api_client_name: "Analytics API key" }
+
+    assert_response :success
+    assert_includes response.body, "/recording_studio_api/api/v1/pages"
+    refute_includes response.body, "/recording_studio_api/api/v1/other-pages"
+
+    get "/api/screens/api_requests/table", params: { api_client_name: "" }
+
+    assert_response :success
+    assert_includes response.body, "/recording_studio_api/api/v1/pages"
+    assert_includes response.body, "/recording_studio_api/api/v1/other-pages"
+
+    get "/api/screens/api_requests/chart", params: {
+      api_client_id: api_client.id,
+      api_client_name: "Analytics API key",
+      start_date: 10.days.ago.to_date.iso8601,
+      end_date: Date.current.iso8601,
+      group_by: "year"
+    }
+
+    assert_response :success
+    chart_body = CGI.unescapeHTML(response.body)
+    assert_includes chart_body, 'data-flat-pack--chart-type-value="bar"'
+    assert_includes chart_body, '"name":"Analytics API key"'
+    refute_includes chart_body, '"name":"Other API key"'
+    assert_includes chart_body, "\"x\":\"#{Time.current.year}\",\"y\":6"
+    assert_includes chart_body, '"stacked":true'
+    assert_includes chart_body, '"horizontal":false'
   end
 
   test "API access clients screen scopes clients to the requested root" do
@@ -219,7 +318,7 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     refute_includes response.body, first_payload.fetch(:credential).oauth_client_id
   end
 
-  test "dummy home links API keys to RecordingStudioAdmin API access screen" do
+  test "dummy home links to RecordingStudioAdmin API section" do
     workspace_root_recording, access_recording = create_access_recording_for(
       user: @user,
       workspace_name: "Redirect workspace",
@@ -231,8 +330,8 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     get "/"
 
     assert_response :success
-    assert_includes response.body, "/api/screens/api_keys"
-    assert_includes response.body, "root_recording_id=#{workspace_root_recording.id}"
+    assert_includes response.body, "/api?anchor_url=%2F"
+    refute_includes response.body, "root_recording_id=#{workspace_root_recording.id}"
   end
 
   private

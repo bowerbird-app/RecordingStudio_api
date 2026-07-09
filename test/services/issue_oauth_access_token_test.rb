@@ -31,13 +31,33 @@ class IssueOauthAccessTokenTest < ActiveSupport::TestCase
 
     assert result.success?, result.error
     assert_equal "Bearer", result.value.fetch(:token_type)
-    assert_operator result.value.fetch(:expires_in), :>, 0
+    assert_in_delta 1.hour.to_i, result.value.fetch(:expires_in), 2
     assert_match(/\Arsapi_at_/, result.value.fetch(:access_token))
 
     access_token = RecordingStudioApi::ApiAccessToken.order(created_at: :desc).first
     assert_not_nil access_token
     assert_not_nil access_token.recording
     assert_equal @payload.fetch(:credential).recording&.id, access_token.recording.parent_recording_id
+  end
+
+  test "uses configured access token ttl for bearer token expiry" do
+    travel_to Time.zone.parse("2026-05-18 12:00:00 UTC") do
+      RecordingStudioApi.configuration.access_token_ttl = 15.minutes
+
+      result = RecordingStudioApi::Services::IssueOauthAccessToken.call(
+        grant_type: "client_credentials",
+        client_id: @payload.fetch(:credential).oauth_client_id,
+        client_secret: @payload.fetch(:token)
+      )
+
+      assert result.success?, result.error
+      assert_in_delta 15.minutes.to_i, result.value.fetch(:expires_in), 2
+
+      access_token = RecordingStudioApi::ApiAccessToken.find_by!(
+        token_digest: RecordingStudioApi::OauthAccessToken.digest(result.value.fetch(:access_token))
+      )
+      assert_equal 15.minutes.from_now, access_token.expires_at
+    end
   end
 
   test "rejects unsupported grant types" do

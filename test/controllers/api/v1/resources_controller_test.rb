@@ -115,6 +115,25 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_equal "0", response.headers["X-RateLimit-Remaining"]
   end
 
+  test "pre auth api limiter fails closed when limiter is unavailable" do
+    RecordingStudioApi.configuration.rate_limit_api_pre_auth_enabled = true
+    RecordingStudioApi.configuration.rate_limit_fail_closed = true
+    RecordingStudioApi.configuration.rate_limit_fail_closed_buckets = %w[oauth api_pre_auth]
+    RecordingStudioApi.configuration.rate_limit_api_pre_auth_requests = 120
+    RecordingStudioApi::Concerns::RateLimiting.decider = lambda do |_controller|
+      raise "redis offline"
+    end
+
+    get "/recording_studio_api/api/v1/pages", headers: { "Authorization" => "Bearer invalid-token" }
+
+    assert_response :too_many_requests
+    body = JSON.parse(response.body)
+    assert_equal "rate_limit_exceeded", body.fetch("error")
+    assert_equal "60", response.headers["Retry-After"]
+    assert_equal "120", response.headers["X-RateLimit-Limit"]
+    assert_equal "0", response.headers["X-RateLimit-Remaining"]
+  end
+
   test "lists resources only within the authenticated root scope" do
     visible_page = create_page_recording(root_recording: @root_recording)
     other_root_recording, = create_access_recording_for(user: create_user(email: "other-root-resources@example.com"))
@@ -161,7 +180,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
-  test "lists default recordable attributes for unregistered page resources" do
+  test "omits attributes for unregistered page resources" do
     page_recording = create_page_recording(root_recording: @root_recording, page_title: "Collection Title")
 
     get "/recording_studio_api/api/v1/pages", headers: authorization_headers
@@ -172,7 +191,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     page_payload = data.find { |row| row.fetch("id") == page_recording.id }
 
     refute_nil page_payload
-    assert_equal "Collection Title", page_payload.fetch("attributes").fetch("title")
+    assert_not_includes page_payload.keys, "attributes"
   end
 
   test "paginates collection responses with pagination_token" do
@@ -258,7 +277,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     payload = JSON.parse(response.body).fetch("data")
     assert_equal page_recording.id, payload.fetch("id")
     assert_equal "page", payload.fetch("type")
-    assert_equal({ "title" => "Docs Landing" }, payload.fetch("attributes"))
+    assert_not_includes payload.keys, "attributes"
   end
 
   test "lists available API resources when no resource param is provided" do
@@ -358,8 +377,9 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     ], payload.fetch("details")
   end
 
-  test "returns validation errors when updating a page with a blank title" do
+  test "ignores update attributes for unregistered page resources" do
     page_recording = create_page_recording(root_recording: @root_recording)
+    original_title = page_recording.recordable.title
 
     patch "/recording_studio_api/api/v1/pages/#{page_recording.id}", params: {
       attributes: {
@@ -367,18 +387,10 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
       }
     }, headers: authorization_headers
 
-    assert_response :unprocessable_entity
+    assert_response :success
 
-    payload = JSON.parse(response.body)
-    assert_equal "Title can't be blank", payload.fetch("error")
-    assert_equal [
-      {
-        "attribute" => "title",
-        "message" => "can't be blank",
-        "full_message" => "Title can't be blank",
-        "type" => "blank"
-      }
-    ], payload.fetch("details")
+    assert_equal original_title, page_recording.recordable.reload.title
+    assert_not_includes JSON.parse(response.body).fetch("data").keys, "attributes"
   end
 
   test "rejects create when parent is outside authenticated scope" do

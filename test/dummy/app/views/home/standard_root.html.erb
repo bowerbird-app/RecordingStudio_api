@@ -14,32 +14,4 @@
     ) %>
   </div>
 
-  <%= render FlatPack::SectionTitle::Component.new(
-    title: "Workspace",
-    subtitle: "Current child access recordings where workspace access has been provided."
-  ) %>
-
-  <div class="-mt-3 flex flex-wrap justify-start gap-3">
-      <%= render FlatPack::Button::Component.new(
-        text: "API keys",
-        style: :default,
-        size: :md,
-        url: @workspace_api_keys_path
-      ) %>
-  </div>
-
-  <%= render FlatPack::SectionTitle::Component.new(
-    title: "Folder",
-    subtitle: "Current child access recordings where folder access has been provided."
-  ) %>
-
-  <div class="-mt-3 flex flex-wrap justify-start gap-3">
-      <%= render FlatPack::Button::Component.new(
-        text: "API keys",
-        style: :default,
-        size: :md,
-        url: @folder_api_keys_path
-      ) %>
-  </div>
-
 </div>

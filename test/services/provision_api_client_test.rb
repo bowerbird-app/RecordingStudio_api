@@ -103,9 +103,9 @@ class ProvisionApiClientTest < ActiveSupport::TestCase
     assert_equal "Not authorized to manage access", result.error
   end
 
-  test "applies the configured token ttl when expires_at is omitted" do
+  test "applies the configured credential ttl when expires_at is omitted" do
     travel_to Time.zone.parse("2026-05-18 12:00:00 UTC") do
-      RecordingStudioApi.configuration.token_ttl = 2.hours
+      RecordingStudioApi.configuration.credential_ttl = 2.hours
 
       result = RecordingStudioApi::Services::ProvisionApiClient.call(
         access_recording: @access_recording,

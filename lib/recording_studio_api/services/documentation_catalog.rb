@@ -636,10 +636,7 @@ module RecordingStudioApi
               schema: {
                 type: "object",
                 properties: {
-                  attributes: {
-                    type: "object",
-                    additionalProperties: true
-                  },
+                  attributes: attributes_schema_for(recordable_type),
                   parent_id: parent_id_schema
                 },
                 required: required_fields
@@ -678,16 +675,7 @@ module RecordingStudioApi
 
       def attributes_schema_for(recordable_type)
         schema = recordable_details_schema(recordable_type)
-        return schema if schema
-
-        inferred_properties = infer_recordable_attribute_properties(recordable_type)
-        return generic_attributes_schema if inferred_properties.empty?
-
-        {
-          type: "object",
-          properties: inferred_properties,
-          additionalProperties: false
-        }
+        schema || generic_attributes_schema
       end
 
       def recordable_details_schema(recordable_type)
@@ -706,84 +694,10 @@ module RecordingStudioApi
         }
       end
 
-      def infer_recordable_attribute_properties(recordable_type)
-        return {} if recordable_type.blank?
-
-        recordable_class = recordable_type.safe_constantize
-        columns = if recordable_class.respond_to?(:columns)
-                    recordable_class.columns
-                  else
-                    infer_columns_from_table(recordable_type)
-                  end
-        return {} if columns.blank?
-
-        columns.each_with_object({}) do |column, properties|
-          next if %w[id created_at updated_at].include?(column.name)
-
-          properties[column.name] = openapi_schema_for_column(column, recordable_class)
-        end
-      end
-
-      def infer_columns_from_table(recordable_type)
-        return [] unless defined?(::ActiveRecord::Base)
-
-        table_name = recordable_type.to_s.tableize
-        connection = ::ActiveRecord::Base.connection
-        return [] unless connection.data_source_exists?(table_name)
-
-        connection.columns(table_name)
-      rescue StandardError
-        []
-      end
-
-      def openapi_schema_for_column(column, recordable_class = nil)
-        enum_schema = openapi_schema_for_enum_column(column, recordable_class)
-        return enum_schema if enum_schema
-
-        case column.type
-        when :integer
-          { type: "integer", nullable: column.null, example: 1 }
-        when :float, :decimal
-          { type: "number", nullable: column.null, example: 1.0 }
-        when :boolean
-          { type: "boolean", nullable: column.null, example: false }
-        when :datetime
-          { type: "string", format: "date-time", nullable: column.null, example: "2026-01-01T12:00:00Z" }
-        when :date
-          { type: "string", format: "date", nullable: column.null, example: "2026-01-01" }
-        when :time
-          { type: "string", format: "time", nullable: column.null, example: "12:00:00" }
-        else
-          { type: "string", nullable: column.null, example: string_example_for_column(column.name) }
-        end
-      end
-
-      def openapi_schema_for_enum_column(column, recordable_class)
-        return unless recordable_class.respond_to?(:defined_enums)
-
-        enum_mapping = recordable_class.defined_enums[column.name]
-        return unless enum_mapping.is_a?(Hash) && enum_mapping.any?
-
-        enum_values = enum_mapping.keys
-        {
-          type: "string",
-          nullable: column.null,
-          enum: enum_values,
-          example: enum_values.first
-        }
-      end
-
-      def string_example_for_column(column_name)
-        normalized_name = column_name.to_s
-        return "Example title" if normalized_name.include?("title")
-        return "Example name" if normalized_name.include?("name")
-
-        "Example #{normalized_name.tr('_', ' ')}"
-      end
-
       def generic_attributes_schema
         {
           type: "object",
+          properties: {},
           additionalProperties: false
         }
       end

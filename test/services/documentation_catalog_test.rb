@@ -166,7 +166,8 @@ module RecordingStudioApi
             recordable_types: ["Page"],
             actions_by_type: {
               "Page" => []
-            }
+            },
+            preserve_recordable_registrations: true
           ) do
             DocumentationCatalog.call
           end
@@ -268,7 +269,7 @@ module RecordingStudioApi
         RecordingStudioApi.configuration.default_api_version = original_version
       end
 
-      def test_resource_write_request_body_uses_generic_attributes_schema
+      def test_resource_write_request_body_uses_closed_attributes_schema_when_unregistered
         catalog = with_catalog_stubs(
           recordable_types: ["Workspace"],
           root_recordable_types: ["Workspace"],
@@ -284,7 +285,8 @@ module RecordingStudioApi
         schema = create_endpoint.fetch(:openapi).fetch(:request_body).fetch(:content).fetch("application/json").fetch(:schema)
 
         assert_equal "object", schema.fetch(:properties).fetch(:attributes).fetch(:type)
-        assert_equal true, schema.fetch(:properties).fetch(:attributes).fetch(:additionalProperties)
+        assert_equal({}, schema.fetch(:properties).fetch(:attributes).fetch(:properties))
+        assert_equal false, schema.fetch(:properties).fetch(:attributes).fetch(:additionalProperties)
         assert_equal %w[attributes], schema.fetch(:required)
         assert_equal true, schema.fetch(:properties).fetch(:parent_id).fetch(:nullable)
       end
@@ -358,16 +360,20 @@ module RecordingStudioApi
         endpoint.fetch(:summary)
       end
 
-      def with_catalog_stubs(recordable_types:, actions_by_type:, root_recordable_types: [])
+      def with_catalog_stubs(recordable_types:, actions_by_type:, root_recordable_types: [], preserve_recordable_registrations: false)
         api_singleton = RecordingStudioApi.singleton_class
         declarations_singleton = RecordingStudio::RecordableDeclarations.singleton_class
         original_recordable_types = RecordingStudioApi.method(:api_recordable_types)
         original_actions_for = RecordingStudioApi.method(:capability_actions_for)
         original_root_allowed = RecordingStudio::RecordableDeclarations.method(:root_allowed?)
+        original_registration_for = RecordingStudioApi.method(:recordable_registration_for)
 
         api_singleton.send(:define_method, :api_recordable_types) { recordable_types }
         api_singleton.send(:define_method, :capability_actions_for) do |recordable_type, **|
           actions_by_type.fetch(recordable_type, [])
+        end
+        api_singleton.send(:define_method, :recordable_registration_for) do |recordable_type|
+          original_registration_for.call(recordable_type) if preserve_recordable_registrations
         end
         declarations_singleton.send(:define_method, :root_allowed?) do |recordable_type|
           root_recordable_types.include?(recordable_type.to_s)
@@ -377,6 +383,7 @@ module RecordingStudioApi
       ensure
         api_singleton.send(:define_method, :api_recordable_types, original_recordable_types)
         api_singleton.send(:define_method, :capability_actions_for, original_actions_for)
+        api_singleton.send(:define_method, :recordable_registration_for, original_registration_for)
         declarations_singleton.send(:define_method, :root_allowed?, original_root_allowed)
       end
 

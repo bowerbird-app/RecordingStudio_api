@@ -7,7 +7,8 @@ module RecordingStudioApi
         def call
           authorize_access!(recording, role: :edit)
 
-          recording.recordable.update!(resource_attributes)
+          attributes = resource_attributes
+          recording.recordable.update!(attributes) if attributes.any?
 
           { json: { data: serialize_recording(recording.reload) } }
         end

@@ -87,7 +87,8 @@ Validation rules:
 Recording Studio 3.x requires every configured ActiveRecord recordable to declare its hierarchy with
 `recording_studio_recordable(...)`. Host apps must mark real roots with `root: true`, declare
 `allowed_parent_types` for child-capable recordables, and enable `RecordingStudio.enable_capability(:accessible, on: ...)`
-for every recordable that can own direct access grants. The dummy app marks `Workspace` and `Folder` as root-capable,
+for every recordable that can own direct access grants. Enable `RecordingStudio.enable_capability(:api_access_point, on: ...)`
+for recordables that may act as API key access points. The dummy app marks `Workspace` and `Folder` as root-capable,
 keeps `Page` as a child recordable, and the API engine registers its internal `RecordingStudio::Access`, API client,
 credential, token, OAuth, and admin API recordables with explicit parent rules.
 

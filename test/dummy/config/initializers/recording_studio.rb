@@ -26,6 +26,8 @@ RecordingStudio.configure do |config|
   config.enable_capability(:accessible, on: "Folder")
   config.enable_capability(:accessible, on: "Page")
   config.enable_capability(:accessible, on: "AdminRoot")
+  config.enable_capability(:api_access_point, on: "Workspace")
+  config.enable_capability(:api_access_point, on: "Folder")
   config.enable_capability(:movable, on: "Folder")
   config.enable_capability(:trashable, on: "Page")
 end

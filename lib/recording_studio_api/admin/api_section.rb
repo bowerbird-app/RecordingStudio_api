@@ -19,14 +19,17 @@ module RecordingStudioApi
            style: :primary
 
       link :clients,
-           text: "View API keys",
+           text: "API keys",
            url: ->(context) { context.admin_screen_path("api_keys") },
            style: :default
 
       link :requests,
-           text: "View requests",
+           text: "API requests",
            url: ->(context) { context.admin_screen_path("api_requests") },
            style: :secondary
+
+      widget "widgets.recording_studio_api.requests_last_four_weeks"
+      widget "widgets.recording_studio_api.most_used_keys"
     end
   end
 end

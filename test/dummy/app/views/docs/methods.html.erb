@@ -14,7 +14,7 @@
 	<%= render FlatPack::CodeBlock::Component.new(
 		language: :ruby,
 		code: <<~'CODE'
-			RecordingStudioApi.configure { |config| config.token_ttl = 30.days }
+			RecordingStudioApi.configure { |config| config.access_token_ttl = 1.hour }
 			RecordingStudioApi.register_recordable_type_api("Page", serializer: PageSerializer)
 			RecordingStudioApi.register_capability_action(
 			  :publish,

@@ -36,6 +36,8 @@ class ConfigurationTest < Minitest::Test
     configuration = RecordingStudioApi::Configuration.new
 
     assert_equal 5, configuration.timeout
+    assert_equal 30.days, configuration.credential_ttl
+    assert_equal 1.hour, configuration.access_token_ttl
     assert_equal [], configuration.token_authenticators
     assert_equal :view, configuration.access_management_view_role
     assert_equal :admin, configuration.access_management_edit_role
@@ -51,6 +53,9 @@ class ConfigurationTest < Minitest::Test
     assert_equal "recording_studio/default_layout", configuration.layout_name
     assert_equal false, configuration.rate_limit_oauth_enabled
     assert_equal false, configuration.rate_limit_api_enabled
+    assert_equal false, configuration.rate_limit_api_pre_auth_enabled
+    assert_equal false, configuration.rate_limit_fail_closed
+    assert_equal %w[oauth api_pre_auth], configuration.rate_limit_fail_closed_buckets
     assert_equal "recording_studio_api", configuration.rate_limit_redis_namespace
     assert_equal 10, configuration.rate_limit_oauth_requests
     assert_equal 60, configuration.rate_limit_oauth_period_seconds
@@ -85,8 +90,13 @@ class ConfigurationTest < Minitest::Test
 
   def test_merge_updates_rate_limit_and_logging_settings
     @configuration.merge!(
+      credential_ttl: 14.days,
+      access_token_ttl: 15.minutes,
       rate_limit_oauth_enabled: true,
       rate_limit_api_enabled: true,
+      rate_limit_api_pre_auth_enabled: true,
+      rate_limit_fail_closed: true,
+      rate_limit_fail_closed_buckets: %i[oauth api_pre_auth],
       rate_limit_redis_namespace: "custom_ns",
       rate_limit_oauth_requests: 10,
       rate_limit_oauth_period_seconds: 30,
@@ -100,8 +110,13 @@ class ConfigurationTest < Minitest::Test
       api_request_logging_payload_mode: "metadata_only"
     )
 
+    assert_equal 14.days, @configuration.credential_ttl
+    assert_equal 15.minutes, @configuration.access_token_ttl
     assert_equal true, @configuration.rate_limit_oauth_enabled
     assert_equal true, @configuration.rate_limit_api_enabled
+    assert_equal true, @configuration.rate_limit_api_pre_auth_enabled
+    assert_equal true, @configuration.rate_limit_fail_closed
+    assert_equal %i[oauth api_pre_auth], @configuration.rate_limit_fail_closed_buckets
     assert_equal "custom_ns", @configuration.rate_limit_redis_namespace
     assert_equal 10, @configuration.rate_limit_oauth_requests
     assert_equal 30, @configuration.rate_limit_oauth_period_seconds

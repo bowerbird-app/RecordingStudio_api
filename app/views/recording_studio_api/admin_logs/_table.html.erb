@@ -38,6 +38,7 @@
     <% table.column(title: "Occurred", sortable: true, sort_key: :occurred_at, html: occurred_timestamp) %>
     <% table.column(title: "Method", sortable: true, sort_key: :request_method, html: ->(row) { row.fetch(:method) }) %>
     <% table.column(title: "Path", sortable: true, sort_key: :request_path, html: ->(row) { row.fetch(:path) }) %>
+    <% table.column(title: "Name", html: ->(row) { row.fetch(:client_name).presence || "-" }) %>
     <% table.column(title: "Status", sortable: true, sort_key: :status_code, html: status_badge) %>
     <% table.column(title: "Rate limited", html: rate_limited_badge) %>
     <% table.column(title: "IP address", sortable: true, sort_key: :remote_ip, html: ->(row) { row.fetch(:ip_address) }) %>

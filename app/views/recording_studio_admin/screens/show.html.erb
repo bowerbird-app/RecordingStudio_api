@@ -1,0 +1,136 @@
+<% recording_studio_page_nav(
+     title: @screen.title,
+     page_nav_anchor_url: page_nav_anchor_url(default: RecordingStudioAdmin.configuration.default_mount_path)
+   ) %>
+<% if @screen.buttons.any? %>
+  <% recording_studio_page_nav_right do %>
+    <%= render FlatPack::ButtonGroup::Component.new do |group| %>
+      <% @screen.buttons.each do |button| %>
+        <% group.button(render(FlatPack::Button::Component.new(text: button.text, href: button.url, style: button.style))) %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>
+<%= render "recording_studio_admin/shared/page_nav" unless recording_studio_admin_default_layout? %>
+
+<%= render FlatPack::PageTitle::Component.new(title: @screen.title, subtitle: @screen.subtitle) %>
+
+<% if @screen.widgets.any? %>
+  <% if RecordingStudioAdmin.configuration.async_widgets.enabled %>
+    <div data-controller="recording-studio-admin--async-widgets"
+         data-recording-studio-admin--async-widgets-max-concurrent-value="<%= RecordingStudioAdmin.configuration.async_widgets.max_concurrent_requests %>"
+         data-recording-studio-admin--async-widgets-retry-count-value="<%= RecordingStudioAdmin.configuration.async_widgets.retry_count %>">
+  <% end %>
+
+    <%= render FlatPack::Grid::Component.new(cols: 3, gap: :md, class: "mb-6") do %>
+      <% @screen.widgets.each do |widget| %>
+        <% if RecordingStudioAdmin.configuration.async_widgets.enabled %>
+          <%= render_recording_studio_async_widget_frame(widget, parent: :screen, parent_key: @screen.key, variant: :compact) %>
+        <% else %>
+          <%= render_recording_studio_widget(widget, variant: :compact) %>
+        <% end %>
+      <% end %>
+    <% end %>
+
+  <% if RecordingStudioAdmin.configuration.async_widgets.enabled %>
+    </div>
+  <% end %>
+<% end %>
+
+<% if @screen.filters.any? %>
+  <% base_query = request.query_parameters.symbolize_keys.except(:page) %>
+  <% filter_param_keys = @screen.filters.flat_map do |filter|
+       if filter.type == :date_range
+         [filter.start_param, filter.end_param, filter.preset_param]
+       else
+         [filter.param_key]
+       end
+     end.map(&:to_sym) %>
+  <% hidden_query = base_query.except(*filter_param_keys) %>
+  <%= form_with url: request.path, method: :get, id: "screen-filters-form", data: {
+    controller: "flat-pack--auto-submit recording-studio-admin--screen-filters",
+    turbo_frame: "screen-chart",
+    action: "change->recording-studio-admin--screen-filters#showTableSkeletons change->flat-pack--auto-submit#queueSubmit input->recording-studio-admin--screen-filters#showTableSkeletons input->flat-pack--auto-submit#queueSubmit submit->recording-studio-admin--screen-filters#showTableSkeletons submit->recording-studio-admin--screen-filters#refreshTableFrame click->recording-studio-admin--screen-filters#queueDateRangeSubmit"
+  } do %>
+    <% hidden_query.each do |key, value| %>
+      <% if value.is_a?(Array) %>
+        <% value.each do |entry| %>
+          <%= hidden_field_tag "#{key}[]", entry %>
+        <% end %>
+      <% else %>
+        <%= hidden_field_tag key, value %>
+      <% end %>
+    <% end %>
+
+    <div class="mb-6 flex flex-wrap items-start gap-4">
+      <% @screen.filters.each do |filter| %>
+        <div class="min-w-64 flex-none">
+          <% if filter.type == :date_range %>
+            <%= render FlatPack::DateRangeInput::Component.new(
+              start_name: filter.start_param,
+              end_name: filter.end_param,
+              start_value: filter.value&.start_date,
+              end_value: filter.value&.end_date
+            ) %>
+            <%= hidden_field_tag filter.preset_param, filter.value&.preset_key %>
+          <% else %>
+            <% select_options = Array(filter.options[:values] || filter.options[:options]).map do |option|
+                 case option
+                 when Hash
+                   {
+                     label: option[:label] || option["label"],
+                     value: option[:value] || option["value"],
+                     disabled: option[:disabled] || option["disabled"] || false
+                   }
+                 when Array
+                   { label: option[0], value: option[1], disabled: false }
+                 else
+                   option_label = if option.to_s.empty? && filter.options[:blank_label].present?
+                                    filter.options[:blank_label]
+                                  elsif filter.options[:humanize_options] == false
+                                    option.to_s
+                                  else
+                                    option.to_s.humanize
+                                  end
+                   { label: option_label, value: option, disabled: false }
+                 end
+               end %>
+            <% if select_options.any? %>
+              <%= render FlatPack::Select::Component.new(
+                name: filter.param_key,
+                options: select_options,
+                value: filter.value,
+                placeholder: filter.options.key?(:placeholder) ? filter.options[:placeholder] : "All"
+              ) %>
+            <% else %>
+              <%= render FlatPack::SearchInput::Component.new(
+                name: filter.param_key,
+                value: filter.value,
+                placeholder: filter.key.to_s.humanize
+              ) %>
+            <% end %>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>
+
+<% if @screen.has_chart %>
+  <%= turbo_frame_tag "screen-chart", src: recording_studio_admin_screen_region_path(@screen.key, :chart) do %>
+    <%= render FlatPack::Card::Component.new(style: :outlined, class: "mb-6") do |card| %>
+      <% card.body do %>
+        <div class="space-y-4">
+          <%= render FlatPack::Skeleton::Component.new(variant: :text, width: "12rem", shimmer: true) %>
+          <%= render FlatPack::Skeleton::Component.new(variant: :rectangle, height: "18rem", shimmer: true) %>
+        </div>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>
+
+<% if @screen.has_table %>
+  <%= turbo_frame_tag "screen-table", src: recording_studio_admin_screen_region_path(@screen.key, :table) do %>
+    <%= render "table_placeholder", screen: @screen %>
+  <% end %>
+<% end %>

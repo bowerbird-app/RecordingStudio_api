@@ -16,7 +16,8 @@ module RecordingStudioApi
     }.freeze
 
     attr_accessor :timeout,
-                  :token_ttl,
+                  :credential_ttl,
+                  :access_token_ttl,
                   :token_authenticators,
                   :access_management_view_role,
                   :access_management_edit_role,
@@ -36,6 +37,8 @@ module RecordingStudioApi
                   :rate_limit_oauth_enabled,
                   :rate_limit_api_enabled,
                   :rate_limit_api_pre_auth_enabled,
+                  :rate_limit_fail_closed,
+                  :rate_limit_fail_closed_buckets,
                   :rate_limit_redis_url,
                   :rate_limit_redis_namespace,
                   :rate_limit_oauth_requests,
@@ -55,7 +58,8 @@ module RecordingStudioApi
     # rubocop:disable Metrics/AbcSize
     def initialize
       @timeout = 5
-      @token_ttl = 30.respond_to?(:days) ? 30.days : 30 * 24 * 60 * 60
+      @credential_ttl = 30.respond_to?(:days) ? 30.days : 30 * 24 * 60 * 60
+      @access_token_ttl = 1.respond_to?(:hour) ? 1.hour : 60 * 60
       @token_authenticators = []
       @access_management_view_role = :view
       @access_management_edit_role = :admin
@@ -90,6 +94,8 @@ module RecordingStudioApi
       @rate_limit_oauth_enabled = false
       @rate_limit_api_enabled = false
       @rate_limit_api_pre_auth_enabled = false
+      @rate_limit_fail_closed = false
+      @rate_limit_fail_closed_buckets = %w[oauth api_pre_auth]
       @rate_limit_redis_url = ENV["RECORDING_STUDIO_API_RATE_LIMIT_REDIS_URL"].presence
       @rate_limit_redis_namespace = "recording_studio_api"
       @rate_limit_oauth_requests = 10
@@ -113,7 +119,8 @@ module RecordingStudioApi
     def to_h
       {
         timeout: timeout,
-        token_ttl: token_ttl,
+        credential_ttl: credential_ttl,
+        access_token_ttl: access_token_ttl,
         token_authenticators_count: token_authenticators.count,
         admin_dashboard_path_resolver: admin_dashboard_path_resolver.respond_to?(:call),
         admin_settings_path_resolver: admin_settings_path_resolver.respond_to?(:call),
@@ -134,6 +141,8 @@ module RecordingStudioApi
         rate_limit_oauth_enabled: rate_limit_oauth_enabled,
         rate_limit_api_enabled: rate_limit_api_enabled,
         rate_limit_api_pre_auth_enabled: rate_limit_api_pre_auth_enabled,
+        rate_limit_fail_closed: rate_limit_fail_closed,
+        rate_limit_fail_closed_buckets: rate_limit_fail_closed_buckets,
         rate_limit_redis_url_present: rate_limit_redis_url.present?,
         rate_limit_redis_namespace: rate_limit_redis_namespace,
         rate_limit_oauth_requests: rate_limit_oauth_requests,

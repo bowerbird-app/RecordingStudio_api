@@ -93,16 +93,26 @@ module RecordingStudioApi
         return
       end
 
-      @request_log_rows = filtered_requests_scope
-                          .order(current_sort_column => @direction.to_sym, id: @direction.to_sym)
-                          .limit(TABLE_LIMIT)
-                          .map do |log|
+      logs = filtered_requests_scope
+             .order(current_sort_column => @direction.to_sym, id: @direction.to_sym)
+             .limit(TABLE_LIMIT)
+             .to_a
+
+      client_ids = logs.map(&:api_client_id).compact.uniq
+      client_names = if client_ids.any?
+                       RecordingStudioApi::ApiClient.where(id: client_ids).pluck(:id, :name).to_h
+                     else
+                       {}
+                     end
+
+      @request_log_rows = logs.map do |log|
         occurred_at = log.occurred_at || log.created_at
 
         {
           occurred_at: occurred_at,
           method: log.request_method,
           path: log.request_path,
+          client_name: client_names[log.api_client_id],
           status: log.status_code.to_s,
           rate_limited: log.rate_limited? ? "Yes" : "No",
           ip_address: log.remote_ip.to_s.presence || "-",

@@ -23,47 +23,12 @@
   <% end %>
 
   <%= form_with url: api_clients_path(page_nav_close_param), scope: :api_client, method: :post, class: "space-y-6" do |form| %>
-    <%= form.hidden_field :root_type, value: @form_values.fetch(:root_type) %>
-
-    <%= render FlatPack::TextInput::Component.new(
-      name: "api_client[api_client_name]",
-      value: @form_values.fetch(:api_client_name),
-      label: "Name",
-      class: "w-full"
-    ) %>
-
-    <%= render FlatPack::Select::Component.new(
-      name: "api_client[access_point_recording_id]",
-      options: @access_point_recordings.map { |recording| [recording_label(recording), recording.id] },
-      value: @form_values.fetch(:access_point_recording_id),
-      label: "Access point",
-      class: "w-full"
-    ) %>
-
-    <%= render FlatPack::Select::Component.new(
-      name: "api_client[role]",
-      options: @role_options,
-      value: @form_values.fetch(:role),
-      label: "Role",
-      help_text: "Controls what this API key can access and change",
-      class: "w-full"
-    ) %>
-
-    <%= render FlatPack::DateInput::Component.new(
-      name: "api_client[expires_at]",
-      value: @form_values.fetch(:expires_at),
-      placeholder: "Never",
-      label: "Expires (optional)",
-      class: "w-full"
-    ) %>
-
-    <div class="flex flex-wrap gap-3">
-      <%= render FlatPack::Button::Component.new(
-        text: "Create",
-        style: :primary,
-        size: :md,
-        type: "submit"
-      ) %>
-    </div>
+    <%= render 'form_fields',
+      form: form,
+      form_values: @form_values,
+      role_options: @role_options,
+      access_point_recordings: @access_point_recordings,
+      show_root_hidden: true,
+      submit_text: "Create" %>
   <% end %>
 </div>

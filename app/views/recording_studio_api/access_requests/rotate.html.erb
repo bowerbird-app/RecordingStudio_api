@@ -16,8 +16,10 @@
         title: "New client secret",
         subtitle: "This token is only shown once. Update any integrations that still use the revoked key."
       ) %>
-      <pre class="overflow-x-auto rounded-md border border-(--surface-border-color) bg-(--surface-background-color) p-4 text-sm text-(--surface-content-color)"><%= @payload.fetch(:token) %></pre>
+      <pre class="overflow-x-auto rounded-md border border-(--surface-border-color) bg-(--surface-background-color) p-4 text-sm text-(--surface-content-color)" data-secret-reveal-target="secret"><%= @payload.fetch(:token) %></pre>
     </div>
+
+    <%= render "recording_studio_api/access_requests/secret_reveal_scrubber" %>
 
     <div class="space-y-3">
       <%= render FlatPack::SectionTitle::Component.new(

@@ -10,7 +10,8 @@
     code: <<~'CODE'
       RecordingStudioApi.configure do |config|
         config.timeout = 10
-        config.token_ttl = 45.days
+        config.credential_ttl = 45.days
+        config.access_token_ttl = 1.hour
         config.api_versions = %w[v1 v2]
         config.default_api_version = "v2"
 
@@ -22,22 +23,25 @@
           api.use :moveable, "~> 2.0"
         end
 
-        # Optional Redis-backed throttling
-        config.rate_limit_oauth_enabled = true
-        config.rate_limit_api_pre_auth_enabled = true
-        config.rate_limit_api_enabled = true
         config.rate_limit_redis_url = ENV["RECORDING_STUDIO_API_RATE_LIMIT_REDIS_URL"]
+        config.rate_limit_redis_namespace = "recording_studio_api"
+        config.rate_limit_oauth_enabled = Rails.env.production?
         config.rate_limit_oauth_requests = 10
         config.rate_limit_oauth_period_seconds = 60
-        config.rate_limit_api_pre_auth_requests = 300
+        config.rate_limit_api_pre_auth_enabled = Rails.env.production?
+        config.rate_limit_api_pre_auth_requests = 120
         config.rate_limit_api_pre_auth_period_seconds = 60
-        config.rate_limit_api_read_requests = 120
+        config.rate_limit_api_enabled = Rails.env.production?
+        config.rate_limit_api_read_requests = 300
         config.rate_limit_api_read_period_seconds = 60
-        config.rate_limit_api_write_requests = 30
+        config.rate_limit_api_write_requests = 60
         config.rate_limit_api_write_period_seconds = 60
+        config.rate_limit_fail_closed = Rails.env.production?
+        config.rate_limit_fail_closed_buckets = %w[oauth api_pre_auth]
 
         # Optional: log API requests to the API request log database
         config.api_request_logging_enabled = true
+        # Use "filtered_params" only when request parameter retention is required.
         config.api_request_logging_payload_mode = "metadata_only"
 
         config.hooks.on_configuration do |loaded_config|

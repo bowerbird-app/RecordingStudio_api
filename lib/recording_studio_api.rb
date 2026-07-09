@@ -244,6 +244,20 @@ module RecordingStudioApi
       end
     end
 
+    def api_access_point_recordable_types
+      api_recordable_types.select { |recordable_type| api_access_point_recordable_type?(recordable_type) }
+    end
+
+    def api_access_point_recordable_type?(recordable_type)
+      type_name = recordable_type.to_s
+      return false if type_name.blank?
+      return false unless api_recordable_types.include?(type_name)
+      return false unless defined?(RecordingStudio) && RecordingStudio.respond_to?(:capability_enabled?)
+
+      RecordingStudio.capability_enabled?(:accessible, for: type_name) &&
+        RecordingStudio.capability_enabled?(:api_access_point, for: type_name)
+    end
+
     def api_versions
       configured_versions = Array(configuration.api_versions).filter_map { |version| normalize_api_version(version) }.uniq
       configured_versions.presence || [Configuration::DEFAULT_API_VERSION]

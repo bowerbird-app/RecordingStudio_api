@@ -1,0 +1,54 @@
+<% if local_assigns[:show_root_hidden] %>
+  <%= form.hidden_field :root_type, value: form_values.fetch(:root_type) %>
+  <%= form.hidden_field :root_recording_id, value: form_values.fetch(:root_recording_id) %>
+<% end %>
+
+<%= render FlatPack::TextInput::Component.new(
+  name: "api_client[api_client_name]",
+  value: form_values.fetch(:api_client_name),
+  label: "Name",
+  class: "w-full"
+) %>
+
+<%= render FlatPack::Collapse::Component.new(
+  id: "api-client-advanced-collapse",
+  title: "Advanced",
+  open: false
+) do %>
+  <div class="space-y-4">
+    <%= render FlatPack::Select::Component.new(
+      name: "api_client[role]",
+      options: role_options,
+      value: form_values.fetch(:role),
+      label: "Role",
+      help_text: "Controls what this API key can access and change",
+      class: "w-full"
+    ) %>
+
+    <%= render FlatPack::DateInput::Component.new(
+      name: "api_client[expires_at]",
+      value: form_values.fetch(:expires_at),
+      placeholder: "Never",
+      label: "Expires (optional)",
+      class: "w-full"
+    ) %>
+
+    <%= render FlatPack::Select::Component.new(
+      name: "api_client[access_point_recording_id]",
+      options: access_point_recordings.map { |recording| [recording_label(recording), recording.id] },
+      value: form_values.fetch(:access_point_recording_id),
+      label: "Access point",
+      help_text: "API access is granted to this item and below",
+      class: "w-full"
+    ) %>
+  </div>
+<% end %>
+
+<div class="flex flex-wrap gap-3">
+  <%= render FlatPack::Button::Component.new(
+    text: submit_text,
+    style: :primary,
+    size: :md,
+    type: "submit"
+  ) %>
+</div>

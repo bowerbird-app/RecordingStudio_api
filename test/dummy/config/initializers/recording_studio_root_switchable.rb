@@ -5,8 +5,7 @@ RecordingStudioRootSwitchable.configure do |config|
     Current.actor || controller.current_user
   end
 
-  # config.layout is no longer needed — the gem now defaults to
-  # "recording_studio/default_layout" from Recording Studio core (v3.0.2).
+  config.layout = "recording_studio/default_layout"
 
   # For production hosts, enable secure cookies and force SSL in the host app.
   # config.device_key_cookie_options = config.device_key_cookie_options.merge(secure: Rails.env.production?)

@@ -12,25 +12,31 @@ RecordingStudioApi.configure do |config|
   # Timeout in seconds for external calls
   # config.timeout = 5
 
-  # Default access token lifetime for OAuth2 client_credentials exchanges
-  # config.token_ttl = 30.days
+  # Default lifetime for API credentials provisioned without an explicit expiry.
+  config.credential_ttl = 30.days
 
-  # Optional Redis-backed rate limiting
-  # config.rate_limit_oauth_enabled = true
-  # config.rate_limit_redis_url = ENV["RECORDING_STUDIO_API_RATE_LIMIT_REDIS_URL"]
-  # config.rate_limit_redis_namespace = "recording_studio_api"
-  # config.rate_limit_oauth_requests = 10
-  # config.rate_limit_oauth_period_seconds = 60
-  # config.rate_limit_api_pre_auth_enabled = true
-  # config.rate_limit_api_pre_auth_requests = 300
-  # config.rate_limit_api_pre_auth_period_seconds = 60
-  # config.rate_limit_api_enabled = false
-  # config.rate_limit_api_read_requests = 120
-  # config.rate_limit_api_read_period_seconds = 60
-  # config.rate_limit_api_write_requests = 30
-  # config.rate_limit_api_write_period_seconds = 60
+  # OAuth bearer access tokens are short-lived because possession is authentication.
+  config.access_token_ttl = 1.hour
+
+  # Recommended Redis-backed rate limiting for production API installs.
+  config.rate_limit_redis_url = ENV.fetch("RECORDING_STUDIO_API_RATE_LIMIT_REDIS_URL", nil)
+  config.rate_limit_redis_namespace = "recording_studio_api"
+  config.rate_limit_oauth_enabled = Rails.env.production?
+  config.rate_limit_oauth_requests = 10
+  config.rate_limit_oauth_period_seconds = 60
+  config.rate_limit_api_pre_auth_enabled = Rails.env.production?
+  config.rate_limit_api_pre_auth_requests = 120
+  config.rate_limit_api_pre_auth_period_seconds = 60
+  config.rate_limit_api_enabled = Rails.env.production?
+  config.rate_limit_api_read_requests = 300
+  config.rate_limit_api_read_period_seconds = 60
+  config.rate_limit_api_write_requests = 60
+  config.rate_limit_api_write_period_seconds = 60
+  config.rate_limit_fail_closed = Rails.env.production?
+  config.rate_limit_fail_closed_buckets = %w[oauth api_pre_auth]
 
   # Optional: log API requests to the API request log database
   # config.api_request_logging_enabled = true
+  # Use "filtered_params" only when request parameter retention is required.
   # config.api_request_logging_payload_mode = "metadata_only"
 end

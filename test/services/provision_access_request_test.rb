@@ -39,6 +39,48 @@ class ProvisionAccessRequestTest < ActiveSupport::TestCase
     assert_not_empty payload.fetch(:token)
   end
 
+  test "creates access client beneath an api access point descendant" do
+    folder_recording = RecordingStudio::Recording.create!(
+      recordable: Folder.create!(name: "Folder access point"),
+      parent_recording: @root_recording
+    )
+
+    result = RecordingStudioApi::Services::ProvisionAccessRequest.call(
+      access_point_recording: folder_recording,
+      actor: @user,
+      role: :admin,
+      api_client_name: "Folder scoped client"
+    )
+
+    assert result.success?, result.error
+    assert_equal folder_recording.id, result.value.fetch(:access_recording).parent_recording_id
+    assert_equal @root_recording.id, result.value.fetch(:access_recording).root_recording_id
+  end
+
+  test "rejects access points without the api access point capability" do
+    folder_recording = RecordingStudio::Recording.create!(
+      recordable: Folder.create!(name: "Blocked access point"),
+      parent_recording: @root_recording
+    )
+    original_capability_enabled = RecordingStudio.method(:capability_enabled?)
+
+    result = RecordingStudio.stub(:capability_enabled?, lambda do |capability, **kwargs|
+      next false if capability == :api_access_point && kwargs[:for] == "Folder"
+
+      original_capability_enabled.call(capability, **kwargs)
+    end) do
+      RecordingStudioApi::Services::ProvisionAccessRequest.call(
+        access_point_recording: folder_recording,
+        actor: @user,
+        role: :admin,
+        api_client_name: "Blocked folder client"
+      )
+    end
+
+    assert result.failure?
+    assert_equal "Access point recording does not allow API access", result.error
+  end
+
   test "creates a separate access recording for each api client" do
     first_result = RecordingStudioApi::Services::ProvisionAccessRequest.call(
       access_point_recording: @root_recording,

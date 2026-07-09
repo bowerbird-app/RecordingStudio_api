@@ -57,6 +57,7 @@ module RecordingStudioApi
         render_invalid_form
       else
         @payload = result.value
+        prevent_secret_response_storage!
         render :create, status: :created
       end
     end
@@ -65,6 +66,7 @@ module RecordingStudioApi
       load_edit_form_state
       expires_at = parsed_edit_expires_at
       @errors << "Name can't be blank" if @form_values.fetch(:api_client_name).blank?
+      @errors << "Access point is invalid" unless @access_point_recordings.any? { |recording| recording.id == @form_values.fetch(:access_point_recording_id) }
       @errors << "Role is invalid" unless role_options.any? { |(_label, value)| value == @form_values.fetch(:role) }
       return render :edit, status: :unprocessable_entity if @errors.any?
 
@@ -97,19 +99,28 @@ module RecordingStudioApi
       end
 
       @payload = result.value
+      prevent_secret_response_storage!
       render :rotate, status: :created
     end
 
     private
 
+    def prevent_secret_response_storage!
+      response.cache_control.replace(no_store: true, private: true)
+      response.headers["Pragma"] = "no-cache"
+      response.headers["Expires"] = "0"
+    end
+
     def load_form_state
       @errors = []
       @root_type = normalized_root_type
-      @access_point_recordings = available_access_point_recordings(@root_type)
+      @root_recording = selected_root_recording
+      @access_point_recordings = available_access_point_recordings(@root_recording)
       @role_options = role_options
       access_point_recording = selected_access_point_recording
       @form_values = {
         root_type: @root_type,
+        root_recording_id: @root_recording&.id,
         access_point_recording_id: api_client_params[:access_point_recording_id].presence || access_point_recording&.id,
         role: api_client_params[:role].presence || "admin",
         api_client_name: api_client_params[:api_client_name].presence || default_api_client_name,
@@ -118,20 +129,23 @@ module RecordingStudioApi
     end
 
     def api_client_params
-      params.fetch(:api_client, params.fetch(:access_request, {})).permit(:root_type, :access_point_recording_id, :role, :api_client_name, :expires_at)
+      params.fetch(:api_client, params.fetch(:access_request, {})).permit(:root_type, :root_recording_id, :access_point_recording_id, :role, :api_client_name, :expires_at)
     end
 
     def api_client_update_params
-      params.fetch(:api_client, params.fetch(:access_request, {})).permit(:role, :api_client_name, :expires_at)
+      params.fetch(:api_client, params.fetch(:access_request, {})).permit(:access_point_recording_id, :role, :api_client_name, :expires_at)
     end
 
     def normalized_root_type
-      requested_root_type = api_client_params[:root_type].presence || params[:root_type].presence
+      root_recording = selected_root_recording
+      return root_recording.recordable_type if root_recording.present?
+
+      requested_root_type = requested_root_type_value
       allowed_root_types.include?(requested_root_type) ? requested_root_type : allowed_root_types.first
     end
 
     def allowed_root_types
-      @allowed_root_types ||= RecordingStudioApi.api_recordable_types & %w[Workspace Folder]
+      @allowed_root_types ||= manageable_root_recordings.map(&:recordable_type).uniq & RecordingStudioApi.api_recordable_types
     end
 
     def available_root_recordings(root_type)
@@ -140,11 +154,15 @@ module RecordingStudioApi
       manageable_root_recordings.select { |recording| recording.recordable_type == root_type }
     end
 
-    def available_access_point_recordings(root_type)
-      recordings = manageable_root_recordings.flat_map do |root_recording|
-        root_recording.subtree_recordings(include_self: true)
+    def available_access_point_recordings(root_recording)
+      access_point_types = RecordingStudioApi.api_access_point_recordable_types
+      return [] if access_point_types.empty?
+
+      roots = root_recording.present? ? [root_recording] : manageable_root_recordings
+      recordings = roots.flat_map do |available_root_recording|
+        available_root_recording.subtree_recordings(include_self: true)
           .includes(:recordable)
-          .where(recordable_type: available_access_point_types(root_type), trashed_at: nil)
+          .where(recordable_type: access_point_types, trashed_at: nil)
           .reorder(:created_at, :id)
           .to_a
       end
@@ -152,18 +170,13 @@ module RecordingStudioApi
       recordings.uniq { |recording| recording.id }
     end
 
-    def available_access_point_types(root_type)
-      types = root_type.present? ? [root_type] : allowed_root_types
-      Array(types).select do |type_name|
-        access_point_capable_type?(type_name)
+    def selected_root_recording
+      @selected_root_recording ||= begin
+        recording = RecordingStudio::Recording.includes(:recordable).find_by(id: requested_root_recording_id) if requested_root_recording_id.present?
+        recording = nil unless manageable_root_recording?(recording)
+        recording ||= available_root_recordings(requested_root_type_value).first if requested_root_type_value.present?
+        recording || manageable_root_recordings.find { |candidate| allowed_root_types.include?(candidate.recordable_type) }
       end
-    end
-
-    def access_point_capable_type?(type_name)
-      return false if type_name.blank?
-      return false unless defined?(RecordingStudio) && RecordingStudio.respond_to?(:capability_enabled?)
-
-      RecordingStudio.capability_enabled?(:accessible, for: type_name)
     end
 
     def role_options
@@ -175,13 +188,10 @@ module RecordingStudioApi
     end
 
     def selected_access_point_recording
-      requested_id = api_client_params[:access_point_recording_id].presence
-
-      @selected_access_point_recording ||= if requested_id.present?
-                                             @access_point_recordings.find { |recording| recording.id == requested_id }
-                                           else
-                                             @access_point_recordings.first
-                                           end
+      @selected_access_point_recording ||= begin
+        requested_recording = @access_point_recordings.find { |recording| recording.id == requested_id } if requested_id.present?
+        requested_recording || @access_point_recordings.first unless requested_access_point_recording_id.present? && requested_recording.nil?
+      end
     end
 
     def current_request_actor
@@ -205,10 +215,36 @@ module RecordingStudioApi
     end
 
     def selected_access_point_recording_for_request
-      root_type = normalized_root_type
-      return nil if root_type.blank?
+      access_point_recordings = available_access_point_recordings(selected_root_recording)
+      requested_recording = access_point_recordings.find { |recording| recording.id == requested_id } if requested_id.present?
+      return requested_recording if requested_access_point_recording_id.present? || requested_recording.present?
 
-      available_access_point_recordings(root_type).first
+      access_point_recordings.first
+    end
+
+    def requested_root_type_value
+      api_client_params[:root_type].presence || params[:root_type].presence
+    end
+
+    def requested_root_recording_id
+      api_client_params[:root_recording_id].presence || params[:root_recording_id].presence
+    end
+
+    def requested_id
+      requested_access_point_recording_id || requested_root_recording_id
+    end
+
+    def requested_access_point_recording_id
+      api_client_params[:access_point_recording_id].presence ||
+        params[:access_point_recording_id].presence ||
+        params[:parent_recording_id].presence ||
+        params[:recording_id].presence
+    end
+
+    def manageable_root_recording?(recording)
+      return false if recording.nil? || recording.parent_recording_id.present?
+
+      manageable_root_recordings.any? { |candidate| candidate.id == recording.id }
     end
 
     def access_management_policy
@@ -666,8 +702,11 @@ module RecordingStudioApi
 
     def load_edit_form_state
       @errors = []
+      @root_recording = @api_client.access_recording&.root_recording
+      @access_point_recordings = available_access_point_recordings(@root_recording)
       @role_options = role_options
       @form_values = {
+        access_point_recording_id: api_client_update_params[:access_point_recording_id].presence || access_point_recording_for(@api_client.access_recording)&.id,
         role: api_client_update_params[:role].presence || resolved_edit_role_value,
         api_client_name: api_client_update_params[:api_client_name].presence || @api_client.name,
         expires_at: resolved_edit_expires_at_value
@@ -693,8 +732,18 @@ module RecordingStudioApi
     def persist_access_updates(expires_at)
       now = Time.current
       access_record = @access_recording&.recordable
+      access_point_recording_id = @form_values.fetch(:access_point_recording_id)
 
       ActiveRecord::Base.transaction do
+        if access_point_recording_id.present? && @access_recording.parent_recording_id != access_point_recording_id
+          updated_access_recordings = RecordingStudio::Recording.unscoped.where(id: @access_recording.id).update_all(
+            parent_recording_id: access_point_recording_id,
+            updated_at: now
+          )
+
+          raise ActiveRecord::ActiveRecordError, "Access recording update failed" unless updated_access_recordings == 1
+        end
+
         if access_record.respond_to?(:id) && access_record.respond_to?(:has_attribute?) && access_record.has_attribute?(:role)
           update_attributes = { role: @form_values.fetch(:role) }
           update_attributes[:updated_at] = now if access_record.has_attribute?(:updated_at)

@@ -113,7 +113,7 @@ module RecordingStudioApi
       def resolved_expiry
         return expires_at if expires_at.present?
 
-        ttl = RecordingStudioApi.configuration.token_ttl
+        ttl = RecordingStudioApi.configuration.credential_ttl
         ttl.present? ? Time.current + ttl : nil
       end
     end

@@ -65,7 +65,9 @@ module RecordingStudioApi
     end
 
     def page_nav_close_url
-      @page_nav_close_url ||= sanitized_page_nav_close_url(params[:close_url]) || page_nav_default_close_url
+      @page_nav_close_url ||= sanitized_page_nav_close_url(params[:anchor_url]) ||
+                              sanitized_page_nav_close_url(params[:close_url]) ||
+                              page_nav_default_close_url
     end
 
     def page_nav_close_param

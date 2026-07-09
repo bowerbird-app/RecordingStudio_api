@@ -9,7 +9,8 @@ module RecordingStudioApi
         setting_row("API versions", format_list(configuration.api_versions)),
         setting_row("Default API version", format_value(configuration.default_api_version)),
         setting_row("Request timeout", format_seconds(configuration.timeout)),
-        setting_row("Token TTL", format_seconds(configuration.token_ttl)),
+        setting_row("Credential TTL", format_seconds(configuration.credential_ttl)),
+        setting_row("Access token TTL", format_seconds(configuration.access_token_ttl)),
         setting_row("API request logging enabled", format_boolean(configuration.api_request_logging_enabled)),
         setting_row("API request logging payload mode", format_presence(configuration.api_request_logging_payload_mode))
       ]

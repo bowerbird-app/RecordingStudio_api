@@ -21,7 +21,7 @@ module RecordingStudioApi
         end
       end
 
-      def test_call_includes_default_recordable_attributes_when_no_custom_serializer_is_registered
+      def test_call_omits_recordable_attributes_when_no_custom_serializer_is_registered
         recording = build_recording(
           recordable_type: "Folder",
           recordable: RecordableStub.new(
@@ -30,6 +30,7 @@ module RecordingStudioApi
             attributes: {
               "id" => "folder-1",
               "name" => "Marketing",
+              "password_digest" => "secret-digest",
               "created_at" => Time.now,
               "updated_at" => Time.now
             }
@@ -39,10 +40,10 @@ module RecordingStudioApi
         payload = ResourceRecordingSerializer.call(recording)
 
         refute payload.key?(:title)
-        assert_equal({ "name" => "Marketing" }, payload.fetch(:attributes))
+        refute payload.key?(:attributes)
       end
 
-      def test_call_merges_default_recordable_attributes_with_registered_serializer_attributes
+      def test_call_uses_registered_serializer_attributes_without_default_model_attributes
         RecordingStudioApi.register_recordable_type_api(
           "Page",
           serializer: ->(recordable) { { summary: "Summary: #{recordable.title}" } }
@@ -66,8 +67,6 @@ module RecordingStudioApi
         refute payload.key?(:title)
         assert_equal(
           {
-            "title" => "Docs Landing",
-            "content" => "Hello world",
             "summary" => "Summary: Docs Landing"
           },
           payload.fetch(:attributes)
@@ -102,7 +101,6 @@ module RecordingStudioApi
         refute payload.key?(:title)
         assert_equal(
           {
-            "title" => "Changelog",
             "label" => "Changelog",
             "source" => "host_app"
           },

@@ -20,7 +20,20 @@ module RecordingStudioApi
       end
 
       filter :date_range, field: :occurred_at, default: :this_month
-      filter :status, values: %w[success redirect client_error server_error], apply: lambda { |relation, value, _context|
+      filter :group_by, values: %i[hour day week month year], default: :day
+      filter :api_client_name,
+             options: -> { RecordingStudioApi::Admin::ApiAccessRequestsScreen.api_client_name_filter_options },
+             blank_label: "All API keys",
+             placeholder: nil,
+             humanize_options: false,
+             apply: lambda { |relation, value, _context|
+               if value.present?
+                 relation.where(api_client_id: RecordingStudioApi::ApiClient.where(name: value).pluck(:id))
+               else
+                 relation
+               end
+             }
+      filter :status, values: %w[success redirect client_error server_error], placeholder: "Status", apply: lambda { |relation, value, _context|
         case value.to_s
         when "success" then relation.where(status_code: 200..299)
         when "redirect" then relation.where(status_code: 300..399)
@@ -39,29 +52,13 @@ module RecordingStudioApi
         title "Requests over time"
         type :column
         series lambda { |context|
-          result = context.query_result
-          return [] if result.nil? || result.count < 1
-
-          relation = result.relation
-          start_date, end_date = RecordingStudioApi::Admin::ApiAccessRequestsScreen.date_range_from_context(context)
-          counts_by_date = relation
-                           .where(occurred_at: start_date.beginning_of_day..end_date.end_of_day)
-                           .group("DATE(occurred_at)")
-                           .order("DATE(occurred_at)")
-                           .count
-
-          date_range = start_date.to_date..end_date.to_date
-          data = date_range.map { |day| counts_by_date.fetch(day, counts_by_date.fetch(day.to_s, 0)) }
-          [{ name: "Requests", data: data }]
+          RecordingStudioApi::Admin::ApiAccessRequestsScreen.stacked_request_series(context)
         }
-        options lambda { |context|
-          start_date, end_date = RecordingStudioApi::Admin::ApiAccessRequestsScreen.date_range_from_context(context)
-          categories = (start_date.to_date..end_date.to_date).map { |day| day.strftime("%b %-d") }
+        options lambda { |_context|
           {
-            xaxis: {
-              categories: categories,
-              labels: { rotate: -45, hideOverlappingLabels: true }
-            },
+            chart: { stacked: true },
+            plotOptions: { bar: { horizontal: false } },
+            xaxis: { labels: { rotate: -45, hideOverlappingLabels: true } },
             yaxis: { min: 0, forceNiceScale: true },
             stroke: { width: 0 },
             dataLabels: { enabled: false }
@@ -75,6 +72,7 @@ module RecordingStudioApi
         }
 
         column :occurred_at, title: "Occurred"
+        column :api_client_name, title: "Name", sortable: false
         column :request_method, title: "Method"
         column :request_path, title: "Path"
         column :status_code,
@@ -87,7 +85,7 @@ module RecordingStudioApi
                display_options: ->(_row, _context, value) { RecordingStudioApi::Admin::ApiRequestLogHelpers.rate_limited_badge_options(value) }
         column :duration_ms, title: "Duration"
         column :request_id, title: "Request ID"
-        default_columns :occurred_at, :request_method, :request_path, :status_code, :rate_limited, :duration_ms
+        default_columns :occurred_at, :api_client_name, :request_method, :request_path, :status_code, :rate_limited, :duration_ms
         default_sort :occurred_at, direction: :desc
         paginate per_page: 25, mode: :infinite
       end
@@ -130,11 +128,125 @@ module RecordingStudioApi
           RecordingStudioApi::Admin::Queries::ApiAccessClientsQuery.call(context).map { |row| row.api_client.id }.uniq
         end
 
+        def api_client_name_filter_options
+          names = RecordingStudioApi::ApiClient.distinct.order(:name).pluck(:name).compact
+          [""] + names
+        end
+
         def date_range_from_context(context)
           filter_value = context.filter_value(:date_range)
           start_date = filter_value&.start_date || 29.days.ago.to_date
           end_date = filter_value&.end_date || Date.current
           [start_date, end_date]
+        end
+
+        def stacked_request_series(context)
+          result = context.query_result
+          return [] if result.nil? || result.count < 1
+
+          bucket = (context.filter_value(:group_by) || :day).to_sym
+          buckets = chart_buckets(context, bucket)
+          return [] if buckets.empty?
+
+          rows = result.relation.reorder(nil).pluck(:occurred_at, :api_credential_id)
+          name_by_credential_id = api_key_names(rows.map(&:second).compact.uniq)
+          counts = Hash.new(0)
+
+          rows.each do |occurred_at, credential_id|
+            next if occurred_at.nil?
+
+            bucket_start = chart_bucket_start(occurred_at, bucket)
+            series_name = name_by_credential_id.fetch(credential_id, "Unknown")
+            counts[[series_name, bucket_start]] += 1
+          end
+
+          series_names = counts.keys.map(&:first).uniq.sort
+          series_names.map do |series_name|
+            {
+              name: series_name,
+              data: buckets.map do |bucket_start|
+                { x: chart_bucket_label(bucket_start, bucket), y: counts.fetch([series_name, bucket_start], 0) }
+              end
+            }
+          end
+        end
+
+        def api_key_names(credential_ids)
+          return {} if credential_ids.empty?
+
+          RecordingStudioApi::ApiCredential
+            .includes(:api_client)
+            .where(id: credential_ids)
+            .each_with_object({}) do |credential, names|
+              names[credential.id] = credential.api_client&.name.to_s.presence || "Unknown"
+            end
+        end
+
+        def chart_buckets(context, bucket)
+          start_date, end_date = date_range_from_context(context)
+          start_bucket = chart_range_start(start_date, bucket)
+          end_bucket = chart_range_end(end_date, bucket)
+          buckets = []
+          current_bucket = start_bucket
+
+          while current_bucket <= end_bucket
+            buckets << current_bucket
+            current_bucket = next_chart_bucket(current_bucket, bucket)
+          end
+
+          buckets
+        end
+
+        def chart_range_start(date, bucket)
+          case bucket
+          when :hour then date.beginning_of_day.beginning_of_hour
+          when :week then date.beginning_of_week.to_date
+          when :month then date.beginning_of_month
+          when :year then date.beginning_of_year
+          else date.to_date
+          end
+        end
+
+        def chart_range_end(date, bucket)
+          case bucket
+          when :hour then date.end_of_day.beginning_of_hour
+          when :week then date.beginning_of_week.to_date
+          when :month then date.beginning_of_month
+          when :year then date.beginning_of_year
+          else date.to_date
+          end
+        end
+
+        def chart_bucket_start(value, bucket)
+          case bucket
+          when :hour then value.in_time_zone.beginning_of_hour
+          when :week then value.to_date.beginning_of_week.to_date
+          when :month then value.to_date.beginning_of_month
+          when :year then value.to_date.beginning_of_year
+          else value.to_date
+          end
+        end
+
+        def next_chart_bucket(value, bucket)
+          case bucket
+          when :hour then value + 1.hour
+          when :week then value + 1.week
+          when :month then value.next_month.beginning_of_month
+          when :year then value.next_year.beginning_of_year
+          else value + 1.day
+          end
+        end
+
+        def chart_bucket_label(value, bucket)
+          timestamp = value.respond_to?(:in_time_zone) ? value.in_time_zone : value.to_time.in_time_zone
+
+          case bucket
+          when :hour then timestamp.strftime("%b %-d %-l%P")
+          when :week then "Week of #{timestamp.strftime('%b %-d')}"
+          when :month then timestamp.strftime("%b %Y")
+          when :year then timestamp.strftime("%Y")
+          else timestamp.strftime("%b %-d")
+          end
         end
 
         def percent_change(current, previous)

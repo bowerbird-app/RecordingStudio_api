@@ -53,7 +53,27 @@ class OauthControllerTest < ActionDispatch::IntegrationTest
     assert_equal "rate_limit_exceeded", body.fetch("error")
   end
 
-  test "writes oauth request log payload when request logging is enabled" do
+  test "fails closed when oauth rate limiter is unavailable" do
+    RecordingStudioApi.configuration.rate_limit_oauth_enabled = true
+    RecordingStudioApi.configuration.rate_limit_fail_closed = true
+    RecordingStudioApi.configuration.rate_limit_fail_closed_buckets = %w[oauth api_pre_auth]
+    RecordingStudioApi::Concerns::RateLimiting.decider = lambda do |_controller|
+      raise "redis offline"
+    end
+
+    post "/recording_studio_api/oauth/token", params: {
+      grant_type: "client_credentials",
+      client_id: @payload.fetch(:credential).oauth_client_id,
+      client_secret: @payload.fetch(:token)
+    }
+
+    assert_response :too_many_requests
+    assert_equal "60", response.headers["Retry-After"]
+    body = JSON.parse(response.body)
+    assert_equal "rate_limit_exceeded", body.fetch("error")
+  end
+
+  test "writes oauth request log metadata without params by default" do
     RecordingStudioApi.configuration.api_request_logging_enabled = true
     logged_payloads = []
     RecordingStudioApi::Concerns::RequestLogging.writer = lambda do |payload|
@@ -73,7 +93,41 @@ class OauthControllerTest < ActionDispatch::IntegrationTest
     assert_equal "POST", payload.fetch(:request_method)
     assert_equal "/recording_studio_api/oauth/token", payload.fetch(:request_path)
     assert_equal 401, payload.fetch(:status_code)
-    assert_equal "[FILTERED]", payload.fetch(:request_params).fetch("client_secret")
+    assert_equal({}, payload.fetch(:request_params))
+  end
+
+  test "recursively filters oauth request params when payload logging is enabled" do
+    RecordingStudioApi.configuration.api_request_logging_enabled = true
+    RecordingStudioApi.configuration.api_request_logging_payload_mode = "filtered_params"
+    logged_payloads = []
+    RecordingStudioApi::Concerns::RequestLogging.writer = lambda do |payload|
+      logged_payloads << payload
+    end
+
+    post "/recording_studio_api/oauth/token", params: {
+      grant_type: "client_credentials",
+      client_id: @payload.fetch(:credential).oauth_client_id,
+      client_secret: "bad-secret",
+      metadata: {
+        label: "safe label",
+        password: "nested-password",
+        credentials: {
+          refresh_token: "nested-refresh-token",
+          client_secret: "nested-client-secret"
+        }
+      }
+    }
+
+    assert_response :unauthorized
+    assert_equal 1, logged_payloads.length
+
+    request_params = logged_payloads.first.fetch(:request_params)
+    assert_equal "client_credentials", request_params.fetch("grant_type")
+    assert_equal "safe label", request_params.fetch("metadata").fetch("label")
+    assert_equal "[FILTERED]", request_params.fetch("client_secret")
+    assert_equal "[FILTERED]", request_params.fetch("metadata").fetch("password")
+    assert_equal "[FILTERED]", request_params.fetch("metadata").fetch("credentials").fetch("refresh_token")
+    assert_equal "[FILTERED]", request_params.fetch("metadata").fetch("credentials").fetch("client_secret")
   end
 
   test "issues access token with valid client credentials" do

@@ -169,6 +169,22 @@ module RecordingStudioApi
       end
     end
 
+    initializer "recording_studio_api.prepend_recording_studio_admin_views", after: "recording_studio_api.register_recording_studio_admin" do
+      config.to_prepare do
+        require_dependency "recording_studio_admin/screens_controller"
+
+        view_path = RecordingStudioApi::Engine.root.join("app/views").to_s
+        [
+          (RecordingStudioAdmin::ApplicationController if defined?(RecordingStudioAdmin::ApplicationController)),
+          (RecordingStudioAdmin::ScreensController if defined?(RecordingStudioAdmin::ScreensController))
+        ].compact.each do |controller|
+          next if controller.view_paths.first.to_s == view_path
+
+          controller.prepend_view_path(view_path)
+        end
+      end
+    end
+
     def self.register_recordable_types!
       return unless defined?(RecordingStudio) && RecordingStudio.respond_to?(:configuration)
       return unless defined?(RecordingStudio::RecordableDeclarations)

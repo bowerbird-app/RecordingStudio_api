@@ -89,10 +89,7 @@ module RecordingStudioApi
           if schema_properties.respond_to?(:keys) && schema_properties.keys.any?
             schema_properties.keys.map(&:to_sym)
           else
-            recordable_class = recordable_type.safe_constantize
-            return [] unless recordable_class.respond_to?(:column_names)
-
-            recordable_class.column_names.map(&:to_sym) - %i[id created_at updated_at]
+            []
           end
         end
 

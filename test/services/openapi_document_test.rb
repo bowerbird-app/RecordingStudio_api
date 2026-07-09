@@ -268,19 +268,19 @@ module RecordingStudioApi
         assert_equal [], actions_schema.fetch("example")
       end
 
-      def test_enum_backed_column_is_documented_as_named_enum
-        with_stubbed_recordable_class(
+      def test_registered_enum_attribute_is_documented_as_named_enum
+        with_recordable_registration(
           "Page",
-          [
-            column_stub("id", :uuid, false),
-            column_stub("role", :integer, false),
-            column_stub("created_at", :datetime, false)
-          ],
-          enums: {
-            "role" => {
-              "view" => 0,
-              "edit" => 1,
-              "admin" => 2
+          openapi: {
+            details_schema: {
+              type: "object",
+              properties: {
+                role: {
+                  type: "string",
+                  enum: %w[view edit admin],
+                  example: "view"
+                }
+              }
             }
           }
         ) do
@@ -325,7 +325,7 @@ module RecordingStudioApi
         assert_nil meta_schema.fetch("example").fetch("next_pagination_token")
       end
 
-      def test_unregistered_page_schema_infers_title_attribute
+      def test_unregistered_page_schema_uses_closed_attributes_schema
         with_stubbed_recordable_class("Page", [
                                       column_stub("id", :uuid, false),
                                       column_stub("title", :string, true),
@@ -347,8 +347,8 @@ module RecordingStudioApi
             .fetch("attributes")
 
           assert_equal "object", attributes_schema.fetch("type")
-          assert_equal "string", attributes_schema.fetch("properties").fetch("title").fetch("type")
-          assert_equal "Example title", attributes_schema.fetch("properties").fetch("title").fetch("example")
+          assert_equal({}, attributes_schema.fetch("properties"))
+          assert_equal false, attributes_schema.fetch("additionalProperties")
         end
       end
 
@@ -413,6 +413,21 @@ module RecordingStudioApi
       ensure
         Object.send(:remove_const, class_name) if Object.const_defined?(class_name)
         Object.const_set(class_name, existing_class) if existing_class
+      end
+
+      def with_recordable_registration(recordable_type, openapi:)
+        registry = RecordingStudioApi.configuration.recordable_registry
+        existing = registry[recordable_type]
+
+        registry.register(recordable_type, openapi: openapi)
+        yield
+      ensure
+        registrations = registry.instance_variable_get(:@registrations)
+        if existing
+          registrations[recordable_type] = existing
+        else
+          registrations.delete(recordable_type)
+        end
       end
     end
   end

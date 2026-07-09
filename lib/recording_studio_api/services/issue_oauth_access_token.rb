@@ -76,8 +76,8 @@ module RecordingStudioApi
       end
 
       def resolved_expiry
-        ttl = RecordingStudioApi.configuration.token_ttl
-        ttl.present? ? Time.current + ttl : 30.minutes.from_now
+        ttl = RecordingStudioApi.configuration.access_token_ttl
+        Time.current + (ttl.presence || 1.hour)
       end
 
       def service_args

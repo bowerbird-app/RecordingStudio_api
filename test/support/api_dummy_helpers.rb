@@ -32,6 +32,8 @@ module ApiDummyHelpers
     RecordingStudio.enable_capability(:accessible, on: "Folder")
     RecordingStudio.enable_capability(:accessible, on: "Page")
     RecordingStudio.enable_capability(:accessible, on: "AdminRoot") if defined?(AdminRoot)
+    RecordingStudio.enable_capability(:api_access_point, on: "Workspace")
+    RecordingStudio.enable_capability(:api_access_point, on: "Folder")
     RecordingStudio.enable_capability(:movable, on: "Folder")
     RecordingStudio.enable_capability(:trashable, on: "Page")
   end

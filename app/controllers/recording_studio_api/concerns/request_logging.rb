@@ -14,6 +14,7 @@ module RecordingStudioApi
         refresh_token
         token
       ].freeze
+      PARAM_PAYLOAD_MODES = %w[filtered filtered_params].freeze
 
       class << self
         attr_accessor :writer
@@ -83,12 +84,23 @@ module RecordingStudioApi
       end
 
       def filtered_request_params
-        unsafe = params.respond_to?(:to_unsafe_h) ? params.to_unsafe_h : {}
+        return {} unless log_request_params?
 
-        unsafe.each_with_object({}) do |(key, value), filtered|
-          key_name = key.to_s
-          filtered[key_name] = FILTERED_PARAM_KEYS.include?(key_name) ? "[FILTERED]" : value
-        end
+        unsafe = params.respond_to?(:to_unsafe_h) ? params.to_unsafe_h : {}
+        request_parameter_filter.filter(unsafe)
+      end
+
+      def log_request_params?
+        PARAM_PAYLOAD_MODES.include?(RecordingStudioApi.configuration.api_request_logging_payload_mode.to_s)
+      end
+
+      def request_parameter_filter
+        @request_parameter_filter ||= ActiveSupport::ParameterFilter.new(request_parameter_filter_keys)
+      end
+
+      def request_parameter_filter_keys
+        configured_keys = Rails.application.config.filter_parameters if defined?(Rails) && Rails.respond_to?(:application)
+        Array(configured_keys) + FILTERED_PARAM_KEYS
       end
     end
   end

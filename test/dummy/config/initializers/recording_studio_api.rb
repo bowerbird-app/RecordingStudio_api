@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 RecordingStudioApi.configure do |config|
-  # Configure timeout, token_ttl, hooks, and action registration here.
+  # Configure timeout, credential TTL, access token TTL, hooks, and action registration here.
 
   config.admin_layout_name = "flat_pack_sidebar"
   config.rate_limit_api_pre_auth_enabled = true

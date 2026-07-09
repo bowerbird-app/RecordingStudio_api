@@ -56,7 +56,7 @@ module RecordingStudioApi
         paginate per_page: 25, mode: :infinite
 
         action :requests,
-               text: "View requests",
+               text: "API requests",
                icon: "queue-list",
                url: lambda { |row, context|
                  "#{context.admin_screen_path('api_requests')}?api_credential_id=#{row.api_credential.id}"

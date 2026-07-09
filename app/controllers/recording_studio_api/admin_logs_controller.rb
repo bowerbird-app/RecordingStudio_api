@@ -109,19 +109,30 @@ module RecordingStudioApi
     end
 
     def log_rows
-      @log_rows ||= @log_records.map do |log|
-        occurred_at = log.occurred_at || log.created_at
+      @log_rows ||= begin
+        records = @log_records
+        client_ids = records.map(&:api_client_id).compact.uniq
+        client_names = if client_ids.any?
+                         RecordingStudioApi::ApiClient.where(id: client_ids).pluck(:id, :name).to_h
+                       else
+                         {}
+                       end
 
-        {
-          occurred_at: occurred_at,
-          method: log.request_method,
-          path: log.request_path,
-          status: log.status_code.to_s,
-          rate_limited: log.rate_limited? ? "Yes" : "No",
-          ip_address: log.remote_ip.to_s.presence || "-",
-          duration: "#{log.duration_ms} ms",
-          request_id: log.request_id.presence || "-"
-        }
+        records.map do |log|
+          occurred_at = log.occurred_at || log.created_at
+
+          {
+            occurred_at: occurred_at,
+            method: log.request_method,
+            path: log.request_path,
+            client_name: client_names[log.api_client_id],
+            status: log.status_code.to_s,
+            rate_limited: log.rate_limited? ? "Yes" : "No",
+            ip_address: log.remote_ip.to_s.presence || "-",
+            duration: "#{log.duration_ms} ms",
+            request_id: log.request_id.presence || "-"
+          }
+        end
       end
     end
 

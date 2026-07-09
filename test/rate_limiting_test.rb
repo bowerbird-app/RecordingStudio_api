@@ -256,6 +256,56 @@ class RateLimitingTest < ActiveSupport::TestCase
     assert_includes logger.messages.first, "redis offline"
   end
 
+  test "resolved decision fails closed for configured oauth bucket when limiter is unavailable" do
+    logger = FakeLogger.new
+    RecordingStudioApi.configuration.rate_limit_oauth_enabled = true
+    RecordingStudioApi.configuration.rate_limit_fail_closed = true
+    RecordingStudioApi.configuration.rate_limit_fail_closed_buckets = %w[oauth api_pre_auth]
+    RecordingStudioApi.configuration.rate_limit_oauth_requests = 10
+    RecordingStudioApi.configuration.rate_limit_oauth_period_seconds = 60
+    harness = Harness.new(path: "/recording_studio_api/oauth/token", method: :post, params: { client_id: "mobile-client" })
+    RecordingStudioApi::Concerns::RateLimiting.decider = lambda do |_controller|
+      raise "redis offline"
+    end
+
+    decision = Rails.stub(:logger, logger) do
+      harness.send(:resolved_rate_limit_decision)
+    end
+
+    assert_equal({ limited: true, limit: 10, remaining: 0, retry_after: 60 }, decision)
+    assert_includes logger.messages.first, "rate limiter unavailable"
+  end
+
+  test "resolved decision fails closed for enabled pre auth bucket when redis client is missing" do
+    RecordingStudioApi.configuration.rate_limit_api_pre_auth_enabled = true
+    RecordingStudioApi.configuration.rate_limit_fail_closed = true
+    RecordingStudioApi.configuration.rate_limit_fail_closed_buckets = %w[oauth api_pre_auth]
+    RecordingStudioApi.configuration.rate_limit_api_pre_auth_requests = 120
+    RecordingStudioApi.configuration.rate_limit_api_pre_auth_period_seconds = 60
+    harness = Harness.new(path: "/recording_studio_api/api/v1/pages", method: :get)
+
+    decision = harness.stub(:rate_limit_redis_client, nil) do
+      harness.send(:with_rate_limit_bucket, "api_pre_auth") do
+        harness.send(:resolved_rate_limit_decision)
+      end
+    end
+
+    assert_equal({ limited: true, limit: 120, remaining: 0, retry_after: 60 }, decision)
+  end
+
+  test "resolved decision still fails open for authenticated api bucket by default" do
+    RecordingStudioApi.configuration.rate_limit_api_enabled = true
+    RecordingStudioApi.configuration.rate_limit_fail_closed = true
+    RecordingStudioApi.configuration.rate_limit_fail_closed_buckets = %w[oauth api_pre_auth]
+    harness = Harness.new(path: "/recording_studio_api/api/v1/pages", method: :get)
+
+    decision = harness.stub(:rate_limit_redis_client, nil) do
+      harness.send(:resolved_rate_limit_decision)
+    end
+
+    assert_equal({ limited: false, limit: 0, remaining: 0, retry_after: 0 }, decision)
+  end
+
   test "enforce_rate_limit renders too many requests response with headers" do
     harness = Harness.new(path: "/recording_studio_api/api/v1/pages", method: :get)
 

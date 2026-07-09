@@ -16,6 +16,9 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
   TEST_PASSWORD = "AccessRequestPassword!2026"
 
   setup do
+    reset_recording_studio_api_configuration!
+    reset_recording_studio_capabilities!
+
     @user = User.find_or_create_by!(email: "access-requests@example.com") do |user|
       user.password = TEST_PASSWORD
       user.password_confirmation = TEST_PASSWORD
@@ -52,6 +55,45 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "Boundary minimum role"
   end
 
+  test "renders api access point choices below the requested root recording" do
+    folder_recording = RecordingStudio::Recording.create!(
+      recordable: Folder.create!(name: "API Access Folder"),
+      parent_recording: @workspace_root_recording
+    )
+    page_recording = create_page_recording(root_recording: @workspace_root_recording, page_title: "Hidden API Page")
+
+    get "/recording_studio_api/api_clients/new", params: { root_recording_id: @workspace_root_recording.id }
+
+    assert_response :success
+    assert_select %(input[type="hidden"][name="api_client[root_recording_id]"][value="#{@workspace_root_recording.id}"]), count: 1
+    assert_includes response.body, "UI Workspace"
+    assert_includes response.body, "API Access Folder"
+    assert_not_includes response.body, "Hidden API Page"
+    assert_not_includes response.body, page_recording.id
+    assert_includes response.body, folder_recording.id
+  end
+
+  test "hides accessible recordings that are not api access point capable" do
+    folder_recording = RecordingStudio::Recording.create!(
+      recordable: Folder.create!(name: "Non API Access Folder"),
+      parent_recording: @workspace_root_recording
+    )
+    original_capability_enabled = RecordingStudio.method(:capability_enabled?)
+
+    RecordingStudio.stub(:capability_enabled?, lambda do |capability, **kwargs|
+      next false if capability == :api_access_point && kwargs[:for] == "Folder"
+
+      original_capability_enabled.call(capability, **kwargs)
+    end) do
+      get "/recording_studio_api/api_clients/new", params: { root_recording_id: @workspace_root_recording.id }
+    end
+
+    assert_response :success
+    assert_includes response.body, "UI Workspace"
+    assert_not_includes response.body, "Non API Access Folder"
+    assert_not_includes response.body, folder_recording.id
+  end
+
   test "submitting the form creates the access hierarchy and shows the client secret" do
     post "/recording_studio_api/api_clients", params: {
       api_client: {
@@ -64,10 +106,20 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     }
 
     assert_response :created
+    assert_secret_response_not_stored
+    assert_secret_reveal_scrubber_present
     assert_select %(nav.flat-pack-page-nav a[href="/"][aria-label="Close"]), count: 1
-    assert_includes response.body, "Workspace API access created"
-    assert_includes response.body, "UI provisioned client"
-    assert_includes response.body, "Client secret"
+    assert_includes response.body, "Copy secret"
+    assert_includes response.body, "This is only shown once. Use it to access the API."
+    assert_includes response.body, "Finish"
+    assert_not_includes response.body, "Back to demo"
+    assert_not_includes response.body, "Add another"
+    assert_not_includes response.body, "Root recording"
+    assert_not_includes response.body, "Access point"
+    assert_not_includes response.body, "Access role"
+    assert_not_includes response.body, "Client ID"
+    assert_not_includes response.body, "Credential expiry"
+    assert_not_includes response.body, "Client secret"
 
     api_client = RecordingStudioApi::ApiClient.order(:created_at, :id).last
     access_recording = api_client.access_recording
@@ -540,6 +592,8 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     post "/recording_studio_api/api_clients/#{api_client.id}/rotate"
 
     assert_response :created
+    assert_secret_response_not_stored
+    assert_secret_reveal_scrubber_present
     assert_includes response.body, "API key rotated"
     assert_includes response.body, "New client secret"
     assert_includes response.body, "New API key"
@@ -706,6 +760,66 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_select %(form[action="/recording_studio_api/api_clients/#{api_client.id}/tokens/#{token.id}/revoke?close_url=%2F"] button), count: 0
   end
 
+  test "update rejects access point ids outside the api client's root" do
+    other_root_recording, = create_access_recording_for(
+      user: @user,
+      workspace_name: "Other Managed Workspace",
+      role: :admin
+    )
+    api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Scoped update client")
+    access_recording = api_client.access_recording
+
+    patch "/recording_studio_api/api_clients/#{api_client.id}", params: {
+      api_client: {
+        access_point_recording_id: other_root_recording.id,
+        role: "admin",
+        api_client_name: "Moved client",
+        expires_at: ""
+      }
+    }
+
+    assert_response :unprocessable_entity
+    assert_includes response.body, "Access point is invalid"
+    assert_equal @workspace_root_recording.id, access_recording.reload.parent_recording_id
+    assert_equal "Scoped update client", api_client.reload.name
+  end
+
+  test "manager of a different root cannot mutate an api client" do
+    api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Protected client")
+    credential = api_client.credentials.max_by(&:created_at)
+    token = RecordingStudioApi::ApiAccessToken.create!(
+      credential: credential,
+      token_digest: "cross_root_token_digest_#{SecureRandom.hex(16)}",
+      token_prefix: "tok-cross-root",
+      expires_at: 2.days.from_now
+    )
+    other_user = create_user(email: "other-manager@example.com")
+    create_access_recording_for(user: other_user, workspace_name: "Other Manager Workspace", role: :admin)
+
+    sign_in other_user
+
+    patch "/recording_studio_api/api_clients/#{api_client.id}", params: {
+      api_client: {
+        api_client_name: "Cross-root rename",
+        expires_at: ""
+      }
+    }
+    assert_response :not_found
+    assert_equal "Protected client", api_client.reload.name
+
+    post "/recording_studio_api/api_clients/#{api_client.id}/rotate"
+    assert_response :not_found
+    assert_nil credential.reload.revoked_at
+
+    post "/recording_studio_api/api_clients/#{api_client.id}/revoke"
+    assert_response :not_found
+    assert_nil credential.reload.revoked_at
+
+    post "/recording_studio_api/api_clients/#{api_client.id}/tokens/#{token.id}/revoke"
+    assert_response :not_found
+    assert_nil token.reload.revoked_at
+  end
+
   test "show does not render token count rows" do
     api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Activity API client")
     latest_credential = api_client.credentials.max_by(&:created_at)
@@ -734,9 +848,12 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     get "/recording_studio_api/api_clients/#{api_client.id}/edit"
 
     assert_response :success
-    assert_includes response.body, "Edit API access"
+    assert_includes response.body, "Edit API key"
     assert_includes response.body, "Name"
+    assert_includes response.body, "Advanced"
+    assert_includes response.body, "Role"
     assert_includes response.body, "Expires"
+    assert_includes response.body, "Access point"
     assert_includes response.body, "Save changes"
     assert_includes response.body, "Create a new secret and api key"
     assert_select %(a[href="/recording_studio_api/api_clients/#{api_client.id}/rotate?close_url=%2F"][data-turbo-method="post"][data-turbo-confirm="Rotate this API key? This will revoke the current key."]), text: "Rotate key"
@@ -800,6 +917,20 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
   end
 
   private
+
+  def assert_secret_response_not_stored
+    assert_includes response.headers["Cache-Control"], "no-store"
+    assert_includes response.headers["Cache-Control"], "private"
+    assert_equal "no-cache", response.headers["Pragma"]
+    assert_equal "0", response.headers["Expires"]
+  end
+
+  def assert_secret_reveal_scrubber_present
+    assert_select %(pre[data-secret-reveal-target="secret"]), count: 1
+    assert_includes response.body, "pagehide"
+    assert_includes response.body, "turbo:before-cache"
+    assert_includes response.body, "Secret hidden after leaving this page."
+  end
 
   def create_api_client_for(parent_recording:, name:, role: :admin)
     manager_access_recording = with_access_creation_context do

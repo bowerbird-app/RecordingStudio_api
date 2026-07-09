@@ -47,10 +47,13 @@ module RecordingStudioApi
                             end
         return normalize_decision(injected_decision) if injected_decision.present?
 
-        normalize_decision(computed_rate_limit_decision)
+        computed_decision = computed_rate_limit_decision
+        return normalize_decision(computed_decision) if computed_decision.present?
+
+        fail_closed_rate_limit_decision
       rescue StandardError => error
         Rails.logger.warn("[RecordingStudioApi] rate limiter unavailable: #{error.class}: #{error.message}")
-        normalize_decision(nil)
+        fail_closed_rate_limit_decision
       end
 
       def computed_rate_limit_decision
@@ -89,6 +92,25 @@ module RecordingStudioApi
           remaining: payload.fetch(:remaining, 0),
           retry_after: payload.fetch(:retry_after, 0)
         }
+      end
+
+      def fail_closed_rate_limit_decision
+        return normalize_decision(nil) unless rate_limit_fail_closed_for_request?
+
+        {
+          limited: true,
+          limit: rate_limit_window_limit,
+          remaining: 0,
+          retry_after: rate_limit_window_period
+        }
+      end
+
+      def rate_limit_fail_closed_for_request?
+        return false unless RecordingStudioApi.configuration.rate_limit_fail_closed
+        return false unless rate_limit_enabled_for_request?
+        return false unless rate_limit_window_limit.to_i.positive? && rate_limit_window_period.to_i.positive?
+
+        Array(RecordingStudioApi.configuration.rate_limit_fail_closed_buckets).map(&:to_s).include?(rate_limit_bucket)
       end
 
       def with_rate_limit_bucket(bucket)

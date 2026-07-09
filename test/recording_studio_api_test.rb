@@ -68,15 +68,20 @@ class RecordingStudioApiTest < Minitest::Test
 
   def test_dummy_home_page_uses_recording_studio_api_title
     standard_root_view_path = File.expand_path("dummy/app/views/home/standard_root.html.erb", __dir__)
+    workspace_view_path = File.expand_path("dummy/app/views/home/workspace.html.erb", __dir__)
+    folder_view_path = File.expand_path("dummy/app/views/home/folder.html.erb", __dir__)
     admin_root_view_path = File.expand_path("dummy/app/views/recording_studio_admin/home/index.html.erb", __dir__)
     standard_root_view_source = File.read(standard_root_view_path)
+    workspace_view_source = File.read(workspace_view_path)
+    folder_view_source = File.read(folder_view_path)
     admin_root_view_source = File.read(admin_root_view_path)
 
     assert_includes standard_root_view_source, 'title: "Recording Studio API demo"'
     assert_includes standard_root_view_source, "Demo to add and remove API access"
-    assert_includes standard_root_view_source, 'title: "Workspace"'
-    assert_includes standard_root_view_source, 'title: "Folder"'
-    assert_includes standard_root_view_source, '"API keys"'
+    assert_includes standard_root_view_source, 'text: "API"'
+    assert_includes standard_root_view_source, "@api_admin_path"
+    assert_includes workspace_view_source, 'title: "Workspace"'
+    assert_includes folder_view_source, 'title: "Folder"'
     assert_includes admin_root_view_source, 'title: "Admin"'
     assert_includes admin_root_view_source, 'text: "Open Admin API"'
   end
