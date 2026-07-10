@@ -37,11 +37,7 @@
         get "/admin_api", to: "admin_dashboards#show", as: :admin_dashboard
         get "/admin_api/logs", to: "admin_logs#index", as: :admin_logs
 
-        resources :api_clients, controller: "access_requests", only: %i[index show new create edit update] do
-          resources :api_access_tokens, path: "tokens", only: :index do
-            post :revoke, on: :member
-          end
-        end
+        resources :api_clients, controller: "access_requests", only: %i[index show new create edit update]
 
         post "/oauth/token", to: "oauth#token"
 

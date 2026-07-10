@@ -84,13 +84,7 @@ module RecordingStudioApi
 
         def allowed_attribute_keys
           registration = RecordingStudioApi.recordable_registration_for(recordable_type)
-          schema_properties = registration&.openapi&.dig(:details_schema, :properties)
-
-          if schema_properties.respond_to?(:keys) && schema_properties.keys.any?
-            schema_properties.keys.map(&:to_sym)
-          else
-            []
-          end
+          Array(registration&.writable_attributes).map(&:to_sym)
         end
 
         def parent_recording_for_create

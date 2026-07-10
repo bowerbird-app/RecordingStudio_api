@@ -10,7 +10,7 @@ module RecordingStudioApi
     end
 
     # rubocop:disable Metrics/ParameterLists
-    def register(name, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil)
+    def register(name, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil)
       registration = ActionRegistration.new(
         name: name,
         capability: capability,
@@ -22,7 +22,8 @@ module RecordingStudioApi
         serializer: serializer,
         scope: scope,
         openapi: openapi,
-        input_contract: input_contract
+        input_contract: input_contract,
+        required_role: required_role
       )
       registration.validate!
 

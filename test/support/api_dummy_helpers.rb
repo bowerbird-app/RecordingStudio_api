@@ -149,6 +149,7 @@ module ApiDummyHelpers
       "Workspace",
       serializer: ->(recordable) { { name: recordable.name } },
       sortable_attributes: %i[name],
+      writable_attributes: %i[name],
       openapi: {
         details_schema: {
           type: "object",
@@ -164,6 +165,7 @@ module ApiDummyHelpers
       "Folder",
       serializer: ->(recordable) { { name: recordable.name } },
       sortable_attributes: %i[name],
+      writable_attributes: %i[name],
       openapi: {
         details_schema: {
           type: "object",
@@ -181,6 +183,7 @@ module ApiDummyHelpers
       :trash,
       capability: :trashable,
       http_verb: :post,
+      required_role: :edit,
       handler: ->(context) { Dummy::Api::Actions::TrashRecording.call(context) },
       openapi: {
         summary: "Trash",

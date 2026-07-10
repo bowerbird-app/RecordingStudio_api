@@ -14,13 +14,8 @@ Rails.application.routes.draw do
 
   get "/workspace", to: "home#workspace", as: :workspace
   get "/folder", to: "home#folder", as: :folder
-  get "/admin/api", to: "recording_studio_api/admin_dashboards#show", as: :admin_api
-  get "/admin/api/settings", to: "recording_studio_api/admin_settings#show", as: :admin_api_settings
-  get "/admin/api/rate-limiting", to: "recording_studio_api/admin_rate_limitings#show", as: :admin_api_rate_limiting
-  get "/admin/api/requests", to: "recording_studio_api/admin_requests#index", as: :admin_api_requests
-  get "/admin/api/errors", to: "recording_studio_api/admin_errors#index", as: :admin_api_errors
-  get "/admin/api/logs", to: "recording_studio_api/admin_logs#index", as: :admin_api_logs
   recording_studio_admin_for :api, at: "/api", root_section: :api
+  recording_studio_admin_for :admin_api, at: "/admin/api", root_section: :admin_api
   resource :scalar_test_token, only: %i[create destroy]
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.

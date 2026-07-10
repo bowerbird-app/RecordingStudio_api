@@ -38,7 +38,7 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
     assert_select "h1", text: "Recording Studio API demo"
     assert_includes response.body, "Demo to add and remove API access"
     assert_includes response.body, "RecordingStudio API"
-    assert_select %(a[href="/api?anchor_url=%2F"]), text: "API", count: 1
+    assert_select %(a[href="/api?anchor_url=%2F"]), text: "API settings", count: 1
     assert_not_includes response.body, "API keys"
     assert_not_includes response.body, "Child access recording"
     assert_select %(a[href="#{docs_install_path}"]), count: 1
@@ -65,6 +65,8 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "Recording Studio API demo"
     assert_includes response.body, "RecordingStudio API"
     assert_includes response.body, "Admin API"
+    assert_includes response.body, "Open Admin API"
+    assert_select %(a[href="/admin/api"]), text: "Open Admin API", count: 1
     # The shared layout now surfaces root-switch choices, including other roots.
     assert_includes response.body, "Old Workspace"
     assert_not_includes response.body, "API keys"
@@ -155,7 +157,7 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
 
     nested_return_to = recording_studio_root_switchable.root_switch_path(
       scope: "all_roots",
-      return_to: admin_api_path
+      return_to: "/admin/api"
     )
 
     patch recording_studio_root_switchable.root_switch_path(scope: "all_roots"), params: {

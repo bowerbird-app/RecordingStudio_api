@@ -39,4 +39,7 @@ RecordingStudioApi.configure do |config|
   # config.api_request_logging_enabled = true
   # Use "filtered_params" only when request parameter retention is required.
   # config.api_request_logging_payload_mode = "metadata_only"
+  # Raw request details are retained for 30 days; daily aggregates are retained indefinitely.
+  # config.api_request_log_retention_days = 30
+  # config.api_daily_metric_retention_days = nil
 end

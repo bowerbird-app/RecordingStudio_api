@@ -10,10 +10,10 @@ module RecordingStudioApi
     ALLOWED_HTTP_VERBS = %i[get post patch put delete].freeze
     ALLOWED_SCOPES = %i[collection resource member].freeze
 
-    attr_reader :name, :capability, :version, :version_notes, :deprecation, :http_verb, :handler, :serializer, :scope, :openapi, :input_contract
+    attr_reader :name, :capability, :version, :version_notes, :deprecation, :http_verb, :handler, :serializer, :scope, :openapi, :input_contract, :required_role
 
     # rubocop:disable Metrics/ParameterLists
-    def initialize(name:, capability:, http_verb:, handler:, version: nil, version_notes: nil, deprecation: nil, serializer: nil, scope: :member, openapi: nil, input_contract: nil)
+    def initialize(name:, capability:, http_verb:, handler:, version: nil, version_notes: nil, deprecation: nil, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil)
       @name = name.to_s
       @capability = capability&.to_sym
       @version = normalize_version(version)
@@ -25,6 +25,7 @@ module RecordingStudioApi
       @scope = scope.to_sym
       @openapi = normalize_openapi(openapi)
       @input_contract = normalize_input_contract(input_contract)
+      @required_role = normalize_required_role(required_role)
     end
     # rubocop:enable Metrics/ParameterLists
 
@@ -37,6 +38,7 @@ module RecordingStudioApi
       raise ConfigurationError, "Serializer must respond to call for #{name}" if serializer && !serializer.respond_to?(:call)
       raise ConfigurationError, "OpenAPI metadata must be a hash for #{name}" unless openapi.is_a?(Hash)
       raise ConfigurationError, "Input contract must be a RecordingStudioApi::ActionInputContract for #{name}" if input_contract && !input_contract.is_a?(ActionInputContract)
+      raise ConfigurationError, "required_role must be one of: #{valid_access_roles.join(', ')} for #{name}" if required_role && !valid_access_roles.include?(required_role)
       raise ConfigurationError, "version_notes must be a string or array of strings for #{name}" unless version_notes.is_a?(Array)
       raise ConfigurationError, "deprecation must be a hash for #{name}" unless deprecation.is_a?(Hash)
     end
@@ -61,6 +63,7 @@ module RecordingStudioApi
         deprecation: deprecation,
         http_verb: http_verb,
         scope: scope,
+        required_role: required_role,
         openapi: openapi,
         input_contract: input_contract&.as_json
       }
@@ -137,6 +140,17 @@ module RecordingStudioApi
       return value if value.is_a?(ActionInputContract)
 
       ActionInputContract.new(value)
+    end
+
+    def normalize_required_role(value)
+      return :edit if value.nil? && scope == :member
+      return if value.nil?
+
+      value.to_s.strip.to_sym
+    end
+
+    def valid_access_roles
+      RecordingStudioApi::Configuration::ACCESS_ROLE_RANKS.keys
     end
   end
 end

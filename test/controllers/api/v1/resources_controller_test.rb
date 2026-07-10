@@ -308,6 +308,36 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_not_includes payload.fetch("attributes").keys, "unknown_attribute"
   end
 
+  test "does not make response-only OpenAPI properties writable" do
+    RecordingStudioApi.register_recordable_type_api(
+      "Workspace",
+      openapi: {
+        details_schema: {
+          properties: {
+            created_at: { type: "string", format: "date-time" }
+          }
+        }
+      }
+    )
+    workspace_recording = RecordingStudio::Recording.create!(
+      recordable: Workspace.create!(name: "Original"),
+      parent_recording: @root_recording
+    )
+    requested_created_at = 1.year.ago.iso8601
+
+    patch "/recording_studio_api/api/v1/workspaces/#{workspace_recording.id}", params: {
+      attributes: {
+        name: "Updated",
+        created_at: requested_created_at
+      }
+    }, headers: authorization_headers
+
+    assert_response :success
+    workspace = workspace_recording.reload.recordable
+    assert_equal "Updated", workspace.name
+    assert_not_equal requested_created_at, workspace.created_at.iso8601
+  end
+
   test "returns validation errors when creating a page without a title" do
     post "/recording_studio_api/api/v1/pages", params: {
       parent_id: @root_recording.id,

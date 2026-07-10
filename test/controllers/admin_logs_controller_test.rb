@@ -17,9 +17,9 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
   setup do
     @original_admin_dashboard_path_resolver = RecordingStudioApi.configuration.admin_dashboard_path_resolver
     @original_admin_logs_path_resolver = RecordingStudioApi.configuration.admin_logs_path_resolver
-    RecordingStudioApi.configuration.admin_dashboard_path_resolver = ->(controller:, **) { controller.main_app.admin_api_path }
+    RecordingStudioApi.configuration.admin_dashboard_path_resolver = ->(controller:, **) { admin_api_path }
     RecordingStudioApi.configuration.admin_logs_path_resolver = lambda do |controller:, **params|
-      controller.main_app.admin_api_logs_path(params)
+      admin_api_logs_path(params)
     end
 
     @user = User.create!(email: "admin-logs-#{SecureRandom.hex(4)}@example.com") do |user|
@@ -56,7 +56,7 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
 
   test "renders the logs page with a lazy frame-targeted loader" do
     without_admin_v1_logs_screen do
-      get "/admin/api/logs"
+      get admin_api_logs_path
 
       assert_response :success
       assert_select %(a[href="#{admin_api_path}"]), minimum: 1
@@ -67,6 +67,9 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
       assert_includes response.body, "IP address"
       assert_includes response.body, "10.0.0.1"
       assert_includes response.body, 'aria-label="Rate limited"'
+      assert_includes response.body, 'data-controller="flat-pack--tooltip"'
+      assert_includes response.body, "/recordings/1"
+      assert_includes response.body, "/recordings/:id"
       assert_includes response.body, "sortable_table"
       assert_includes response.body, 'data-controller="auto-load"'
       assert_includes response.body, "Loading more logs..."
@@ -80,7 +83,7 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "renders legacy logs route directly" do
-    get "/admin/api/logs"
+    get admin_api_logs_path
 
     assert_response :success
     assert_includes response.body, "API logs"
@@ -159,7 +162,7 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "switching to a workspace root falls back to the host root when the logs path is requested" do
+  test "switching to a workspace root preserves the configured legacy logs path" do
     workspace = Workspace.create!(name: "Workspace root")
     workspace_root_recording = RecordingStudio::Recording.create!(recordable: workspace)
     create_access_recording(parent_recording: workspace_root_recording, user: @user, role: :admin)
@@ -171,12 +174,11 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
       }
     }
 
-    assert_redirected_to "/"
+    assert_redirected_to admin_api_logs_path
 
     follow_redirect!
 
-    assert_response :success
-    assert_select "h1", text: "Recording Studio API demo"
+    assert_response :forbidden
   end
 
   test "forbids the logs page when accessed directly from a non-admin root" do
@@ -192,7 +194,7 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
     }
 
     without_admin_v1_logs_screen do
-      get "/admin/api/logs"
+      get admin_api_logs_path
 
       assert_response :forbidden
     end
@@ -215,6 +217,19 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
   end
 
   private
+
+  def admin_api_path
+    "/admin/api"
+  end
+
+  def admin_api_logs_path(params = {})
+    path_with_query("/recording_studio_api/admin_api/logs", params)
+  end
+
+  def path_with_query(path, params)
+    query = params.compact.to_query
+    query.present? ? "#{path}?#{query}" : path
+  end
 
   def create_access_recording(parent_recording:, user:, role:)
     with_access_creation_context do

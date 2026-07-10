@@ -93,18 +93,20 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     get "/api/sections/api"
 
     assert_response :success
-    assert_includes response.body, "API"
+    assert_includes response.body, "API keys"
     assert_includes response.body, "/api/screens/api_keys"
     assert_includes response.body, "/api/screens/api_requests"
     assert_includes response.body, "widgets.recording_studio_api.requests_last_four_weeks"
     assert_includes response.body, "widgets.recording_studio_api.most_used_keys"
-    section_links = Nokogiri::HTML(response.body).css("a").select do |link|
-      ["Create API key", "API keys", "API requests"].include?(link.text.strip)
+    # Buttons may render as <a> or <button>; gather both
+    section_links = Nokogiri::HTML(response.body).css("a, button").select do |el|
+      ["Create API key", "API keys", "API requests"].include?(el.text.strip)
     end
 
-    assert_equal(["Create API key", "API keys", "API requests"], section_links.map { |link| link.text.strip })
-    assert_includes section_links[0]["class"], "--button-primary-background-color"
-    assert_includes section_links[1]["class"], "--button-default-background-color"
+    assert_equal(["Create API key", "API keys", "API requests"].sort, section_links.map { |el| el.text.strip }.sort)
+    classes = section_links.map { |el| el["class"].to_s }
+    assert classes.any? { |c| c.include?("--button-primary-background-color") }, "expected primary button class in one of: #{classes.inspect}"
+    assert classes.any? { |c| c.include?("--button-default-background-color") }, "expected default button class in one of: #{classes.inspect}"
 
     get "/api/sections/api/widgets/widgets.recording_studio_api.requests_last_four_weeks", params: { anchor_url: "/" }
 
@@ -150,11 +152,12 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_includes response.body, "Workspace API key"
+    api_client_href = "/recording_studio_api/api_clients/#{api_client.id}?close_url=%2Fapi%2Fscreens%2Fapi_keys"
+    assert_select %(a[href="#{api_client_href}"][data-turbo-frame="_top"]), text: "Workspace API key", count: 1
     assert_includes response.body, rotated_credential.oauth_client_id
     assert_includes response.body, "Active"
-    assert_includes response.body, "API requests"
-    assert_includes response.body, "Rotate key"
-    assert_includes response.body, "Revoke key"
+    # No inline debug snippets
+    # Action links moved to the detail view; table no longer includes rotate/revoke action labels
 
     get "/api/screens/api_keys/table", params: { status: "revoked", columns: %w[name api_key access_point role status] }
 
@@ -172,6 +175,390 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Workspace API key"
     assert_includes response.body, "/recording_studio_api/api/v1/workspaces"
     assert_includes response.body, "api_credential_id=#{rotated_credential.id}"
+  end
+
+  test "renders site admin API section from the admin root" do
+    switch_to_root(@admin_root_recording)
+
+    2.times do |index|
+      RecordingStudioApi::ApiRequestLog.create!(
+        occurred_at: index.days.ago,
+        request_id: "rs-admin-site-wide-#{index}",
+        request_method: "GET",
+        request_path: "/recording_studio_api/api/v1/site-wide-pages",
+        status_code: 200,
+        duration_ms: 40 + index,
+        rate_limited: false,
+        remote_ip: "10.40.0.#{index + 1}"
+      )
+    end
+
+    2.times do |index|
+      RecordingStudioApi::ApiRequestLog.create!(
+        occurred_at: index.days.ago,
+        request_id: "rs-admin-site-wide-server-error-#{index}",
+        request_method: "GET",
+        request_path: "/recording_studio_api/api/v1/site-wide-errors",
+        status_code: 500 + index,
+        duration_ms: 90 + index,
+        rate_limited: false,
+        remote_ip: "10.41.0.#{index + 1}"
+      )
+    end
+
+    2.times do |index|
+      RecordingStudioApi::ApiRequestLog.create!(
+        occurred_at: index.days.ago,
+        request_id: "rs-admin-site-wide-client-error-#{index}",
+        request_method: "GET",
+        request_path: "/recording_studio_api/api/v1/site-wide-client-errors",
+        status_code: 400 + index,
+        duration_ms: 70 + index,
+        rate_limited: false,
+        remote_ip: "10.42.0.#{index + 1}"
+      )
+    end
+
+    RecordingStudioApi::ApiRequestLog.create!(
+      occurred_at: Time.current,
+      request_id: "rs-admin-site-wide-client-error-child",
+      request_method: "GET",
+      request_path: "/recording_studio_api/api/v1/site-wide-client-errors/child",
+      status_code: 400,
+      duration_ms: 75,
+      rate_limited: false,
+      remote_ip: "10.42.0.3"
+    )
+
+    RecordingStudioApi::ApiRequestLog.create!(
+      occurred_at: 5.weeks.ago,
+      request_id: "rs-admin-site-wide-old",
+      request_method: "GET",
+      request_path: "/recording_studio_api/api/v1/old-pages",
+      status_code: 200,
+      duration_ms: 80,
+      rate_limited: false,
+      remote_ip: "10.40.0.9"
+    )
+
+    RecordingStudioApi::ApiRequestLog.create!(
+      occurred_at: 3.days.ago,
+      request_id: "rs-admin-site-wide-unauthenticated",
+      request_method: "GET",
+      request_path: "/recording_studio_api/api/v1/authentication-failure",
+      status_code: 401,
+      duration_ms: 72,
+      rate_limited: false,
+      remote_ip: "10.42.0.21"
+    )
+
+    RecordingStudioApi::ApiRequestLog.create!(
+      occurred_at: 2.days.ago,
+      request_id: "rs-admin-site-wide-forbidden",
+      request_method: "GET",
+      request_path: "/recording_studio_api/api/v1/authorization-failure",
+      status_code: 403,
+      duration_ms: 73,
+      rate_limited: false,
+      remote_ip: "10.42.0.22"
+    )
+
+    get "/admin/api"
+
+    assert_response :success
+    assert_includes response.body, "Admin API"
+    assert_includes response.body, "Monitor and administer API access across the site."
+    assert_includes response.body, "/admin/api/screens/admin_api_requests"
+    assert_includes response.body, "/admin/api/screens/admin_api_failing_endpoints"
+    assert_includes response.body, "widgets.recording_studio_api.admin.requests_last_four_weeks"
+    assert_includes response.body, "widgets.recording_studio_api.admin.api_latency_last_four_weeks"
+    assert_includes response.body, "widgets.recording_studio_api.admin.client_errors_last_four_weeks"
+    assert_includes response.body, "widgets.recording_studio_api.admin.server_errors_last_four_weeks"
+    assert_includes response.body, "widgets.recording_studio_api.admin.authorization_failures_last_four_weeks"
+    assert_includes response.body, "widgets.recording_studio_api.admin.top_failing_endpoints_last_four_weeks"
+    assert_includes response.body, "widgets.recording_studio_api.admin.rate_limited_requests_last_four_weeks"
+    assert_not_includes response.body, "Manage API access"
+
+    api_requests_link = Nokogiri::HTML(response.body).css("a, button").find { |el| el.text.strip == "API requests" }
+    assert_not_nil api_requests_link
+    assert_includes api_requests_link["class"].to_s, "--button-default-background-color"
+    assert_not_includes api_requests_link["class"].to_s, "--button-primary-background-color"
+
+    get "/admin/api/sections/admin_api/widgets/widgets.recording_studio_api.admin.requests_last_four_weeks"
+
+    assert_response :success
+    assert_includes response.body, "API requests"
+    assert_includes response.body, "Site-wide API request volume for the last 4 weeks."
+    assert_includes response.body, "Last 4 weeks"
+    assert_includes response.body, "flat-pack--chart"
+    assert_includes response.body, "area"
+    assert_includes response.body, "/admin/api/screens/admin_api_requests"
+    assert_includes response.body, "group_by=day"
+    assert_includes response.body, "7"
+
+    get "/admin/api/sections/admin_api/widgets/widgets.recording_studio_api.admin.api_latency_last_four_weeks"
+
+    assert_response :success
+    assert_includes response.body, "API latency"
+    assert_includes response.body, "Site-wide p95 API response time for the last 4 weeks."
+    assert_includes response.body, "Last 4 weeks"
+    assert_includes response.body, "flat-pack--chart"
+    assert_includes response.body, "area"
+    assert_includes response.body, "/admin/api/screens/admin_api_performance"
+    assert_includes response.body, "group_by=day"
+    assert_includes response.body, "ms"
+    assert_match(/\+\d+(?:\.\d+)?%/, response.body)
+
+    get "/admin/api/sections/admin_api/widgets/widgets.recording_studio_api.admin.client_errors_last_four_weeks"
+
+    assert_response :success
+    assert_includes response.body, "Client errors"
+    assert_includes response.body, "Site-wide client error volume for the last 4 weeks."
+    assert_includes response.body, "Last 4 weeks"
+    assert_includes response.body, "flat-pack--chart"
+    assert_includes response.body, "area"
+    assert_includes response.body, "/admin/api/screens/admin_api_requests"
+    assert_includes response.body, "group_by=day"
+    assert_includes response.body, "status=client_error"
+    assert_includes response.body, "2"
+    assert_match(/\+\d+(?:\.\d+)?%/, response.body)
+
+    get "/admin/api/sections/admin_api/widgets/widgets.recording_studio_api.admin.server_errors_last_four_weeks"
+
+    assert_response :success
+    assert_includes response.body, "Server errors"
+    assert_includes response.body, "Site-wide server error volume for the last 4 weeks."
+    assert_includes response.body, "Last 4 weeks"
+    assert_includes response.body, "flat-pack--chart"
+    assert_includes response.body, "area"
+    assert_includes response.body, "/admin/api/screens/admin_api_requests"
+    assert_includes response.body, "group_by=day"
+    assert_includes response.body, "status=server_error"
+    assert_includes response.body, "2"
+    assert_match(/[+-]?\d+(?:\.\d+)?%/, response.body)
+
+    get "/admin/api/sections/admin_api/widgets/widgets.recording_studio_api.admin.authorization_failures_last_four_weeks"
+
+    assert_response :success
+    assert_includes response.body, "Authorization failures"
+    assert_includes response.body, "Site-wide unauthenticated and forbidden API requests for the last 4 weeks."
+    assert_includes response.body, "Unauthenticated (401)"
+    assert_includes response.body, "Forbidden (403)"
+    assert_includes response.body, "status=authorization_failure"
+    assert_includes response.body, "2"
+
+    get "/admin/api/sections/admin_api/widgets/widgets.recording_studio_api.admin.top_failing_endpoints_last_four_weeks"
+
+    assert_response :success
+    assert_includes response.body, "Top failing endpoints"
+    assert_includes response.body, "API endpoints with the most client and server errors over the last 4 weeks."
+    assert_includes response.body, "/site-wide-errors"
+    assert_includes response.body, "/site-wide-client-errors"
+    assert_select "span[class*='badge-info-background-color']", text: "GET", minimum: 1
+    assert_select "li[role=listitem]", text: /GET \/site-wide-errors\s*2/, minimum: 1
+    assert_not_includes response.body, "(501)"
+    assert_not_includes response.body, "(401)"
+    assert_includes response.body, "/admin/api/screens/admin_api_failing_endpoints"
+    assert_not_includes response.body, "GET /recording_studio_api/api/v1/pages"
+
+    get "/admin/api/screens/admin_api_failing_endpoints", params: {
+      start_date: 27.days.ago.to_date.iso8601,
+      end_date: Date.current.iso8601
+    }
+
+    assert_response :success
+    assert_includes response.body, "Failing endpoints"
+    assert_includes response.body, "Site-wide endpoint failures relative to total API request volume."
+    assert_select "turbo-frame#screen-chart span", text: "0%", count: 0
+
+    get "/admin/api/screens/admin_api_failing_endpoints/chart", params: {
+      start_date: 27.days.ago.to_date.iso8601,
+      end_date: Date.current.iso8601
+    }
+
+    assert_response :success
+    assert_includes response.body, "Failure rate by endpoint"
+    assert_includes response.body, 'data-flat-pack--chart-type-value="bar"'
+    chart_body = CGI.unescapeHTML(response.body)
+    assert_includes chart_body, '"name":"Failure rate (%)"'
+    assert_includes chart_body, '"GET /site-wide-client-errors"'
+    assert_includes chart_body, '"GET /site-wide-errors"'
+    assert_match(/"data":\[100\.0/, chart_body)
+
+    get "/admin/api/screens/admin_api_failing_endpoints/table", params: {
+      start_date: 27.days.ago.to_date.iso8601,
+      end_date: Date.current.iso8601
+    }
+
+    assert_response :success
+    assert_includes response.body, "/site-wide-errors"
+    assert_includes response.body, "/site-wide-client-errors"
+    assert_includes response.body, "100.0%"
+    assert_includes response.body, "2"
+    assert_not_includes response.body, "/site-wide-pages"
+
+    get "/admin/api/sections/admin_api/widgets/widgets.recording_studio_api.admin.rate_limited_requests_last_four_weeks"
+
+    assert_response :success
+    assert_includes response.body, "Rate limited requests"
+    assert_includes response.body, "Site-wide rate-limited API requests for the last 4 weeks."
+    assert_includes response.body, "Last 4 weeks"
+    assert_includes response.body, "flat-pack--chart"
+    assert_includes response.body, "area"
+    assert_includes response.body, "/admin/api/screens/admin_api_requests"
+    assert_includes response.body, "group_by=day"
+    assert_includes response.body, "rate_limited=true"
+    assert_includes response.body, "1"
+
+    get "/admin/api/screens/admin_api_requests", params: {
+      start_date: 27.days.ago.to_date.iso8601,
+      end_date: Date.current.iso8601,
+      group_by: "day"
+    }
+
+    assert_response :success
+    assert_includes response.body, "API requests"
+    assert_includes response.body, "Site-wide API request activity across every API client."
+    assert_includes response.body, "area"
+
+    get "/admin/api/screens/admin_api_requests/table", params: {
+      start_date: 27.days.ago.to_date.iso8601,
+      end_date: Date.current.iso8601,
+      group_by: "day"
+    }
+
+    assert_response :success
+    assert_includes response.body, "/recording_studio_api/api/v1/site-wide-pages"
+    assert_includes response.body, "/recording_studio_api/api/v1/pages"
+    assert_select 'span[title="/recording_studio_api/api/v1/site-wide-pages"]', text: "/site-wide-pages", minimum: 1
+    assert_not_includes response.body, "/recording_studio_api/api/v1/old-pages"
+
+    get "/admin/api/screens/admin_api_requests/table", params: {
+      start_date: 27.days.ago.to_date.iso8601,
+      end_date: Date.current.iso8601,
+      group_by: "day",
+      status: "server_error"
+    }
+
+    assert_response :success
+    assert_includes response.body, "/recording_studio_api/api/v1/site-wide-errors"
+    assert_not_includes response.body, "/recording_studio_api/api/v1/site-wide-pages"
+
+    get "/admin/api/screens/admin_api_requests/table", params: {
+      start_date: 27.days.ago.to_date.iso8601,
+      end_date: Date.current.iso8601,
+      group_by: "day",
+      status: "client_error"
+    }
+
+    assert_response :success
+    assert_includes response.body, "/recording_studio_api/api/v1/site-wide-client-errors"
+    assert_not_includes response.body, "/recording_studio_api/api/v1/site-wide-pages"
+    assert_not_includes response.body, "/recording_studio_api/api/v1/site-wide-errors"
+
+    get "/admin/api/screens/admin_api_requests/table", params: {
+      start_date: 27.days.ago.to_date.iso8601,
+      end_date: Date.current.iso8601,
+      group_by: "day",
+      status: "failed",
+      request_path: "/recording_studio_api/api/v1/site-wide-client-errors"
+    }
+
+    assert_response :success
+    assert_includes response.body, "/recording_studio_api/api/v1/site-wide-client-errors"
+    assert_not_includes response.body, "/recording_studio_api/api/v1/site-wide-client-errors/child"
+    assert_not_includes response.body, "/recording_studio_api/api/v1/site-wide-errors"
+
+    get "/admin/api/screens/admin_api_requests/table", params: {
+      start_date: 27.days.ago.to_date.iso8601,
+      end_date: Date.current.iso8601,
+      group_by: "day",
+      status: "authorization_failure"
+    }
+
+    assert_response :success
+    assert_includes response.body, "/recording_studio_api/api/v1/authentication-failure"
+    assert_includes response.body, "/recording_studio_api/api/v1/authorization-failure"
+    assert_not_includes response.body, "/recording_studio_api/api/v1/site-wide-pages"
+    assert_not_includes response.body, "/recording_studio_api/api/v1/site-wide-errors"
+
+    get "/admin/api/screens/admin_api_requests/table", params: {
+      start_date: 27.days.ago.to_date.iso8601,
+      end_date: Date.current.iso8601,
+      group_by: "day",
+      rate_limited: "true"
+    }
+
+    assert_response :success
+    assert_includes response.body, "/recording_studio_api/api/v1/pages"
+    assert_not_includes response.body, "/recording_studio_api/api/v1/site-wide-pages"
+  end
+
+  test "site admins can filter credentials by root and revoke an active credential" do
+    _first_root_recording, first_access_recording = create_access_recording_for(
+      user: @user,
+      workspace_name: "First credential root",
+      role: :admin
+    )
+    _second_root_recording, second_access_recording = create_access_recording_for(
+      user: @user,
+      workspace_name: "Second credential root",
+      role: :admin
+    )
+    first_payload = provision_api_client_for(access_recording: first_access_recording, name: "First site credential")
+    second_payload = provision_api_client_for(access_recording: second_access_recording, name: "Second site credential")
+
+    switch_to_root(@admin_root_recording)
+
+    get "/admin/api"
+
+    assert_response :success
+    assert_includes response.body, "/admin/api/screens/admin_api_credentials"
+    assert_includes response.body, "API credentials"
+
+    get "/admin/api/screens/admin_api_credentials"
+
+    assert_response :success
+    assert_select %(select[name="status"] option[value=""]:not([disabled])), count: 1
+    assert_select %(select[name="root_recording_id"] option[value=""]:not([disabled])), count: 1
+    assert_select %(select[name="root_type"] option[value=""]:not([disabled])), count: 1
+    assert_select %(select[name="root_recording_id"] option[value="First credential root"]), text: "First credential root", count: 1
+
+    get "/admin/api/screens/admin_api_credentials/table"
+
+    assert_response :success
+    assert_includes response.body, "First credential root"
+    assert_includes response.body, "Second credential root"
+    assert_includes response.body, "First site credential"
+    assert_includes response.body, "Second site credential"
+    assert_includes response.body, first_payload.fetch(:credential).oauth_client_id
+    assert_includes response.body, second_payload.fetch(:credential).oauth_client_id
+
+    get "/admin/api/screens/admin_api_credentials/table", params: {
+      root_recording_id: "First credential root"
+    }
+
+    assert_response :success
+    assert_includes response.body, "First site credential"
+    refute_includes response.body, "Second site credential"
+
+    get "/admin/api/screens/admin_api_credentials/table", params: {
+      status: "",
+      root_recording_id: "",
+      root_type: ""
+    }
+
+    assert_response :success
+    assert_includes response.body, "First site credential"
+    assert_includes response.body, "Second site credential"
+
+    post "/recording_studio_api/admin_api/credentials/#{first_payload.fetch(:credential).id}/revoke", params: {
+      close_url: "/admin/api/screens/admin_api_credentials"
+    }
+
+    assert_redirected_to "/admin/api/screens/admin_api_credentials"
+    assert_not_nil first_payload.fetch(:credential).reload.revoked_at
+    assert_nil second_payload.fetch(:credential).reload.revoked_at
   end
 
   test "API access requests screen shows chart and widgets for request analytics" do

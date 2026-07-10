@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-# rubocop:disable Metrics/BlockLength
 RecordingStudioApi::Engine.routes.draw do
   get "/admin_api", to: "admin_dashboards#show", as: :admin_dashboard
   get "/admin_api/settings", to: "admin_settings#show", as: :admin_settings
@@ -8,16 +7,12 @@ RecordingStudioApi::Engine.routes.draw do
   get "/admin_api/requests", to: "admin_requests#index", as: :admin_requests
   get "/admin_api/errors", to: "admin_errors#index", as: :admin_errors
   get "/admin_api/logs", to: "admin_logs#index", as: :admin_logs
+  post "/admin_api/credentials/:id/revoke", to: "admin_credentials#revoke", as: :admin_revoke_credential
 
   resources :api_clients, controller: "access_requests", only: %i[index show new create edit update] do
     get :requests_chart, on: :collection
-    get :log, on: :member
     post :revoke, on: :member
     post :rotate, on: :member
-
-    resources :api_access_tokens, path: "tokens", only: :index do
-      post :revoke, on: :member
-    end
   end
   post "/oauth/token", to: "oauth#token"
 
@@ -67,4 +62,3 @@ RecordingStudioApi::Engine.routes.draw do
     end
   end
 end
-# rubocop:enable Metrics/BlockLength

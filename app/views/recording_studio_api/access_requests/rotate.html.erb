@@ -14,7 +14,7 @@
     <div class="space-y-3">
       <%= render FlatPack::SectionTitle::Component.new(
         title: "New client secret",
-        subtitle: "This token is only shown once. Update any integrations that still use the revoked key."
+        subtitle: "This secret is only shown once. Update any integrations that still use the revoked key."
       ) %>
       <pre class="overflow-x-auto rounded-md border border-(--surface-border-color) bg-(--surface-background-color) p-4 text-sm text-(--surface-content-color)" data-secret-reveal-target="secret"><%= @payload.fetch(:token) %></pre>
     </div>
@@ -31,11 +31,12 @@
   </div>
 
   <div class="flex flex-wrap gap-3">
+    <% finish_param = page_nav_close_url == main_app.root_path ? { close_url: "/api/screens/api_keys" } : page_nav_close_param %>
     <%= render FlatPack::Button::Component.new(
       text: "Finish",
       style: :primary,
       size: :md,
-      url: api_client_path(@payload.fetch(:api_client), page_nav_close_param)
+      url: api_client_path(@payload.fetch(:api_client), finish_param)
     ) %>
   </div>
 </div>

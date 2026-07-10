@@ -18,7 +18,7 @@
       <% if admin_root_current? %>
         <%= render FlatPack::Sidebar::Item::Component.new(
           label: "Admin API",
-          href: RecordingStudioApi.admin_dashboard_path(controller: self),
+          href: "/admin/api",
           icon: :queue_list
         ) %>
       <% else %>

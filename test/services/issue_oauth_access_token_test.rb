@@ -81,4 +81,21 @@ class IssueOauthAccessTokenTest < ActiveSupport::TestCase
     assert result.failure?
     assert_equal "invalid_client", result.error.fetch(:error)
   end
+
+  test "does not expose database errors during token issuance" do
+    result = RecordingStudioApi::ApiAccessToken.stub(:create!, lambda { |**|
+      raise ActiveRecord::StatementInvalid, "database constraint detail"
+    }) do
+      RecordingStudioApi::Services::IssueOauthAccessToken.call(
+        grant_type: "client_credentials",
+        client_id: @payload.fetch(:credential).oauth_client_id,
+        client_secret: @payload.fetch(:token)
+      )
+    end
+
+    assert result.failure?
+    assert_equal "server_error", result.error.fetch(:error)
+    assert_equal RecordingStudioApi::OauthErrorMapper::SERVER_ERROR_DESCRIPTION, result.error.fetch(:error_description)
+    assert_not_includes result.error.fetch(:error_description), "database constraint detail"
+  end
 end

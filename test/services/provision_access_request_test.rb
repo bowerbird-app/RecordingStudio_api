@@ -121,4 +121,21 @@ class ProvisionAccessRequestTest < ActiveSupport::TestCase
     assert result.failure?
     assert_equal "Actor is not authorized to manage API access for this recording", result.error
   end
+
+  test "prevents edit managers from provisioning admin API access" do
+    edit_user = create_user(email: "edit-provision@example.com")
+    edit_root_recording, = create_access_recording_for(user: edit_user, role: :edit)
+    RecordingStudioApi.configuration.access_management_edit_role = :edit
+
+    rejected_result = RecordingStudioApi::Services::ProvisionAccessRequest.call(
+      access_point_recording: edit_root_recording,
+      actor: edit_user,
+      role: :admin,
+      api_client_name: "Escalated client"
+    )
+
+    assert rejected_result.failure?
+    assert_equal "Requested API access role exceeds the manager's access", rejected_result.error
+    assert_equal 0, RecordingStudioApi::ApiClient.where(name: "Escalated client").count
+  end
 end

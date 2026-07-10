@@ -10,25 +10,14 @@ RecordingStudioApi.configure do |config|
   config.api_request_logging_enabled = true
 
   config.admin_dashboard_path_resolver = lambda do |controller:, **|
-    controller.main_app.admin_api_path
-  end
-
-  config.admin_requests_path_resolver = lambda do |controller:, **params|
-    controller.main_app.admin_api_requests_path(params)
-  end
-
-  config.admin_errors_path_resolver = lambda do |controller:, **params|
-    controller.main_app.admin_api_errors_path(params)
-  end
-
-  config.admin_logs_path_resolver = lambda do |controller:, **params|
-    controller.main_app.admin_api_logs_path(params)
+    "/admin/api"
   end
 
   config.action_registry.register(
     :trash,
     capability: :trashable,
     http_verb: :post,
+    required_role: :edit,
     handler: ->(context) { Dummy::Api::Actions::TrashRecording.call(context) },
     openapi: {
       summary: "Trash",
@@ -66,6 +55,7 @@ RecordingStudioApi.configure do |config|
     :move,
     capability: :movable,
     http_verb: :post,
+    required_role: :edit,
     handler: RecordingStudioApi::Services::MoveRecording,
     serializer: RecordingStudioApi::Serializers::ResourceRecordingSerializer,
     openapi: {
@@ -124,6 +114,7 @@ end
 RecordingStudioApi.register_recordable_type_api(
   "Workspace",
   serializer: ->(recordable) { { name: recordable.name } },
+  writable_attributes: %i[name],
   openapi: {
     details_schema: {
       type: "object",
@@ -205,6 +196,7 @@ RecordingStudioApi.register_recordable_type_api(
 RecordingStudioApi.register_recordable_type_api(
   "Folder",
   serializer: ->(recordable) { { name: recordable.name } },
+  writable_attributes: %i[name],
   openapi: {
     details_schema: {
       type: "object",

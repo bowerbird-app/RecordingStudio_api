@@ -24,6 +24,8 @@ module RecordingStudioApi
         return failure("Access role is required") if resolved_role.blank?
         return failure("API client name is required") if name.blank?
         return failure("Access recording must point to RecordingStudio::Access") if access_recording.present? && access_recording.recordable_type != "RecordingStudio::Access"
+        return failure("Not authorized to manage access") unless access_management_policy.can_manage_recording?(resolved_access_point_recording)
+        return failure("Requested API access role exceeds the manager's access") unless access_management_policy.can_assign_role?(resolved_access_point_recording, resolved_role)
 
         token = Token.generate
         payload = nil
@@ -96,6 +98,10 @@ module RecordingStudioApi
 
       def resolved_role
         @resolved_role ||= role.to_s.presence || access_recording&.recordable&.try(:role).to_s.presence
+      end
+
+      def access_management_policy
+        @access_management_policy ||= RecordingStudioApi::AccessManagementPolicy.new(actor: resolved_manager_actor)
       end
 
       def service_args

@@ -2,6 +2,8 @@
 
 module RecordingStudioApi
   class OauthErrorMapper
+    SERVER_ERROR_DESCRIPTION = "The authorization server encountered an unexpected condition."
+
     STATUS_BY_ERROR_CODE = {
       "invalid_request" => :bad_request,
       "invalid_grant" => :bad_request,
@@ -19,7 +21,14 @@ module RecordingStudioApi
       def payload_for(error)
         return error.symbolize_keys if error.is_a?(Hash)
 
-        { error: "invalid_request", error_description: error.to_s }
+        server_error_payload
+      end
+
+      def server_error_payload
+        {
+          error: "server_error",
+          error_description: SERVER_ERROR_DESCRIPTION
+        }
       end
 
       def status_for(payload)

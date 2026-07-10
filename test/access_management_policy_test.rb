@@ -39,6 +39,20 @@ class AccessManagementPolicyTest < ActiveSupport::TestCase
     assert policy.can_manage_root_recording?(root_recording)
   end
 
+  test "assignable roles do not exceed the manager's effective role" do
+    user = create_user(email: "policy-edit@example.com")
+    root_recording, = create_access_recording_for(user: user, role: :edit)
+    RecordingStudioApi.configuration.access_management_edit_role = :edit
+
+    policy = RecordingStudioApi::AccessManagementPolicy.new(actor: user)
+
+    assert_equal :edit, policy.maximum_assignable_role_for(root_recording)
+    assert policy.can_assign_role?(root_recording, :view)
+    assert policy.can_assign_role?(root_recording, :edit)
+    refute policy.can_assign_role?(root_recording, :admin)
+    refute policy.can_assign_role?(root_recording, :owner)
+  end
+
   test "descendant access recording visibility follows RecordingStudioAccessible authorization" do
     user = create_user(email: "policy-descendant@example.com")
     workspace = Workspace.create!(name: "Scoped Workspace")

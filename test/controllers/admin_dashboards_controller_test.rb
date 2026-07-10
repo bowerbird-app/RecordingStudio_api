@@ -22,21 +22,21 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
     @original_admin_requests_path_resolver = RecordingStudioApi.configuration.admin_requests_path_resolver
     @original_admin_errors_path_resolver = RecordingStudioApi.configuration.admin_errors_path_resolver
     @original_admin_logs_path_resolver = RecordingStudioApi.configuration.admin_logs_path_resolver
-    RecordingStudioApi.configuration.admin_dashboard_path_resolver = ->(controller:, **) { controller.main_app.admin_api_path }
+    RecordingStudioApi.configuration.admin_dashboard_path_resolver = ->(controller:, **) { admin_api_path }
     RecordingStudioApi.configuration.admin_settings_path_resolver = lambda do |controller:, **params|
-      controller.main_app.admin_api_settings_path(params)
+      admin_api_settings_path(params)
     end
     RecordingStudioApi.configuration.admin_rate_limiting_path_resolver = lambda do |controller:, **params|
-      controller.main_app.admin_api_rate_limiting_path(params)
+      admin_api_rate_limiting_path(params)
     end
     RecordingStudioApi.configuration.admin_requests_path_resolver = lambda do |controller:, **params|
-      controller.main_app.admin_api_requests_path(params)
+      admin_api_requests_path(params)
     end
     RecordingStudioApi.configuration.admin_errors_path_resolver = lambda do |controller:, **params|
-      controller.main_app.admin_api_errors_path(params)
+      admin_api_errors_path(params)
     end
     RecordingStudioApi.configuration.admin_logs_path_resolver = lambda do |controller:, **params|
-      controller.main_app.admin_api_logs_path(params)
+      admin_api_logs_path(params)
     end
 
     @user = User.create!(email: "admin-dashboard-#{SecureRandom.hex(4)}@example.com") do |user|
@@ -192,7 +192,7 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "renders the admin api dashboard from the configured host route" do
-    get "/admin/api"
+    get admin_api_dashboard_path
 
     assert_response :success
     assert_includes response.body, "Admin API"
@@ -216,25 +216,25 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Full screen"
     assert_includes response.body, "flat-pack--chart"
     assert_not_includes response.body, "Peak hour"
-    assert_select %(turbo-frame#admin-api-requests-last-24-hours-frame[src*="/admin/api/requests"]), count: 1
+    assert_select %(turbo-frame#admin-api-requests-last-24-hours-frame[src*="/recording_studio_api/admin_api/requests"]), count: 1
     assert_select %(turbo-frame#admin-api-requests-last-24-hours-frame[src*="dashboard_embed=1"]), count: 1
     assert_select %(turbo-frame#admin-api-requests-last-24-hours-frame[src*="show_summary=1"]), count: 1
     assert_select %(turbo-frame#admin-api-requests-last-24-hours-frame[src*="range=last_24_hours"]), count: 1
     assert_select %(turbo-frame#admin-api-requests-last-24-hours-frame[src*="group_by=hour"]), count: 1
-    assert_select %(turbo-frame#admin-api-requests-last-30-days-frame[src*="/admin/api/requests"]), count: 1
+    assert_select %(turbo-frame#admin-api-requests-last-30-days-frame[src*="/recording_studio_api/admin_api/requests"]), count: 1
     assert_select %(turbo-frame#admin-api-requests-last-30-days-frame[src*="dashboard_embed=1"]), count: 1
-    assert_select %(a[href="#{admin_api_settings_path(close_url: admin_api_path)}"]), text: "Settings", count: 1
-    assert_select %(a[href="#{admin_api_rate_limiting_path(close_url: admin_api_path)}"]), text: "Rate limiting", count: 1
-    assert_select %(a[href="#{admin_api_logs_path(close_url: admin_api_path)}"]), text: "Logs", count: 1
-    assert_select %(a[href="#{admin_api_requests_path(close_url: admin_api_path, range: 'last_24_hours', group_by: 'hour')}"]), text: "Full screen", count: 1
-    assert_select %(a[href="#{admin_api_requests_path(close_url: admin_api_path, start_date: 29.days.ago.to_date.iso8601, end_date: Date.current.iso8601, group_by: 'day')}"]), text: "Full screen", count: 1
-    assert_select %(a[href="#{admin_api_errors_path(close_url: admin_api_path, start_date: 29.days.ago.to_date.iso8601, end_date: Date.current.iso8601)}"]), text: "Full screen", count: 1
+    assert_select %(a[href="#{admin_api_settings_path(close_url: admin_api_dashboard_path)}"]), text: "Settings", count: 1
+    assert_select %(a[href="#{admin_api_rate_limiting_path(close_url: admin_api_dashboard_path)}"]), text: "Rate limiting", count: 1
+    assert_select %(a[href="#{admin_api_logs_path(close_url: admin_api_dashboard_path)}"]), text: "Logs", count: 1
+    assert_select %(a[href="#{admin_api_requests_path(close_url: admin_api_dashboard_path, range: 'last_24_hours', group_by: 'hour')}"]), text: "Full screen", count: 1
+    assert_select %(a[href="#{admin_api_requests_path(close_url: admin_api_dashboard_path, start_date: 29.days.ago.to_date.iso8601, end_date: Date.current.iso8601, group_by: 'day')}"]), text: "Full screen", count: 1
+    assert_select %(a[href="#{admin_api_errors_path(close_url: admin_api_dashboard_path, start_date: 29.days.ago.to_date.iso8601, end_date: Date.current.iso8601)}"]), text: "Full screen", count: 1
     assert_not_includes response.body, "Admin API views start here"
     assert_not_includes response.body, "Section key"
   end
 
   test "renders the dedicated admin api errors page with filters" do
-    get "/admin/api/errors"
+    get admin_api_errors_path
 
     assert_response :success
     assert_includes response.body, "Admin API errors"
@@ -253,7 +253,7 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
     RecordingStudioApi::ApiRequestLog.where("controller_name LIKE ?", "recording_studio_api/admin_%").delete_all
     RecordingStudioApi::ApiRequestLog.where("request_path LIKE ? OR request_path LIKE ?", "/admin/api%", "/recording_studio_api/admin_api%").delete_all
 
-    get "/admin/api/errors"
+    get admin_api_errors_path
 
     assert_response :success
     assert_includes response.body, "RecordingStudioApi::ExternalEndpointError"
@@ -269,7 +269,7 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "renders the dedicated admin api requests page with filters" do
-    get "/admin/api/requests"
+    get admin_api_requests_path
 
     assert_response :success
     assert_includes response.body, "Admin API requests"
@@ -360,7 +360,7 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
       recordable_type: "RecordingStudioApi::AdminApi"
     )
 
-    get "/admin/api"
+    get admin_api_dashboard_path
 
     assert_response :success
 
@@ -375,7 +375,7 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "renders the admin api settings page from the configured host route" do
-    get "/admin/api/settings"
+    get admin_api_settings_path
 
     assert_response :success
     assert_includes response.body, "Admin API settings"
@@ -389,7 +389,7 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "renders the admin api rate limiting page from the configured host route" do
-    get "/admin/api/rate-limiting"
+    get admin_api_rate_limiting_path
 
     assert_response :success
     assert_includes response.body, "Rate limiting"
@@ -435,12 +435,45 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
       }
     }
 
-    get "/admin/api"
+    get admin_api_dashboard_path
 
     assert_response :forbidden
   end
 
   private
+
+  def admin_api_path
+    "/admin/api"
+  end
+
+  def admin_api_dashboard_path(params = {})
+    path_with_query("/recording_studio_api/admin_api", params)
+  end
+
+  def admin_api_settings_path(params = {})
+    path_with_query("/recording_studio_api/admin_api/settings", params)
+  end
+
+  def admin_api_rate_limiting_path(params = {})
+    path_with_query("/recording_studio_api/admin_api/rate_limiting", params)
+  end
+
+  def admin_api_requests_path(params = {})
+    path_with_query("/recording_studio_api/admin_api/requests", params)
+  end
+
+  def admin_api_errors_path(params = {})
+    path_with_query("/recording_studio_api/admin_api/errors", params)
+  end
+
+  def admin_api_logs_path(params = {})
+    path_with_query("/recording_studio_api/admin_api/logs", params)
+  end
+
+  def path_with_query(path, params)
+    query = params.compact.to_query
+    query.present? ? "#{path}?#{query}" : path
+  end
 
   def create_access_recording(parent_recording:, user:, role:)
     with_access_creation_context do

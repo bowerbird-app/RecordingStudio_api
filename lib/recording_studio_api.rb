@@ -33,6 +33,8 @@ require "recording_studio_api/services/move_recording"
 require "recording_studio_api/services/documentation_catalog"
 require "recording_studio_api/services/openapi_document"
 require "recording_studio_api/services/paginate_resource_collection"
+require "recording_studio_api/services/aggregate_api_request_log_metrics"
+require "recording_studio_api/services/prune_api_request_logs"
 require "recording_studio_api/services/resource_operations/base"
 require "recording_studio_api/services/resource_operations/index"
 require "recording_studio_api/services/resource_operations/show"
@@ -100,7 +102,7 @@ module RecordingStudioApi
     end
 
     # rubocop:disable Metrics/ParameterLists
-    def register_capability_action(name, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil)
+    def register_capability_action(name, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil)
       configuration.action_registry.register(
         name,
         capability: capability,
@@ -112,17 +114,19 @@ module RecordingStudioApi
         serializer: serializer,
         scope: scope,
         openapi: openapi,
-        input_contract: input_contract
+        input_contract: input_contract,
+        required_role: required_role
       )
     end
     # rubocop:enable Metrics/ParameterLists
 
-    def register_recordable_type_api(recordable_type, serializer: nil, openapi: nil, sortable_attributes: nil)
+    def register_recordable_type_api(recordable_type, serializer: nil, openapi: nil, sortable_attributes: nil, writable_attributes: nil)
       configuration.recordable_registry.register(
         recordable_type,
         serializer: serializer,
         openapi: openapi,
-        sortable_attributes: sortable_attributes
+        sortable_attributes: sortable_attributes,
+        writable_attributes: writable_attributes
       )
     end
 
@@ -299,6 +303,7 @@ module RecordingStudioApi
           :move,
           capability: :movable,
           http_verb: :post,
+          required_role: :edit,
           handler: RecordingStudioApi::Services::MoveRecording,
           serializer: RecordingStudioApi::Serializers::ResourceRecordingSerializer
         )
@@ -308,6 +313,7 @@ module RecordingStudioApi
         :trash_restore,
         capability: :trashable,
         http_verb: :post,
+        required_role: :edit,
         handler: RecordingStudioApi::Services::TrashableOperations::Restore,
         scope: :resource
       ) unless capability_action(:trash_restore)
@@ -316,6 +322,7 @@ module RecordingStudioApi
         :trash_destroy,
         capability: :trashable,
         http_verb: :delete,
+        required_role: :edit,
         handler: RecordingStudioApi::Services::TrashableOperations::Destroy,
         scope: :resource
       ) unless capability_action(:trash_destroy)

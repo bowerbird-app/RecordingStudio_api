@@ -218,7 +218,7 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
     assert_response :unauthorized
   end
 
-  test "dispatches custom member actions for clients with view-only access" do
+  test "denies custom member actions for clients below the default edit role" do
     view_user = create_user(email: "view-only-member-actions@example.com")
     view_root_recording, view_access_recording = create_access_recording_for(user: view_user, role: :view)
     view_page_recording = create_page_recording(root_recording: view_root_recording)
@@ -227,8 +227,37 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
     post "/recording_studio_api/api/v1/pages/#{view_page_recording.id}/actions/echo",
          headers: { "Authorization" => "Bearer #{view_token}" }
 
+    assert_response :forbidden
+    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).fetch("error")
+  end
+
+  test "allows the host to lower a custom action role requirement" do
+    RecordingStudioApi.configuration.capability_action_roles = { echo: :view }
+    view_user = create_user(email: "view-role-override-member-actions@example.com")
+    view_root_recording, view_access_recording = create_access_recording_for(user: view_user, role: :view)
+    view_page_recording = create_page_recording(root_recording: view_root_recording)
+    view_token = issue_oauth_access_token_for(access_recording: view_access_recording, name: "View role override token")
+
+    post "/recording_studio_api/api/v1/pages/#{view_page_recording.id}/actions/echo",
+         headers: { "Authorization" => "Bearer #{view_token}" }
+
     assert_response :success
     assert_equal view_page_recording.id, JSON.parse(response.body).fetch("data").fetch("id")
+  end
+
+  test "uses a host action role resolver" do
+    edit_user = create_user(email: "resolver-member-actions@example.com")
+    edit_root_recording, edit_access_recording = create_access_recording_for(user: edit_user, role: :edit)
+    edit_page_recording = create_page_recording(root_recording: edit_root_recording)
+    edit_token = issue_oauth_access_token_for(access_recording: edit_access_recording, name: "Resolver token")
+    RecordingStudioApi.configuration.capability_action_role_resolver = lambda do |action:, recording:, **|
+      action.name == "echo" && recording.id == edit_page_recording.id ? :admin : :edit
+    end
+
+    post "/recording_studio_api/api/v1/pages/#{edit_page_recording.id}/actions/echo",
+         headers: { "Authorization" => "Bearer #{edit_token}" }
+
+    assert_response :forbidden
   end
 
   test "trash capability owns write authorization for view-only clients" do

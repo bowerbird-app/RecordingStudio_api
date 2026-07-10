@@ -14,7 +14,7 @@
       <%= render FlatPack::Tooltip::Component.new(text: "Create a new secret and api key") do %>
         <%= render FlatPack::Button::Component.new(
           text: "Rotate key",
-          style: :danger,
+          style: :default,
           size: :md,
           url: rotate_api_client_path(@api_client, page_nav_close_param),
           data: { turbo_method: :post, turbo_confirm: "Rotate this API key? This will revoke the current key." }
@@ -23,7 +23,7 @@
       <%= render FlatPack::Tooltip::Component.new(text: "Revoke this API key") do %>
         <%= render FlatPack::Button::Component.new(
           text: "Revoke",
-          style: :danger,
+          style: :default,
           size: :md,
           url: revoke_api_client_path(@api_client, page_nav_close_param),
           data: { turbo_method: :post, turbo_confirm: "Revoke this API key?" }

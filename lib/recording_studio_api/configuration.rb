@@ -21,6 +21,7 @@ module RecordingStudioApi
                   :token_authenticators,
                   :access_management_view_role,
                   :access_management_edit_role,
+                  :capability_action_role_resolver,
                   :admin_dashboard_path_resolver,
                   :admin_settings_path_resolver,
                   :admin_rate_limiting_path_resolver,
@@ -52,8 +53,10 @@ module RecordingStudioApi
                   :rate_limit_api_write_requests,
                   :rate_limit_api_write_period_seconds,
                   :api_request_logging_enabled,
-                  :api_request_logging_payload_mode
-    attr_reader :hooks, :action_registry, :recordable_registry, :default_api_version, :api_version_profiles
+                  :api_request_logging_payload_mode,
+                  :api_request_log_retention_days,
+                  :api_daily_metric_retention_days
+    attr_reader :hooks, :action_registry, :recordable_registry, :default_api_version, :api_version_profiles, :capability_action_roles
 
     # rubocop:disable Metrics/AbcSize
     def initialize
@@ -63,6 +66,8 @@ module RecordingStudioApi
       @token_authenticators = []
       @access_management_view_role = :view
       @access_management_edit_role = :admin
+      @capability_action_roles = {}
+      @capability_action_role_resolver = nil
       @admin_dashboard_path_resolver = lambda do |controller:, **|
         controller.recording_studio_api.admin_dashboard_path
       end
@@ -110,6 +115,8 @@ module RecordingStudioApi
       @rate_limit_api_write_period_seconds = 60
       @api_request_logging_enabled = false
       @api_request_logging_payload_mode = "metadata_only"
+      @api_request_log_retention_days = 30
+      @api_daily_metric_retention_days = nil
       @hooks = Hooks.new
       @action_registry = ActionRegistry.new
       @recordable_registry = RecordableRegistry.new
@@ -122,6 +129,8 @@ module RecordingStudioApi
         credential_ttl: credential_ttl,
         access_token_ttl: access_token_ttl,
         token_authenticators_count: token_authenticators.count,
+        capability_action_roles: capability_action_roles,
+        capability_action_role_resolver: capability_action_role_resolver.respond_to?(:call),
         admin_dashboard_path_resolver: admin_dashboard_path_resolver.respond_to?(:call),
         admin_settings_path_resolver: admin_settings_path_resolver.respond_to?(:call),
         admin_rate_limiting_path_resolver: admin_rate_limiting_path_resolver.respond_to?(:call),
@@ -157,6 +166,8 @@ module RecordingStudioApi
         rate_limit_api_write_period_seconds: rate_limit_api_write_period_seconds,
         api_request_logging_enabled: api_request_logging_enabled,
         api_request_logging_payload_mode: api_request_logging_payload_mode,
+        api_request_log_retention_days: api_request_log_retention_days,
+        api_daily_metric_retention_days: api_daily_metric_retention_days,
         action_registrations: action_registry.to_h,
         recordable_registrations: recordable_registry.to_h,
         hooks_registered: hooks.instance_variable_get(:@registry).transform_values(&:size)
@@ -182,6 +193,7 @@ module RecordingStudioApi
       action_registry.validate!
       recordable_registry.validate!
       validate_access_management_roles!
+      validate_capability_action_role_resolver!
       validate_api_versions!
     end
 
@@ -195,6 +207,35 @@ module RecordingStudioApi
 
     def access_management_edit_role=(value)
       @access_management_edit_role = normalize_access_role(value, default: :admin)
+    end
+
+    def capability_action_roles=(value)
+      raise ConfigurationError, "capability_action_roles must be a hash" unless value.respond_to?(:each_pair)
+
+      @capability_action_roles = value.each_pair.each_with_object({}) do |(action_name, role), roles|
+        normalized_action_name = action_name.to_s.strip
+        raise ConfigurationError, "capability action name is required" if normalized_action_name.empty?
+
+        normalized_role = normalize_access_role(role, default: :edit)
+        validate_access_role!(:capability_action_roles, normalized_role)
+        roles[normalized_action_name] = normalized_role
+      end
+    end
+
+    def capability_action_role_for(action:, recording:, api_client:, access_grant:)
+      default_role = capability_action_roles.fetch(action.name, action.required_role)
+      return default_role unless capability_action_role_resolver.respond_to?(:call)
+
+      resolved_role = capability_action_role_resolver.call(
+        action: action,
+        recording: recording,
+        api_client: api_client,
+        access_grant: access_grant,
+        default_role: default_role
+      )
+      normalized_role = normalize_access_role(resolved_role, default: default_role)
+      validate_access_role!(:capability_action_role_resolver, normalized_role)
+      normalized_role
     end
 
     def api_versions=(value)
@@ -251,6 +292,12 @@ module RecordingStudioApi
       return unless access_role_rank(access_management_view_role) > access_role_rank(access_management_edit_role)
 
       raise ConfigurationError, "Access management view role must be less than or equal to edit role"
+    end
+
+    def validate_capability_action_role_resolver!
+      return if capability_action_role_resolver.nil? || capability_action_role_resolver.respond_to?(:call)
+
+      raise ConfigurationError, "capability_action_role_resolver must respond to call"
     end
 
     def validate_access_role!(name, role)

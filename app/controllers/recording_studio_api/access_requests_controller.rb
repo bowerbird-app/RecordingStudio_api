@@ -14,7 +14,7 @@ module RecordingStudioApi
     before_action :authorize_access_management_edit_for_new_request!, only: %i[new create]
     before_action :load_form_state, only: %i[new create]
     before_action :load_api_access_list, only: %i[index requests_chart]
-    before_action :load_api_access_detail, only: %i[show edit update log revoke rotate]
+    before_action :load_api_access_detail, only: %i[show edit update revoke rotate]
     before_action :authorize_access_management_edit_for_loaded_client!, only: %i[edit update revoke rotate]
 
     def index
@@ -27,10 +27,6 @@ module RecordingStudioApi
     end
 
     def requests_chart
-    end
-
-    def log
-      @log_rows = load_api_client_log_rows
     end
 
     def edit
@@ -68,6 +64,7 @@ module RecordingStudioApi
       @errors << "Name can't be blank" if @form_values.fetch(:api_client_name).blank?
       @errors << "Access point is invalid" unless @access_point_recordings.any? { |recording| recording.id == @form_values.fetch(:access_point_recording_id) }
       @errors << "Role is invalid" unless role_options.any? { |(_label, value)| value == @form_values.fetch(:role) }
+      @errors << "Requested API access role exceeds your access" unless access_management_policy.can_assign_role?(selected_edit_access_point_recording, @form_values.fetch(:role))
       return render :edit, status: :unprocessable_entity if @errors.any?
 
       return redirect_to(api_client_path(@api_client, page_nav_close_param), notice: "API access updated.") if persist_access_updates(expires_at)
@@ -657,7 +654,7 @@ module RecordingStudioApi
 
     def load_api_access_detail
       @api_client = RecordingStudioApi::ApiClient
-        .includes(credentials: :access_tokens, access_recording: [:recordable, { parent_recording: :parent_recording }])
+        .includes(:credentials, access_recording: [:recordable, { parent_recording: :parent_recording }])
         .where(access_recording_id: visible_api_client_access_recordings.map(&:id))
         .find(params[:id])
 
@@ -665,39 +662,49 @@ module RecordingStudioApi
       @root_recording = @access_recording&.root_recording
       @can_manage_access_request = access_management_policy.can_manage_recording?(access_point_recording_for(@access_recording))
       @latest_credential = @api_client.credentials.max_by { |credential| [credential.created_at.to_i, credential.id.to_i] }
-      load_api_token_counts
+      @rotated_credential_rows = rotated_credential_rows_for(@api_client.credentials, @latest_credential)
     rescue ActiveRecord::RecordNotFound
       head :not_found
     end
 
-    def load_api_token_counts
-      all_tokens = @api_client.credentials.flat_map(&:access_tokens)
-      active_tokens = all_tokens.select do |token|
-        token.revoked_at.nil? && token.expires_at.present? && token.expires_at.future?
-      end
-
-      @issued_token_count = all_tokens.count
-      @active_token_count = active_tokens.count
-      @revoked_token_count = all_tokens.count { |token| token.revoked_at.present? }
+    def rotated_credential_rows_for(credentials, latest_credential)
+      credentials
+        .reject { |credential| credential.id == latest_credential&.id }
+        .sort_by { |credential| [credential.created_at.to_i, credential.id.to_s] }
+        .reverse
+        .map { |credential| rotated_credential_row(credential) }
     end
 
-    def load_api_client_log_rows
-      return [] unless RecordingStudioApi::ApiRequestLog.table_available?
+    def rotated_credential_row(credential)
+      {
+        api_key: credential.oauth_client_id,
+        status_text: credential_status_label(credential),
+        status_style: credential_status_style(credential),
+        last_used_at: credential.last_used_at,
+        revoked_at: credential.revoked_at,
+        expires_at: expires_at_for(credential),
+        expires_text: expires_text_for(credential)
+      }
+    end
 
-      RecordingStudioApi::ApiRequestLog
-        .where(api_client_id: @api_client.id)
-        .order(occurred_at: :desc, id: :desc)
-        .limit(100)
-        .map do |log|
-          {
-            occurred_at: log.occurred_at || log.created_at,
-            method: log.request_method,
-            path: log.request_path,
-            status: log.status_code.to_s,
-            duration: "#{log.duration_ms} ms",
-            request_id: log.request_id.presence || "-"
-          }
-        end
+    def credential_status_style(credential)
+      return :danger if credential.revoked_at.present?
+      return :default if credential.expires_at.present? && credential.expires_at.past?
+
+      :success
+    end
+
+    def expires_at_for(credential)
+      return if credential.expires_at.blank? || credential.expires_at.past?
+
+      credential.expires_at
+    end
+
+    def expires_text_for(credential)
+      return "Expired" if credential.expires_at.present? && credential.expires_at.past?
+      return "Never" if credential.expires_at.blank?
+
+      credential.expires_at.to_date.to_s
     end
 
     def load_edit_form_state
@@ -733,6 +740,7 @@ module RecordingStudioApi
       now = Time.current
       access_record = @access_recording&.recordable
       access_point_recording_id = @form_values.fetch(:access_point_recording_id)
+      return false unless access_management_policy.can_assign_role?(selected_edit_access_point_recording, @form_values.fetch(:role))
 
       ActiveRecord::Base.transaction do
         if access_point_recording_id.present? && @access_recording.parent_recording_id != access_point_recording_id
@@ -773,6 +781,10 @@ module RecordingStudioApi
       true
     rescue ActiveRecord::ActiveRecordError
       false
+    end
+
+    def selected_edit_access_point_recording
+      @access_point_recordings.find { |recording| recording.id == @form_values.fetch(:access_point_recording_id) }
     end
 
     def credential_status_label(credential)

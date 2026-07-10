@@ -103,6 +103,22 @@ class ProvisionApiClientTest < ActiveSupport::TestCase
     assert_equal "Not authorized to manage access", result.error
   end
 
+  test "prevents direct provisioning above the manager's effective role" do
+    edit_user = create_user(email: "edit-direct-provision@example.com")
+    _edit_root_recording, edit_access_recording = create_access_recording_for(user: edit_user, role: :edit)
+    RecordingStudioApi.configuration.access_management_edit_role = :edit
+
+    result = RecordingStudioApi::Services::ProvisionApiClient.call(
+      access_recording: edit_access_recording,
+      role: :admin,
+      name: "Escalated direct token"
+    )
+
+    assert result.failure?
+    assert_equal "Requested API access role exceeds the manager's access", result.error
+    assert_equal 0, RecordingStudioApi::ApiClient.where(name: "Escalated direct token").count
+  end
+
   test "applies the configured credential ttl when expires_at is omitted" do
     travel_to Time.zone.parse("2026-05-18 12:00:00 UTC") do
       RecordingStudioApi.configuration.credential_ttl = 2.hours

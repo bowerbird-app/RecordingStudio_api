@@ -374,17 +374,6 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :forbidden
 
-    view_token = RecordingStudioApi::ApiAccessToken.create!(
-      credential: view_api_client.credentials.max_by(&:created_at),
-      token_digest: "view_only_token_digest_#{SecureRandom.hex(16)}",
-      token_prefix: "tok-view",
-      expires_at: 2.days.from_now
-    )
-
-    post "/recording_studio_api/api_clients/#{view_api_client.id}/tokens/#{view_token.id}/revoke"
-
-    assert_response :forbidden
-
     post "/recording_studio_api/api_clients/#{view_api_client.id}/revoke"
 
     assert_response :forbidden
@@ -576,9 +565,10 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_select %(div#oauth2-activity[data-controller="flat-pack--section-title-anchor"]), count: 0
     assert_select %(a[href="#oauth2-activity"][data-flat-pack--section-title-anchor-target="link"]), count: 0
     assert_select %(a[href="/recording_studio_api/api_clients/#{api_client.id}/edit?close_url=%2F"]), text: "Edit"
-    assert_select %(a[href="/recording_studio_api/api_clients/#{api_client.id}/tokens?close_url=%2F"]), text: "Tokens"
-    assert_select %(a[href="/recording_studio_api/api_clients/#{api_client.id}/log?close_url=%2F"]), text: "Log"
+    assert_select %(a[href="/recording_studio_api/api_clients/#{api_client.id}/tokens?close_url=%2F"]), count: 0
+    assert_select %(a[href="/recording_studio_api/api_clients/#{api_client.id}/log?close_url=%2F"]), count: 0
     assert_not_includes response.body, "Create a new secret and api key"
+    assert_not_includes response.body, "Rotated keys"
     assert_select %(a[href="/recording_studio_api/api_clients/#{api_client.id}/rotate?close_url=%2F"]), count: 0
     assert_select %(a[href="/recording_studio_api/api_clients/#{api_client.id}/revoke?close_url=%2F"]), count: 0
     assert_not_includes response.body, "Back to API access list"
@@ -607,6 +597,31 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, new_credential.oauth_client_id
   end
 
+  test "show lists rotated keys for older credentials" do
+    api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Rotated history client")
+    previous_credential = api_client.credentials.max_by(&:created_at)
+
+    result = RecordingStudioApi::Services::RotateApiCredential.call(
+      api_client: api_client,
+      actor: @user
+    )
+
+    assert result.success?, result.error
+
+    new_credential = result.value.fetch(:credential)
+
+    get "/recording_studio_api/api_clients/#{api_client.id}"
+
+    assert_response :success
+    assert_includes response.body, "Rotated keys"
+    assert_includes response.body, "API keys that were rotated and revoked"
+    assert_includes response.body, previous_credential.oauth_client_id
+    assert_includes response.body, "Revoked"
+    assert_includes response.body, "Never used"
+    assert_includes response.body, "Never"
+    assert_includes response.body, new_credential.oauth_client_id
+  end
+
   test "show revokes the latest credential" do
     api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Revocable API client")
     latest_credential = api_client.credentials.max_by(&:created_at)
@@ -619,8 +634,8 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     get "/recording_studio_api/api_clients/#{api_client.id}"
 
     assert_response :success
-    assert_select %(div[data-page-nav-right-slot="revoked-badge"]), count: 1
-    assert_select %(div[data-page-nav-right-slot="revoked-badge"] span), text: "Revoked", count: 1
+    # badge removed per design; ensure status shows Revoked and revoke link is gone
+    assert_includes response.body, "Revoked"
     assert_select %(a[href="/recording_studio_api/api_clients/#{api_client.id}/revoke?close_url=%2F"]), count: 0
   end
 
@@ -641,123 +656,6 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, expired_api_client.name
     assert_includes response.body, "Revoked"
     assert_includes response.body, "Expired"
-  end
-
-  test "log lists API request rows for the selected api client only" do
-    api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Logged API client")
-    other_api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Other logged API client")
-
-    ensure_api_request_logs_table!
-
-    RecordingStudioApi::ApiRequestLog.create!(
-      occurred_at: Time.current,
-      request_id: "client-log-1",
-      request_method: "GET",
-      request_path: "/recording_studio_api/api/v1/workspaces",
-      status_code: 200,
-      duration_ms: 31,
-      api_client_id: api_client.id,
-      api_credential_id: api_client.credentials.max_by(&:created_at).id,
-      access_recording_id: api_client.access_recording_id,
-      root_recording_id: @workspace_root_recording.id
-    )
-
-    RecordingStudioApi::ApiRequestLog.create!(
-      occurred_at: Time.current,
-      request_id: "client-log-other",
-      request_method: "POST",
-      request_path: "/recording_studio_api/oauth/token",
-      status_code: 201,
-      duration_ms: 45,
-      api_client_id: other_api_client.id,
-      api_credential_id: other_api_client.credentials.max_by(&:created_at).id,
-      access_recording_id: other_api_client.access_recording_id,
-      root_recording_id: @workspace_root_recording.id
-    )
-
-    get "/recording_studio_api/api_clients/#{api_client.id}/log"
-
-    assert_response :success
-    assert_select %(nav.flat-pack-page-nav a[href="/"][aria-label="Close"]), count: 1
-    assert_includes response.body, "/recording_studio_api/api_clients/#{api_client.id}"
-    assert_includes response.body, "Logged API client"
-    assert_includes response.body, "API request log"
-    assert_includes response.body, "Occurred"
-    assert_includes response.body, "Method"
-    assert_includes response.body, "Path"
-    assert_includes response.body, "Status"
-    assert_includes response.body, "Duration"
-    assert_includes response.body, "Request ID"
-    assert_includes response.body, "client-log-1"
-    assert_not_includes response.body, "client-log-other"
-    assert_includes response.body, "/recording_studio_api/api/v1/workspaces"
-    assert_not_includes response.body, "/recording_studio_api/oauth/token"
-  end
-
-  test "tokens lists child tokens for the selected api client only" do
-    api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Token parent client")
-    other_api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Other client")
-
-    credential = api_client.credentials.max_by(&:created_at)
-    other_credential = other_api_client.credentials.max_by(&:created_at)
-
-    token = RecordingStudioApi::ApiAccessToken.create!(
-      credential: credential,
-      token_digest: "child_token_digest_#{SecureRandom.hex(16)}",
-      token_prefix: "tok-main",
-      expires_at: 2.days.from_now,
-      last_used_at: 2.hours.ago
-    )
-
-    RecordingStudioApi::ApiAccessToken.create!(
-      credential: other_credential,
-      token_digest: "other_child_token_digest_#{SecureRandom.hex(16)}",
-      token_prefix: "tok-other",
-      expires_at: 3.days.from_now,
-      last_used_at: 3.hours.ago
-    )
-
-    get "/recording_studio_api/api_clients/#{api_client.id}/tokens"
-
-    assert_response :success
-    assert_includes response.body, "Tokens"
-    assert_includes response.body, "Token parent client"
-    assert_select "p.text-sm.text-slate-600", text: "A token is a temporary pass that lets this API key make requests.", count: 1
-    assert_includes response.body, "Prefix"
-    assert_includes response.body, "Status"
-    assert_includes response.body, "****main"
-    assert_not_includes response.body, "tok-main"
-    assert_not_includes response.body, "tok-other"
-    assert_select %(form[action="/recording_studio_api/api_clients/#{api_client.id}/tokens/#{token.id}/revoke?close_url=%2F"] button), text: "Revoke", count: 1
-    assert_select %(nav.flat-pack-page-nav a[href="/"][aria-label="Close"]), count: 1
-  end
-
-  test "tokens index shows revoke action and revoke marks token revoked" do
-    api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Revocable token client")
-    credential = api_client.credentials.max_by(&:created_at)
-
-    token = RecordingStudioApi::ApiAccessToken.create!(
-      credential: credential,
-      token_digest: "revocable_token_digest_#{SecureRandom.hex(16)}",
-      token_prefix: "tok-revoke",
-      expires_at: 2.days.from_now
-    )
-
-    get "/recording_studio_api/api_clients/#{api_client.id}/tokens"
-
-    assert_response :success
-    assert_select %(form[action="/recording_studio_api/api_clients/#{api_client.id}/tokens/#{token.id}/revoke?close_url=%2F"] button), text: "Revoke", count: 1
-
-    post "/recording_studio_api/api_clients/#{api_client.id}/tokens/#{token.id}/revoke"
-
-    assert_redirected_to "/recording_studio_api/api_clients/#{api_client.id}/tokens?close_url=%2F"
-    assert_not_nil token.reload.revoked_at
-
-    get "/recording_studio_api/api_clients/#{api_client.id}/tokens"
-
-    assert_response :success
-    assert_includes response.body, "Revoked"
-    assert_select %(form[action="/recording_studio_api/api_clients/#{api_client.id}/tokens/#{token.id}/revoke?close_url=%2F"] button), count: 0
   end
 
   test "update rejects access point ids outside the api client's root" do
@@ -787,12 +685,6 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
   test "manager of a different root cannot mutate an api client" do
     api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Protected client")
     credential = api_client.credentials.max_by(&:created_at)
-    token = RecordingStudioApi::ApiAccessToken.create!(
-      credential: credential,
-      token_digest: "cross_root_token_digest_#{SecureRandom.hex(16)}",
-      token_prefix: "tok-cross-root",
-      expires_at: 2.days.from_now
-    )
     other_user = create_user(email: "other-manager@example.com")
     create_access_recording_for(user: other_user, workspace_name: "Other Manager Workspace", role: :admin)
 
@@ -814,10 +706,6 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     post "/recording_studio_api/api_clients/#{api_client.id}/revoke"
     assert_response :not_found
     assert_nil credential.reload.revoked_at
-
-    post "/recording_studio_api/api_clients/#{api_client.id}/tokens/#{token.id}/revoke"
-    assert_response :not_found
-    assert_nil token.reload.revoked_at
   end
 
   test "show does not render token count rows" do
@@ -896,6 +784,39 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :unprocessable_entity
     assert_includes response.body, "Role is invalid"
+  end
+
+  test "edit managers cannot create or assign admin API access" do
+    RecordingStudio::Access.where(id: @workspace_access_recording.recordable_id).update_all(role: "edit")
+    RecordingStudioApi.configuration.access_management_edit_role = :edit
+
+    post "/recording_studio_api/api_clients", params: {
+      api_client: {
+        root_type: "Workspace",
+        access_point_recording_id: @workspace_root_recording.id,
+        role: "admin",
+        api_client_name: "Escalated client",
+        expires_at: ""
+      }
+    }
+
+    assert_response :unprocessable_entity
+    assert_equal 0, RecordingStudioApi::ApiClient.where(name: "Escalated client").count
+
+    api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Editable client", role: :edit)
+
+    patch "/recording_studio_api/api_clients/#{api_client.id}", params: {
+      api_client: {
+        role: "admin",
+        api_client_name: "Escalated update",
+        expires_at: ""
+      }
+    }
+
+    assert_response :unprocessable_entity
+    assert_includes response.body, "Requested API access role exceeds your access"
+    assert_equal "edit", api_client.access_recording.reload.recordable.role
+    assert_equal "Editable client", api_client.reload.name
   end
 
   test "update changes api client name and latest credential expiry" do

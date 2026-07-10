@@ -3,11 +3,12 @@
 require_relative "test_helper"
 
 class OauthErrorMapperTest < ActiveSupport::TestCase
-  test "normalizes non-hash errors into invalid_request payload" do
-    payload = RecordingStudioApi::OauthErrorMapper.payload_for("boom")
+  test "normalizes non-hash errors into a generic server error payload" do
+    payload = RecordingStudioApi::OauthErrorMapper.payload_for("database constraint detail")
 
-    assert_equal "invalid_request", payload.fetch(:error)
-    assert_equal "boom", payload.fetch(:error_description)
+    assert_equal "server_error", payload.fetch(:error)
+    assert_equal RecordingStudioApi::OauthErrorMapper::SERVER_ERROR_DESCRIPTION, payload.fetch(:error_description)
+    assert_not_includes payload.fetch(:error_description), "database constraint detail"
   end
 
   test "preserves hash error payloads" do

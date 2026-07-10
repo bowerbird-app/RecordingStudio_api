@@ -188,8 +188,22 @@ module RecordingStudioApi
 
         def render_dispatched_capability_action!(action_name, recording:)
           action = resolve_capability_action!(action_name, recordable_type: recording.recordable_type)
-          result = action.handler.call(resource_operation_context(recording: recording, recordable_type: recording.recordable_type))
+          context = resource_operation_context(recording: recording, recordable_type: recording.recordable_type)
+          authorize_capability_action!(action, context)
+          result = action.handler.call(context)
           render json: result.fetch(:json), status: result.fetch(:status, :ok)
+        end
+
+        def authorize_capability_action!(action, context)
+          required_role = RecordingStudioApi.configuration.capability_action_role_for(
+            action: action,
+            recording: context.recording,
+            api_client: context.api_client,
+            access_grant: context.access_grant
+          )
+          return if required_role.nil?
+
+          context.access_grant.authorize!(recording: context.recording, role: required_role, include_trashed: true)
         end
 
         def resolve_resource_action!(operation_name)

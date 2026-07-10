@@ -234,6 +234,20 @@ class ActionInputContractTest < Minitest::Test
     assert_equal ["Initial release"], registration.as_json[:version_notes]
   end
 
+  def test_action_registration_rejects_invalid_required_role
+    registration = RecordingStudioApi::ActionRegistration.new(
+      name: :echo,
+      capability: :echoable,
+      http_verb: :post,
+      required_role: :owner,
+      handler: ->(_context) { true }
+    )
+
+    error = assert_raises(RecordingStudioApi::ConfigurationError) { registration.validate! }
+
+    assert_includes error.message, "required_role must be one of"
+  end
+
   def test_action_registration_normalizes_grouped_deprecation_metadata
     registration = RecordingStudioApi::ActionRegistration.new(
       name: :echo,

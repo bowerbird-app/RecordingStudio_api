@@ -107,6 +107,45 @@ def ensure_api_request_logs_table!
                        name: "index_rs_api_request_logs_on_credential_and_time"
 end
 
+def ensure_api_daily_metrics_tables!
+  connection = RecordingStudioApi::ApiRequestLog.connection
+
+  unless connection.data_source_exists?("recording_studio_api_api_daily_metrics")
+    connection.create_table "recording_studio_api_api_daily_metrics", id: :uuid do |t|
+      t.date :metric_date, null: false
+      t.string :route_name, null: false
+      t.string :controller_name
+      t.string :action_name
+      t.string :request_method, null: false
+      t.integer :status_class, null: false
+      t.bigint :request_count, null: false, default: 0
+      t.bigint :rate_limited_count, null: false, default: 0
+      t.bigint :client_error_count, null: false, default: 0
+      t.bigint :server_error_count, null: false, default: 0
+      t.bigint :duration_count, null: false, default: 0
+      t.bigint :duration_sum_ms, null: false, default: 0
+      t.integer :duration_max_ms, null: false, default: 0
+      t.timestamps
+    end
+    connection.add_index "recording_studio_api_api_daily_metrics", %i[metric_date route_name request_method status_class], unique: true, name: "index_rs_api_daily_metrics_on_dimensions"
+    connection.add_index "recording_studio_api_api_daily_metrics", :metric_date
+  end
+
+  return if connection.data_source_exists?("recording_studio_api_api_daily_latency_histogram_buckets")
+
+  connection.create_table "recording_studio_api_api_daily_latency_histogram_buckets", id: :uuid do |t|
+    t.date :metric_date, null: false
+    t.string :route_name, null: false
+    t.string :request_method, null: false
+    t.integer :status_class, null: false
+    t.integer :upper_bound_ms, null: false
+    t.bigint :request_count, null: false, default: 0
+    t.timestamps
+  end
+  connection.add_index "recording_studio_api_api_daily_latency_histogram_buckets", %i[metric_date route_name request_method status_class upper_bound_ms], unique: true, name: "index_rs_api_daily_latency_histogram_on_dimensions"
+  connection.add_index "recording_studio_api_api_daily_latency_histogram_buckets", :metric_date
+end
+
 def ensure_api_client_with_credential!(access_recording:, name:, expires_at: nil, revoked_at: nil)
   deduplicate_seeded_api_clients!(name: name)
 
@@ -186,9 +225,36 @@ def pick_weighted_index(random, weights)
   weights.length - 1
 end
 
-def seed_api_request_logs!(admin_root_recording:, admin_access_recording:, seeded_api_clients:)
+def seeded_api_request_scenarios(resource_recordings:)
+  api_base_path = "/recording_studio_api/api/v1"
+  resources_controller = "recording_studio_api/api/v1/resources"
+
+  resource_scenarios = resource_recordings.flat_map do |recording|
+    resource = RecordingStudioApi.resource_name_for(recording.recordable_type)
+    resource_path = "#{api_base_path}/#{resource}"
+    item_path = "#{resource_path}/#{recording.id}"
+
+    [
+      { method: "GET", path: resource_path, action: "index", controller: resources_controller, success_statuses: [200], weight: 6 },
+      { method: "GET", path: item_path, action: "show", controller: resources_controller, success_statuses: [200], weight: 12 },
+      { method: "POST", path: resource_path, action: "create", controller: resources_controller, success_statuses: [201], weight: 1 },
+      { method: "PATCH", path: item_path, action: "update", controller: resources_controller, success_statuses: [200], weight: 1 }
+    ]
+  end
+
+  resource_scenarios + [
+    { method: "GET", path: api_base_path, action: "index", controller: resources_controller, success_statuses: [200], weight: 3 },
+    { method: "GET", path: "#{api_base_path}/trash", action: "trash_index", controller: resources_controller, success_statuses: [200], weight: 1 },
+    { method: "POST", path: "/recording_studio_api/oauth/token", action: "token", controller: "recording_studio_api/oauth", success_statuses: [200], weight: 2 }
+  ]
+end
+
+def seed_api_request_logs!(admin_root_recording:, admin_access_recording:, resource_recordings:, seeded_api_clients:)
   ensure_api_request_logs_table!
+  ensure_api_daily_metrics_tables!
   now = Time.current
+  request_scenarios = seeded_api_request_scenarios(resource_recordings: resource_recordings)
+  scenario_weights = request_scenarios.map { |scenario| scenario.fetch(:weight) }
 
   RecordingStudioApi::ApiRequestLog.where("request_id LIKE ?", "seed-log-%").delete_all
 
@@ -211,22 +277,17 @@ def seed_api_request_logs!(admin_root_recording:, admin_access_recording:, seede
         request_random = Random.new(request_seed)
         day_offset = pick_weighted_index(request_random, weekday_weights)
         occurred_at = week_start + day_offset.days + (7 + request_random.rand(13)).hours + request_random.rand(60).minutes + request_random.rand(60).seconds
-          occurred_at = now - request_random.rand(6.hours).seconds if occurred_at > now
-        method = request_random.rand < 0.7 ? "GET" : "POST"
-        path = if method == "GET"
-                 "/api/v1/recordings/#{client_index + request_number + day_offset}"
-               else
-                 ["/oauth/token", "/api/v1/search", "/api/v1/recordings"].sample(random: request_random)
-               end
+        occurred_at = now - request_random.rand(6.hours).seconds if occurred_at > now
+        scenario = request_scenarios.fetch(pick_weighted_index(request_random, scenario_weights))
         status_roll = request_random.rand(100)
         status_code = if status_roll < 72
-                        200
+                        scenario.fetch(:success_statuses).sample(random: request_random)
                       elsif status_roll < 82
-                        201
-                      elsif status_roll < 88
-                        204
-                      elsif status_roll < 94
                         401
+                      elsif status_roll < 88
+                        403
+                      elsif status_roll < 94
+                        422
                       elsif status_roll < 98
                         429
                       else
@@ -242,11 +303,11 @@ def seed_api_request_logs!(admin_root_recording:, admin_access_recording:, seede
         RecordingStudioApi::ApiRequestLog.create!(
           occurred_at: occurred_at,
           request_id: request_id,
-          request_method: method,
-          request_path: path,
-          route_name: method == "GET" ? "recording" : "oauth_token",
-          controller_name: method == "GET" ? "recording_studio_api/api/recordings" : "recording_studio_api/oauth/tokens",
-          action_name: method == "GET" ? "show" : "create",
+          request_method: scenario.fetch(:method),
+          request_path: scenario.fetch(:path),
+          route_name: scenario.fetch(:controller),
+          controller_name: scenario.fetch(:controller),
+          action_name: scenario.fetch(:action),
           status_code: status_code,
           duration_ms: 75 + (client_index * 9) + request_random.rand(250),
           rate_limited: status_code == 429,
@@ -268,6 +329,11 @@ def seed_api_request_logs!(admin_root_recording:, admin_access_recording:, seede
       end
     end
   end
+
+  RecordingStudioApi::ApiRequestLog.distinct.pluck(Arel.sql("DATE(occurred_at)")).each do |metric_date|
+    RecordingStudioApi::Services::AggregateApiRequestLogMetrics.call(metric_date: metric_date)
+  end
+  RecordingStudioApi::Services::PruneApiRequestLogs.call
 end
 
 admin_user = User.find_or_create_by!(email: "admin@admin.com") do |user|
@@ -302,7 +368,7 @@ root_recording = RecordingStudio::Recording.unscoped.find_or_create_by!(
 )
 
 folder_recording = ensure_recording_for(recordable: folder, parent_recording: root_recording)
-ensure_recording_for(recordable: page, parent_recording: folder_recording)
+page_recording = ensure_recording_for(recordable: page, parent_recording: folder_recording)
 
 Current.actor = admin_user
 ensure_access_recording_for(
@@ -415,6 +481,7 @@ puts "  Access token recording id: #{service_token&.recording&.id}"
 seed_api_request_logs!(
   admin_root_recording: admin_root_recording,
   admin_access_recording: admin_access_recording,
+  resource_recordings: [root_recording, folder_recording, page_recording],
   seeded_api_clients: seeded_api_clients
 )
 

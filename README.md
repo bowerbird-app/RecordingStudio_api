@@ -134,10 +134,15 @@ end
 
 RecordingStudioApi.configuration
 RecordingStudioApi::Hooks.run(:before_initialize)
-RecordingStudioApi.register_recordable_type_api("Page", serializer: PageSerializer)
+RecordingStudioApi.register_recordable_type_api(
+  "Page",
+  serializer: PageSerializer,
+  writable_attributes: %i[title]
+)
 RecordingStudioApi.register_capability_action(
   :publish,
   capability: :publishable,
+  required_role: :edit,
   version: "1.0.0",
   version_notes: ["Initial publish contract"],
   deprecation: {
@@ -148,6 +153,17 @@ RecordingStudioApi.register_capability_action(
   handler: PublishRecording
 )
 ```
+
+Member actions require `:edit` by default. A host can override an action's role without replacing its handler:
+
+```ruby
+RecordingStudioApi.configure do |config|
+  config.capability_action_roles = { publish: :admin }
+end
+```
+
+`writable_attributes` is an explicit allowlist for API create and update operations. OpenAPI
+`details_schema` properties describe response data only and never grant write access.
 
 ### Access management role settings
 

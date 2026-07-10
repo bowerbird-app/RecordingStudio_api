@@ -12,7 +12,9 @@ module RecordingStudioApi
         setting_row("Credential TTL", format_seconds(configuration.credential_ttl)),
         setting_row("Access token TTL", format_seconds(configuration.access_token_ttl)),
         setting_row("API request logging enabled", format_boolean(configuration.api_request_logging_enabled)),
-        setting_row("API request logging payload mode", format_presence(configuration.api_request_logging_payload_mode))
+        setting_row("API request logging payload mode", format_presence(configuration.api_request_logging_payload_mode)),
+        setting_row("API request log retention", format_days(configuration.api_request_log_retention_days)),
+        setting_row("API daily metric retention", format_days(configuration.api_daily_metric_retention_days))
       ]
     end
 
@@ -44,6 +46,12 @@ module RecordingStudioApi
 
     def format_seconds(value)
       "#{value.to_i} seconds"
+    end
+
+    def format_days(value)
+      return "Indefinite" if value.nil?
+
+      "#{value} days"
     end
   end
 end

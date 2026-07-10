@@ -60,8 +60,8 @@ module RecordingStudioApi
             api_client_id: credential.api_client_id
           }
         )
-      rescue ActiveRecord::ActiveRecordError => e
-        failure(e)
+      rescue ActiveRecord::ActiveRecordError
+        failure(OauthErrorMapper.server_error_payload)
       end
 
       def oauth_failure(code, description)

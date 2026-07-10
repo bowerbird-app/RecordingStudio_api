@@ -200,7 +200,6 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
       assert_includes response.body, "get &quot;/admin_api/logs&quot;, to: &quot;admin_logs#index&quot;"
       assert_includes response.body, "GET /api/screens/api_keys"
       assert_includes response.body, "resources :api_clients, controller: &quot;access_requests&quot;, only: %i[index show new create edit update]"
-      assert_includes response.body, "resources :api_access_tokens, path: &quot;tokens&quot;"
       assert_includes response.body, "post &quot;/oauth/token&quot;, to: &quot;oauth#token&quot;"
       assert_includes response.body, "post &quot;/trash/:id/restore&quot;"
       assert_includes response.body, "namespace :v1 do"

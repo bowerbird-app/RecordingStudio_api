@@ -22,6 +22,7 @@ module RecordingStudioApi
         return failure("Access role is required") if role.blank?
         return failure("API client name is required") if api_client_name.blank?
         return failure("Actor is not authorized to manage API access for this recording") unless access_management_policy.can_manage_recording?(access_point_recording)
+        return failure("Requested API access role exceeds the manager's access") unless access_management_policy.can_assign_role?(access_point_recording, role)
 
         payload = nil
 

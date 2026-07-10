@@ -8,9 +8,15 @@ module RecordingStudioApi
           authorize_access!(recording, role: :edit)
 
           attributes = resource_attributes
-          recording.recordable.update!(attributes) if attributes.any?
+          revised_recording = if attributes.any?
+                                recording.root_recording.revise(recording, actor: api_client) do |recordable|
+                                  recordable.assign_attributes(attributes)
+                                end
+                              else
+                                recording
+                              end
 
-          { json: { data: serialize_recording(recording.reload) } }
+          { json: { data: serialize_recording(revised_recording) } }
         end
       end
     end

@@ -41,6 +41,8 @@ class ConfigurationTest < Minitest::Test
     assert_equal [], configuration.token_authenticators
     assert_equal :view, configuration.access_management_view_role
     assert_equal :admin, configuration.access_management_edit_role
+    assert_equal({}, configuration.capability_action_roles)
+    assert_nil configuration.capability_action_role_resolver
     assert_respond_to configuration.admin_dashboard_path_resolver, :call
     assert_respond_to configuration.admin_requests_path_resolver, :call
     assert_respond_to configuration.admin_errors_path_resolver, :call
@@ -67,6 +69,8 @@ class ConfigurationTest < Minitest::Test
     assert_equal 60, configuration.rate_limit_api_write_period_seconds
     assert_equal false, configuration.api_request_logging_enabled
     assert_equal "metadata_only", configuration.api_request_logging_payload_mode
+    assert_equal 30, configuration.api_request_log_retention_days
+    assert_nil configuration.api_daily_metric_retention_days
     assert_instance_of RecordingStudioApi::Hooks, configuration.hooks
   end
 
@@ -107,7 +111,9 @@ class ConfigurationTest < Minitest::Test
       rate_limit_api_write_requests: 40,
       rate_limit_api_write_period_seconds: 20,
       api_request_logging_enabled: true,
-      api_request_logging_payload_mode: "metadata_only"
+      api_request_logging_payload_mode: "metadata_only",
+      api_request_log_retention_days: 14,
+      api_daily_metric_retention_days: 365
     )
 
     assert_equal 14.days, @configuration.credential_ttl
@@ -245,7 +251,17 @@ class ConfigurationTest < Minitest::Test
     assert_equal true, registration.fetch(:deprecation).fetch(:deprecated)
     assert_equal "2026-12-31", registration.fetch(:deprecation).fetch(:removal_date)
     assert_equal "Replaced by echo v2", registration.fetch(:deprecation).fetch(:reason)
+    assert_equal :edit, registration.fetch(:required_role)
     assert_equal ["1.2.3"], registration.fetch(:versions)
+  end
+
+  def test_capability_action_roles_normalizes_and_validates_host_overrides
+    @configuration.capability_action_roles = { publish: "admin", "archive" => :view }
+
+    assert_equal({ "publish" => :admin, "archive" => :view }, @configuration.capability_action_roles)
+    assert_raises(RecordingStudioApi::ConfigurationError) do
+      @configuration.capability_action_roles = { publish: :owner }
+    end
   end
 
   def test_version_profile_dsl_tracks_contribution_requirements
@@ -286,6 +302,7 @@ class ConfigurationTest < Minitest::Test
     @configuration.recordable_registry.register(
       "Page",
       serializer: ->(recordable) { { title: recordable.title } },
+      writable_attributes: %i[title],
       openapi: { details_schema: { type: "object" } }
     )
 
@@ -293,12 +310,14 @@ class ConfigurationTest < Minitest::Test
 
     assert_equal "Page", registration.fetch(:recordable_type)
     assert_equal true, registration.fetch(:serializer)
+    assert_equal ["title"], registration.fetch(:writable_attributes)
   end
 
   def test_register_recordable_type_api_composes_multiple_registrations_for_same_type
     @configuration.recordable_registry.register(
       "Page",
       serializer: ->(recordable) { { title: recordable.title } },
+      writable_attributes: %i[title],
       openapi: {
         details_schema: {
           properties: {
@@ -311,6 +330,7 @@ class ConfigurationTest < Minitest::Test
     @configuration.recordable_registry.register(
       "Page",
       serializer: ->(recordable) { { summary: "Summary: #{recordable.title}" } },
+      writable_attributes: %i[summary],
       openapi: {
         details_schema: {
           properties: {
@@ -327,6 +347,7 @@ class ConfigurationTest < Minitest::Test
     properties = registration.openapi.fetch(:details_schema).fetch(:properties)
     assert_equal "string", properties.fetch(:title).fetch(:type)
     assert_equal "string", properties.fetch(:summary).fetch(:type)
+    assert_equal %w[summary title], registration.writable_attributes
   end
 
   def test_configure_without_block_is_safe

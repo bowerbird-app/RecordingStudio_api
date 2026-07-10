@@ -1,15 +1,12 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
   <%= render FlatPack::PageTitle::Component.new(
     title: "Gem Views",
-    subtitle: "All ERB views currently shipped by the gem, grouped by API credentials and API tokens.",
+    subtitle: "All ERB views currently shipped by the gem, grouped by API credentials.",
     variant: :h1
   ) %>
 
   <% api_credentials_views = @engine_views.select do |view| %>
-    <% view.fetch(:logical_path).start_with?("recording_studio_api/access_requests/") && view.fetch(:template) != "tokens" %>
-  <% end %>
-  <% api_tokens_views = @engine_views.select do |view| %>
-    <% view.fetch(:logical_path).start_with?("recording_studio_api/api_access_tokens/") || view.fetch(:template) == "tokens" %>
+    <% view.fetch(:logical_path).start_with?("recording_studio_api/access_requests/") %>
   <% end %>
 
   <% if @engine_views.any? %>
@@ -29,21 +26,6 @@
       <p class="text-sm text-(--surface-muted-content-color)">No API credential views were found.</p>
     <% end %>
 
-    <%= render FlatPack::SectionTitle::Component.new(
-      title: "API tokens",
-      subtitle: "Token-focused views used by API credential flows.",
-      anchor_link: true,
-    ) %>
-
-    <% if api_tokens_views.any? %>
-      <%= render FlatPack::Table::Component.new(data: api_tokens_views) do |table| %>
-        <% table.column(title: "Template", html: ->(view) { view.fetch(:template) }) %>
-        <% table.column(title: "Type", html: ->(view) { view.fetch(:partial) ? "Partial" : "Page" }) %>
-        <% table.column(title: "Path", html: ->(view) { view.fetch(:relative_path) }) %>
-      <% end %>
-    <% else %>
-      <p class="text-sm text-(--surface-muted-content-color)">No API token views were found.</p>
-    <% end %>
   <% else %>
     <p class="text-sm text-(--surface-muted-content-color)">No gem views were found.</p>
   <% end %>

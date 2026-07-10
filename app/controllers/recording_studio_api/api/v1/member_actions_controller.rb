@@ -17,7 +17,9 @@ module RecordingStudioApi
           action = resolve_action!
           raise UnsupportedActionError, "#{action.name} must be called with #{action.http_verb.to_s.upcase}" unless request.request_method_symbol == action.http_verb
 
-          result = action.handler.call(action_context(action))
+          context = action_context(action)
+          authorize_action!(action, context)
+          result = action.handler.call(context)
           render json: { data: serialize_result(action, result) }
         end
 
@@ -49,6 +51,18 @@ module RecordingStudioApi
             "Invalid input for action #{action.name}",
             details: contract_result.errors
           )
+        end
+
+        def authorize_action!(action, context)
+          required_role = RecordingStudioApi.configuration.capability_action_role_for(
+            action: action,
+            recording: context.recording,
+            api_client: context.api_client,
+            access_grant: context.access_grant
+          )
+          return if required_role.nil?
+
+          context.access_grant.authorize!(recording: context.recording, role: required_role)
         end
 
         def resolve_action!

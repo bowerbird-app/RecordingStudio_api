@@ -3,4 +3,13 @@
     title: "Admin",
     variant: :h1
   ) %>
+
+  <div class="inline-flex self-start">
+    <%= render FlatPack::Button::Component.new(
+      text: "Open Admin API",
+      style: :primary,
+      size: :md,
+      url: "/admin/api"
+    ) %>
+  </div>
 </div>

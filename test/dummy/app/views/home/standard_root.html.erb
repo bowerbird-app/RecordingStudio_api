@@ -7,10 +7,17 @@
 
   <div class="-mt-3 flex flex-wrap justify-start gap-3">
     <%= render FlatPack::Button::Component.new(
-      text: "API",
+      text: "API settings",
       style: :default,
       size: :md,
       url: @api_admin_path
+    ) %>
+
+    <%= render FlatPack::Button::Component.new(
+      text: "API docs",
+      style: :default,
+      size: :md,
+      url: "/docs/scalar"
     ) %>
   </div>
 

@@ -29,7 +29,6 @@ module RecordingStudioApi
         change_good_when :neutral
       end
 
-      # rubocop:disable Metrics/BlockLength
       table do
         filter :search, apply: lambda { |rows, value, _context|
           next rows if value.blank?
@@ -40,7 +39,19 @@ module RecordingStudioApi
           end
         }
 
-        column :name, title: "Name", sortable: false
+        column :name,
+               title: "Name",
+               sortable: false,
+               value: lambda { |row, context|
+                 context.controller.view_context.link_to(
+                   row.name,
+                   context.controller.recording_studio_api.api_client_path(
+                     row.api_client.id,
+                     close_url: context.admin_screen_path("api_keys")
+                   ),
+                   data: { turbo_frame: "_top" }
+                 )
+               }
         column :api_key, title: "API key", sortable: false
         column :access_point, title: "Access point", sortable: false
         column :role, title: "Role", sortable: false
@@ -55,13 +66,6 @@ module RecordingStudioApi
         default_columns :name, :api_key, :access_point, :role, :status, :request_count, :last_requested_at
         paginate per_page: 25, mode: :infinite
 
-        action :requests,
-               text: "API requests",
-               icon: "queue-list",
-               url: lambda { |row, context|
-                 "#{context.admin_screen_path('api_requests')}?api_credential_id=#{row.api_credential.id}"
-               }
-
         action :edit,
                text: "Edit",
                icon: "pencil-square",
@@ -72,39 +76,8 @@ module RecordingStudioApi
                  )
                }
 
-        action :rotate,
-               text: "Rotate key",
-               icon: "arrow-path",
-               method: :post,
-               confirm: "Rotate this API key? The new secret will only be shown once.",
-               url: lambda { |row, context|
-                 context.controller.recording_studio_api.rotate_api_client_path(
-                   row.api_client.id,
-                   close_url: context.admin_screen_path("api_keys")
-                 )
-               },
-               visible_if: lambda { |row, context|
-                 RecordingStudioApi::Admin::ApiKeysScreen.manageable?(row, context)
-               }
-
-        action :revoke,
-               text: "Revoke key",
-               icon: "trash",
-               method: :post,
-               confirm: "Revoke this API key?",
-               destructive: true,
-               url: lambda { |row, context|
-                 context.controller.recording_studio_api.revoke_api_client_path(
-                   row.api_client.id,
-                   close_url: context.admin_screen_path("api_keys")
-                 )
-               },
-               visible_if: lambda { |row, context|
-                 RecordingStudioApi::Admin::ApiKeysScreen.manageable?(row, context) && row.status == "Active"
-               }
+        # Removed rotate and revoke actions from the UI per admin request.
       end
-      # rubocop:enable Metrics/BlockLength
-
       class << self
         def workspace_name(context)
           recordable = context.root_recording&.recordable || context.access_recordable
