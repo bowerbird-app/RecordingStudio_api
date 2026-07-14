@@ -12,7 +12,7 @@ module RecordingStudioApi
         RecordingStudioApi::Admin::Queries::AdminApiCredentialsQuery.call
       end
 
-      filter :status, values: [""] + %w[active expired revoked], apply: lambda { |rows, value, _context|
+      filter :status, values: [""] + %w[active expired revoked], default: "active", apply: lambda { |rows, value, _context|
         value.present? ? rows.select { |row| row.status.casecmp?(value.to_s) } : rows
       }
 
@@ -72,9 +72,10 @@ module RecordingStudioApi
                text: "Revoke",
                icon: "no-symbol",
                method: :post,
-               destructive: true,
                confirm: "Revoke this API credential? This cannot be undone.",
-               visible_if: ->(row, _context) { row.status == "Active" },
+               visible_if: lambda { |row, context|
+                 row.status == "Active" && RecordingStudioApi::Admin::AdminApiCredentialsScreen.can_revoke?(context)
+               },
                url: lambda { |row, context|
                  context.controller.recording_studio_api.admin_revoke_credential_path(
                    row.id,
@@ -100,6 +101,25 @@ module RecordingStudioApi
                                                                               .map(&:root_type)
                                                                               .uniq
                                                                               .sort
+        end
+
+        def can_revoke?(context)
+          root_recording = context.root_recording
+          return false if root_recording.nil?
+
+          admin_api = RecordingStudioApi::AdminApi.find_by(key: "api")
+          admin_api_recording = RecordingStudio::Recording.unscoped.find_by(
+            recordable: admin_api,
+            root_recording_id: root_recording.id,
+            parent_recording_id: root_recording.id
+          )
+          return false if admin_api_recording.nil?
+
+          RecordingStudioAccessible.authorized?(
+            actor: context.current_actor,
+            recording: admin_api_recording,
+            role: RecordingStudioApi.configuration.access_management_edit_role
+          )
         end
 
         def status_badge_options(value)

@@ -361,14 +361,12 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "/admin/api/screens/admin_api_failing_endpoints"
     assert_not_includes response.body, "GET /recording_studio_api/api/v1/pages"
 
-    get "/admin/api/screens/admin_api_failing_endpoints", params: {
-      start_date: 27.days.ago.to_date.iso8601,
-      end_date: Date.current.iso8601
-    }
+    get "/admin/api/screens/admin_api_failing_endpoints"
 
     assert_response :success
     assert_includes response.body, "Failing endpoints"
     assert_includes response.body, "Site-wide endpoint failures relative to total API request volume."
+    assert_select %(input[type="hidden"][name="date_range_preset"][value="last_4_weeks"]), count: 1
     assert_select "turbo-frame#screen-chart span", text: "0%", count: 0
 
     get "/admin/api/screens/admin_api_failing_endpoints/chart", params: {
@@ -519,6 +517,7 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     get "/admin/api/screens/admin_api_credentials"
 
     assert_response :success
+    assert_select %(select[name="status"] option[value="active"][selected]), text: "Active", count: 1
     assert_select %(select[name="status"] option[value=""]:not([disabled])), count: 1
     assert_select %(select[name="root_recording_id"] option[value=""]:not([disabled])), count: 1
     assert_select %(select[name="root_type"] option[value=""]:not([disabled])), count: 1
@@ -533,6 +532,8 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Second site credential"
     assert_includes response.body, first_payload.fetch(:credential).oauth_client_id
     assert_includes response.body, second_payload.fetch(:credential).oauth_client_id
+    revoke_path = "/recording_studio_api/admin_api/credentials/#{first_payload.fetch(:credential).id}/revoke?close_url=%2Fadmin%2Fapi%2Fscreens%2Fadmin_api_credentials"
+    assert_select %(a[href="#{revoke_path}"][data-turbo-method="post"][data-turbo-confirm="Revoke this API credential? This cannot be undone."]), text: "Revoke", count: 1
 
     get "/admin/api/screens/admin_api_credentials/table", params: {
       root_recording_id: "First credential root"
@@ -559,6 +560,57 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_redirected_to "/admin/api/screens/admin_api_credentials"
     assert_not_nil first_payload.fetch(:credential).reload.revoked_at
     assert_nil second_payload.fetch(:credential).reload.revoked_at
+
+    get "/admin/api/screens/admin_api_credentials/table"
+
+    assert_response :success
+    assert_not_includes response.body, "First site credential"
+    assert_includes response.body, "Second site credential"
+  end
+
+  test "API admin viewers cannot revoke credentials" do
+    _workspace_root_recording, access_recording = create_access_recording_for(
+      user: @user,
+      workspace_name: "Protected site credential root",
+      role: :admin
+    )
+    credential = provision_api_client_for(
+      access_recording: access_recording,
+      name: "Protected site credential"
+    ).fetch(:credential)
+
+    switch_to_root(@admin_root_recording)
+    get "/admin/api"
+
+    admin_api = RecordingStudioApi::AdminApi.find_by!(key: "api")
+    admin_api_recording = RecordingStudio::Recording.unscoped.find_by!(
+      recordable: admin_api,
+      root_recording_id: @admin_root_recording.id,
+      parent_recording_id: @admin_root_recording.id
+    )
+    viewer = create_user(email: "api-admin-viewer-#{SecureRandom.hex(4)}@example.com")
+    create_access_recording(parent_recording: @admin_root_recording, user: viewer, role: :view)
+    reset!
+    sign_in viewer, scope: :user
+    switch_to_root(@admin_root_recording)
+
+    assert_equal :view, RecordingStudioAccessible.role_for(actor: viewer, recording: admin_api_recording)
+  assert_equal :admin, RecordingStudioApi.configuration.access_management_edit_role
+    refute RecordingStudioApi::AccessManagementPolicy.new(actor: viewer).can_manage_recording?(admin_api_recording)
+
+    get "/admin/api/screens/admin_api_credentials/table"
+
+    assert_response :success
+    assert_equal viewer, request.env.fetch("warden").user(:user)
+    assert_includes response.body, "Protected site credential"
+    refute_includes response.body, "Revoke"
+
+    post "/recording_studio_api/admin_api/credentials/#{credential.id}/revoke", params: {
+      close_url: "/admin/api/screens/admin_api_credentials"
+    }
+
+    assert_response :forbidden
+    assert_nil credential.reload.revoked_at
   end
 
   test "API access requests screen shows chart and widgets for request analytics" do

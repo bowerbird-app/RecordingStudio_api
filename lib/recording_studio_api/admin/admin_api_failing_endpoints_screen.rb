@@ -12,7 +12,7 @@ module RecordingStudioApi
         RecordingStudioApi::Admin::AdminApiFailingEndpointsScreen.endpoint_rows(context)
       end
 
-      filter :date_range, default: :last_30_days
+      filter :date_range, default: :last_4_weeks
 
       summary do
         label "Failing endpoints"

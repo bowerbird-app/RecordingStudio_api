@@ -132,29 +132,30 @@ class RateLimitingTest < ActiveSupport::TestCase
     assert_equal [expected_key], redis.ttl_calls
   end
 
-  test "computed oauth decision uses client id bucket and falls back to period when ttl is not positive" do
+  test "computed oauth decision applies an IP bucket before the recognized client bucket" do
     RecordingStudioApi.configuration.rate_limit_oauth_enabled = true
-    RecordingStudioApi.configuration.rate_limit_oauth_requests = 1
+    RecordingStudioApi.configuration.rate_limit_oauth_requests = 2
     RecordingStudioApi.configuration.rate_limit_oauth_period_seconds = 60
 
     harness = Harness.new(
       path: "/recording_studio_api/oauth/token",
       method: :post,
-      params: { client_id: "mobile-client" }
+      params: { client_id: "untrusted-client" },
+      remote_ip: "203.0.113.9"
     )
-    redis = FakeRedis.new(incr_values: [2], ttl: -1)
+    redis = FakeRedis.new(incr_values: [3], ttl: -1)
 
     decision = harness.stub(:rate_limit_redis_client, redis) do
       harness.send(:resolved_rate_limit_decision)
     end
 
     assert_equal true, decision.fetch(:limited)
-    assert_equal 1, decision.fetch(:limit)
+    assert_equal 2, decision.fetch(:limit)
     assert_equal 0, decision.fetch(:remaining)
     assert_equal 60, decision.fetch(:retry_after)
 
     current_window = (Time.current.to_i / 60).to_i
-    expected_key = "recording_studio_api:oauth:client:mobile-client:#{current_window}"
+    expected_key = "recording_studio_api:oauth:ip:203.0.113.9:#{current_window}"
     assert_equal [expected_key], redis.incr_calls
     assert_equal [], redis.expire_calls
   end
@@ -214,12 +215,42 @@ class RateLimitingTest < ActiveSupport::TestCase
     assert_equal true, redis.incr_calls.first.start_with?(expected_key_prefix)
   end
 
-  test "rate limit identifier falls back to remote ip when oauth client id or api credentials are unavailable" do
-    oauth_harness = Harness.new(path: "/recording_studio_api/oauth/token", method: :post, remote_ip: "10.0.0.9")
+  test "rate limit identifier uses remote IP for OAuth requests regardless of the supplied client id" do
+    oauth_harness = Harness.new(
+      path: "/recording_studio_api/oauth/token",
+      method: :post,
+      params: { client_id: "attacker-controlled-client-id" },
+      remote_ip: "10.0.0.9"
+    )
     api_harness = Harness.new(path: "/recording_studio_api/api/v1/pages", method: :get, remote_ip: "10.0.0.10")
 
     assert_equal "ip:10.0.0.9", oauth_harness.send(:rate_limit_identifier)
     assert_equal "ip:10.0.0.10", api_harness.send(:rate_limit_identifier)
+  end
+
+  test "OAuth rate limiting cannot be bypassed by changing client IDs from the same IP" do
+    RecordingStudioApi.configuration.rate_limit_oauth_enabled = true
+    RecordingStudioApi.configuration.rate_limit_oauth_requests = 1
+    RecordingStudioApi.configuration.rate_limit_oauth_period_seconds = 60
+
+    harness = Harness.new(
+      path: "/recording_studio_api/oauth/token",
+      method: :post,
+      params: { client_id: "first-untrusted-client" },
+      remote_ip: "203.0.113.9"
+    )
+    redis = FakeRedis.new(incr_values: [1, 2], ttl: 59)
+
+    harness.stub(:rate_limit_redis_client, redis) do
+      harness.send(:enforce_rate_limit!)
+      harness.params[:client_id] = "second-untrusted-client"
+      harness.send(:enforce_rate_limit!)
+    end
+
+    assert_equal :too_many_requests, harness.rendered_payload.fetch(:status)
+    assert_equal 2, redis.incr_calls.length
+    assert_equal redis.incr_calls.first, redis.incr_calls.last
+    assert_includes redis.incr_calls.first, ":oauth:ip:203.0.113.9:"
   end
 
   test "api pre auth limiter is disabled outside configured api version paths" do

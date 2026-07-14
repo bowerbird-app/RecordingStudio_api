@@ -25,8 +25,12 @@ module RecordingStudioApi
       end
 
       def enforce_rate_limit!
+        enforce_current_rate_limit!
+      end
+
+      def enforce_current_rate_limit!
         decision = resolved_rate_limit_decision
-        return unless decision[:limited]
+        return false unless decision[:limited]
 
         response.set_header("Retry-After", decision[:retry_after].to_i.to_s) if decision[:retry_after].to_i.positive?
         response.set_header("X-RateLimit-Limit", decision[:limit].to_i.to_s)
@@ -34,6 +38,7 @@ module RecordingStudioApi
 
         @rate_limited_request = true
         render json: { error: "rate_limit_exceeded", error_description: "Too many requests" }, status: :too_many_requests
+          true
       end
 
       def resolved_rate_limit_decision
@@ -179,14 +184,7 @@ module RecordingStudioApi
       end
 
       def rate_limit_identifier
-        return "ip:#{request.remote_ip}" if rate_limit_bucket == "api_pre_auth"
-
-        if oauth_rate_limited_path?
-          client_id = params[:client_id].to_s.strip
-          return "client:#{client_id}" if client_id.present?
-
-          return "ip:#{request.remote_ip}"
-        end
+        return "ip:#{request.remote_ip}" if %w[oauth api_pre_auth].include?(rate_limit_bucket)
 
         if respond_to?(:current_api_credential, true) && current_api_credential.present?
           "credential:#{current_api_credential.id}"
