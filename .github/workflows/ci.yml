@@ -7,6 +7,14 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      RAILS_ENV: test
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/app_test
+      API_LOGGING_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/app_api_logging_test
     
     permissions:
       contents: read
@@ -17,11 +25,11 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: recording_studio_api_test
+          POSTGRES_DB: app_test
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -47,18 +55,13 @@ jobs:
       working-directory: test/dummy
       env:
         BUNDLE_GITHUB__COM: x-access-token:${{ secrets.BOWERBIRD_ORG_CI_TOKEN }}
-        DATABASE_URL: postgres://postgres:postgres@localhost:5432/recording_studio_api_test
     
     - name: Run database migrations
       run: bundle exec rake db:migrate RAILS_ENV=test
       working-directory: test/dummy
-      env:
-        DATABASE_URL: postgres://postgres:postgres@localhost:5432/recording_studio_api_test
 
     - name: Run RuboCop
       run: bundle exec rubocop
 
     - name: Run tests
       run: bundle exec rake app:test
-      env:
-        DATABASE_URL: postgres://postgres:postgres@localhost:5432/recording_studio_api_test

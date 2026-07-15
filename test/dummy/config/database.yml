@@ -17,20 +17,20 @@ default: &default
   encoding: unicode
   # For details on connection pooling, see Rails configuration guide
   # https://guides.rubyonrails.org/configuring.html#database-pooling
-  max_connections: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
-  host: <%= ENV.fetch("DB_HOST") { "localhost" } %>
-  port: <%= ENV.fetch("DB_PORT") { 5432 } %>
-  username: <%= ENV.fetch("DB_USER") { "postgres" } %>
-  password: <%= ENV.fetch("DB_PASSWORD") { "postgres" } %>
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS", 5) %>
+  host: <%= ENV.fetch("PGHOST", "127.0.0.1") %>
+  port: <%= ENV.fetch("PGPORT", 5432) %>
+  username: <%= ENV.fetch("PGUSER", "postgres") %>
+  password: <%= ENV.fetch("PGPASSWORD", "postgres") %>
 
 
 development:
   primary:
     <<: *default
-    database: <%= ENV.fetch("DB_NAME") { "app_development" } %>
+    database: <%= ENV.fetch("POSTGRES_DB", "app_development") %>
   api_logging:
     <<: *default
-    database: <%= ENV.fetch("DB_API_LOG_NAME") { "app_api_logging_development" } %>
+    database: <%= ENV.fetch("API_LOGGING_POSTGRES_DB", "app_api_logging_development") %>
 
 # Warning: The database defined as "test" will be erased and
 # re-generated from your development database when you run "rake".
@@ -38,10 +38,10 @@ development:
 test:
   primary:
     <<: *default
-    database: <%= ENV.fetch("DB_NAME") { "app_test" } %>
+    database: <%= ENV.fetch("POSTGRES_DB", "app_test") %>
   api_logging:
     <<: *default
-    database: <%= ENV.fetch("DB_API_LOG_NAME") { "app_api_logging_test" } %>
+    database: <%= ENV.fetch("API_LOGGING_POSTGRES_DB", "app_api_logging_test") %>
 
 # As with config/credentials.yml, you never want to store sensitive information,
 # like your database password, in your source code. If your source code is
