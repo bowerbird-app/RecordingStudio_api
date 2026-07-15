@@ -47,7 +47,8 @@ module RecordingStudioApi
                    row.name,
                    context.controller.recording_studio_api.api_client_path(
                      row.api_client.id,
-                     close_url: context.admin_screen_path("api_keys")
+                     anchor_url: context.params[:anchor_url] || context.params["anchor_url"],
+                     close_url: NavigationUrlHelpers.admin_screen_url(context, "api_keys")
                    ),
                    data: { turbo_frame: "_top" }
                  )
@@ -72,7 +73,8 @@ module RecordingStudioApi
                url: lambda { |row, context|
                  context.controller.recording_studio_api.edit_api_client_path(
                    row.api_client.id,
-                   close_url: context.admin_screen_path("api_keys")
+                   anchor_url: context.params[:anchor_url] || context.params["anchor_url"],
+                   close_url: NavigationUrlHelpers.admin_screen_url(context, "api_keys")
                  )
                }
 

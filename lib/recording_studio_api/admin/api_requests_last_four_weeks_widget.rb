@@ -53,7 +53,7 @@ module RecordingStudioApi
           group_by: "day"
         }
 
-        "#{context.admin_screen_path('api_requests')}?#{query.to_query}"
+        NavigationUrlHelpers.admin_screen_url(context, "api_requests", query)
       end
 
       def daily_points(context)

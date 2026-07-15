@@ -66,7 +66,7 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "RecordingStudio API"
     assert_includes response.body, "Admin API"
     assert_includes response.body, "Open Admin API"
-    assert_select %(a[href="/admin/api"]), text: "Open Admin API", count: 1
+    assert_select %(a[href="/admin/api?anchor_url=%2F"]), text: "Open Admin API", count: 1
     # The shared layout now surfaces root-switch choices, including other roots.
     assert_includes response.body, "Old Workspace"
     assert_not_includes response.body, "API keys"

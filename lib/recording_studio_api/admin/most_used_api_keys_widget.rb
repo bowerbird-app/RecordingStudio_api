@@ -18,7 +18,7 @@ module RecordingStudioApi
         hide_change
         list_options divider: true
         items { |context| RecordingStudioApi::Admin::MostUsedApiKeysWidget.items(context) }
-        link_to { |context| context.admin_screen_path("api_keys") }
+        link_to { |context| NavigationUrlHelpers.admin_screen_url(context, "api_keys") }
         link_label "API keys"
       end
 

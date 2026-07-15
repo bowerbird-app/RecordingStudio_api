@@ -15,13 +15,13 @@ module RecordingStudioApi
         change_good_when :down
         value { RecordingStudioApi::Admin::AdminApiRateLimitedRequestsLastFourWeeksWidget.total }
         metadata { { period_label: "Last 4 weeks" } }
-        change { |context|
+        change do |_context|
           current = RecordingStudioApi::Admin::AdminApiRateLimitedRequestsLastFourWeeksWidget.total
           previous = RecordingStudioApi::Admin::AdminApiRateLimitedRequestsLastFourWeeksWidget.previous_total
           RecordingStudioApi::Admin::ApiAccessRequestsScreen.format_change(
             RecordingStudioApi::Admin::ApiAccessRequestsScreen.percent_change(current, previous)
           )
-        }
+        end
         chart_type :area
         series { RecordingStudioApi::Admin::AdminApiRateLimitedRequestsLastFourWeeksWidget.series }
         chart_options do
@@ -59,7 +59,7 @@ module RecordingStudioApi
           rate_limited: "true"
         }
 
-        "#{context.admin_screen_path('admin_api_requests')}?#{query.to_query}"
+        NavigationUrlHelpers.admin_screen_url(context, "admin_api_requests", query)
       end
 
       def daily_points

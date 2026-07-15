@@ -14,13 +14,13 @@ module RecordingStudioApi
         description "Site-wide API request volume for the last 4 weeks."
         value { |context| RecordingStudioApi::Admin::AdminApiRequestsLastFourWeeksWidget.total(context) }
         metadata { { period_label: "Last 4 weeks" } }
-        change { |context|
+        change do |context|
           current = RecordingStudioApi::Admin::AdminApiRequestsLastFourWeeksWidget.total(context)
           previous = RecordingStudioApi::Admin::AdminApiRequestsLastFourWeeksWidget.previous_total(context)
           RecordingStudioApi::Admin::ApiAccessRequestsScreen.format_change(
             RecordingStudioApi::Admin::ApiAccessRequestsScreen.percent_change(current, previous)
           )
-        }
+        end
         chart_type :area
         series { RecordingStudioApi::Admin::AdminApiRequestsLastFourWeeksWidget.series }
         chart_options do
@@ -57,7 +57,7 @@ module RecordingStudioApi
           group_by: "day"
         }
 
-        "#{context.admin_screen_path('admin_api_requests')}?#{query.to_query}"
+        NavigationUrlHelpers.admin_screen_url(context, "admin_api_requests", query)
       end
 
       def daily_points

@@ -60,32 +60,45 @@ module RecordingStudioApi
         end
 
         def rows
-          api_credentials.filter_map do |api_credential|
-            api_client = api_credential.api_client
+          visible_api_clients.flat_map do |api_client|
             access_recording = api_client.access_recording
-            next if access_recording.nil?
+            next [] if access_recording.nil?
 
             root_recording = access_recording.root_recording
-            next if root_recording.nil?
+            next [] if root_recording.nil?
 
             access_point_recording = access_point_recording_for(access_recording)
-            Row.new(
-              id: api_credential.id,
-              api_credential: api_credential,
-              api_client: api_client,
-              access_point_recording: access_point_recording,
-              name: api_client.name,
-              api_key: api_credential.oauth_client_id || "Unknown",
-              access_point: access_point_label(access_point_recording),
-              role: access_recording.recordable&.try(:role).to_s.humanize.presence || "Unknown",
-              credentials_count: api_client.credentials.size,
-              expires_at: expires_at_for(api_credential),
-              expires_text: expires_text_for(api_credential),
-              status: credential_status_label(api_credential),
-              request_count: request_count_for(api_credential),
-              last_requested_at: last_requested_at_for(api_credential)
-            )
+            credentials = api_client.credentials.to_a
+            credentials = [nil] if credentials.empty?
+
+            credentials.map do |api_credential|
+              build_row(
+                api_client: api_client,
+                api_credential: api_credential,
+                access_recording: access_recording,
+                access_point_recording: access_point_recording
+              )
+            end
           end
+        end
+
+        def build_row(api_client:, api_credential:, access_recording:, access_point_recording:)
+          Row.new(
+            id: api_credential&.id || api_client.id,
+            api_credential: api_credential,
+            api_client: api_client,
+            access_point_recording: access_point_recording,
+            name: api_client.name,
+            api_key: api_credential&.oauth_client_id || "Unknown",
+            access_point: access_point_label(access_point_recording),
+            role: access_recording.recordable&.try(:role).to_s.humanize.presence || "Unknown",
+            credentials_count: api_client.credentials.size,
+            expires_at: expires_at_for(api_credential),
+            expires_text: expires_text_for(api_credential),
+            status: credential_status_label(api_credential),
+            request_count: request_count_for(api_credential),
+            last_requested_at: last_requested_at_for(api_credential)
+          )
         end
 
         def api_credentials
@@ -266,10 +279,14 @@ module RecordingStudioApi
         end
 
         def request_count_for(api_credential)
+          return 0 if api_credential.nil?
+
           request_counts_by_credential_id.fetch(api_credential.id, 0)
         end
 
         def last_requested_at_for(api_credential)
+          return if api_credential.nil?
+
           last_requests_by_credential_id.fetch(api_credential.id, nil)
         end
 

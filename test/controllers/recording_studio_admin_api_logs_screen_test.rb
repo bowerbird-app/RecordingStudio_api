@@ -263,13 +263,13 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
       remote_ip: "10.42.0.22"
     )
 
-    get "/admin/api"
+    get "/admin/api", params: { anchor_url: "/" }
 
     assert_response :success
     assert_includes response.body, "Admin API"
     assert_includes response.body, "Monitor and administer API access across the site."
-    assert_includes response.body, "/admin/api/screens/admin_api_requests"
-    assert_includes response.body, "/admin/api/screens/admin_api_failing_endpoints"
+    assert_includes response.body, "/admin/api/screens/admin_api_requests?anchor_url=%2F"
+    assert_includes response.body, "/admin/api/screens/admin_api_failing_endpoints?anchor_url=%2F"
     assert_includes response.body, "widgets.recording_studio_api.admin.requests_last_four_weeks"
     assert_includes response.body, "widgets.recording_studio_api.admin.api_latency_last_four_weeks"
     assert_includes response.body, "widgets.recording_studio_api.admin.client_errors_last_four_weeks"
@@ -284,7 +284,7 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_includes api_requests_link["class"].to_s, "--button-default-background-color"
     assert_not_includes api_requests_link["class"].to_s, "--button-primary-background-color"
 
-    get "/admin/api/sections/admin_api/widgets/widgets.recording_studio_api.admin.requests_last_four_weeks"
+    get "/admin/api/sections/admin_api/widgets/widgets.recording_studio_api.admin.requests_last_four_weeks", params: { anchor_url: "/" }
 
     assert_response :success
     assert_includes response.body, "API requests"
@@ -293,6 +293,7 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "flat-pack--chart"
     assert_includes response.body, "area"
     assert_includes response.body, "/admin/api/screens/admin_api_requests"
+    assert_includes response.body, "anchor_url=%2F"
     assert_includes response.body, "group_by=day"
     assert_includes response.body, "7"
 
@@ -355,7 +356,7 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "/site-wide-errors"
     assert_includes response.body, "/site-wide-client-errors"
     assert_select "span[class*='badge-info-background-color']", text: "GET", minimum: 1
-    assert_select "li[role=listitem]", text: /GET \/site-wide-errors\s*2/, minimum: 1
+    assert_select "li[role=listitem]", text: %r{GET /site-wide-errors\s*2}, minimum: 1
     assert_not_includes response.body, "(501)"
     assert_not_includes response.body, "(401)"
     assert_includes response.body, "/admin/api/screens/admin_api_failing_endpoints"
@@ -418,6 +419,7 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "API requests"
     assert_includes response.body, "Site-wide API request activity across every API client."
     assert_includes response.body, "area"
+    assert_select 'button[data-modal-id="screen-filters-modal"]', count: 1
 
     get "/admin/api/screens/admin_api_requests/table", params: {
       start_date: 27.days.ago.to_date.iso8601,
@@ -428,7 +430,7 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "/recording_studio_api/api/v1/site-wide-pages"
     assert_includes response.body, "/recording_studio_api/api/v1/pages"
-    assert_select 'span[title="/recording_studio_api/api/v1/site-wide-pages"]', text: "/site-wide-pages", minimum: 1
+    assert_select '[role="tooltip"]', text: "/recording_studio_api/api/v1/site-wide-pages", minimum: 1
     assert_not_includes response.body, "/recording_studio_api/api/v1/old-pages"
 
     get "/admin/api/screens/admin_api_requests/table", params: {
@@ -566,6 +568,13 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_not_includes response.body, "First site credential"
     assert_includes response.body, "Second site credential"
+
+    revoked_at = first_payload.fetch(:credential).revoked_at.utc.strftime("%Y-%m-%d %H:%M UTC")
+    get "/admin/api/screens/admin_api_credentials/table", params: { status: "revoked" }
+
+    assert_response :success
+    assert_includes response.body, "First site credential"
+    assert_select '[role="tooltip"]', text: "Revoked at #{revoked_at}", count: 1
   end
 
   test "API admin viewers cannot revoke credentials" do
@@ -595,7 +604,7 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     switch_to_root(@admin_root_recording)
 
     assert_equal :view, RecordingStudioAccessible.role_for(actor: viewer, recording: admin_api_recording)
-  assert_equal :admin, RecordingStudioApi.configuration.access_management_edit_role
+    assert_equal :admin, RecordingStudioApi.configuration.access_management_edit_role
     refute RecordingStudioApi::AccessManagementPolicy.new(actor: viewer).can_manage_recording?(admin_api_recording)
 
     get "/admin/api/screens/admin_api_credentials/table"
@@ -678,12 +687,20 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     get "/api/screens/api_requests", params: { api_client_id: api_client.id }
 
     assert_response :success
-    assert_select %(select[name="group_by"]), count: 1
-    assert_select %(select[name="group_by"] option[value="day"][selected]), text: "Day", count: 1
-    assert_select %(select[name="api_client_name"]), count: 1
-    assert_select %(select[name="api_client_name"] option[value=""]:not([disabled])), text: "All API keys", count: 1
-    assert_select %(select[name="api_client_name"] option[value="Analytics API key"]), count: 1
-    assert_select %(select[name="status"] option[value=""][disabled][selected]), text: "Status", count: 1
+    assert_select 'button[data-modal-id="screen-filters-modal"]', count: 1
+    assert_select "form#screen-inline-filters-form" do
+      assert_select %(input[name="date_range_preset"]), count: 1
+      assert_select %(select[name="group_by"]), count: 1
+    end
+    assert_select "form#screen-filters-mobile-form" do
+      assert_select %(select[name="api_client_name"]), count: 1
+      assert_select %(select[name="api_client_name"] option[value=""]:not([disabled])), count: 1
+      assert_select %(select[name="api_client_name"] option[value="Analytics API key"]), count: 1
+      assert_select %(select[name="status"] option[value=""][disabled][selected]), count: 1
+    end
+    assert_includes response.body, "All API keys"
+    assert_includes response.body, "Analytics API key"
+    assert_includes response.body, "Status"
     refute_includes response.body, "Avg duration"
     refute_includes response.body, "Error rate"
 

@@ -22,21 +22,21 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
     @original_admin_requests_path_resolver = RecordingStudioApi.configuration.admin_requests_path_resolver
     @original_admin_errors_path_resolver = RecordingStudioApi.configuration.admin_errors_path_resolver
     @original_admin_logs_path_resolver = RecordingStudioApi.configuration.admin_logs_path_resolver
-    RecordingStudioApi.configuration.admin_dashboard_path_resolver = ->(controller:, **) { admin_api_path }
-    RecordingStudioApi.configuration.admin_settings_path_resolver = lambda do |controller:, **params|
-      admin_api_settings_path(params)
+    RecordingStudioApi.configuration.admin_dashboard_path_resolver = ->(**) { admin_api_path }
+    RecordingStudioApi.configuration.admin_settings_path_resolver = lambda do |**params|
+      admin_api_settings_path(params.except(:controller))
     end
-    RecordingStudioApi.configuration.admin_rate_limiting_path_resolver = lambda do |controller:, **params|
-      admin_api_rate_limiting_path(params)
+    RecordingStudioApi.configuration.admin_rate_limiting_path_resolver = lambda do |**params|
+      admin_api_rate_limiting_path(params.except(:controller))
     end
-    RecordingStudioApi.configuration.admin_requests_path_resolver = lambda do |controller:, **params|
-      admin_api_requests_path(params)
+    RecordingStudioApi.configuration.admin_requests_path_resolver = lambda do |**params|
+      admin_api_requests_path(params.except(:controller))
     end
-    RecordingStudioApi.configuration.admin_errors_path_resolver = lambda do |controller:, **params|
-      admin_api_errors_path(params)
+    RecordingStudioApi.configuration.admin_errors_path_resolver = lambda do |**params|
+      admin_api_errors_path(params.except(:controller))
     end
-    RecordingStudioApi.configuration.admin_logs_path_resolver = lambda do |controller:, **params|
-      admin_api_logs_path(params)
+    RecordingStudioApi.configuration.admin_logs_path_resolver = lambda do |**params|
+      admin_api_logs_path(params.except(:controller))
     end
 
     @user = User.create!(email: "admin-dashboard-#{SecureRandom.hex(4)}@example.com") do |user|

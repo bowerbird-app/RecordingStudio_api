@@ -21,6 +21,7 @@ module RecordingStudioApi
 
       filter :date_range, field: :occurred_at, default: :this_month
       filter :group_by, values: %i[hour day week month year], default: :day
+      filter_presentation :modal, inline_count: 2
       filter :api_client_name,
              options: -> { RecordingStudioApi::Admin::ApiAccessRequestsScreen.api_client_name_filter_options },
              blank_label: "All API keys",

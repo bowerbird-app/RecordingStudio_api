@@ -15,13 +15,13 @@ module RecordingStudioApi
         value { |context| "#{RecordingStudioApi::Admin::AdminApiLatencyLastFourWeeksWidget.p95_duration_ms(context)} ms" }
         metadata { { period_label: "Last 4 weeks" } }
         change_good_when :down
-        change { |context|
+        change do |context|
           current = RecordingStudioApi::Admin::AdminApiLatencyLastFourWeeksWidget.p95_duration_ms(context)
           previous = RecordingStudioApi::Admin::AdminApiLatencyLastFourWeeksWidget.previous_p95_duration_ms(context)
           RecordingStudioApi::Admin::ApiAccessRequestsScreen.format_change(
             RecordingStudioApi::Admin::ApiAccessRequestsScreen.percent_change(current, previous)
           )
-        }
+        end
         chart_type :area
         series { RecordingStudioApi::Admin::AdminApiLatencyLastFourWeeksWidget.series }
         chart_options do
@@ -69,7 +69,7 @@ module RecordingStudioApi
           group_by: "day"
         }
 
-        "#{context.admin_screen_path('admin_api_performance')}?#{query.to_query}"
+        NavigationUrlHelpers.admin_screen_url(context, "admin_api_performance", query)
       end
 
       def request_scope

@@ -18,6 +18,7 @@ module RecordingStudioApi
 
       filter :date_range, field: :occurred_at, default: :this_month
       filter :group_by, values: %i[hour day week month year], default: :day
+      filter_presentation :modal, inline_count: 2
       filter :api_client_name,
              options: -> { RecordingStudioApi::Admin::AdminApiRequestsScreen.api_client_name_filter_options },
              blank_label: "All API clients",
@@ -82,10 +83,10 @@ module RecordingStudioApi
         column :occurred_at, title: "Occurred"
         column :api_client_name, title: "Client", sortable: false
         column :request_method, title: "Method"
-         column :request_path,
-           title: "Path",
-           value: ->(row, _context) { RecordingStudioApi::Admin::ApiRequestLogHelpers.compact_path(row.request_path) },
-           tooltip: ->(row, _context) { row.request_path }
+        column :request_path,
+               title: "Path",
+               value: ->(row, _context) { RecordingStudioApi::Admin::ApiRequestLogHelpers.compact_path(row.request_path) },
+               tooltip: ->(row, _context) { row.request_path }
         column :status_code,
                title: "Status",
                display: :badge,

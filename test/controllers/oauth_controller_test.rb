@@ -96,9 +96,28 @@ class OauthControllerTest < ActionDispatch::IntegrationTest
     assert_equal({}, payload.fetch(:request_params))
   end
 
+  test "retains no oauth request params without an allowlist" do
+    RecordingStudioApi.configuration.api_request_logging_enabled = true
+    RecordingStudioApi.configuration.api_request_logging_payload_mode = "filtered_params"
+    logged_payloads = []
+    RecordingStudioApi::Concerns::RequestLogging.writer = lambda do |payload|
+      logged_payloads << payload
+    end
+
+    post "/recording_studio_api/oauth/token", params: {
+      grant_type: "client_credentials",
+      client_id: @payload.fetch(:credential).oauth_client_id,
+      client_secret: "bad-secret"
+    }
+
+    assert_response :unauthorized
+    assert_equal({}, logged_payloads.first.fetch(:request_params))
+  end
+
   test "recursively filters oauth request params when payload logging is enabled" do
     RecordingStudioApi.configuration.api_request_logging_enabled = true
     RecordingStudioApi.configuration.api_request_logging_payload_mode = "filtered_params"
+    RecordingStudioApi.configuration.api_request_log_allowed_param_keys = %w[grant_type client_secret metadata]
     logged_payloads = []
     RecordingStudioApi::Concerns::RequestLogging.writer = lambda do |payload|
       logged_payloads << payload
@@ -128,6 +147,8 @@ class OauthControllerTest < ActionDispatch::IntegrationTest
     assert_equal "[FILTERED]", request_params.fetch("metadata").fetch("password")
     assert_equal "[FILTERED]", request_params.fetch("metadata").fetch("credentials").fetch("refresh_token")
     assert_equal "[FILTERED]", request_params.fetch("metadata").fetch("credentials").fetch("client_secret")
+    assert_equal "[FILTERED]", request_params.fetch("client_secret")
+    assert_not_includes request_params, "client_id"
   end
 
   test "issues access token with valid client credentials" do
@@ -138,6 +159,10 @@ class OauthControllerTest < ActionDispatch::IntegrationTest
     }
 
     assert_response :success
+    assert_includes response.headers["Cache-Control"], "no-store"
+    assert_includes response.headers["Cache-Control"], "private"
+    assert_equal "no-cache", response.headers["Pragma"]
+    assert_equal "0", response.headers["Expires"]
     body = JSON.parse(response.body)
     assert_equal "Bearer", body.fetch("token_type")
     assert_match(/\Arsapi_at_/, body.fetch("access_token"))
@@ -151,6 +176,10 @@ class OauthControllerTest < ActionDispatch::IntegrationTest
     }
 
     assert_response :unauthorized
+    assert_includes response.headers["Cache-Control"], "no-store"
+    assert_includes response.headers["Cache-Control"], "private"
+    assert_equal "no-cache", response.headers["Pragma"]
+    assert_equal "0", response.headers["Expires"]
     body = JSON.parse(response.body)
     assert_equal "invalid_client", body.fetch("error")
   end

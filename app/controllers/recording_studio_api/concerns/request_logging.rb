@@ -87,7 +87,7 @@ module RecordingStudioApi
         return {} unless log_request_params?
 
         unsafe = params.respond_to?(:to_unsafe_h) ? params.to_unsafe_h : {}
-        request_parameter_filter.filter(unsafe)
+        request_parameter_filter.filter(allowed_request_params(unsafe))
       end
 
       def log_request_params?
@@ -101,6 +101,11 @@ module RecordingStudioApi
       def request_parameter_filter_keys
         configured_keys = Rails.application.config.filter_parameters if defined?(Rails) && Rails.respond_to?(:application)
         Array(configured_keys) + FILTERED_PARAM_KEYS
+      end
+
+      def allowed_request_params(params)
+        allowed_keys = Array(RecordingStudioApi.configuration.api_request_log_allowed_param_keys).map(&:to_s)
+        params.slice(*allowed_keys)
       end
     end
   end

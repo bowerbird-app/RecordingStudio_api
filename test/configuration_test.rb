@@ -69,6 +69,7 @@ class ConfigurationTest < Minitest::Test
     assert_equal 60, configuration.rate_limit_api_write_period_seconds
     assert_equal false, configuration.api_request_logging_enabled
     assert_equal "metadata_only", configuration.api_request_logging_payload_mode
+    assert_equal [], configuration.api_request_log_allowed_param_keys
     assert_equal 30, configuration.api_request_log_retention_days
     assert_nil configuration.api_daily_metric_retention_days
     assert_instance_of RecordingStudioApi::Hooks, configuration.hooks
@@ -112,6 +113,7 @@ class ConfigurationTest < Minitest::Test
       rate_limit_api_write_period_seconds: 20,
       api_request_logging_enabled: true,
       api_request_logging_payload_mode: "metadata_only",
+      api_request_log_allowed_param_keys: %w[resource limit],
       api_request_log_retention_days: 14,
       api_daily_metric_retention_days: 365
     )
@@ -134,6 +136,7 @@ class ConfigurationTest < Minitest::Test
     assert_equal 20, @configuration.rate_limit_api_write_period_seconds
     assert_equal true, @configuration.api_request_logging_enabled
     assert_equal "metadata_only", @configuration.api_request_logging_payload_mode
+    assert_equal %w[resource limit], @configuration.api_request_log_allowed_param_keys
   end
 
   def test_merge_updates_access_management_roles
@@ -354,5 +357,63 @@ class ConfigurationTest < Minitest::Test
     RecordingStudioApi.configure
 
     assert_kind_of RecordingStudioApi::Configuration, RecordingStudioApi.configuration
+  end
+
+  def test_validate_rejects_non_positive_access_token_ttl
+    @configuration.access_token_ttl = 0
+
+    error = assert_raises(RecordingStudioApi::ConfigurationError) { @configuration.validate! }
+
+    assert_equal "access_token_ttl must be positive", error.message
+  end
+
+  def test_validate_rejects_negative_credential_ttl
+    @configuration.credential_ttl = -1.second
+
+    error = assert_raises(RecordingStudioApi::ConfigurationError) { @configuration.validate! }
+
+    assert_equal "credential_ttl must be non-negative", error.message
+  end
+
+  def test_validate_allows_nil_credential_ttl
+    @configuration.credential_ttl = nil
+
+    @configuration.validate!
+  end
+
+  def test_validate_rejects_invalid_enabled_rate_limit_bucket
+    @configuration.rate_limit_oauth_enabled = true
+    @configuration.rate_limit_oauth_requests = 0
+
+    error = assert_raises(RecordingStudioApi::ConfigurationError) { @configuration.validate! }
+
+    assert_equal "rate_limit_oauth_requests must be positive when rate limiting is enabled", error.message
+  end
+
+  def test_validate_rejects_invalid_enabled_api_fallback_rate_limit
+    @configuration.rate_limit_api_enabled = true
+    @configuration.rate_limit_api_read_requests = 0
+    @configuration.rate_limit_api_requests = 0
+
+    error = assert_raises(RecordingStudioApi::ConfigurationError) { @configuration.validate! }
+
+    assert_equal "rate_limit_api_read_requests must be positive when rate limiting is enabled", error.message
+  end
+
+  def test_validate_rejects_negative_enabled_api_rate_limit_override
+    @configuration.rate_limit_api_enabled = true
+    @configuration.rate_limit_api_write_requests = -1
+
+    error = assert_raises(RecordingStudioApi::ConfigurationError) { @configuration.validate! }
+
+    assert_equal "rate_limit_api_write_requests must be positive when rate limiting is enabled", error.message
+  end
+
+  def test_validate_rejects_invalid_configured_retention_duration
+    @configuration.api_request_log_retention_days = 0
+
+    error = assert_raises(RecordingStudioApi::ConfigurationError) { @configuration.validate! }
+
+    assert_equal "api_request_log_retention_days must be positive when configured", error.message
   end
 end

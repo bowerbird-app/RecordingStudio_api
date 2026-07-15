@@ -54,6 +54,7 @@ module RecordingStudioApi
                   :rate_limit_api_write_period_seconds,
                   :api_request_logging_enabled,
                   :api_request_logging_payload_mode,
+                  :api_request_log_allowed_param_keys,
                   :api_request_log_retention_days,
                   :api_daily_metric_retention_days
     attr_reader :hooks, :action_registry, :recordable_registry, :default_api_version, :api_version_profiles, :capability_action_roles
@@ -115,6 +116,7 @@ module RecordingStudioApi
       @rate_limit_api_write_period_seconds = 60
       @api_request_logging_enabled = false
       @api_request_logging_payload_mode = "metadata_only"
+      @api_request_log_allowed_param_keys = []
       @api_request_log_retention_days = 30
       @api_daily_metric_retention_days = nil
       @hooks = Hooks.new
@@ -123,6 +125,7 @@ module RecordingStudioApi
     end
     # rubocop:enable Metrics/AbcSize
 
+    # rubocop:disable Metrics/AbcSize
     def to_h
       {
         timeout: timeout,
@@ -166,6 +169,7 @@ module RecordingStudioApi
         rate_limit_api_write_period_seconds: rate_limit_api_write_period_seconds,
         api_request_logging_enabled: api_request_logging_enabled,
         api_request_logging_payload_mode: api_request_logging_payload_mode,
+        api_request_log_allowed_param_keys: api_request_log_allowed_param_keys,
         api_request_log_retention_days: api_request_log_retention_days,
         api_daily_metric_retention_days: api_daily_metric_retention_days,
         action_registrations: action_registry.to_h,
@@ -173,6 +177,7 @@ module RecordingStudioApi
         hooks_registered: hooks.instance_variable_get(:@registry).transform_values(&:size)
       }
     end
+    # rubocop:enable Metrics/AbcSize
 
     def merge!(hash)
       return unless hash.respond_to?(:each)
@@ -195,6 +200,7 @@ module RecordingStudioApi
       validate_access_management_roles!
       validate_capability_action_role_resolver!
       validate_api_versions!
+      validate_security_configuration!
     end
 
     def api_versions
@@ -212,7 +218,7 @@ module RecordingStudioApi
     def capability_action_roles=(value)
       raise ConfigurationError, "capability_action_roles must be a hash" unless value.respond_to?(:each_pair)
 
-      @capability_action_roles = value.each_pair.each_with_object({}) do |(action_name, role), roles|
+      @capability_action_roles = value.each_pair.with_object({}) do |(action_name, role), roles|
         normalized_action_name = action_name.to_s.strip
         raise ConfigurationError, "capability action name is required" if normalized_action_name.empty?
 
@@ -318,6 +324,52 @@ module RecordingStudioApi
       return if api_versions.include?(default_api_version)
 
       raise ConfigurationError, "default_api_version must be included in api_versions"
+    end
+
+    def validate_security_configuration!
+      validate_positive_duration!(:access_token_ttl, access_token_ttl)
+      validate_non_negative_duration!(:credential_ttl, credential_ttl) if credential_ttl.present?
+      validate_enabled_rate_limits!
+      validate_positive_days!(:api_request_log_retention_days, api_request_log_retention_days)
+      validate_positive_days!(:api_daily_metric_retention_days, api_daily_metric_retention_days) if api_daily_metric_retention_days.present?
+    end
+
+    def validate_enabled_rate_limits!
+      validate_rate_limit!(:oauth, rate_limit_oauth_requests, rate_limit_oauth_period_seconds) if rate_limit_oauth_enabled
+      validate_rate_limit!(:api_pre_auth, rate_limit_api_pre_auth_requests, rate_limit_api_pre_auth_period_seconds) if rate_limit_api_pre_auth_enabled
+      return unless rate_limit_api_enabled
+
+      validate_rate_limit!(:api_read, effective_rate_limit_value(rate_limit_api_read_requests, rate_limit_api_requests), effective_rate_limit_value(rate_limit_api_read_period_seconds, rate_limit_api_period_seconds))
+      validate_rate_limit!(:api_write, effective_rate_limit_value(rate_limit_api_write_requests, rate_limit_api_requests), effective_rate_limit_value(rate_limit_api_write_period_seconds, rate_limit_api_period_seconds))
+    end
+
+    def effective_rate_limit_value(primary, fallback)
+      primary.to_i.nonzero? || fallback
+    end
+
+    def validate_rate_limit!(bucket, requests, period)
+      raise ConfigurationError, "rate_limit_#{bucket}_requests must be positive when rate limiting is enabled" unless positive_number?(requests)
+      raise ConfigurationError, "rate_limit_#{bucket}_period_seconds must be positive when rate limiting is enabled" unless positive_number?(period)
+    end
+
+    def validate_positive_duration!(name, value)
+      raise ConfigurationError, "#{name} must be positive" unless positive_number?(value)
+    end
+
+    def validate_non_negative_duration!(name, value)
+      raise ConfigurationError, "#{name} must be non-negative" unless non_negative_number?(value)
+    end
+
+    def validate_positive_days!(name, value)
+      raise ConfigurationError, "#{name} must be positive when configured" unless positive_number?(value)
+    end
+
+    def positive_number?(value)
+      value.respond_to?(:to_i) && value.to_i.positive?
+    end
+
+    def non_negative_number?(value)
+      value.respond_to?(:to_i) && value.to_i >= 0
     end
   end
 end

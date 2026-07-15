@@ -59,12 +59,12 @@ module RecordingStudioApi
           end
         }
 
-         column :request_method, title: "Method", sortable: false
-         column :request_path,
-           title: "Path",
-           sortable: false,
-           value: ->(row, _context) { RecordingStudioApi::Admin::ApiRequestLogHelpers.compact_path(row.request_path) },
-           tooltip: ->(row, _context) { row.request_path }
+        column :request_method, title: "Method", sortable: false
+        column :request_path,
+               title: "Path",
+               sortable: false,
+               value: ->(row, _context) { RecordingStudioApi::Admin::ApiRequestLogHelpers.compact_path(row.request_path) },
+               tooltip: ->(row, _context) { row.request_path }
         column :request_count, title: "Requests", sortable: false
         column :average_duration_ms, title: "Avg duration", sortable: false
         column :p50_duration_ms, title: "P50 duration", sortable: false
@@ -84,7 +84,7 @@ module RecordingStudioApi
           logs = request_scope(context).pluck(:request_method, :request_path, :duration_ms, :status_code, :rate_limited)
           grouped = logs.group_by { |request_method, request_path, *_| [request_method, request_path] }
 
-          grouped.map do |(request_method, request_path), rows|
+          rows = grouped.map do |(request_method, request_path), rows|
             durations = rows.map { |row| row[2] }.compact
             Row.new(
               request_method: request_method,
@@ -98,7 +98,9 @@ module RecordingStudioApi
               client_error_count: rows.count { |row| (400..499).cover?(row[3].to_i) },
               rate_limited_count: rows.count { |row| row[4] }
             )
-          end.sort_by { |row| [-row.p95_duration_ms.to_i, -row.average_duration_ms.to_i, row.request_path.to_s] }
+          end
+
+          rows.sort_by { |row| [-row.p95_duration_ms.to_i, -row.average_duration_ms.to_i, row.request_path.to_s] }
         end
 
         def latency_series_for(start_date, end_date)

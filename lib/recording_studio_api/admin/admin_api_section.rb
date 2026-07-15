@@ -10,18 +10,18 @@ module RecordingStudioApi
 
       link :requests,
            text: "API requests",
-           url: ->(context) { context.admin_screen_path("admin_api_requests") },
+           url: ->(context) { admin_screen_url(context, "admin_api_requests") },
            style: :default
 
-       link :failing_endpoints,
-         text: "Failing endpoints",
-         url: ->(context) { context.admin_screen_path("admin_api_failing_endpoints") },
-         style: :default
+      link :failing_endpoints,
+           text: "Failing endpoints",
+           url: ->(context) { admin_screen_url(context, "admin_api_failing_endpoints") },
+           style: :default
 
-       link :credentials,
-         text: "API credentials",
-         url: ->(context) { context.admin_screen_path("admin_api_credentials") },
-         style: :default
+      link :credentials,
+           text: "API credentials",
+           url: ->(context) { admin_screen_url(context, "admin_api_credentials") },
+           style: :default
 
       widget "widgets.recording_studio_api.admin.requests_last_four_weeks"
       widget "widgets.recording_studio_api.admin.api_latency_last_four_weeks"
@@ -30,6 +30,10 @@ module RecordingStudioApi
       widget "widgets.recording_studio_api.admin.authorization_failures_last_four_weeks"
       widget "widgets.recording_studio_api.admin.top_failing_endpoints_last_four_weeks"
       widget "widgets.recording_studio_api.admin.rate_limited_requests_last_four_weeks"
+
+      def self.admin_screen_url(context, key)
+        NavigationUrlHelpers.admin_screen_url(context, key)
+      end
     end
   end
 end

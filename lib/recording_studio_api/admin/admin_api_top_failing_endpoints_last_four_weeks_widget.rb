@@ -77,7 +77,7 @@ module RecordingStudioApi
           end_date: Date.current.iso8601
         }
 
-        "#{context.admin_screen_path('admin_api_failing_endpoints')}?#{query.to_query}"
+        NavigationUrlHelpers.admin_screen_url(context, "admin_api_failing_endpoints", query)
       end
 
       def daily_buckets

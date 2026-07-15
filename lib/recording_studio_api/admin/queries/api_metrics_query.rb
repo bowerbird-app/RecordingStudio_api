@@ -47,10 +47,10 @@ module RecordingStudioApi
           return [] unless ApiRequestLog.table_available?
 
           scope = ApiRequestLog.where(occurred_at: raw_start_date.beginning_of_day..end_date.end_of_day)
-          scope = scope.where(status_code: status_class.to_i * 100..(status_class.to_i * 100) + 99) if status_class
+          scope = scope.where(status_code: (status_class.to_i * 100)..((status_class.to_i * 100) + 99)) if status_class
           scope = scope.where(rate_limited: true) if rate_limited == true
           scope.pluck(:occurred_at, :route_name, :request_method, :status_code, :rate_limited, :duration_ms)
-            .map { |values| row_from_log(*values) }
+               .map { |values| row_from_log(*values) }
         end
 
         def aggregate_end_date

@@ -17,9 +17,9 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
   setup do
     @original_admin_dashboard_path_resolver = RecordingStudioApi.configuration.admin_dashboard_path_resolver
     @original_admin_logs_path_resolver = RecordingStudioApi.configuration.admin_logs_path_resolver
-    RecordingStudioApi.configuration.admin_dashboard_path_resolver = ->(controller:, **) { admin_api_path }
-    RecordingStudioApi.configuration.admin_logs_path_resolver = lambda do |controller:, **params|
-      admin_api_logs_path(params)
+    RecordingStudioApi.configuration.admin_dashboard_path_resolver = ->(**) { admin_api_path }
+    RecordingStudioApi.configuration.admin_logs_path_resolver = lambda do |**params|
+      admin_api_logs_path(params.except(:controller))
     end
 
     @user = User.create!(email: "admin-logs-#{SecureRandom.hex(4)}@example.com") do |user|

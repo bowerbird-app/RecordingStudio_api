@@ -28,7 +28,7 @@ module RecordingStudioApi
         end
 
         def call
-          credentials.filter_map do |credential|
+          rows = credentials.filter_map do |credential|
             api_client = credential.api_client
             access_recording = api_client&.access_recording
             root_recording = access_recording&.root_recording
@@ -49,7 +49,9 @@ module RecordingStudioApi
               request_count: request_count_for(credential),
               last_requested_at: last_requested_at_for(credential)
             )
-          end.sort_by { |row| [row.root.to_s.downcase, row.api_client.name.to_s.downcase, row.id.to_s] }
+          end
+
+          rows.sort_by { |row| [row.root.to_s.downcase, row.api_client.name.to_s.downcase, row.id.to_s] }
         end
 
         private

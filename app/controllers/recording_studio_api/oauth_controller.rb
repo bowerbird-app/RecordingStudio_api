@@ -8,6 +8,8 @@ module RecordingStudioApi
     skip_before_action :verify_authenticity_token, only: :token
 
     def token
+      prevent_token_response_storage!
+
       result = RecordingStudioApi::Services::IssueOauthAccessToken.call(
         grant_type: params[:grant_type].to_s,
         client_id: params[:client_id].to_s,
@@ -27,6 +29,12 @@ module RecordingStudioApi
       payload = RecordingStudioApi::OauthErrorMapper.payload_for(error)
       status = RecordingStudioApi::OauthErrorMapper.status_for(payload)
       render json: payload, status: status
+    end
+
+    def prevent_token_response_storage!
+      response.cache_control.replace(no_store: true, private: true)
+      response.headers["Pragma"] = "no-cache"
+      response.headers["Expires"] = "0"
     end
 
   end

@@ -82,6 +82,32 @@ class IssueOauthAccessTokenTest < ActiveSupport::TestCase
     assert_equal "invalid_client", result.error.fetch(:error)
   end
 
+  test "does not issue an access token for an expired credential" do
+    @payload.fetch(:credential).update_columns(expires_at: 1.second.ago, updated_at: Time.current)
+
+    result = RecordingStudioApi::Services::IssueOauthAccessToken.call(
+      grant_type: "client_credentials",
+      client_id: @payload.fetch(:credential).oauth_client_id,
+      client_secret: @payload.fetch(:token)
+    )
+
+    assert result.failure?
+    assert_equal "invalid_client", result.error.fetch(:error)
+  end
+
+  test "does not issue an access token for a revoked credential" do
+    @payload.fetch(:credential).revoke!
+
+    result = RecordingStudioApi::Services::IssueOauthAccessToken.call(
+      grant_type: "client_credentials",
+      client_id: @payload.fetch(:credential).oauth_client_id,
+      client_secret: @payload.fetch(:token)
+    )
+
+    assert result.failure?
+    assert_equal "invalid_client", result.error.fetch(:error)
+  end
+
   test "does not expose database errors during token issuance" do
     result = RecordingStudioApi::ApiAccessToken.stub(:create!, lambda { |**|
       raise ActiveRecord::StatementInvalid, "database constraint detail"

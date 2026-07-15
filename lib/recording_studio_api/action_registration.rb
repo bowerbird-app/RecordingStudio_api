@@ -29,6 +29,7 @@ module RecordingStudioApi
     end
     # rubocop:enable Metrics/ParameterLists
 
+    # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
     def validate!
       raise ConfigurationError, "API action name is required" if name.blank?
       raise ConfigurationError, "Capability is required for #{name}" if capability.blank? && scope == :member
@@ -42,6 +43,7 @@ module RecordingStudioApi
       raise ConfigurationError, "version_notes must be a string or array of strings for #{name}" unless version_notes.is_a?(Array)
       raise ConfigurationError, "deprecation must be a hash for #{name}" unless deprecation.is_a?(Hash)
     end
+    # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity
 
     def applicable_to?(recordable_type)
       capability_enabled_for?(recordable_type)

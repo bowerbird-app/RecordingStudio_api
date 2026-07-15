@@ -30,7 +30,7 @@ module RecordingStudioApi
         def call
           return [] unless RecordingStudioApi::ApiRequestLog.table_available?
 
-          grouped_logs.map do |(request_method, request_path), logs|
+          rows = grouped_logs.map do |(request_method, request_path), logs|
             failure_logs = logs.select { |log| failed_status_code?(log[2]) }
             status_counts = failure_logs.each_with_object(Hash.new(0)) { |log, counts| counts[log[2]] += 1 }
 
@@ -44,8 +44,10 @@ module RecordingStudioApi
               server_error_count: failure_logs.count { |log| (500..599).cover?(log[2].to_i) },
               dominant_status_code: status_counts.max_by { |status_code, count| [count, status_code] }&.first
             )
-          end.select { |row| row.failure_count.positive? }
-             .sort_by { |row| [-row.failure_rate, -row.failure_count, -row.server_error_count, row.request_method.to_s, row.request_path.to_s] }
+          end
+
+          failures = rows.select { |row| row.failure_count.positive? }
+          failures.sort_by { |row| [-row.failure_rate, -row.failure_count, -row.server_error_count, row.request_method.to_s, row.request_path.to_s] }
         end
 
         private

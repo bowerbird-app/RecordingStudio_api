@@ -14,7 +14,7 @@
         text: "Open Admin API",
         style: :primary,
         size: :md,
-        url: "/admin/api"
+        url: ["/admin/api", { anchor_url: main_app.root_path }.to_query].join("?")
       ) %>
     </div>
   <% end %>

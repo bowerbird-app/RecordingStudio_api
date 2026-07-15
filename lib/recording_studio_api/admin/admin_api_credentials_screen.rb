@@ -61,7 +61,8 @@ module RecordingStudioApi
                title: "Status",
                sortable: false,
                display: :badge,
-           display_options: ->(_row, _context, value) { RecordingStudioApi::Admin::AdminApiCredentialsScreen.status_badge_options(value) }
+               display_options: ->(_row, _context, value) { RecordingStudioApi::Admin::AdminApiCredentialsScreen.status_badge_options(value) },
+               tooltip: ->(row, _context) { RecordingStudioApi::Admin::AdminApiCredentialsScreen.status_tooltip(row) }
         column :request_count, title: "Requests", sortable: false
         column :last_requested_at, title: "Last request", sortable: false
         column :expires_text, title: "Expires", sortable: false
@@ -79,7 +80,8 @@ module RecordingStudioApi
                url: lambda { |row, context|
                  context.controller.recording_studio_api.admin_revoke_credential_path(
                    row.id,
-                   close_url: context.admin_screen_path("admin_api_credentials")
+                   anchor_url: context.params[:anchor_url] || context.params["anchor_url"],
+                   close_url: NavigationUrlHelpers.admin_screen_url(context, "admin_api_credentials")
                  )
                }
       end
@@ -87,9 +89,9 @@ module RecordingStudioApi
       class << self
         def root_filter_options
           [""] + RecordingStudioApi::Admin::Queries::AdminApiCredentialsQuery.call
-                                                                              .map { |row| root_filter_value(row) }
-                                                                              .uniq
-                                                                              .sort
+                                                                             .map { |row| root_filter_value(row) }
+                                                                             .uniq
+                                                                             .sort
         end
 
         def root_filter_value(row)
@@ -98,9 +100,9 @@ module RecordingStudioApi
 
         def root_type_filter_options
           [""] + RecordingStudioApi::Admin::Queries::AdminApiCredentialsQuery.call
-                                                                              .map(&:root_type)
-                                                                              .uniq
-                                                                              .sort
+                                                                             .map(&:root_type)
+                                                                             .uniq
+                                                                             .sort
         end
 
         def can_revoke?(context)
@@ -133,6 +135,13 @@ module RecordingStudioApi
                    else :default
                    end
           }
+        end
+
+        def status_tooltip(row)
+          revoked_at = row.api_credential.revoked_at
+          return if row.status != "Revoked" || revoked_at.nil?
+
+          "Revoked at #{revoked_at.utc.strftime('%Y-%m-%d %H:%M UTC')}"
         end
       end
     end

@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "base64"
-require "json"
 require "time"
 require "bigdecimal"
 
@@ -10,6 +8,7 @@ module RecordingStudioApi
     class PaginateResourceCollection < BaseService
       SUPPORTED_ORDERS = %w[asc desc].freeze
       PAGINATION_TOKEN_VERSION = 1
+      PAGINATION_TOKEN_PURPOSE = "recording_studio_api.pagination.v1"
 
       def initialize(relation:, resource:, recordable_type:, limit:, pagination_token:, sort:, order:)
         @relation = relation
@@ -53,7 +52,7 @@ module RecordingStudioApi
             }
           }
         )
-      rescue ArgumentError, TypeError, JSON::ParserError
+      rescue ActiveSupport::MessageVerifier::InvalidSignature, ArgumentError, TypeError
         failure(RecordingStudioApi::InvalidPaginationTokenError.new("Invalid pagination token"))
       end
 
@@ -138,7 +137,7 @@ module RecordingStudioApi
       def decode_pagination_token(normalized_sort, normalized_order)
         return nil if pagination_token.blank?
 
-        payload = JSON.parse(Base64.urlsafe_decode64(pagination_token.to_s))
+        payload = pagination_token_verifier.verify(pagination_token.to_s, purpose: PAGINATION_TOKEN_PURPOSE)
         raise RecordingStudioApi::InvalidPaginationTokenError, "Invalid pagination token" unless payload.is_a?(Hash)
         raise RecordingStudioApi::InvalidPaginationTokenError, "Invalid pagination token" unless payload.fetch("v") == PAGINATION_TOKEN_VERSION
         raise RecordingStudioApi::InvalidPaginationTokenError, "Pagination token does not match requested resource" unless payload.fetch("resource") == resource
@@ -149,7 +148,11 @@ module RecordingStudioApi
       end
 
       def encode_pagination_token(payload)
-        Base64.urlsafe_encode64(payload.to_json)
+        pagination_token_verifier.generate(payload, purpose: PAGINATION_TOKEN_PURPOSE)
+      end
+
+      def pagination_token_verifier
+        Rails.application.message_verifier(PAGINATION_TOKEN_PURPOSE)
       end
 
       def service_args

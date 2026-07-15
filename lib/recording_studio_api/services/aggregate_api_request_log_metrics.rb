@@ -36,7 +36,7 @@ module RecordingStudioApi
 
       def log_rows
         @log_rows ||= ApiRequestLog.where(occurred_at: metric_date.beginning_of_day..metric_date.end_of_day)
-                                  .pluck(:route_name, :controller_name, :action_name, :request_method, :status_code, :rate_limited, :duration_ms)
+                                   .pluck(:route_name, :controller_name, :action_name, :request_method, :status_code, :rate_limited, :duration_ms)
       end
 
       def delete_existing_metrics!

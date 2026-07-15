@@ -24,11 +24,13 @@ module RecordingStudioApi
         end
       end
 
+      # rubocop:disable Naming/PredicateMethod
       def enforce_rate_limit!
-        enforce_current_rate_limit!
+        current_rate_limit_exceeded?
       end
+      # rubocop:enable Naming/PredicateMethod
 
-      def enforce_current_rate_limit!
+      def current_rate_limit_exceeded?
         decision = resolved_rate_limit_decision
         return false unless decision[:limited]
 
@@ -38,7 +40,7 @@ module RecordingStudioApi
 
         @rate_limited_request = true
         render json: { error: "rate_limit_exceeded", error_description: "Too many requests" }, status: :too_many_requests
-          true
+        true
       end
 
       def resolved_rate_limit_decision

@@ -13,19 +13,20 @@ module RecordingStudioApi
            url: lambda { |context|
              context.controller.recording_studio_api.new_api_client_path(
                root_recording_id: context.root_recording&.id,
-               close_url: context.admin_screen_path("api_keys")
+               close_url: NavigationUrlHelpers.admin_screen_url(context, "api_keys"),
+               anchor_url: context.params[:anchor_url] || context.params["anchor_url"]
              )
            },
            style: :primary
 
       link :clients,
            text: "API keys",
-           url: ->(context) { context.admin_screen_path("api_keys") },
+           url: ->(context) { NavigationUrlHelpers.admin_screen_url(context, "api_keys") },
            style: :default
 
       link :requests,
            text: "API requests",
-           url: ->(context) { context.admin_screen_path("api_requests") },
+           url: ->(context) { NavigationUrlHelpers.admin_screen_url(context, "api_requests") },
            style: :secondary
 
       widget "widgets.recording_studio_api.requests_last_four_weeks"

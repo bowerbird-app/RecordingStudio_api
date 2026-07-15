@@ -66,6 +66,93 @@ class AuthenticateOauthAccessTokenTest < ActiveSupport::TestCase
     assert_equal "Bearer access token is inactive", result.error
   end
 
+  test "rejects access tokens after the parent credential expires" do
+    @credential.update_columns(expires_at: 1.second.ago, updated_at: Time.current)
+
+    result = RecordingStudioApi::Services::AuthenticateOauthAccessToken.call(
+      authorization_header: "Bearer #{@access_token}"
+    )
+
+    assert result.failure?
+    assert_equal "Bearer access token is inactive", result.error
+  end
+
+  test "rejects access tokens after the parent credential is revoked" do
+    @credential.revoke!
+
+    result = RecordingStudioApi::Services::AuthenticateOauthAccessToken.call(
+      authorization_header: "Bearer #{@access_token}"
+    )
+
+    assert result.failure?
+    assert_equal "Bearer access token is inactive", result.error
+  end
+
+  test "rejects an access token exactly at its expiry without updating usage timestamps" do
+    access_token = RecordingStudioApi::ApiAccessToken.find_by!(
+      token_digest: RecordingStudioApi::OauthAccessToken.digest(@access_token)
+    )
+    assert_nil access_token.last_used_at
+    assert_nil @credential.last_used_at
+
+    travel_to Time.zone.parse("2026-07-15 12:00:00 UTC") do
+      access_token.update_columns(expires_at: Time.current, updated_at: Time.current)
+
+      result = RecordingStudioApi::Services::AuthenticateOauthAccessToken.call(
+        authorization_header: "Bearer #{@access_token}"
+      )
+
+      assert result.failure?
+      assert_equal "Bearer access token is inactive", result.error
+      assert_nil access_token.reload.last_used_at
+      assert_nil @credential.reload.last_used_at
+    end
+  end
+
+  test "rejects access tokens with trashed credential recordings" do
+    @credential.recording.update_column(:trashed_at, Time.current)
+
+    result = RecordingStudioApi::Services::AuthenticateOauthAccessToken.call(
+      authorization_header: "Bearer #{@access_token}"
+    )
+
+    assert result.failure?
+    assert_equal "Bearer access token is invalid", result.error
+  end
+
+  test "rejects access tokens when the effective access recording is trashed" do
+    @client_access_recording.update_column(:trashed_at, Time.current)
+
+    result = RecordingStudioApi::Services::AuthenticateOauthAccessToken.call(
+      authorization_header: "Bearer #{@access_token}"
+    )
+
+    assert result.failure?
+    assert_equal "Bearer access token is inactive", result.error
+  end
+
+  test "rejects access tokens when the API client recording is trashed" do
+    @credential.api_client.recording.update_column(:trashed_at, Time.current)
+
+    result = RecordingStudioApi::Services::AuthenticateOauthAccessToken.call(
+      authorization_header: "Bearer #{@access_token}"
+    )
+
+    assert result.failure?
+    assert_equal "Bearer access token is inactive", result.error
+  end
+
+  test "rejects access tokens when the root recording is trashed" do
+    @root_recording.update_column(:trashed_at, Time.current)
+
+    result = RecordingStudioApi::Services::AuthenticateOauthAccessToken.call(
+      authorization_header: "Bearer #{@access_token}"
+    )
+
+    assert result.failure?
+    assert_equal "Bearer access token scope is invalid", result.error
+  end
+
   test "rejects access tokens with trashed token recordings" do
     access_token = RecordingStudioApi::ApiAccessToken.find_by(
       token_digest: RecordingStudioApi::OauthAccessToken.digest(@access_token)

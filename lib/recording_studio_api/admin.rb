@@ -16,6 +16,7 @@ module RecordingStudioApi
       recording_studio_api/admin/queries/api_access_clients_query
       recording_studio_api/admin/queries/admin_api_credentials_query
       recording_studio_api/admin/queries/admin_api_endpoint_failures_query
+      recording_studio_api/admin/navigation_url_helpers
       recording_studio_api/admin/api_requests_last_four_weeks_widget
       recording_studio_api/admin/most_used_api_keys_widget
       recording_studio_api/admin/admin_api_requests_last_four_weeks_widget

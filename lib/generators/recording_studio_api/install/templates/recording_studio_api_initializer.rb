@@ -38,6 +38,8 @@ RecordingStudioApi.configure do |config|
   # Optional: log API requests to the API request log database
   # config.api_request_logging_enabled = true
   # Use "filtered_params" only when request parameter retention is required.
+  # Only top-level keys in this allowlist are retained; Rails filter_parameters still applies.
+  # config.api_request_log_allowed_param_keys = %w[grant_type resource sort order limit]
   # config.api_request_logging_payload_mode = "metadata_only"
   # Raw request details are retained for 30 days; daily aggregates are retained indefinitely.
   # config.api_request_log_retention_days = 30

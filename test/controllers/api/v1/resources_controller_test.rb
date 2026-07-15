@@ -94,6 +94,18 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_response :unauthorized
   end
 
+  test "rejects API requests after the parent credential is revoked" do
+    access_token = RecordingStudioApi::ApiAccessToken.find_by!(
+      token_digest: RecordingStudioApi::OauthAccessToken.digest(@access_token)
+    )
+    access_token.credential.revoke!
+
+    get "/recording_studio_api/api/v1/pages", headers: authorization_headers
+
+    assert_response :unauthorized
+    assert_equal "Bearer access token is inactive", JSON.parse(response.body).fetch("error")
+  end
+
   test "pre auth api limiter can throttle invalid bearer traffic before authentication" do
     RecordingStudioApi.configuration.rate_limit_api_pre_auth_enabled = true
     RecordingStudioApi::Concerns::RateLimiting.decider = lambda do |controller|
@@ -234,6 +246,24 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
 
   test "returns unprocessable entity for invalid pagination token" do
     get "/recording_studio_api/api/v1/pages", params: { pagination_token: "not-a-valid-token" }, headers: authorization_headers
+
+    assert_response :unprocessable_entity
+    assert_equal "Invalid pagination token", JSON.parse(response.body).fetch("error")
+  end
+
+  test "returns unprocessable entity for a tampered pagination token" do
+    3.times { |index| create_page_recording(root_recording: @root_recording, page_title: "Page #{index}") }
+
+    get "/recording_studio_api/api/v1/pages", params: { limit: 2 }, headers: authorization_headers
+
+    assert_response :success
+    pagination_token = JSON.parse(response.body).dig("meta", "next_pagination_token")
+    refute_nil pagination_token
+
+    tampered_token = pagination_token.dup
+    tampered_token[-1] = tampered_token.end_with?("a") ? "b" : "a"
+
+    get "/recording_studio_api/api/v1/pages", params: { limit: 2, pagination_token: tampered_token }, headers: authorization_headers
 
     assert_response :unprocessable_entity
     assert_equal "Invalid pagination token", JSON.parse(response.body).fetch("error")
@@ -636,6 +666,28 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_equal trashed_page.id, JSON.parse(response.body).fetch("data").fetch("id")
+  end
+
+  test "hides out-of-scope trashed resources from every trash endpoint" do
+    other_root_recording, = create_access_recording_for(user: create_user(email: "outside-trash@example.com"))
+    hidden_page = create_page_recording(root_recording: other_root_recording)
+    hidden_page.update_column(:trashed_at, Time.current)
+
+    get "/recording_studio_api/api/v1/trash", headers: authorization_headers
+
+    assert_response :success
+    ids = JSON.parse(response.body).fetch("data").map { |row| row.fetch("id") }
+    assert_not_includes ids, hidden_page.id
+
+    get "/recording_studio_api/api/v1/trash/#{hidden_page.id}", headers: authorization_headers
+    assert_response :not_found
+
+    post "/recording_studio_api/api/v1/trash/#{hidden_page.id}/restore", headers: authorization_headers
+    assert_response :not_found
+
+    delete "/recording_studio_api/api/v1/trash/#{hidden_page.id}", headers: authorization_headers
+    assert_response :not_found
+    assert_not_nil RecordingStudio::Recording.unscoped.find_by(id: hidden_page.id)
   end
 
   test "restores and permanently deletes trashed resources" do
