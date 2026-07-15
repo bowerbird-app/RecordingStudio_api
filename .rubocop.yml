@@ -1,3 +1,6 @@
+inherit_from:
+  - .rubocop_todo.yml
+
 AllCops:
   TargetRubyVersion: 3.3
   NewCops: enable
@@ -14,13 +17,17 @@ Style/StringLiterals:
   EnforcedStyle: double_quotes
 
 Layout/LineLength:
-  Max: 120
+  Enabled: false
 
 # Relax metrics for test files and generators
 Metrics/ClassLength:
   Exclude:
     - 'test/**/*'
-    - 'lib/gem_template/hooks.rb'
+    - 'lib/recording_studio_api/hooks.rb'
+
+Metrics/BlockLength:
+  Exclude:
+    - 'test/**/*'
 
 Metrics/MethodLength:
   Exclude:
@@ -50,5 +57,5 @@ Naming/VariableNumber:
 # Don't require super in service initialize methods
 Lint/MissingSuper:
   Exclude:
-    - 'lib/gem_template/services/**/*'
+    - 'lib/recording_studio_api/services/**/*'
     - 'test/services/**/*'

@@ -2,7 +2,7 @@
 
 require "test_helper"
 
-module GemTemplate
+module RecordingStudioApi
   module Services
     class ExampleServiceTest < Minitest::Test
       def test_success_with_valid_name

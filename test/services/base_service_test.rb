@@ -2,7 +2,7 @@
 
 require "test_helper"
 
-module GemTemplate
+module RecordingStudioApi
   module Services
     class BaseServiceTest < Minitest::Test
       # Test subclass for testing BaseService
@@ -65,7 +65,7 @@ module GemTemplate
         result = TestService.call(should_succeed: true, value: { data: 123 })
 
         assert result.success?
-        refute result.failure?
+        assert_not result.failure?
         assert_equal({ data: 123 }, result.value)
         assert_nil result.error
       end
@@ -73,7 +73,7 @@ module GemTemplate
       def test_failure_result
         result = TestService.call(should_succeed: false, error: "Something went wrong")
 
-        refute result.success?
+        assert_not result.success?
         assert result.failure?
         assert_nil result.value
         assert_equal "Something went wrong", result.error
@@ -116,7 +116,7 @@ module GemTemplate
           result.on_success { called = true }
         end
 
-        refute called, "on_success should not be called on failure"
+        assert_not called, "on_success should not be called on failure"
       end
 
       def test_on_failure_not_called_on_success
@@ -126,7 +126,7 @@ module GemTemplate
           result.on_failure { called = true }
         end
 
-        refute called, "on_failure should not be called on success"
+        assert_not called, "on_failure should not be called on success"
       end
 
       def test_value_bang_returns_value_on_success
@@ -149,7 +149,7 @@ module GemTemplate
           .on_failure { failure_called = true }
 
         assert success_called
-        refute failure_called
+        assert_not failure_called
       end
 
       def test_perform_not_implemented_raises
@@ -192,10 +192,10 @@ module GemTemplate
         before_calls = []
         after_calls = []
 
-        GemTemplate.configuration.hooks.before_service do |service_class, args|
+        RecordingStudioApi.configuration.hooks.before_service do |service_class, args|
           before_calls << [service_class, args]
         end
-        GemTemplate.configuration.hooks.after_service do |service_class, result|
+        RecordingStudioApi.configuration.hooks.after_service do |service_class, result|
           after_calls << [service_class, result.value]
         end
 
@@ -204,12 +204,12 @@ module GemTemplate
         assert_equal [[HookedService, { input: "hello" }]], before_calls
         assert_equal [[HookedService, "HELLO"]], after_calls
       ensure
-        GemTemplate.configuration.hooks.clear!
+        RecordingStudioApi.configuration.hooks.clear!
       end
 
       def test_around_hook_wraps_service_execution
         events = []
-        GemTemplate.configuration.hooks.around_service do |service, block|
+        RecordingStudioApi.configuration.hooks.around_service do |service, block|
           events << [:around, service.class]
           result = block.call
           events << [:result, result.value]
@@ -221,13 +221,13 @@ module GemTemplate
         assert_equal "HOOKED", result.value
         assert_equal [[:around, HookedService], [:result, "HOOKED"]], events
       ensure
-        GemTemplate.configuration.hooks.clear!
+        RecordingStudioApi.configuration.hooks.clear!
       end
 
       def test_hooks_are_skipped_when_configuration_has_no_hooks
         configuration = Object.new
 
-        GemTemplate.stub(:configuration, configuration) do
+        RecordingStudioApi.stub(:configuration, configuration) do
           result = HookedService.call(input: "plain")
 
           assert result.success?
@@ -237,7 +237,7 @@ module GemTemplate
 
       def test_default_service_args_are_empty_hash
         received_args = nil
-        GemTemplate.configuration.hooks.before_service do |_service_class, args|
+        RecordingStudioApi.configuration.hooks.before_service do |_service_class, args|
           received_args = args
         end
 
@@ -245,7 +245,7 @@ module GemTemplate
 
         assert_equal({}, received_args)
       ensure
-        GemTemplate.configuration.hooks.clear!
+        RecordingStudioApi.configuration.hooks.clear!
       end
     end
   end

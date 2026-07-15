@@ -1,0 +1,128 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <% recording_studio_page_nav(
+    title: "API key",
+    page_nav_anchor_url: page_nav_close_url
+  ) %>
+
+  <%# Revoked badge removed per design: do not show warning button for revoked keys %>
+
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "API key",
+    variant: :h1
+  ) %>
+
+  <div class="flex flex-wrap gap-3">
+    <% if @can_manage_access_request %>
+      <%= render FlatPack::Button::Component.new(
+        text: "Edit",
+        style: :primary,
+        size: :md,
+        url: edit_api_client_path(@api_client, page_nav_close_param)
+      ) %>
+    <% end %>
+  </div>
+
+  <% api_key_value = @latest_credential&.oauth_client_id || "Unknown" %>
+  <% expiry_value = if @latest_credential.nil?
+                      "No credentials"
+                    elsif @latest_credential.revoked_at.present?
+                      "Expired"
+                    elsif @latest_credential.expires_at.present? && @latest_credential.expires_at.past?
+                      "Expired"
+                    elsif @latest_credential.expires_at.blank?
+                      "Never"
+                    else
+                      render FlatPack::Timestamp::Component.new(timestamp: @latest_credential.expires_at, fallback_text: "Never")
+                    end %>
+  <% access_point_recording = if @access_recording&.parent_recording.present?
+                                @access_recording.parent_recording
+                              else
+                                @access_recording&.root_recording
+                              end %>
+  <% access_point_label = access_point_recording.present? ? recording_label(access_point_recording) : "Unknown" %>
+  <% access_point_value = render FlatPack::Tooltip::Component.new(
+       text: "This API key will have access to all items below this point."
+     ) do %>
+    <span class="underline decoration-dotted underline-offset-2"><%= access_point_label %></span>
+  <% end %>
+  <% role_label = @access_recording&.recordable&.try(:role).to_s.humanize.presence || "Unknown" %>
+  <% role_value = render FlatPack::Tooltip::Component.new(
+       text: "This API key will have #{role_label} access."
+     ) do %>
+    <span class="underline decoration-dotted underline-offset-2"><%= role_label %></span>
+  <% end %>
+  <% status_value = begin
+                       if @latest_credential.nil?
+                         text = "No credentials"
+                         style = :default
+                       elsif @latest_credential.revoked_at.present?
+                         text = "Revoked"
+                         style = :danger
+                       else
+                         text = "Active"
+                         style = :success
+                       end
+
+                       render FlatPack::Badge::Component.new(
+                         text: text,
+                         style: style,
+                         size: :md
+                       )
+                     end %>
+  <% last_used_value = if @latest_credential&.last_used_at.present?
+                         render FlatPack::Timestamp::Component.new(timestamp: @latest_credential.last_used_at, fallback_text: "Never used")
+                       else
+                         "Never used"
+                       end %>
+  <% detail_rows = [
+    { field: "Name", value: @api_client.name },
+    { field: "API key", value: api_key_value },
+    { field: "API secret", value: "Hidden after creation" },
+    { field: "Access point", value: access_point_value },
+    { field: "Role", value: role_value },
+    { field: "Last used", value: last_used_value },
+    { field: "Status", value: status_value },
+    { field: "Expiry", value: expiry_value }
+  ] %>
+
+  <%= render FlatPack::Table::Component.new(data: detail_rows) do |table| %>
+    <% table.column(title: "Field", html: ->(row) { row.fetch(:field) }) %>
+    <% table.column(title: "Value", html: ->(row) { row.fetch(:value) }) %>
+  <% end %>
+
+  <% if @rotated_credential_rows.any? %>
+    <% rotated_key_status = lambda do |row|
+         render FlatPack::Badge::Component.new(text: row.fetch(:status_text), style: row.fetch(:status_style), size: :sm)
+       end %>
+    <% rotated_key_timestamp = lambda do |timestamp, fallback_text|
+         if timestamp.present?
+           render FlatPack::Timestamp::Component.new(timestamp: timestamp, fallback_text: fallback_text)
+         else
+           fallback_text
+         end
+       end %>
+    <% rotated_key_expiry = lambda do |row|
+         if row.fetch(:expires_at).present?
+           render FlatPack::Timestamp::Component.new(timestamp: row.fetch(:expires_at), fallback_text: row.fetch(:expires_text))
+         else
+           row.fetch(:expires_text)
+         end
+       end %>
+
+    <div class="space-y-3">
+      <%= render FlatPack::SectionTitle::Component.new(
+        title: "Rotated keys",
+        subtitle: "API keys that were rotated and revoked"
+      ) %>
+
+      <%= render FlatPack::Table::Component.new(data: @rotated_credential_rows) do |table| %>
+        <% table.column(title: "API key", html: ->(row) { row.fetch(:api_key) }) %>
+        <% table.column(title: "Status", html: ->(row) { rotated_key_status.call(row) }) %>
+        <% table.column(title: "Last used", html: ->(row) { rotated_key_timestamp.call(row.fetch(:last_used_at), "Never used") }) %>
+        <% table.column(title: "Revoked", html: ->(row) { rotated_key_timestamp.call(row.fetch(:revoked_at), "Not revoked") }) %>
+        <% table.column(title: "Expiry", html: ->(row) { rotated_key_expiry.call(row) }) %>
+      <% end %>
+    </div>
+  <% end %>
+
+</div>

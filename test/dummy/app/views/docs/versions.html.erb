@@ -1,0 +1,161 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "Versions",
+    subtitle: "How public API versions map routes, docs, and contribution contract versions.",
+    variant: :h1
+  ) %>
+
+  <%= render FlatPack::SectionTitle::Component.new(
+    title: "Configuration",
+    subtitle: "Define supported versions and the default in your initializer.",
+    anchor_link: true,
+  ) %>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    language: :ruby,
+    code: <<~'CODE'
+      RecordingStudioApi.configure do |config|
+        config.api_versions = %w[v1 v2]
+        config.default_api_version = "v2"
+
+        config.version "v1" do |api|
+          api.use :moveable, "~> 1.23"
+        end
+
+        config.version "v2" do |api|
+          api.use :moveable, "~> 2.0"
+        end
+      end
+    CODE
+  ) %>
+
+  <%= render FlatPack::SectionTitle::Component.new(
+    title: "Contribution Contracts",
+    subtitle: "Addon features publish their own API contract versions; host apps decide which contract each public API version exposes.",
+    anchor_link: true,
+  ) %>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    language: :ruby,
+    code: <<~'CODE'
+      RecordingStudioApi.register_capability_action(
+        :move,
+        capability: :movable,
+        version: "1.23.4",
+        version_notes: ["Initial move contract", "Requires parent_id"],
+        deprecation: {
+          deprecated: true,
+          removal_date: "2026-12-31",
+          reason: "Replaced by move v2 with structured conflict errors"
+        },
+        handler: MoveRecordingV1
+      )
+
+      RecordingStudioApi.register_capability_action(
+        :move,
+        capability: :movable,
+        version: "2.0.0",
+        version_notes: ["Adds destination validation", "Returns structured conflict errors"],
+        handler: MoveRecordingV2
+      )
+    CODE
+  ) %>
+
+  <%= render FlatPack::Card::Component.new(style: :default) do %>
+    <%= render FlatPack::List::Component.new(divider: true) do %>
+      <%= render FlatPack::List::Item.new(icon: :queue_list) do %>
+        <span><code>config.version "v1"</code> defines the public API profile for v1 clients.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :adjustments_horizontal) do %>
+        <span><code>api.use :moveable, "~&gt; 1.23"</code> selects the newest compatible move contribution for that profile.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :sparkles) do %>
+        <span><code>api.use :moveable</code> leaves that contribution unconstrained and resolves to the latest registered contract.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :archive_box) do %>
+        <span>Contribution versions are API contract versions, not gem package versions.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :document_text) do %>
+        <span><code>version_notes</code> is optional metadata for explaining what changed in that contribution version. It does not affect matching or routing.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :clock) do %>
+        <span><code>deprecation</code> is optional grouped metadata for warning that a contribution version is on the way out, including <code>deprecated</code>, <code>removal_date</code>, and <code>reason</code>.</span>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <%= render FlatPack::SectionTitle::Component.new(
+    title: "Resolution and Validation",
+    subtitle: "The registry rejects malformed contracts early, then resolves the newest compatible contribution per public API version.",
+    anchor_link: true,
+  ) %>
+
+  <%= render FlatPack::Card::Component.new(style: :default) do %>
+    <%= render FlatPack::List::Component.new(divider: true) do %>
+      <%= render FlatPack::List::Item.new(icon: :check_badge) do %>
+        <span>Contribution versions use RubyGems-compatible <code>Gem::Version</code> strings such as <code>1.23.4</code>, <code>2.0.0.pre</code>, or <code>2026.6.3</code>.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :x_circle) do %>
+        <span>Malformed contribution versions, including blank values, <code>v1.2.3</code>, or <code>1..2</code>, raise <code>RecordingStudioApi::ConfigurationError</code> during registration.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :adjustments_horizontal) do %>
+        <span>Profile constraints use <code>Gem::Requirement</code> syntax, for example <code>~&gt; 1.23</code>, <code>&gt;= 2.0</code>, or no constraint to select the latest registered contract.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :exclamation_triangle) do %>
+        <span>Invalid profile constraints raise <code>RecordingStudioApi::ConfigurationError</code> when <code>api.use</code> is configured.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :calendar_days) do %>
+        <span>Deprecation removal dates are metadata only and must use ISO <code>YYYY-MM-DD</code> format when supplied.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :square_2_stack) do %>
+        <span>The same action name can be registered more than once only when each registration has a different contribution version.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :no_symbol) do %>
+        <span>A duplicate action name plus duplicate contribution version is rejected before it enters the registry.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :funnel) do %>
+        <span>For each request and OpenAPI document, the resolver filters incompatible contribution versions out, then selects the newest matching version.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :eye_slash) do %>
+        <span>If no registered contribution matches a profile, that action is omitted for that public API version instead of falling back to an incompatible contract.</span>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <%= render FlatPack::SectionTitle::Component.new(
+    title: "Concurrent Routing",
+    subtitle: "V1 and V2 routes can run side-by-side while each resolves its own contribution contracts.",
+    anchor_link: true,
+  ) %>
+
+  <%= render FlatPack::Card::Component.new(style: :default) do %>
+    <%= render FlatPack::List::Component.new(divider: true) do %>
+      <%= render FlatPack::List::Item.new(icon: :arrow_path_rounded_square) do %>
+        <span><code>/recording_studio_api/api/v1/*</code> keeps legacy integrations working.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :arrow_path_rounded_square) do %>
+        <span><code>/recording_studio_api/api/v2/*</code> is available at the same time for newer clients.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :document_text) do %>
+        <span>Additional versions can be introduced without removing older routes or older contribution contracts immediately.</span>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <%= render FlatPack::SectionTitle::Component.new(
+    title: "Versioned Scalar",
+    subtitle: "Each docs URL points to a matching OpenAPI document.",
+    anchor_link: true,
+  ) %>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    language: :text,
+    code: <<~'CODE'
+      /APIdocs            -> redirects to /APIdocs/<default>
+      /APIdocs/v1         -> Scalar UI for v1
+      /APIdocs/v2         -> Scalar UI for v2
+      /APIdocs/v1/openapi.json
+      /APIdocs/v2/openapi.json
+    CODE
+  ) %>
+</div>

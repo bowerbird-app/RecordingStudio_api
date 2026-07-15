@@ -1,19 +1,72 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
   <%= render FlatPack::PageTitle::Component.new(
     title: "Install",
-    subtitle: "Host-app setup for the mounted GemTemplate engine and its sample migrations.",
+    subtitle: "Mount the renamed engine, copy migrations, and wire the host-app validation surface.",
     variant: :h1
   ) %>
 
   <%= render FlatPack::SectionTitle::Component.new(
-    title: "Step 1",
-    subtitle: "Provide one section title for each step",
+    title: "1. Add the gem",
+    subtitle: "Point the host app at the renamed engine and make sure FlatPack is already available for shared UI components.",
+    anchor_link: true,
   ) %>
 
   <%= render FlatPack::CodeBlock::Component.new(
     language: :bash,
     code: <<~CODE
-      # Put the step instruction here.
+      bundle add recording_studio_api --path ../RecordingStudio_api
+      bundle install
+    CODE
+  ) %>
+
+  <p class="text-sm text-(--surface-muted-content-color)">
+    The dummy-app review surface expects the host app to load the shared <code>flat_pack</code> gem and styles before these pages render.
+  </p>
+
+  <%= render FlatPack::SectionTitle::Component.new(
+    title: "2. Install the engine",
+    subtitle: "Mount the engine and add the starter initializer and optional YAML config.",
+    anchor_link: true,
+  ) %>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    language: :bash,
+    code: <<~CODE
+      bin/rails generate recording_studio_api:install
+      bin/rails generate recording_studio_api:migrations
+    CODE
+  ) %>
+
+  <%= render FlatPack::SectionTitle::Component.new(
+    title: "3. Prepare the host app",
+    subtitle: "Apply migrations and rebuild Tailwind when the host app uses the FlatPack UI shell.",
+    anchor_link: true,
+  ) %>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    language: :bash,
+    code: <<~CODE
+      bin/rails db:migrate
+      bin/rails tailwindcss:build
+    CODE
+  ) %>
+
+  <%= render FlatPack::SectionTitle::Component.new(
+    title: "4. Wire API access",
+    subtitle: "Provision credentials from a Recording Studio access recording, then authorize inside each capability handler.",
+    anchor_link: true,
+  ) %>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    language: :ruby,
+    code: <<~'CODE'
+      result = RecordingStudioApi::Services::ProvisionApiClient.call(
+        access_recording: access_recording,
+        name: "Primary OAuth client"
+      )
+
+      # Later, inside a custom capability handler:
+      context.access_grant.authorize!(recording: context.recording, role: :edit)
     CODE
   ) %>
 </div>

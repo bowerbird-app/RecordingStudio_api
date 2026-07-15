@@ -13,4 +13,19 @@ export PORT="${PORT:-3000}"
 export RUBY_DEBUG_OPEN="true"
 export RUBY_DEBUG_LAZY="true"
 
+# Clear a stale server PID so `bin/dev` can restart cleanly after crashes.
+if [ -f tmp/pids/server.pid ]; then
+  pid="$(cat tmp/pids/server.pid 2>/dev/null)"
+
+  if [ -z "$pid" ] || ! kill -0 "$pid" 2>/dev/null; then
+    rm -f tmp/pids/server.pid
+  else
+    stat="$(ps -o stat= -p "$pid" 2>/dev/null | tr -d '[:space:]')"
+
+    if [ -z "$stat" ] || printf '%s' "$stat" | grep -q '^Z'; then
+      rm -f tmp/pids/server.pid
+    fi
+  fi
+fi
+
 exec foreman start -f Procfile.dev "$@"

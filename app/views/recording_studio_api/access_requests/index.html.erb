@@ -1,0 +1,82 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-6">
+  <% recording_studio_page_nav(
+    title: "API keys",
+    page_nav_anchor_url: page_nav_close_url
+  ) %>
+
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "API keys",
+    subtitle: @access_list_subtitle,
+    variant: :h1
+  ) %>
+
+  <% if @can_manage_access_requests %>
+    <div>
+      <%= render FlatPack::Button::Component.new(
+        text: "New",
+        style: :primary,
+        size: :md,
+        url: new_api_client_path(page_nav_close_param)
+      ) %>
+    </div>
+
+    <% if @total_api_keys.to_i.positive? %>
+      <%= render FlatPack::Card::Component.new(style: :default) do %>
+          <div class="space-y-4">
+            <div class="flex items-start justify-between gap-3">
+              <%= render FlatPack::SectionTitle::Component.new(
+                title: "API requests",
+                subtitle: "Last 30 days"
+              ) %>
+
+              <%= render FlatPack::Button::Component.new(
+                text: "Full screen",
+                style: :default,
+                size: :sm,
+                url: requests_chart_api_clients_path(requests_chart_link_params)
+              ) %>
+            </div>
+
+            <%= render FlatPack::Chart::Component.new(
+              card: false,
+              type: :line,
+              height: 220,
+              series: [
+                { name: "API requests", data: @requests_chart_series }
+              ],
+              options: {
+                stroke: {
+                  curve: "smooth",
+                  width: 3
+                },
+                xaxis: {
+                  categories: @requests_chart_categories,
+                  labels: {
+                    rotate: 0,
+                    hideOverlappingLabels: true
+                  }
+                },
+                yaxis: {
+                  min: 0,
+                  forceNiceScale: true
+                },
+                dataLabels: {
+                  enabled: false
+                }
+              }
+            ) %>
+          </div>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <% if @api_access_rows.any? %>
+    <%= render partial: "table_content" %>
+  <% else %>
+    <%= render FlatPack::EmptyState::Component.new(
+      title: "No API access given yet",
+      description: @can_manage_access_requests ? "Create API access from the demo home page to populate this list." : "You can view API access details, but you do not have permission to create new API access.",
+      icon: :inbox
+    ) %>
+  <% end %>
+</div>

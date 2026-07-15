@@ -1,0 +1,110 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "Add API capability",
+    subtitle: "Register a capability-backed action so it appears on matching API resources.",
+    variant: :h1
+  ) %>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    language: :ruby,
+    code: <<~'CODE'
+      # config/initializers/recording_studio_api.rb
+      RecordingStudioApi.register_capability_action(
+        :publish,
+        capability: :publishable,
+        version: "1.0.0",
+        version_notes: [
+          "Initial publish contract",
+          "Notifies followers by default"
+        ],
+        deprecation: {
+          deprecated: true,
+          removal_date: "2026-12-31",
+          reason: "Use publish v2 for structured validation errors"
+        },
+        http_verb: :post,
+        scope: :member,
+        # Handles the action logic and returns the value serialized in the API response.
+        handler: MyAddon::Api::Actions::PublishRecording,
+        serializer: RecordingStudioApi::Serializers::RecordingSerializer,
+        input_contract: {
+          reject_unknown: true,
+          fields: {
+            audience: {
+              type: :string,
+              required: true,
+              enum: %w[internal public],
+              description: "Who this publish event is intended for."
+            },
+            notify_followers: {
+              type: :boolean,
+              required: false,
+              default: true,
+              description: "Notify followers after publishing."
+            }
+          }
+        },
+        openapi: {
+          summary: "Publish recording",
+          description: "Publishes the recording and returns the updated payload.",
+          tags: ["Publishing"],
+          responses: {
+            "200" => {
+              description: "Recording published successfully."
+            },
+            "422" => {
+              description: "Validation failed while publishing."
+            }
+          }
+        }
+      )
+    CODE
+  ) %>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    language: :ruby,
+    code: <<~'CODE'
+      # app/services/my_addon/api/actions/publish_recording.rb
+      module MyAddon
+        module Api
+          module Actions
+            class PublishRecording
+              def self.call(context)
+                recording = context.recording
+                recordable = recording.recordable
+
+                context.access_grant.authorize!(recording: recording, role: :edit)
+
+                recordable.update!(published_at: Time.current)
+
+                # Return the recording so the registered serializer can render it.
+                recording
+              end
+            end
+          end
+        end
+      end
+    CODE
+  ) %>
+
+  <%= render FlatPack::SectionTitle::Component.new(
+    title: "Authorization contract",
+    subtitle: "The API validates the token and passes the access grant; the capability decides what access is required.",
+    anchor_link: true,
+  ) %>
+
+  <%= render FlatPack::Card::Component.new(style: :default) do %>
+    <%= render FlatPack::List::Component.new(divider: true) do %>
+      <%= render FlatPack::List::Item.new(icon: :key) do %>
+        <span>The API core authenticates the credential and resolves <code>context.access_grant</code>.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :shield_check) do %>
+        <span>The capability handler authorizes with <code>context.access_grant.authorize!</code> or with direct Recording Studio Accessible checks for complex multi-recording actions.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :route) do %>
+        <span>Handlers that move, copy, export, or share data should check every source and destination recording they touch.</span>
+      <% end %>
+    <% end %>
+  <% end %>
+
+</div>

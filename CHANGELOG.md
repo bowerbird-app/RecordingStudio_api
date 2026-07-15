@@ -7,24 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.1] - 2026-04-28
-
-### Changed
-- Bumped the dummy app FlatPack dependency from `0.1.2` to `0.1.33` and pinned it by tag in `test/dummy/Gemfile`
-
-## [0.1.0] - 2025-12-04
+## [0.1.0] - 2026-07-15
 
 ### Added
-- Initial release
-- Rails mountable engine structure
-- PostgreSQL with UUID primary keys support
-- TailwindCSS v4 integration
-- GitHub Codespaces devcontainer configuration
-- Docker Compose setup with PostgreSQL and Redis
-- Install generator for host applications
-- Comprehensive README and documentation
-- Basic test suite with Minitest
+- OAuth2 `client_credentials` authentication with Recording Studio-backed API clients, credentials, and access tokens
+- OAuth2 Authorization Code with PKCE, refresh-token rotation, and token revocation for public mobile clients
+- Capability-backed API action registration, versioned contribution contracts, and access-grant authorization
+- Recordable resource lookup, nested resource routing, structured action input contracts, and OpenAPI documentation
+- Configurable API version profiles and runtime dispatch to the newest compatible contribution contract
+- Configurable pre-auth IP rate limiting for `/api/v1` requests
+- FlatPack-based administration screens for API clients, OAuth clients, credentials, access tokens, grants, and request logs
+- Install generator, Rails engine configuration, hooks, and a Minitest-covered dummy application integration
 
-[Unreleased]: https://github.com/bowerbird-app/gem_template/compare/v0.1.1...HEAD
-[0.1.1]: https://github.com/bowerbird-app/gem_template/releases/tag/v0.1.1
-[0.1.0]: https://github.com/bowerbird-app/gem_template/releases/tag/v0.1.0
+### Changed
+- Renamed live engine surfaces from `gem_template` to `recording_studio_api`
+- Replaced placeholder documentation with the RecordingStudio API architecture and integration guide
+
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/bowerbird-app/RecordingStudio_api/releases/tag/v0.1.0

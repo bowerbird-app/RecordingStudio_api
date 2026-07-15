@@ -1,0 +1,21 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "Admin",
+    variant: :h1
+  ) %>
+
+  <%= render FlatPack::Card::Component.new(style: :default) do %>
+    <div class="space-y-4">
+      <p class="text-sm text-(--surface-muted-content-color)">
+        Open the gem-provided Admin API dashboard to manage admin-only API views from the current admin root.
+      </p>
+
+      <%= render FlatPack::Button::Component.new(
+        text: "Open Admin API",
+        style: :primary,
+        size: :md,
+        url: ["/admin/api", { anchor_url: main_app.root_path }.to_query].join("?")
+      ) %>
+    </div>
+  <% end %>
+</div>

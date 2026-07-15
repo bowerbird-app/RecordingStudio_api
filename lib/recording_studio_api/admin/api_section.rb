@@ -1,0 +1,36 @@
+# frozen_string_literal: true
+
+module RecordingStudioApi
+  module Admin
+    class ApiSection < ::RecordingStudioAdmin::Section
+      key "api"
+      icon :key
+      title "API"
+      subtitle "Manage API keys and inspect request usage for this workspace."
+
+      link :new_client,
+           text: "Create API key",
+           url: lambda { |context|
+             context.controller.recording_studio_api.new_api_client_path(
+               root_recording_id: context.root_recording&.id,
+               close_url: NavigationUrlHelpers.admin_screen_url(context, "api_keys"),
+               anchor_url: context.params[:anchor_url] || context.params["anchor_url"]
+             )
+           },
+           style: :primary
+
+      link :clients,
+           text: "API keys",
+           url: ->(context) { NavigationUrlHelpers.admin_screen_url(context, "api_keys") },
+           style: :default
+
+      link :requests,
+           text: "API requests",
+           url: ->(context) { NavigationUrlHelpers.admin_screen_url(context, "api_requests") },
+           style: :secondary
+
+      widget "widgets.recording_studio_api.requests_last_four_weeks"
+      widget "widgets.recording_studio_api.most_used_keys"
+    end
+  end
+end

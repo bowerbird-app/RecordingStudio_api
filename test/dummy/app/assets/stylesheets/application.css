@@ -8,3 +8,24 @@
  *
  * Consider organizing styles into separate files for maintainability.
  */
+
+[data-controller~="flat-pack--chart"],
+[data-controller~="flat-pack--chart"] .apexcharts-canvas,
+[data-controller~="flat-pack--chart"] .apexcharts-svg {
+	touch-action: pan-y pinch-zoom !important;
+}
+
+[data-controller~="flat-pack--chart"] .apexcharts-gridlines-horizontal {
+	display: block !important;
+}
+
+[data-controller~="flat-pack--chart"] .apexcharts-gridlines-horizontal .apexcharts-gridline {
+	display: none;
+}
+
+[data-controller~="flat-pack--chart"] .apexcharts-gridlines-horizontal .apexcharts-gridline:last-child {
+	display: block;
+	stroke: var(--surface-border-color) !important;
+	stroke-width: 1 !important;
+	stroke-dasharray: 0 !important;
+}

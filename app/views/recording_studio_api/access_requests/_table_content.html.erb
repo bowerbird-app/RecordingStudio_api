@@ -1,0 +1,31 @@
+<div>
+  <%= render FlatPack::Table::Component.new(
+    data: @api_access_rows,
+    tbody_data: { pagination_content: true }
+  ) do |table| %>
+    <% table.column(
+      title: "Name",
+      html: ->(row) { link_to(row.fetch(:name), api_client_path(row.fetch(:id), page_nav_close_param), class: "text-(--surface-content-color) underline decoration-(--surface-border-color) underline-offset-2 hover:decoration-(--surface-content-color)") }
+    ) %>
+    <% table.column(title: "API key", html: ->(row) { row.fetch(:api_key) }) %>
+    <% table.column(title: "Access point", html: ->(row) { row.fetch(:access_point) }) %>
+    <% table.column(title: "Role", html: ->(row) { row.fetch(:role) }) %>
+    <% table.column(title: "Expires", html: lambda { |row|
+         expires_at = row.fetch(:expires_at)
+         expires_text = row.fetch(:expires_text)
+
+         if expires_at.present?
+           render FlatPack::Timestamp::Component.new(timestamp: expires_at, fallback_text: expires_text)
+         else
+           expires_text
+         end
+       }) %>
+  <% end %>
+
+  <%= render FlatPack::Pagination::Component.new(
+    mode: :infinite,
+    infinite_url: next_api_access_page_url,
+    has_more: @api_access_has_more,
+    loading_variant: :table
+  ) %>
+</div>

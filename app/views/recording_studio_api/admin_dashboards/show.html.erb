@@ -1,0 +1,180 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <%= render FlatPack::PageTitle::Component.new(
+    title: @admin_api.name,
+    subtitle: "Manage API access",
+    variant: :h1
+  ) %>
+
+  <div class="flex flex-wrap items-center gap-3">
+    <%= render FlatPack::Button::Component.new(
+      text: "Settings",
+      style: :default,
+      size: :md,
+      url: RecordingStudioApi.admin_settings_path(controller: self, close_url: request.fullpath)
+    ) %>
+
+    <%= render FlatPack::Button::Component.new(
+      text: "Rate limiting",
+      style: :default,
+      size: :md,
+      url: RecordingStudioApi.admin_rate_limiting_path(controller: self, close_url: request.fullpath)
+    ) %>
+
+    <%= render FlatPack::Button::Component.new(
+      text: "Logs",
+      style: :default,
+      size: :md,
+      url: RecordingStudioApi.admin_logs_path(controller: self, close_url: request.fullpath)
+    ) %>
+  </div>
+
+  <%= render FlatPack::Grid::Component.new(cols: 2, class: "items-start gap-6") do %>
+    <%= render FlatPack::Card::Component.new(style: :default, class: "h-full") do %>
+      <div class="flex h-full flex-col gap-4">
+        <div class="flex items-start justify-between gap-4">
+          <div class="space-y-1">
+            <h3 class="text-lg font-semibold leading-tight text-slate-900">Requests last 24 hours</h3>
+            <p class="text-sm text-slate-500">API requests</p>
+          </div>
+
+          <%= render FlatPack::Button::Component.new(
+            text: "Full screen",
+            style: :default,
+            size: :sm,
+            url: @last_24_hours_requests_path
+          ) %>
+        </div>
+
+        <turbo-frame
+          id="admin-api-requests-last-24-hours-frame"
+          src="<%= RecordingStudioApi.admin_requests_path(
+            controller: self,
+            close_url: request.fullpath,
+            dashboard_embed: "1",
+            show_summary: "1",
+            range: "last_24_hours",
+            group_by: "hour"
+          ) %>">
+          <div class="h-[260px]"></div>
+        </turbo-frame>
+      </div>
+    <% end %>
+
+    <%= render FlatPack::Card::Component.new(style: :default, class: "h-full") do %>
+      <div class="flex h-full flex-col gap-4">
+        <div class="flex items-start justify-between gap-4">
+          <div class="space-y-1">
+            <h3 class="text-lg font-semibold leading-tight text-slate-900">Requests last 30 days</h3>
+            <p class="text-sm text-slate-500">API requests</p>
+          </div>
+
+          <%= render FlatPack::Button::Component.new(
+            text: "Full screen",
+            style: :default,
+            size: :sm,
+            url: @last_30_days_requests_path
+          ) %>
+        </div>
+
+        <turbo-frame
+          id="admin-api-requests-last-30-days-frame"
+          src="<%= RecordingStudioApi.admin_requests_path(
+            controller: self,
+            close_url: request.fullpath,
+            dashboard_embed: "1",
+            start_date: 29.days.ago.to_date.iso8601,
+            end_date: Date.current.iso8601
+          ) %>">
+          <div class="h-[260px]"></div>
+        </turbo-frame>
+      </div>
+    <% end %>
+  <% end %>
+
+  <%= render FlatPack::Grid::Component.new(cols: 2, class: "items-start gap-6") do %>
+    <%= render FlatPack::Card::Component.new(style: :default, class: "h-full") do %>
+      <div class="flex h-full flex-col gap-4">
+        <div class="space-y-1">
+          <h3 class="text-lg font-semibold leading-tight text-slate-900">Rate limiting (last 30 days)</h3>
+          <p class="text-sm text-slate-500">Rate-limited requests per day</p>
+        </div>
+
+        <%= render FlatPack::Chart::Component.new(
+          card: false,
+          type: :line,
+          height: 260,
+          series: [
+            { name: "Rate-limited requests", data: @rate_limited_chart_series_last_30_days }
+          ],
+          options: {
+            stroke: {
+              curve: "smooth",
+              width: 3
+            },
+            xaxis: {
+              categories: @rate_limited_chart_categories_last_30_days,
+              labels: {
+                rotate: 0,
+                hideOverlappingLabels: true
+              }
+            },
+            yaxis: {
+              min: 0,
+              forceNiceScale: true
+            },
+            dataLabels: {
+              enabled: false
+            }
+          }
+        ) %>
+      </div>
+    <% end %>
+
+    <%= render FlatPack::Card::Component.new(style: :default, class: "h-full") do %>
+      <div class="flex h-full flex-col gap-4">
+        <div class="flex items-start justify-between gap-4">
+          <div class="space-y-1">
+            <h3 class="text-lg font-semibold leading-tight text-slate-900">Errors (last 30 days)</h3>
+            <p class="text-sm text-slate-500">Error requests per day</p>
+          </div>
+
+          <%= render FlatPack::Button::Component.new(
+            text: "Full screen",
+            style: :default,
+            size: :sm,
+            url: @last_30_days_errors_path
+          ) %>
+        </div>
+
+        <%= render FlatPack::Chart::Component.new(
+          card: false,
+          type: :line,
+          height: 260,
+          series: [
+            { name: "Error requests", data: @errors_chart_series_last_30_days }
+          ],
+          options: {
+            stroke: {
+              curve: "smooth",
+              width: 3
+            },
+            xaxis: {
+              categories: @errors_chart_categories_last_30_days,
+              labels: {
+                rotate: 0,
+                hideOverlappingLabels: true
+              }
+            },
+            yaxis: {
+              min: 0,
+              forceNiceScale: true
+            },
+            dataLabels: {
+              enabled: false
+            }
+          }
+        ) %>
+      </div>
+    <% end %>
+  <% end %>
+</div>

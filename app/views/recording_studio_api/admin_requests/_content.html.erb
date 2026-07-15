@@ -1,0 +1,85 @@
+<turbo-frame id="admin-api-requests-chart-frame">
+  <%= form_with(
+    url: RecordingStudioApi.admin_requests_path(controller: self, **admin_requests_filter_form_params),
+    method: :get,
+    class: "mb-4",
+    data: {
+      turbo_frame: "admin-api-requests-chart-frame",
+      controller: "flat-pack--auto-submit",
+      action: "change->flat-pack--auto-submit#queueSubmit",
+      flat_pack__auto_submit_delay_value: 250
+    }
+  ) do %>
+    <div class="mb-4 flex flex-wrap items-end gap-3">
+      <%= render FlatPack::DateRangeInput::Component.new(
+        start_name: "start_date",
+        end_name: "end_date",
+        start_value: @requests_chart_start_date,
+        end_value: @requests_chart_end_date,
+        label: nil
+      ) %>
+
+      <%= render FlatPack::Select::Component.new(
+        name: "status",
+        options: [["All statuses", ""]] + @requests_chart_status_lists,
+        value: @requests_chart_status,
+        label: nil,
+        class: "w-[200px]"
+      ) %>
+
+      <%= render FlatPack::Select::Component.new(
+        name: "group_by",
+        options: @requests_chart_group_by_options,
+        value: @requests_chart_group_by,
+        label: nil,
+        class: "w-[160px]"
+      ) %>
+    </div>
+  <% end %>
+
+  <%= render FlatPack::Card::Component.new(style: :default) do %>
+    <div class="requests-chart-gridlines">
+      <%= render FlatPack::Chart::Component.new(
+        card: false,
+        type: :line,
+        height: 620,
+        series: [
+          { name: "API requests", data: @requests_chart_series }
+        ],
+        options: {
+          stroke: {
+            curve: "smooth",
+            width: 3
+          },
+          xaxis: {
+            categories: @requests_chart_categories,
+            axisBorder: {
+              show: true,
+              color: "var(--surface-border-color)",
+              height: 1
+            },
+            axisTicks: {
+              show: false
+            }
+          },
+          yaxis: {
+            min: 0,
+            forceNiceScale: true
+          },
+          dataLabels: {
+            enabled: false
+          }
+        }
+      ) %>
+    </div>
+  <% end %>
+
+  <div class="mt-4">
+    <%= render partial: "recording_studio_api/admin_logs/table", locals: {
+      log_rows: @request_log_rows,
+      sort: @sort,
+      direction: @direction,
+      table_base_url: @requests_table_base_url
+    } %>
+  </div>
+</turbo-frame>

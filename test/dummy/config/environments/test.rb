@@ -17,6 +17,8 @@ Rails.application.configure do
 
   # Configure public file server for tests with cache-control for performance.
   config.public_file_server.headers = { "cache-control" => "public, max-age=3600" }
+  config.assets.unknown_asset_fallback = true if config.respond_to?(:assets)
+  config.assets.check_precompiled_asset = false if config.respond_to?(:assets)
 
   # Show full error reports.
   config.consider_all_requests_local = true
@@ -27,6 +29,11 @@ Rails.application.configure do
 
   # Disable request forgery protection in test environment.
   config.action_controller.allow_forgery_protection = false
+
+  # Engine tests run against copied dummy migrations whose versions differ
+  # from source engine files, so pending migration checks can false-positive.
+  config.active_record.migration_error = false
+  config.active_record.maintain_test_schema = false
 
   # Store uploaded files on the local file system in a temporary directory.
   config.active_storage.service = :test

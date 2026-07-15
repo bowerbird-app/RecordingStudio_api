@@ -1,0 +1,129 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "Auth",
+    subtitle: "How OAuth2 credentials become a RecordingStudioApi access grant for endpoint dispatch.",
+    variant: :h1
+  ) %>
+
+  <%= render FlatPack::SectionTitle::Component.new(
+    title: "Token exchange",
+    subtitle: "Exchange client credentials for a short-lived OAuth2 bearer access token.",
+    anchor_link: true,
+  ) %>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    language: :bash,
+    code: <<~CODE
+      curl -X POST http://localhost:3000/recording_studio_api/oauth/token \
+        -d grant_type=client_credentials \
+        -d client_id=<client_id> \
+        -d client_secret=<client_secret>
+    CODE
+  ) %>
+
+  <%= render FlatPack::SectionTitle::Component.new(
+    title: "Authorized request",
+    subtitle: "Use the returned access token in the Authorization header for API requests.",
+    anchor_link: true,
+  ) %>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    language: :bash,
+    code: <<~CODE
+      curl -H "Authorization: Bearer <access_token>" \
+        http://localhost:3000/recording_studio_api/api/v2/workspaces
+    CODE
+  ) %>
+
+  <%= render FlatPack::SectionTitle::Component.new(
+    title: "Validation flow",
+    subtitle: "API requests can be throttled before bearer-token lookup, then authenticated into an access grant.",
+    anchor_link: true,
+  ) %>
+
+  <%= render FlatPack::Card::Component.new(style: :default) do %>
+    <%= render FlatPack::List::Component.new(divider: true) do %>
+      <%= render FlatPack::List::Item.new(icon: :adjustments_horizontal) do %>
+        <span>When <code>rate_limit_api_pre_auth_enabled</code> is enabled, configured <code>/api/&lt;version&gt;</code> requests are first throttled by IP before bearer-token lookup.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :shield_check) do %>
+        <span>The token endpoint calls <code>RecordingStudioApi::Services::IssueOauthAccessToken</code> and only accepts <code>grant_type=client_credentials</code>.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :key) do %>
+        <span>API requests authenticate through <code>RecordingStudioApi::Services::AuthenticateOauthAccessToken</code> with <code>Authorization: Bearer &lt;access_token&gt;</code>.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :finger_print) do %>
+        <span>The OAuth token service validates issued access token digests and confirms both token and underlying credential are active.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :folder_open) do %>
+        <span>It resolves <code>access_recording</code> and <code>root_recording</code>, rejecting trashed or invalid recording references.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :link) do %>
+        <span>The controller builds <code>RecordingStudioApi::AccessGrant</code> from the API client, credential, access recording, and root recording.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :chart_bar) do %>
+        <span>When <code>rate_limit_api_enabled</code> is enabled, authenticated API requests are then throttled by credential or client using separate read and write buckets.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :clock) do %>
+        <span>On success, it updates <code>last_used_at</code>, resolves the requested public API version, and passes authenticated context to the selected resource or newest compatible capability contract.</span>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <%= render FlatPack::SectionTitle::Component.new(
+    title: "Capability authorization",
+    subtitle: "The API core authenticates; capability handlers authorize their own behavior.",
+    anchor_link: true,
+  ) %>
+
+  <%= render FlatPack::Card::Component.new(style: :default) do %>
+    <%= render FlatPack::List::Component.new(divider: true) do %>
+      <%= render FlatPack::List::Item.new(icon: :check_badge) do %>
+        <span>OAuth2 proves that the API credential or mobile access token is valid.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :adjustments_horizontal) do %>
+        <span>The API resolves <code>current_access_grant</code> and dispatches it to the requested capability.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :shield_check) do %>
+        <span>Default resource, trash, and move handlers call <code>context.access_grant.authorize!</code> before returning or mutating recordings.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :sparkles) do %>
+        <span>Custom capability handlers are responsible for their own Recording Studio Accessible checks using the passed grant.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :eye_slash) do %>
+        <span>Resources outside the authenticated access grant remain hidden even with a valid token.</span>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <%= render FlatPack::SectionTitle::Component.new(
+    title: "Controller context",
+    subtitle: "Values made available for API actions after successful auth.",
+    anchor_link: true,
+  ) %>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    language: :ruby,
+    code: <<~'CODE'
+      current_api_client
+      current_api_credential
+      current_access_recording
+      current_access_grant
+      current_root_recording
+    CODE
+  ) %>
+
+  <%= render FlatPack::Card::Component.new(style: :default) do %>
+    <%= render FlatPack::List::Component.new(divider: true) do %>
+      <%= render FlatPack::List::Item.new(icon: :x_circle) do %>
+        <span>Missing, malformed, inactive, or invalid tokens return <code>401 Unauthorized</code> with a JSON <code>error</code> message.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :ban) do %>
+        <span>Authorization failures during action execution return <code>403 Forbidden</code>.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :clock) do %>
+        <span>Rate limit failures return <code>429 Too Many Requests</code> with <code>Retry-After</code> and rate-limit headers.</span>
+      <% end %>
+    <% end %>
+  <% end %>
+</div>

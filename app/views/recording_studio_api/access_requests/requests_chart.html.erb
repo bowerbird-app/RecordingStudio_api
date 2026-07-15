@@ -1,0 +1,81 @@
+<div class="mx-auto flex w-full max-w-7xl flex-col gap-6 pb-6">
+  <% recording_studio_page_nav(
+    title: "API requests",
+    page_nav_back_url: api_clients_path(requests_chart_back_params),
+    page_nav_back_label: "Back",
+    page_nav_anchor_url: page_nav_close_url
+  ) %>
+
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "API requests",
+    variant: :h1
+  ) %>
+
+  <turbo-frame id="requests-chart-frame">
+    <%= form_with(
+      url: requests_chart_api_clients_path(requests_chart_filter_form_params),
+      method: :get,
+      class: "mb-4",
+      data: {
+        turbo_frame: "requests-chart-frame",
+        controller: "flat-pack--auto-submit",
+        action: "change->flat-pack--auto-submit#queueSubmit",
+        flat_pack__auto_submit_delay_value: 250
+      }
+    ) do %>
+      <div class="mb-4 flex flex-wrap items-end gap-3">
+        <%= render FlatPack::Select::Component.new(
+          name: "api_client_id",
+          options: @requests_chart_api_client_options,
+          value: @requests_chart_api_client_id,
+          placeholder: "All API keys",
+          label: nil,
+          searchable: true,
+          class: "w-[220px]"
+        ) %>
+
+        <%= render FlatPack::Chart::DefaultFilterComponent.new(
+          start_date_value: @requests_chart_start_date,
+          end_date_value: @requests_chart_end_date,
+          status: @requests_chart_status,
+          status_lists: [["All statuses", ""]] + @requests_chart_status_lists,
+          start_date_label: nil,
+          end_date_label: nil,
+          status_label: nil,
+          status_placeholder: nil
+        ) %>
+      </div>
+    <% end %>
+
+    <%= render FlatPack::Card::Component.new(style: :default) do %>
+      <%= render FlatPack::Chart::Component.new(
+        card: false,
+        type: :line,
+        height: 560,
+        series: [
+          { name: "API requests", data: @requests_chart_series }
+        ],
+        options: {
+          stroke: {
+            curve: "smooth",
+            width: 3
+          },
+          xaxis: {
+            categories: @requests_chart_categories,
+            labels: {
+              rotate: 0,
+              hideOverlappingLabels: true
+            }
+          },
+          yaxis: {
+            min: 0,
+            forceNiceScale: true
+          },
+          dataLabels: {
+            enabled: false
+          }
+        }
+      ) %>
+    <% end %>
+  </turbo-frame>
+</div>

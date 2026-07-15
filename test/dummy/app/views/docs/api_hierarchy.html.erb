@@ -1,0 +1,17 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "API hierarchy",
+    subtitle: "How API recordables nest beneath each other in the Recording Studio tree.",
+    variant: :h1
+  ) %>
+
+  <%= render FlatPack::Tree::Component.new(compact: true, class: "max-w-3xl") do |tree| %>
+    <% render_recording_tree_nodes(tree, @api_hierarchy) %>
+  <% end %>
+
+  <%= render FlatPack::Card::Component.new(style: :default) do %>
+    <p class="text-sm text-(--surface-muted-content-color)">
+      <code>RecordingStudioApi::AccessGrant</code> is runtime context, not a persisted recording. It is built from the authenticated API client, credential, access recording, and root recording, then passed into resource and capability handlers.
+    </p>
+  <% end %>
+</div>

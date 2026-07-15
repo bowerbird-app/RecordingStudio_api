@@ -1,0 +1,7 @@
+development:
+  enable_feature_x: true
+  timeout: 5
+
+production:
+  enable_feature_x: false
+  timeout: 5

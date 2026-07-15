@@ -1,0 +1,29 @@
+<%= form_with(
+  url: RecordingStudioApi.admin_logs_path(controller: self, **admin_logs_filter_form_params),
+  method: :get,
+  class: "mb-4",
+  data: {
+    turbo_frame: "sortable_table",
+    controller: "flat-pack--auto-submit admin-logs-date-range-submit",
+    action: "change->flat-pack--auto-submit#queueSubmit click->admin-logs-date-range-submit#submitOnApply",
+    flat_pack__auto_submit_delay_value: 250
+  }
+) do %>
+  <div class="mb-4 flex flex-wrap items-end gap-3">
+    <%= render FlatPack::DateInput::Component.new(
+      name: "logs_date_range",
+      picker: :flatpack_date_picker,
+      range: true,
+      range_start_name: "start_date",
+      range_end_name: "end_date",
+      value: { start: @logs_start_date, end: @logs_end_date },
+      label: "Date Range",
+      class: "w-[220px]"
+    ) %>
+  </div>
+<% end %>
+
+<turbo-frame id="sortable_table">
+  <%= render partial: "table", locals: { log_rows: @log_rows, sort: @sort, direction: @direction, table_base_url: @table_base_url } %>
+  <%= render partial: "loader", locals: { has_more: @has_more, next_page: @page + 1, sort: @sort, direction: @direction, start_date: @logs_start_date, end_date: @logs_end_date } %>
+</turbo-frame>

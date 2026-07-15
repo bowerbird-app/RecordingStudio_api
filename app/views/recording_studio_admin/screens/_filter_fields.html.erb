@@ -1,0 +1,52 @@
+<% filters.each do |filter| %>
+  <div class="<%= wrapper_class %>">
+    <% if filter.type == :date_range %>
+      <%= render FlatPack::DateRangeInput::Component.new(
+        start_name: filter.start_param,
+        end_name: filter.end_param,
+        start_value: filter.value&.start_date,
+        end_value: filter.value&.end_date,
+        label: filter.key.to_s.humanize
+      ) %>
+      <%= hidden_field_tag filter.preset_param, filter.value&.preset_key %>
+    <% else %>
+      <% raw_options = filter.options[:values] || filter.options[:options] %>
+      <% raw_options = raw_options.call if raw_options.respond_to?(:call) %>
+      <% select_options = Array(raw_options).map do |option| %>
+        <% case option %>
+        <% when Hash %>
+          <% { label: option[:label] || option["label"], value: option[:value] || option["value"], disabled: option[:disabled] || option["disabled"] || false } %>
+        <% when Array %>
+          <% { label: option[0], value: option[1], disabled: false } %>
+        <% else %>
+          <% label = if option.to_s.empty? && filter.options[:blank_label].present? %>
+                       <% filter.options[:blank_label] %>
+                     <% elsif filter.options[:humanize_options] == false %>
+                       <% option.to_s %>
+                     <% else %>
+                       <% option.to_s.humanize %>
+                     <% end %>
+          <% { label: label, value: option, disabled: false } %>
+        <% end %>
+      <% end %>
+      <% select_search_options = filter.options.slice(:searchable, :search_mode, :search_param, :search_endpoint).compact %>
+      <% if select_options.any? %>
+        <%= render FlatPack::Select::Component.new(
+          name: filter.param_key,
+          options: select_options,
+          value: filter.value,
+          label: filter.key.to_s.humanize,
+          placeholder: filter.options.key?(:placeholder) ? filter.options[:placeholder] : "All",
+          **select_search_options
+        ) %>
+      <% else %>
+        <%= render FlatPack::SearchInput::Component.new(
+          name: filter.param_key,
+          value: filter.value,
+          label: filter.key.to_s.humanize,
+          placeholder: filter.key.to_s.humanize
+        ) %>
+      <% end %>
+    <% end %>
+  </div>
+<% end %>

@@ -1,30 +1,53 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
-  <%= render FlatPack::PageTitle::Component.new(
-    title: "Methods",
-    subtitle: "Document the public methods your addon exposes.",
-    variant: :h1
-  ) %>
+	<%= render FlatPack::PageTitle::Component.new(
+		title: "Methods",
+		subtitle: "Reference for the public Ruby entrypoints and runtime context used by API handlers.",
+		variant: :h1
+	) %>
 
-  <%= render FlatPack::SectionTitle::Component.new(
-    title: "Example method",
-    subtitle: "recordingstudio_addon.example_method",
-  ) %>
+	<%= render FlatPack::SectionTitle::Component.new(
+		title: "Registration",
+		subtitle: "Methods called from host-app initializers or addon gems.",
+		anchor_link: true,
+	) %>
 
-  <%= render FlatPack::CodeBlock::Component.new(
-    language: :ruby,
-    code: <<~'CODE'
-      # Explain what this method does before the example.
-      result = RecordingstudioAddon.example_method(
-        # Replace with the real arguments this method accepts.
-        input: "demo value"
-      )
+	<%= render FlatPack::CodeBlock::Component.new(
+		language: :ruby,
+		code: <<~'CODE'
+			RecordingStudioApi.configure { |config| config.access_token_ttl = 1.hour }
+			RecordingStudioApi.register_recordable_type_api("Page", serializer: PageSerializer)
+			RecordingStudioApi.register_capability_action(
+			  :publish,
+			  capability: :publishable,
+			  version: "1.0.0",
+			  version_notes: ["Initial publish contract"],
+			  deprecation: {
+			    deprecated: true,
+			    removal_date: "2026-12-31",
+			    reason: "Use publish v2"
+			  },
+			  handler: PublishRecording
+			)
+			RecordingStudioApi.capability_action(:publish)
+			RecordingStudioApi.resource_action(:show)
+		CODE
+	) %>
 
-      # Show what the method returns or what side effect it creates.
-      puts result
-    CODE
-  ) %>
+	<%= render FlatPack::SectionTitle::Component.new(
+		title: "Handler context",
+		subtitle: "Methods available to capability and resource handlers at runtime.",
+		anchor_link: true,
+	) %>
 
-  <p class="text-sm text-(--body-muted-content-color)">
-    Provide one section title and codeblock for each method
-  </p>
+	<%= render FlatPack::CodeBlock::Component.new(
+		language: :ruby,
+		code: <<~'CODE'
+			context.api_client
+			context.credential
+			context.access_recording
+			context.access_grant
+			context.access_grant.actor
+			context.access_grant.authorize!(recording: context.recording, role: :edit)
+		CODE
+	) %>
 </div>

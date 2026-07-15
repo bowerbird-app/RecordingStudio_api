@@ -15,10 +15,6 @@
 
   <% end %>
 
-  <% nav.center do %>
-    <span aria-hidden="true"></span>
-  <% end %>
-
   <% nav.right do %>
     <% if user_signed_in? %>
       <%= render FlatPack::Avatar::Component.new(
@@ -26,5 +22,11 @@
         size: :sm
       ) %>
     <% end %>
+
+    <%= recording_studio_root_switch_dropdown(
+      return_to: request.fullpath,
+      style: :ghost,
+      size: :sm
+    ) %>
   <% end %>
 <% end %>

@@ -1,0 +1,16 @@
+<div class="mx-auto flex w-full max-w-7xl flex-col gap-6 pb-6">
+  <% recording_studio_page_nav(
+    title: "Admin API errors",
+    page_nav_back_url: RecordingStudioApi.admin_dashboard_path(controller: self),
+    page_nav_back_label: "Back",
+    page_nav_anchor_url: page_nav_close_url
+  ) %>
+
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "Admin API errors",
+    subtitle: "Filter and inspect admin API error volume.",
+    variant: :h1
+  ) %>
+
+  <%= render partial: "content" %>
+</div>

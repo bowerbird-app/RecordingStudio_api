@@ -1,3 +1,3 @@
 class Current < ActiveSupport::CurrentAttributes
-  attribute :actor
+  attribute :actor, :impersonator
 end

@@ -1,0 +1,53 @@
+<turbo-frame id="<%= request.headers["Turbo-Frame"] %>">
+  <% if params[:show_summary].to_s == "1" %>
+    <% percentage_difference = @requests_chart_percentage_difference %>
+    <% trend_label = if percentage_difference.nil?
+                      "No prior period data"
+                    elsif percentage_difference.positive?
+                      "+#{format("%.1f", percentage_difference)}%"
+                    else
+                      "#{format("%.1f", percentage_difference)}%"
+                    end %>
+
+    <div class="mb-3 grid gap-3 sm:grid-cols-2">
+      <div class="px-1 py-1">
+        <p class="text-lg font-semibold text-slate-900"><%= @requests_chart_total_count %></p>
+      </div>
+
+      <div class="px-1 py-1">
+        <p class="text-lg font-semibold text-slate-900"><%= trend_label %></p>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="requests-chart-gridlines">
+    <%= render FlatPack::Chart::Component.new(
+      card: true,
+      type: :line,
+      height: 260,
+      series: [
+        { name: "API requests", data: @requests_chart_series }
+      ],
+      options: {
+        stroke: {
+          curve: "smooth",
+          width: 3
+        },
+        xaxis: {
+          categories: @requests_chart_categories,
+          labels: {
+            rotate: 0,
+            hideOverlappingLabels: true
+          }
+        },
+        yaxis: {
+          min: 0,
+          forceNiceScale: true
+        },
+        dataLabels: {
+          enabled: false
+        }
+      }
+    ) %>
+  </div>
+</turbo-frame>

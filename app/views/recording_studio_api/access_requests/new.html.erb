@@ -1,0 +1,34 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <% recording_studio_page_nav(
+    title: "Create API key",
+    page_nav_anchor_url: page_nav_close_url
+  ) %>
+
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "Create API key",
+    variant: :h1
+  ) %>
+
+  <% if @errors.any? %>
+    <%= render FlatPack::Card::Component.new(style: :default) do %>
+      <div class="space-y-2">
+        <p class="text-sm font-medium text-red-700">The API client could not be created.</p>
+        <ul class="list-disc space-y-1 pl-5 text-sm text-red-700">
+          <% @errors.uniq.each do |error| %>
+            <li><%= error %></li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+  <% end %>
+
+  <%= form_with url: api_clients_path(page_nav_close_param), scope: :api_client, method: :post, class: "space-y-6" do |form| %>
+    <%= render 'form_fields',
+      form: form,
+      form_values: @form_values,
+      role_options: @role_options,
+      access_point_recordings: @access_point_recordings,
+      show_root_hidden: true,
+      submit_text: "Create" %>
+  <% end %>
+</div>

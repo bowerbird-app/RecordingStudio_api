@@ -24,6 +24,7 @@ def dummy_bundle_base_env
     "BUNDLE_GEMFILE" => DUMMY_GEMFILE,
     "BUNDLE_PATH" => ENV.fetch("BUNDLE_PATH", nil),
     "DISABLE_SIMPLECOV" => "true",
+    "RAILS_ENV" => "test",
     "GEM_HOME" => ENV.fetch("BUNDLER_ORIG_GEM_HOME", ENV.fetch("GEM_HOME", nil)),
     "GEM_PATH" => ENV.fetch("BUNDLER_ORIG_GEM_PATH", nil)
   }

@@ -1,0 +1,141 @@
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "API routes",
+    subtitle: "How the host app mounts the engine and how the engine declares the JSON API endpoints.",
+    variant: :h1
+  ) %>
+
+  <%= render FlatPack::SectionTitle::Component.new(
+    title: "Mount the engine",
+    subtitle: "Expose the RecordingStudioApi routes from the host application's router.",
+    anchor_link: true,
+  ) %>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    language: :ruby,
+    code: <<~'CODE'
+      # config/routes.rb
+      Rails.application.routes.draw do
+        mount RecordingStudioApi::Engine, at: "/recording_studio_api"
+        mount RecordingStudioAccessible::Engine, at: "/admin/access", as: :recording_studio_admin_access
+        recording_studio_admin_for :api, at: "/api", root_section: :api
+      end
+    CODE
+  ) %>
+
+  <%= render FlatPack::SectionTitle::Component.new(
+    title: "Define engine routes",
+    subtitle: "These are the routes declared inside RecordingStudioApi itself.",
+    anchor_link: true,
+  ) %>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    language: :ruby,
+    code: <<~'CODE'
+      # config/routes.rb
+      RecordingStudioApi::Engine.routes.draw do
+        get "/admin_api", to: "admin_dashboards#show", as: :admin_dashboard
+        get "/admin_api/logs", to: "admin_logs#index", as: :admin_logs
+
+        resources :api_clients, controller: "access_requests", only: %i[index show new create edit update]
+
+        post "/oauth/token", to: "oauth#token"
+
+        namespace :api, defaults: { format: :json } do
+          namespace :v1 do
+            get "/", to: "resources#index"
+            get "/trash", to: "resources#trash_index", as: :trash_collection
+            get "/trash/:id", to: "resources#trash_show", as: :trash
+            post "/trash/:id/restore", to: "resources#trash_restore", as: :trash_restore
+            delete "/trash/:id", to: "resources#trash_destroy", as: :trash_destroy
+            get "/:resource", to: "resources#index", as: :resource_collection
+            post "/:resource", to: "resources#create"
+            get "/:resource/:id", to: "resources#show", as: :resource
+            patch "/:resource/:id", to: "resources#update"
+            delete "/:resource/:id", to: "resources#destroy"
+            match "/:resource/:id/actions/:action_name",
+              to: "member_actions#create",
+              via: %i[post patch put delete],
+              as: :resource_action
+            match "/:resource/:id/:action_name",
+              to: "member_actions#create",
+              via: %i[post patch put delete],
+              as: :resource_nested_action
+          end
+
+          (RecordingStudioApi.api_versions - ["v1"]).each do |api_version|
+            namespace api_version.to_sym do
+              get "/", to: "/recording_studio_api/api/v1/resources#index"
+              get "/trash", to: "/recording_studio_api/api/v1/resources#trash_index", as: :trash_collection
+              get "/trash/:id", to: "/recording_studio_api/api/v1/resources#trash_show", as: :trash
+              post "/trash/:id/restore", to: "/recording_studio_api/api/v1/resources#trash_restore", as: :trash_restore
+              delete "/trash/:id", to: "/recording_studio_api/api/v1/resources#trash_destroy", as: :trash_destroy
+              get "/:resource", to: "/recording_studio_api/api/v1/resources#index", as: :resource_collection
+              post "/:resource", to: "/recording_studio_api/api/v1/resources#create"
+              get "/:resource/:id", to: "/recording_studio_api/api/v1/resources#show", as: :resource
+              patch "/:resource/:id", to: "/recording_studio_api/api/v1/resources#update"
+              delete "/:resource/:id", to: "/recording_studio_api/api/v1/resources#destroy"
+            end
+            end
+          end
+        end
+      end
+    CODE
+  ) %>
+
+  <%= render FlatPack::SectionTitle::Component.new(
+    title: "API admin screens",
+    subtitle: "When RecordingStudioAdmin is mounted, the API gem registers workspace API key and request screens.",
+    anchor_link: true,
+  ) %>
+
+  <%= render FlatPack::CodeBlock::Component.new(
+    language: :text,
+    code: <<~'CODE'
+      GET /api/sections/api
+      GET /api/screens/api_keys
+      GET /api/screens/api_requests
+    CODE
+  ) %>
+
+  <%= render FlatPack::SectionTitle::Component.new(
+    title: "Generated endpoint inventory",
+    subtitle: "Built from RecordingStudioApi::Services::DocumentationCatalog so docs stay in sync with registered resources and actions.",
+    anchor_link: true,
+  ) %>
+
+  <%= render FlatPack::Card::Component.new(style: :default) do %>
+    <%= render FlatPack::List::Component.new(divider: true, html_options: { id: "generated-endpoint-inventory" }) do %>
+      <% @api_catalog.fetch(:resources, []).each do |resource| %>
+        <% resource.fetch(:endpoints, []).each do |endpoint| %>
+          <%= render FlatPack::List::Item.new(icon: :link) do %>
+            <div class="space-y-1">
+              <p class="text-sm font-medium text-(--surface-content-color)"><%= endpoint.fetch(:verb) %> <%= endpoint.fetch(:path) %></p>
+              <p class="text-xs text-(--surface-content-subtle-color)">Action: <%= endpoint[:action_name].presence || "none" %> · Scope: <%= endpoint[:scope].presence || "none" %></p>
+            </div>
+          <% end %>
+        <% end %>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <%= render FlatPack::Card::Component.new(style: :default) do %>
+    <%= render FlatPack::List::Component.new(divider: true) do %>
+      <%= render FlatPack::List::Item.new(icon: :rectangle_group) do %>
+        <span>Action routes stay grouped under their owning resource.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :shield_check) do %>
+        <span>Admin browser routes are separate from JSON API routes and still use the host app's browser authentication.</span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :arrow_path_rounded_square) do %>
+        <span>Example: <code>/recording_studio_api/api/v2/folders/:id/actions/move</code></span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :sparkles) do %>
+        <span>Action: <code>move</code></span>
+      <% end %>
+      <%= render FlatPack::List::Item.new(icon: :queue_list) do %>
+        <span>Additional public API versions currently alias the shared controller implementation, but runtime action selection and OpenAPI generation still follow the configured <code>config.version</code> profile for that route.</span>
+      <% end %>
+    <% end %>
+  <% end %>
+</div>

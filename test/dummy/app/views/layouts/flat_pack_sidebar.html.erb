@@ -16,15 +16,11 @@
     <link rel="apple-touch-icon" href="/icon.png">
 
     <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
-    <%= stylesheet_link_tag "flat_pack/variables", "data-turbo-track": "reload" %>
-    <%= stylesheet_link_tag "flat_pack/application", "data-turbo-track": "reload" %>
     <%= stylesheet_link_tag "tailwind", "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags %>
   </head>
 
   <body class="m-0 h-full overflow-hidden overscroll-none bg-[var(--surface-page-background-color)] text-[var(--surface-content-color)]">
-    <%= render "layouts/icon_sprite" %>
-
     <%= render FlatPack::SidebarLayout::Component.new(side: :left, storage_key: "flat-pack-sidebar-layout") do |layout| %>
       <% layout.sidebar do %>
         <%= render "layouts/flat_pack/sidebar", sidebar_side: :left %>
