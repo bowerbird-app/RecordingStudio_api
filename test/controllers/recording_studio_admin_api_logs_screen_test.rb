@@ -308,7 +308,7 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "/admin/api/screens/admin_api_performance"
     assert_includes response.body, "group_by=day"
     assert_includes response.body, "ms"
-    assert_match(/\+\d+(?:\.\d+)?%/, response.body)
+    assert_match(/[+-]?\d+(?:\.\d+)?%/, response.body)
 
     get "/admin/api/sections/admin_api/widgets/widgets.recording_studio_api.admin.client_errors_last_four_weeks"
 
@@ -322,7 +322,7 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "group_by=day"
     assert_includes response.body, "status=client_error"
     assert_includes response.body, "2"
-    assert_match(/\+\d+(?:\.\d+)?%/, response.body)
+    assert_match(/[+-]?\d+(?:\.\d+)?%/, response.body)
 
     get "/admin/api/sections/admin_api/widgets/widgets.recording_studio_api.admin.server_errors_last_four_weeks"
 

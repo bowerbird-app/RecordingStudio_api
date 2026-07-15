@@ -48,14 +48,6 @@ Rake::TestTask.new(:test) do |t|
   t.verbose = false
 end
 
-task :prepare_test_db do
-  Dir.chdir(DUMMY_APP_ROOT) do
-    run_command!(dummy_bundle_env, "bin/rails", "db:prepare")
-  end
-end
-
-Rake::Task[:test].enhance([:prepare_test_db])
-
 namespace :test do
   desc "Run rename verification tests to validate gem naming consistency"
   task :rename_verification do
