@@ -55,10 +55,6 @@ jobs:
       working-directory: test/dummy
       env:
         BUNDLE_GITHUB__COM: x-access-token:${{ secrets.BOWERBIRD_ORG_CI_TOKEN }}
-    
-    - name: Prepare test databases
-      run: bundle exec rails db:create db:prepare RAILS_ENV=test
-      working-directory: test/dummy
 
     - name: Run RuboCop
       run: bundle exec rubocop
