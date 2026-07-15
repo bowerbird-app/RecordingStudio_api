@@ -13,8 +13,8 @@ jobs:
       PGPORT: 5432
       PGUSER: postgres
       PGPASSWORD: postgres
-      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/app_test
-      API_LOGGING_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/app_api_logging_test
+      POSTGRES_DB: app_test
+      API_LOGGING_POSTGRES_DB: app_api_logging_test
     
     permissions:
       contents: read
@@ -56,8 +56,8 @@ jobs:
       env:
         BUNDLE_GITHUB__COM: x-access-token:${{ secrets.BOWERBIRD_ORG_CI_TOKEN }}
     
-    - name: Run database migrations
-      run: bundle exec rake db:migrate RAILS_ENV=test
+    - name: Prepare test databases
+      run: bundle exec rails db:create db:prepare RAILS_ENV=test
       working-directory: test/dummy
 
     - name: Run RuboCop
