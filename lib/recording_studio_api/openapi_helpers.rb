@@ -2,12 +2,20 @@
 
 module RecordingStudioApi
   module OpenapiHelpers
-    def documentation_catalog(version: nil)
-      RecordingStudioApi::Services::DocumentationCatalog.call(version: version)
+    def documentation_catalog(version: nil, mount_path: nil, api_mount_path: nil)
+      RecordingStudioApi::Services::DocumentationCatalog.call(
+        version: version,
+        mount_path: mount_path,
+        api_mount_path: api_mount_path
+      )
     end
 
-    def openapi_document(version: nil)
-      RecordingStudioApi::Services::OpenapiDocument.call(version: version)
+    def openapi_document(version: nil, mount_path: nil, api_mount_path: nil)
+      RecordingStudioApi::Services::OpenapiDocument.call(
+        version: version,
+        mount_path: mount_path,
+        api_mount_path: api_mount_path
+      )
     end
 
     def recordable_details_schema_name_for(recordable_type)

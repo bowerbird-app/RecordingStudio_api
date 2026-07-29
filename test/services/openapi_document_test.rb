@@ -142,6 +142,34 @@ module RecordingStudioApi
         RecordingStudioApi.configuration.default_api_version = original_version
       end
 
+      def test_call_passes_mount_context_to_documentation_catalog
+        original_versions = RecordingStudioApi.configuration.api_versions
+        original_version = RecordingStudioApi.configuration.default_api_version
+        RecordingStudioApi.configuration.api_versions = %w[v1 v2]
+
+        document = with_recordable_types(["Workspace"]) do
+          OpenapiDocument.call(
+            version: "v2",
+            mount_path: "/platform/recording-api",
+            api_mount_path: "/public-api"
+          )
+        end
+
+        assert document.fetch(:paths).key?("/platform/recording-api/oauth/token")
+        assert document.fetch(:paths).key?("/platform/recording-api/public-api/v2/workspaces")
+
+        token_operation = document.fetch(:paths).fetch("/platform/recording-api/oauth/token").fetch("post")
+        assert_equal [], token_operation.fetch(:security)
+        assert token_operation.fetch(:responses).key?("422")
+        assert_not token_operation.fetch(:responses).key?("403")
+        assert_equal "/platform/recording-api/oauth/token",
+                     document.fetch(:components).fetch(:securitySchemes).fetch(:oauthClientCredentials)
+                       .fetch(:flows).fetch(:clientCredentials).fetch(:tokenUrl)
+      ensure
+        RecordingStudioApi.configuration.api_versions = original_versions
+        RecordingStudioApi.configuration.default_api_version = original_version
+      end
+
       def test_resource_list_operation_includes_cursor_pagination_contract
         document = with_recordable_types(["Workspace"]) { OpenapiDocument.call }
         list_operation = document.fetch(:paths).fetch("/recording_studio_api/api/v1/workspaces").fetch("get")

@@ -41,6 +41,61 @@ RecordingStudioApi.configure do |config|
 end
 ```
 
+## Scalar API documentation
+
+Install a standalone, named Scalar reference in a host application:
+
+```sh
+bin/rails generate recording_studio_api:scalar_docs public_api \
+  --mount-path=/api-docs \
+  --api-mount-path=/recording_studio_api
+```
+
+This creates a namespaced controller and embedded, fullscreen, and shared ERB views without
+requiring FlatPack, Tailwind, or the dummy application. It adds a marked, idempotent route block
+with helpers derived from the name, such as `public_api_scalar_docs_path`.
+
+The generated routes serve `/api-docs/v1`, `/api-docs/v1/fullscreen`, and
+`/api-docs/v1/openapi.json`. Unsupported versions return `404`; the root route safely redirects
+to `--default-api-version` (default `v1`). Routes are ordered so the OpenAPI and fullscreen
+endpoints are registered before the version page.
+
+The default Scalar script is a version-pinned jsDelivr URL. Override the presentation or document
+source when needed:
+
+```sh
+bin/rails generate recording_studio_api:scalar_docs partner_docs \
+  --scalar-source=https://cdn.example.test/scalar.js \
+  --scalar-integrity=sha384-BASE64_HASH \
+  --scalar-url=https://docs.example.test/openapi.json \
+  --openapi-provider=Partner::OpenapiProvider
+```
+
+When `--scalar-url` is omitted, the generated OpenAPI route is used. A custom provider must
+respond to `call(version:, mount_path:, api_mount_path:)`. The default provider receives the
+engine mount path from `--api-mount-path`, so generated OpenAPI paths match applications that
+mount the API engine somewhere other than `/recording_studio_api`.
+
+To install manually, copy the generated controller and the three ERB templates into the host
+application, then add the marked four-route block from `config/routes.rb`. Keep the static root,
+OpenAPI, and fullscreen routes ahead of `/:version`, use a static redirect target, and pass the
+same API mount context to the OpenAPI provider. If a strict Content Security Policy is enabled,
+use `--scalar-integrity` for the pinned CDN script and its generated `crossorigin="anonymous"`
+attribute. Authorize the initialization script with a CSP nonce or hash, or move it into the host
+application's approved JavaScript bundle; self-hosting Scalar is also supported. Do not enable
+`unsafe-inline`.
+
+An integrity default is only used when the gem has shipped a verified hash for the exact default
+Scalar URL. A custom `--scalar-source` never inherits that hash: provide its matching
+`--scalar-integrity` explicitly or self-host the verified asset.
+
+The generated controller includes `authorize_scalar_documentation!`, an explicit host-policy hook
+for both HTML and OpenAPI routes. Replace its no-op implementation with the application's
+authentication and authorization checks for private documentation, or leave it unchanged only when
+public documentation is intentional. Route reversal finds the named marker block regardless of
+mount options. If a custom `--controller` was used, repeat that option during revoke so Rails can
+remove the matching custom controller and views.
+
 Example addon registration:
 
 ```ruby

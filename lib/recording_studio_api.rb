@@ -286,9 +286,15 @@ module RecordingStudioApi
       supported_api_version?(normalized_version) ? normalized_version : default_api_version
     end
 
-    def api_base_path(version: default_api_version)
+    def api_base_path(version: default_api_version, mount_path: "/recording_studio_api", api_mount_path: "/api")
       normalized_version = resolve_api_version(version)
-      "/recording_studio_api/api/#{normalized_version}"
+      path_segments = [
+        normalize_documentation_mount_path(mount_path),
+        normalize_documentation_mount_path(api_mount_path, allow_root: false),
+        normalized_version
+      ].flat_map { |path| path.split("/") }.reject(&:blank?)
+
+      "/#{path_segments.join('/')}"
     end
 
     def api_version_profile_for(version)
@@ -371,6 +377,20 @@ module RecordingStudioApi
     end
 
     private
+
+    def normalize_documentation_mount_path(value, allow_root: true)
+      path = value.to_s.strip
+      path = "/#{path}" unless path.start_with?("/")
+      path = path.squeeze("/").sub(%r{/\z}, "")
+      path = "/" if path.empty?
+      unless path.match?(%r{\A/[a-zA-Z0-9._~!$&'()*+,;=@/-]*\z}) && !path.include?("..")
+        raise ArgumentError, "mount paths must be safe absolute paths"
+      end
+
+      return path if allow_root || path != "/"
+
+      raise ArgumentError, "api_mount_path must not be the root path"
+    end
 
     def normalize_api_version(value)
       normalized = value.to_s.strip.downcase

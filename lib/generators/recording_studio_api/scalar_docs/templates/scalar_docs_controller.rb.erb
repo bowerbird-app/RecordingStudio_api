@@ -1,0 +1,69 @@
+# frozen_string_literal: true
+
+<% if controller_namespace.present? %>
+module <%= controller_namespace %>
+<% end %>
+class <%= controller_short_class_name %> < ApplicationController
+<% if options[:layout] == false || options[:layout].to_s == "false" %>
+  layout false
+<% else %>
+  layout <%= options[:layout].to_s.inspect %>
+<% end %>
+
+  before_action :authorize_scalar_documentation!
+  before_action :ensure_supported_api_version
+
+  def show
+    @scalar_url = configured_scalar_url || helpers.<%= openapi_route_helper %>(version: api_version)
+    @fullscreen_url = helpers.<%= fullscreen_route_helper %>(version: api_version)
+    @scalar_source = <%= scalar_source.inspect %>
+    @scalar_integrity = <%= scalar_integrity.inspect %>
+    @scalar_configuration_json = ERB::Util.json_escape(
+      { url: @scalar_url, layout: "modern" }.to_json
+    )
+  end
+
+  def fullscreen
+    show
+    render :fullscreen, layout: false
+  end
+
+  def openapi
+    render json: openapi_provider.call(
+      version: api_version,
+      mount_path: <%= api_mount_path.inspect %>,
+      api_mount_path: "/api"
+    )
+  rescue StandardError
+    render plain: "Unable to generate the OpenAPI document. Check the configured OpenAPI provider.", status: :service_unavailable
+  end
+
+  private
+
+  # Implement this hook with your host application's authentication and authorization policy.
+  # Leaving it unchanged intentionally keeps this documentation installation public.
+  def authorize_scalar_documentation!
+  end
+
+  def api_version
+    params.fetch(:version).to_s.downcase
+  end
+
+  def ensure_supported_api_version
+    return if RecordingStudioApi.supported_api_version?(api_version)
+
+    render plain: "Unsupported API version. Supported versions: #{RecordingStudioApi.api_versions.join(', ')}.", status: :not_found
+  end
+
+  def openapi_provider
+    <%= options[:openapi_provider].to_s %>
+  end
+
+  def configured_scalar_url
+    value = <%= options[:scalar_url].to_s.strip.presence.inspect %>
+    value.presence
+  end
+end
+<% if controller_namespace.present? %>
+end
+<% end %>

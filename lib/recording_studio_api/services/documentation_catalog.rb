@@ -3,16 +3,20 @@
 module RecordingStudioApi
   module Services
     class DocumentationCatalog # rubocop:disable Metrics/ClassLength
-      BASE_PATH = "/recording_studio_api"
+      DEFAULT_MOUNT_PATH = "/recording_studio_api"
+      DEFAULT_API_MOUNT_PATH = "/api"
+      BASE_PATH = DEFAULT_MOUNT_PATH
 
       class << self
-        def call(version: nil)
-          new(version: version).call
+        def call(version: nil, mount_path: nil, api_mount_path: nil)
+          new(version: version, mount_path: mount_path, api_mount_path: api_mount_path).call
         end
       end
 
-      def initialize(version: nil)
+      def initialize(version: nil, mount_path: nil, api_mount_path: nil)
         @api_version = RecordingStudioApi.resolve_api_version(version)
+        @mount_path = normalized_mount_path(mount_path || DEFAULT_MOUNT_PATH)
+        @api_mount_path = normalized_mount_path(api_mount_path || DEFAULT_API_MOUNT_PATH, allow_root: false)
       end
 
       def call
@@ -29,7 +33,7 @@ module RecordingStudioApi
         [
           {
             verb: "POST",
-            path: "#{BASE_PATH}/oauth/token",
+            path: mounted_path("/oauth/token"),
             action: "oauth#token",
             summary: "Exchange OAuth client credentials",
             description: "Exchange client credentials for an OAuth2 access token.",
@@ -304,7 +308,29 @@ module RecordingStudioApi
       end
 
       def api_root_path
-        RecordingStudioApi.api_base_path(version: @api_version)
+        RecordingStudioApi.api_base_path(
+          version: @api_version,
+          mount_path: @mount_path,
+          api_mount_path: @api_mount_path
+        )
+      end
+
+      def mounted_path(path)
+        "/#{[@mount_path, path].flat_map { |entry| entry.split("/") }.reject(&:blank?).join('/')}"
+      end
+
+      def normalized_mount_path(value, allow_root: true)
+        path = value.to_s.strip
+        path = "/#{path}" unless path.start_with?("/")
+        path = path.squeeze("/").sub(%r{/\z}, "")
+        path = "/" if path.empty?
+        unless path.match?(%r{\A/[a-zA-Z0-9._~!$&'()*+,;=@/-]*\z}) && !path.include?("..")
+          raise ArgumentError, "mount paths must be safe absolute paths"
+        end
+
+        raise ArgumentError, "api_mount_path must not be the root path" if !allow_root && path == "/"
+
+        path
       end
 
       def default_action_openapi(resource_name, recordable_type, action)

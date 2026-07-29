@@ -9,13 +9,15 @@ module RecordingStudioApi
       OAUTH_TOKEN_PATH = "/recording_studio_api/oauth/token"
 
       class << self
-        def call(version: nil)
-          new(version: version).call
+        def call(version: nil, mount_path: nil, api_mount_path: nil)
+          new(version: version, mount_path: mount_path, api_mount_path: api_mount_path).call
         end
       end
 
-      def initialize(version: nil)
+      def initialize(version: nil, mount_path: nil, api_mount_path: nil)
         @api_version = RecordingStudioApi.resolve_api_version(version)
+        @mount_path = mount_path
+        @api_mount_path = api_mount_path
       end
 
       def call
@@ -50,7 +52,11 @@ module RecordingStudioApi
       end
 
       def all_endpoints
-        catalog = RecordingStudioApi.documentation_catalog(version: @api_version)
+        catalog = RecordingStudioApi.documentation_catalog(
+          version: @api_version,
+          mount_path: @mount_path,
+          api_mount_path: @api_mount_path
+        )
         resource_endpoints = catalog.fetch(:resources).flat_map { |section| section.fetch(:endpoints) }
 
         catalog.fetch(:auth_endpoints) + catalog.fetch(:root_endpoints) + resource_endpoints
@@ -85,7 +91,7 @@ module RecordingStudioApi
       end
 
       def default_responses_for(endpoint)
-        if endpoint.fetch(:path) == OAUTH_TOKEN_PATH
+        if token_endpoint?(endpoint)
           {
             "401" => { "$ref" => "#/components/responses/Unauthorized" },
             "422" => { "$ref" => "#/components/responses/UnprocessableEntity" }
@@ -100,7 +106,7 @@ module RecordingStudioApi
       end
 
       def security_for(endpoint, metadata)
-        return metadata.fetch(:security, []) if endpoint.fetch(:path) == OAUTH_TOKEN_PATH
+        return metadata.fetch(:security, []) if token_endpoint?(endpoint)
 
         metadata.fetch(:security, [{ bearerAuth: [] }])
       end
@@ -132,7 +138,7 @@ module RecordingStudioApi
               type: "oauth2",
               flows: {
                 clientCredentials: {
-                  tokenUrl: OAUTH_TOKEN_PATH,
+                  tokenUrl: oauth_token_path,
                   scopes: {}
                 }
               }
@@ -232,9 +238,22 @@ module RecordingStudioApi
       end
 
       def tag_for(endpoint)
-        return "auth" if endpoint.fetch(:path).include?("/oauth/token")
+        return "auth" if token_endpoint?(endpoint)
 
         "resources"
+      end
+
+      def token_endpoint?(endpoint)
+        endpoint.fetch(:path) == oauth_token_path
+      end
+
+      def oauth_token_path
+        @oauth_token_path ||= begin
+          mount_path = @mount_path.presence || DocumentationCatalog::DEFAULT_MOUNT_PATH
+          path_segments = mount_path.to_s.squeeze("/").split("/").reject(&:blank?)
+
+          "/#{(path_segments + %w[oauth token]).join('/')}"
+        end
       end
     end
   end

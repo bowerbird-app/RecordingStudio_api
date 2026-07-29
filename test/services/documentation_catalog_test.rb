@@ -269,6 +269,30 @@ module RecordingStudioApi
         RecordingStudioApi.configuration.default_api_version = original_version
       end
 
+      def test_catalog_uses_explicit_mount_context
+        catalog = with_catalog_stubs(
+          recordable_types: ["Page"],
+          actions_by_type: { "Page" => [] }
+        ) do
+          DocumentationCatalog.call(
+            version: "v2",
+            mount_path: "/platform/recording-api",
+            api_mount_path: "/public-api"
+          )
+        end
+
+        assert_equal "/platform/recording-api/oauth/token", catalog.fetch(:auth_endpoints).first.fetch(:path)
+        assert_equal "/platform/recording-api/public-api/v2", catalog.fetch(:root_endpoints).first.fetch(:path)
+      end
+
+      def test_catalog_rejects_unsafe_mount_context
+        error = assert_raises(ArgumentError) do
+          DocumentationCatalog.call(mount_path: "/platform/../private")
+        end
+
+        assert_equal "mount paths must be safe absolute paths", error.message
+      end
+
       def test_resource_write_request_body_uses_closed_attributes_schema_when_unregistered
         catalog = with_catalog_stubs(
           recordable_types: ["Workspace"],
