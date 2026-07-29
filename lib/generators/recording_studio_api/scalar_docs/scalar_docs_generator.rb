@@ -239,7 +239,7 @@ module RecordingStudioApi
       def valid_path?(path, allow_root: false)
         return false if path == "/" && !allow_root
 
-        path.match?(%r{\A/[a-zA-Z0-9._~!$&'()*+,;=@/-]*\z}) &&
+        path.match?(%r{\A/[a-zA-Z0-9._~!$&'+,;=@/-]*\z}) &&
           !path.include?("..") &&
           !path.include?("//")
       end
@@ -254,7 +254,8 @@ module RecordingStudioApi
       end
 
       def valid_http_url?(value)
-        URI.parse(value.to_s).is_a?(URI::HTTP) && value.to_s.match?(/\Ahttps?:\/\//)
+        uri = URI.parse(value.to_s)
+        uri.is_a?(URI::HTTP) && uri.host.present? && value.to_s.match?(/\Ahttps?:\/\//)
       rescue URI::InvalidURIError
         false
       end

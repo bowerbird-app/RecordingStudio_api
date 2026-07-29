@@ -73,6 +73,48 @@ class ScalarDocsGeneratorTest < Minitest::Test
     end
   end
 
+  def test_generator_rejects_dynamic_route_syntax_in_mount_paths
+    with_temp_app do |destination_root|
+      {
+        mount_path: ["/api-docs(optional)", "/api-docs/*rest", "/api-docs/:tenant"],
+        api_mount_path: ["/recording_studio_api(optional)", "/recording_studio_api/*rest", "/recording_studio_api/:tenant"]
+      }.each do |option, invalid_paths|
+        invalid_paths.each do |invalid_path|
+          generator = build_generator(destination_root, ["public_api"], option => invalid_path)
+
+          error = assert_raises(Thor::Error) { generator.validate_configuration }
+
+          assert_includes error.message, "--#{option.to_s.tr('_', '-')}"
+        end
+      end
+    end
+  end
+
+  def test_generator_accepts_literal_safe_mount_path_punctuation
+    with_temp_app do |destination_root|
+      generator = build_generator(
+        destination_root,
+        ["public_api"],
+        mount_path: "/developer/reference-v2_1.0~beta",
+        api_mount_path: "/gateway/recording-api_v2.1~beta"
+      )
+
+      generator.validate_configuration
+    end
+  end
+
+  def test_generator_rejects_http_urls_without_a_host
+    with_temp_app do |destination_root|
+      invalid_source = build_generator(destination_root, ["public_api"], scalar_source: "https://")
+      error = assert_raises(Thor::Error) { invalid_source.validate_configuration }
+      assert_includes error.message, "--scalar-source"
+
+      invalid_scalar_url = build_generator(destination_root, ["public_api"], scalar_url: "http://")
+      error = assert_raises(Thor::Error) { invalid_scalar_url.validate_configuration }
+      assert_includes error.message, "--scalar-url"
+    end
+  end
+
   def test_generator_detects_parenthesized_and_non_get_route_path_collisions
     with_temp_app do |destination_root|
       File.write(
