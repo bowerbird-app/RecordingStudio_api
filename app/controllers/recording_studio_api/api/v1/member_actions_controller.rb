@@ -66,16 +66,17 @@ module RecordingStudioApi
         end
 
         def resolve_action!
-          action = RecordingStudioApi.capability_action(params[:action_name], version: current_api_version)
+          action = RecordingStudioApi.capability_action(params[:action_name], version: current_api_version, api: current_api_key)
           raise UnsupportedActionError, "Unknown API action #{params[:action_name]}" if action.nil?
           raise UnsupportedActionError, "#{action.name} is not enabled for #{resource_recording.recordable_type}" unless action.applicable_to?(resource_recording.recordable_type)
+          raise UnsupportedActionError, "#{action.name} is not enabled for #{resource_recording.recordable_type}" unless RecordingStudioApi.capability_action_enabled_for?(action, resource_recording.recordable_type, api: current_api_key)
 
           action
         end
 
         def resource_recording
           @resource_recording ||= begin
-            recordable_type = RecordingStudioApi.recordable_type_for_resource(params[:resource])
+            recordable_type = RecordingStudioApi.recordable_type_for_resource(params[:resource], api: current_api_key)
             raise RecordingStudioApi::NotFoundError, "Unknown API resource #{params[:resource]}" if recordable_type.blank?
 
             recording = scoped_recordings.find_by(id: params[:id])
@@ -92,7 +93,7 @@ module RecordingStudioApi
 
         def serialize_result(action, result)
           serializer = action.serializer || RecordingStudioApi::Serializers::ResourceRecordingSerializer
-          return serializer.call(result, version: current_api_version) if versioned_recording_serializer?(serializer)
+          return serializer.call(result, version: current_api_version, api: current_api_key) if versioned_recording_serializer?(serializer)
 
           serializer.call(result)
         end

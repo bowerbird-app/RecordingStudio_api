@@ -43,6 +43,19 @@ class AuthenticateOauthAccessTokenTest < ActiveSupport::TestCase
     assert_equal @root_recording.id, result.value.root_recording.id
   end
 
+  test "rejects a bearer token belonging to another api" do
+    RecordingStudioApi.configuration.api(:operations)
+
+    result = RecordingStudioApi::Services::AuthenticateOauthAccessToken.call(
+      authorization_header: "Bearer #{@access_token}",
+      api: :operations
+    )
+
+    assert result.failure?
+    assert_equal "Bearer access token is invalid", result.error
+    assert_nil @credential.reload.last_used_at
+  end
+
   test "rejects malformed OAuth access tokens" do
     result = RecordingStudioApi::Services::AuthenticateOauthAccessToken.call(
       authorization_header: "Bearer rsapi_not_oauth_format"

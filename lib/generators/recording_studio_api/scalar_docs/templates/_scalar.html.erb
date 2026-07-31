@@ -1,5 +1,5 @@
-<div id="scalar-api-reference" style="min-height: 100vh;"></div>
-<script src="<%= ERB::Util.html_escape(@scalar_source) %>"<% if @scalar_integrity.present? %> integrity="<%= ERB::Util.html_escape(@scalar_integrity) %>" crossorigin="anonymous"<% end %> defer></script>
+<div id="scalar-api-reference" style="min-height: 100vh;">Loading API documentation...</div>
+<script id="scalar-api-reference-source" src="<%= ERB::Util.html_escape(scalar_source) %>"<% if scalar_integrity.present? %> integrity="<%= ERB::Util.html_escape(scalar_integrity) %>" crossorigin="anonymous"<% end %> defer></script>
 <script>
   (function () {
     function scalarTarget() {
@@ -8,10 +8,19 @@
 
     function initializeScalar() {
       var target = scalarTarget();
-      if (!target || target.dataset.scalarInitialized === "true" || !window.Scalar) return;
+      if (!target || target.dataset.scalarInitialized === "true") return;
+      if (!window.Scalar || typeof window.Scalar.createApiReference !== "function") {
+        displayScalarLoadFailure();
+        return;
+      }
 
-      target.dataset.scalarInitialized = "true";
-      window.Scalar.createApiReference("#scalar-api-reference", <%= raw @scalar_configuration_json %>);
+      try {
+        target.textContent = "";
+        window.Scalar.createApiReference("#scalar-api-reference", <%%= raw @scalar_configuration_json %>);
+        target.dataset.scalarInitialized = "true";
+      } catch (error) {
+        displayScalarLoadFailure();
+      }
     }
 
     function displayScalarLoadFailure() {
@@ -21,6 +30,10 @@
       }
     }
 
+    var source = document.getElementById("scalar-api-reference-source");
+    source.addEventListener("load", initializeScalar, { once: true });
+    source.addEventListener("error", displayScalarLoadFailure, { once: true });
+
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", initializeScalar, { once: true });
     } else {
@@ -29,7 +42,6 @@
 
     window.addEventListener("load", function () {
       initializeScalar();
-      displayScalarLoadFailure();
     }, { once: true });
   }());
 </script>

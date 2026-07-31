@@ -11,6 +11,7 @@ module RecordingStudioApi
           :root_recording,
           :root,
           :root_type,
+          :api_name,
           :access_point,
           :role,
           :api_key,
@@ -22,9 +23,13 @@ module RecordingStudioApi
         )
 
         class << self
-          def call
-            new.call
+          def call(api: :public)
+            new(api: api).call
           end
+        end
+
+        def initialize(api: :public)
+          @api_key = RecordingStudioApi::Admin::ApiContext.resolve(api).name
         end
 
         def call
@@ -41,6 +46,7 @@ module RecordingStudioApi
               root_recording: root_recording,
               root: recordable_identifier(root_recording.recordable),
               root_type: root_recording.recordable_type.to_s.demodulize.underscore.humanize,
+              api_name: api_client.api_key,
               access_point: access_point_label(access_recording),
               role: access_recording.recordable&.try(:role).to_s.humanize.presence || "Unknown",
               api_key: credential.oauth_client_id || "Unknown",
@@ -56,9 +62,12 @@ module RecordingStudioApi
 
         private
 
+        attr_reader :api_key
+
         def credentials
           @credentials ||= RecordingStudioApi::ApiCredential
                            .includes(api_client: { access_recording: [:recordable, :root_recording] })
+                           .where(api_client_id: RecordingStudioApi::ApiClient.where(api_key: api_key).select(:id))
                            .reorder(:created_at, :id)
                            .to_a
         end

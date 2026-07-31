@@ -1,14 +1,14 @@
 # frozen_string_literal: true
 
-<% if controller_namespace.present? %>
+<% if controller_namespace.present? -%>
 module <%= controller_namespace %>
-<% end %>
+<% end -%>
 class <%= controller_short_class_name %> < ApplicationController
-<% if options[:layout] == false || options[:layout].to_s == "false" %>
+<% if options[:layout] == false || options[:layout].to_s == "false" -%>
   layout false
-<% else %>
+<% else -%>
   layout <%= options[:layout].to_s.inspect %>
-<% end %>
+<% end -%>
 
   before_action :authorize_scalar_documentation!
   before_action :ensure_supported_api_version
@@ -32,7 +32,8 @@ class <%= controller_short_class_name %> < ApplicationController
     render json: openapi_provider.call(
       version: api_version,
       mount_path: <%= api_mount_path.inspect %>,
-      api_mount_path: "/api"
+      api_mount_path: <%= api_mount_path_for_surface.inspect %><% unless api_name == "public" %>,
+      api: <%= api_name.inspect %><% end %>
     )
   rescue StandardError
     render plain: "Unable to generate the OpenAPI document. Check the configured OpenAPI provider.", status: :service_unavailable
@@ -50,9 +51,9 @@ class <%= controller_short_class_name %> < ApplicationController
   end
 
   def ensure_supported_api_version
-    return if RecordingStudioApi.supported_api_version?(api_version)
+    return if RecordingStudioApi.supported_api_version?(api_version, api: <%= api_name.inspect %>)
 
-    render plain: "Unsupported API version. Supported versions: #{RecordingStudioApi.api_versions.join(', ')}.", status: :not_found
+    render plain: "Unsupported API version. Supported versions: #{RecordingStudioApi.api_versions(api: <%= api_name.inspect %>).join(', ')}.", status: :not_found
   end
 
   def openapi_provider
@@ -64,6 +65,6 @@ class <%= controller_short_class_name %> < ApplicationController
     value.presence
   end
 end
-<% if controller_namespace.present? %>
+<% if controller_namespace.present? -%>
 end
-<% end %>
+<% end -%>

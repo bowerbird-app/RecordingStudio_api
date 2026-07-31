@@ -40,6 +40,20 @@ class IssueOauthAccessTokenTest < ActiveSupport::TestCase
     assert_equal @payload.fetch(:credential).recording&.id, access_token.recording.parent_recording_id
   end
 
+  test "rejects credentials belonging to another api" do
+    RecordingStudioApi.configuration.api(:operations)
+
+    result = RecordingStudioApi::Services::IssueOauthAccessToken.call(
+      grant_type: "client_credentials",
+      client_id: @payload.fetch(:credential).oauth_client_id,
+      client_secret: @payload.fetch(:token),
+      api: :operations
+    )
+
+    assert result.failure?
+    assert_equal "invalid_client", result.error.fetch(:error)
+  end
+
   test "uses configured access token ttl for bearer token expiry" do
     travel_to Time.zone.parse("2026-05-18 12:00:00 UTC") do
       RecordingStudioApi.configuration.access_token_ttl = 15.minutes

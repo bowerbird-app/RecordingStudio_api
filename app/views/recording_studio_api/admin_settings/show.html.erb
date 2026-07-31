@@ -1,20 +1,37 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
   <% recording_studio_page_nav(
-    title: "Admin API settings",
-    page_nav_back_url: RecordingStudioApi.admin_dashboard_path(controller: self),
+    title: "Admin #{@api_label} API settings",
+    page_nav_back_url: RecordingStudioApi.admin_dashboard_path(
+      controller: self,
+      api_key: @current_admin_api.name
+    ),
     page_nav_back_label: "Back",
     page_nav_anchor_url: page_nav_close_url
   ) %>
 
   <%= render FlatPack::PageTitle::Component.new(
-    title: "Admin API settings",
-    subtitle: "Read-only view of the current API configuration loaded for this environment.",
+    title: "#{@api_label} API settings",
+    subtitle: "Manage #{@api_label.downcase} API access and review its runtime configuration.",
     variant: :h1
   ) %>
 
+  <%= form_with url: recording_studio_api.admin_api_access_settings_path(
+    **RecordingStudioApi::Admin::ApiContext.query_params(@current_admin_api.name),
+    **page_nav_close_param
+  ), method: :patch, class: "flex flex-col items-start gap-4" do %>
+    <%= hidden_field_tag "api_access[enabled]", "0" %>
+    <%= render FlatPack::Switch::Component.new(
+      name: "api_access[enabled]",
+      checked: @api_access_enabled,
+      label: "Enable #{@api_label} API access",
+      help_text: @current_admin_api.name == "public" ? "Global emergency switch for all API access" : "Turn this API surface on and off"
+    ) %>
+    <%= render FlatPack::Button::Component.new(text: "Save", style: :primary, size: :md, type: :submit) %>
+  <% end %>
+
   <%= render FlatPack::SectionTitle::Component.new(
-    title: "Current configuration",
-    subtitle: "These values reflect the active RecordingStudioApi configuration at runtime."
+    title: "Runtime configuration",
+    subtitle: "Configuration set in recording_studio_api.rb and loaded at runtime"
   ) %>
 
   <%= render FlatPack::Table::Component.new(data: @settings_rows) do |table| %>

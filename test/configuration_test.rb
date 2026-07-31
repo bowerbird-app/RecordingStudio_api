@@ -35,6 +35,8 @@ class ConfigurationTest < Minitest::Test
   def test_initialize_uses_defaults
     configuration = RecordingStudioApi::Configuration.new
 
+    assert_equal ["public"], configuration.api_names
+    assert_same configuration.public_api, configuration.api(:public)
     assert_equal 5, configuration.timeout
     assert_equal 30.days, configuration.credential_ttl
     assert_equal 1.hour, configuration.access_token_ttl
@@ -73,6 +75,84 @@ class ConfigurationTest < Minitest::Test
     assert_equal 30, configuration.api_request_log_retention_days
     assert_nil configuration.api_daily_metric_retention_days
     assert_instance_of RecordingStudioApi::Hooks, configuration.hooks
+  end
+
+  def test_named_api_definitions_are_isolated_from_public_api
+    operations_api = @configuration.api(:operations) do |api|
+      api.api_versions = %w[v1 v2]
+      api.default_api_version = "v2"
+      api.openapi_title = "Operations API"
+      api.recordable_registry.register("AdminRoot")
+    end
+
+    assert_equal %w[public operations], @configuration.api_names
+    assert_equal "operations", operations_api.name
+    assert_equal %w[v1 v2], operations_api.api_versions
+    assert_equal "v2", operations_api.default_api_version
+    assert_equal "Operations API", operations_api.openapi_title
+    assert operations_api.recordable_registry["AdminRoot"]
+    assert_nil @configuration.public_api.recordable_registry["AdminRoot"]
+  end
+
+  def test_named_api_policies_inherit_public_defaults_and_can_override_them
+    @configuration.credential_ttl = 12.hours
+    @configuration.access_token_ttl = 20.minutes
+    @configuration.rate_limit_api_read_requests = 75
+    @configuration.api_request_logging_payload_mode = "filtered"
+    @configuration.api_request_log_allowed_param_keys = %w[query]
+
+    operations_api = @configuration.api(:operations) do |api|
+      api.api_management_authorization_required = true
+      api.access_token_ttl = 5.minutes
+      api.rate_limit_api_read_requests = 20
+      api.api_request_log_allowed_param_keys << "cursor"
+    end
+
+    assert_equal 12.hours, operations_api.credential_ttl
+    assert_equal 5.minutes, operations_api.access_token_ttl
+    assert_equal 20, operations_api.rate_limit_api_read_requests
+    assert_equal "filtered", operations_api.api_request_logging_payload_mode
+    assert_equal %w[query cursor], operations_api.api_request_log_allowed_param_keys
+    assert operations_api.api_management_authorization_required
+    assert_equal 20.minutes, @configuration.access_token_ttl
+    assert_equal 75, @configuration.rate_limit_api_read_requests
+    assert_equal %w[query], @configuration.api_request_log_allowed_param_keys
+    refute @configuration.api_management_authorization_required
+  end
+
+  def test_api_names_are_normalized_and_invalid_names_are_rejected
+    assert_same @configuration.api("Operations API"), @configuration.api(:operations_api)
+
+    assert_raises(RecordingStudioApi::ConfigurationError) { @configuration.api("../admin") }
+    assert_raises(RecordingStudioApi::ConfigurationError) { @configuration.fetch_api(:missing) }
+  end
+
+  def test_module_facade_targets_named_api_without_leaking_to_public
+    original_configuration = RecordingStudioApi.configuration
+    RecordingStudioApi.instance_variable_set(:@configuration, @configuration)
+    @configuration.api(:operations) { |api| api.api_versions = %w[v1 v2] }
+
+    RecordingStudioApi.register_recordable_type_api("AdminRoot", api: :operations)
+
+    assert_equal %w[v1 v2], RecordingStudioApi.api_versions(api: :operations)
+    assert_equal ["AdminRoot"], RecordingStudioApi.api_recordable_types(api: :operations)
+    assert RecordingStudioApi.recordable_registration_for("AdminRoot", api: :operations)
+    assert_nil RecordingStudioApi.recordable_registration_for("AdminRoot")
+  ensure
+    RecordingStudioApi.instance_variable_set(:@configuration, original_configuration)
+  end
+
+  def test_default_resource_actions_are_registered_for_each_api
+    original_configuration = RecordingStudioApi.configuration
+    RecordingStudioApi.instance_variable_set(:@configuration, @configuration)
+    @configuration.api(:operations)
+
+    RecordingStudioApi.register_default_resource_actions!
+
+    assert RecordingStudioApi.resource_action(:index)
+    assert RecordingStudioApi.resource_action(:index, api: :operations)
+  ensure
+    RecordingStudioApi.instance_variable_set(:@configuration, original_configuration)
   end
 
   def test_register_token_authenticator_adds_callable_to_configuration
@@ -314,6 +394,71 @@ class ConfigurationTest < Minitest::Test
     assert_equal "Page", registration.fetch(:recordable_type)
     assert_equal true, registration.fetch(:serializer)
     assert_equal ["title"], registration.fetch(:writable_attributes)
+    assert_equal %i[create destroy index show update], registration.fetch(:operations)
+    assert_equal [], registration.fetch(:capability_actions)
+  end
+
+  def test_recordable_registration_accepts_a_capability_action_allowlist
+    @configuration.recordable_registry.register("Page", capability_actions: %i[publish move])
+
+    registration = @configuration.recordable_registry.fetch("Page")
+
+    assert registration.supports_capability_action?(:publish)
+    assert registration.supports_capability_action?(:move)
+    refute registration.supports_capability_action?(:archive)
+  end
+
+  def test_recordable_registration_rejects_invalid_capability_action_names
+    error = assert_raises(RecordingStudioApi::ConfigurationError) do
+      @configuration.recordable_registry.register("Page", capability_actions: ["not-valid"])
+    end
+
+    assert_equal "Capability actions are invalid for Page: not-valid", error.message
+  end
+
+  def test_capability_actions_require_a_recordable_specific_api_opt_in
+    original_configuration_defined = RecordingStudioApi.instance_variable_defined?(:@configuration)
+    original_configuration = RecordingStudioApi.instance_variable_get(:@configuration)
+    RecordingStudioApi.instance_variable_set(:@configuration, @configuration)
+    @configuration.action_registry.register(
+      :publish,
+      capability: :publishable,
+      http_verb: :post,
+      handler: ->(_context) { :ok }
+    )
+    @configuration.recordable_registry.register("Page")
+
+    RecordingStudio.stub(:capability_enabled?, ->(capability, **kwargs) { capability == :publishable && kwargs[:for] == "Page" }) do
+      assert_equal [], RecordingStudioApi.capability_actions_for("Page")
+
+      @configuration.recordable_registry.register("Page", capability_actions: %i[publish])
+
+      assert_equal ["publish"], RecordingStudioApi.capability_actions_for("Page").map(&:name)
+    end
+  ensure
+    if original_configuration_defined
+      RecordingStudioApi.instance_variable_set(:@configuration, original_configuration)
+    elsif RecordingStudioApi.instance_variable_defined?(:@configuration)
+      RecordingStudioApi.remove_instance_variable(:@configuration)
+    end
+  end
+
+  def test_recordable_registration_accepts_an_operation_allowlist
+    @configuration.recordable_registry.register("AuditLog", operations: %i[index show])
+
+    registration = @configuration.recordable_registry.fetch("AuditLog")
+
+    assert registration.supports_operation?(:index)
+    assert registration.supports_operation?(:show)
+    refute registration.supports_operation?(:create)
+  end
+
+  def test_recordable_registration_rejects_unknown_operations
+    error = assert_raises(RecordingStudioApi::ConfigurationError) do
+      @configuration.recordable_registry.register("AuditLog", operations: %i[index export])
+    end
+
+    assert_equal "Unsupported API operations for AuditLog: export", error.message
   end
 
   def test_register_recordable_type_api_composes_multiple_registrations_for_same_type
@@ -351,6 +496,7 @@ class ConfigurationTest < Minitest::Test
     assert_equal "string", properties.fetch(:title).fetch(:type)
     assert_equal "string", properties.fetch(:summary).fetch(:type)
     assert_equal %w[summary title], registration.writable_attributes
+    assert_equal [], registration.capability_actions
   end
 
   def test_configure_without_block_is_safe

@@ -4,9 +4,10 @@ module RecordingStudioApi
   module Integration
     module_function
 
-    def authenticate_authorization_header(authorization_header:)
+    def authenticate_authorization_header(authorization_header:, api: :public)
       RecordingStudioApi::Services::AuthenticateOauthAccessToken.call(
-        authorization_header: authorization_header
+        authorization_header: authorization_header,
+        api: api
       )
     end
 
@@ -19,8 +20,8 @@ module RecordingStudioApi
       )
     end
 
-    def access_grant_from_authorization_header(authorization_header:)
-      auth_result = authenticate_authorization_header(authorization_header: authorization_header)
+    def access_grant_from_authorization_header(authorization_header:, api: :public)
+      auth_result = authenticate_authorization_header(authorization_header: authorization_header, api: api)
       return auth_result if auth_result.failure?
 
       RecordingStudioApi::Services::BaseService::Result.new(

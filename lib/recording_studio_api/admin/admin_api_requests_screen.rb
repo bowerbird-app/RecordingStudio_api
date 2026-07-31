@@ -8,9 +8,14 @@ module RecordingStudioApi
       title "API requests"
       subtitle "Site-wide API request activity across every API client."
 
-      query do |_context|
-        if RecordingStudioApi::ApiRequestLog.table_available?
-          RecordingStudioApi::ApiRequestLog.all
+      query do |context|
+        if RecordingStudioApi::Admin::ApiAuthorization.authorized?(
+          actor: context.current_actor,
+          api: RecordingStudioApi::Admin::ApiContext.key_from_context(context),
+          root_recording: context.root_recording,
+          role: RecordingStudioApi.configuration.access_management_view_role
+        ) && RecordingStudioApi::ApiRequestLog.table_available?
+          RecordingStudioApi::ApiRequestLog.where(api_key: RecordingStudioApi::Admin::ApiContext.key_from_context(context))
         else
           RecordingStudioApi::ApiRequestLog.none
         end
@@ -24,9 +29,9 @@ module RecordingStudioApi
              blank_label: "All API clients",
              placeholder: nil,
              humanize_options: false,
-             apply: lambda { |relation, value, _context|
+             apply: lambda { |relation, value, context|
                if value.present?
-                 relation.where(api_client_id: RecordingStudioApi::ApiClient.where(name: value).pluck(:id))
+                 relation.where(api_client_id: RecordingStudioApi::ApiClient.where(api_key: RecordingStudioApi::Admin::ApiContext.key_from_context(context), name: value).pluck(:id))
                else
                  relation
                end

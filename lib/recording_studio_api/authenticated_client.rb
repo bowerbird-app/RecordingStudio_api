@@ -5,6 +5,7 @@ module RecordingStudioApi
     :api_client,
     :credential,
     :access_recording,
-    :root_recording
+    :root_recording,
+    :api_key
   )
 end

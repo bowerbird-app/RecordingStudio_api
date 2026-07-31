@@ -15,6 +15,8 @@ class ScalarDocsGeneratorTest < Minitest::Test
 
       controller = File.read(File.join(destination_root, "app/controllers/public_api/scalar_docs_controller.rb"))
       routes = File.read(File.join(destination_root, "config/routes.rb"))
+      show_view = File.read(File.join(destination_root, "app/views/public_api/scalar_docs/show.html.erb"))
+      scalar_view = File.read(File.join(destination_root, "app/views/public_api/scalar_docs/_scalar.html.erb"))
 
       assert_includes controller, "module PublicApi"
       assert_includes controller, "class ScalarDocsController < ApplicationController"
@@ -25,8 +27,14 @@ class ScalarDocsGeneratorTest < Minitest::Test
 
       assert_includes routes, "# BEGIN RecordingStudioApi Scalar docs: public_api"
       assert_includes routes, "as: :public_api_scalar_docs"
+      assert_includes routes, "as: :public_api_scalar_docs_version"
       assert_operator routes.index("/:version/openapi.json"), :<, routes.index("/:version/fullscreen")
       assert_operator routes.index("/:version/fullscreen"), :<, routes.index('"/api-docs/:version"')
+      assert_includes show_view, "<%= ERB::Util.html_escape(@fullscreen_url) %>"
+      assert_includes scalar_view, "@scalar/api-reference@1.64.0/dist/browser/standalone.js"
+      assert_includes scalar_view, 'id="scalar-api-reference-source"'
+      assert_includes scalar_view, 'source.addEventListener("load", initializeScalar'
+      assert_includes scalar_view, "Loading API documentation..."
 
       assert_framework_agnostic_views(destination_root)
       assert_generated_ruby_and_erb_compile(destination_root)
@@ -192,6 +200,39 @@ class ScalarDocsGeneratorTest < Minitest::Test
       assert_nil default_generator.send(:scalar_integrity)
       assert_nil custom_generator.send(:scalar_integrity)
       assert_equal "sha384-AbCdEf123+/=", explicit_generator.send(:scalar_integrity)
+    end
+  end
+
+  def test_generator_can_install_and_revoke_optional_test_auth
+    with_temp_app do |destination_root|
+      generator = build_generator(
+        destination_root,
+        ["operations_api"],
+        mount_path: "/admin/operations-api/docs",
+        api_surface: "operations",
+        test_auth: true
+      )
+
+      generator.invoke_all
+
+      assert File.exist?(File.join(destination_root, "app/controllers/operations_api/scalar_test_credentials_controller.rb"))
+      assert File.exist?(File.join(destination_root, "app/views/operations_api/scalar_docs/_test_auth.html.erb"))
+      assert_includes File.read(File.join(destination_root, "config/routes.rb")),
+                      "BEGIN RecordingStudioApi test auth routes: operations_api"
+
+      revoke = build_generator(
+        destination_root,
+        ["operations_api"],
+        mount_path: "/admin/operations-api/docs",
+        api_surface: "operations",
+        test_auth: true
+      )
+      revoke.stub(:behavior, :revoke) { revoke.invoke_all }
+
+      refute File.exist?(File.join(destination_root, "app/controllers/operations_api/scalar_docs_controller.rb"))
+      refute File.exist?(File.join(destination_root, "app/controllers/operations_api/scalar_test_credentials_controller.rb"))
+      refute_includes File.read(File.join(destination_root, "config/routes.rb")), "RecordingStudioApi Scalar docs: operations_api"
+      refute_includes File.read(File.join(destination_root, "config/routes.rb")), "RecordingStudioApi test auth routes: operations_api"
     end
   end
 

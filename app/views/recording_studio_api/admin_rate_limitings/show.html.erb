@@ -1,13 +1,13 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
   <% recording_studio_page_nav(
-    title: "Rate limiting",
-    page_nav_back_url: RecordingStudioApi.admin_dashboard_path(controller: self),
+    title: "Rate limiting - #{@api_label}",
+    page_nav_back_url: RecordingStudioApi.admin_dashboard_path(controller: self, **RecordingStudioApi::Admin::ApiContext.query_params(@current_admin_api)),
     page_nav_back_label: "Back",
     page_nav_anchor_url: page_nav_close_url
   ) %>
 
   <%= render FlatPack::PageTitle::Component.new(
-    title: "Rate limiting",
+    title: "#{@api_label} API rate limiting",
     subtitle: "Read-only view of the current rate-limiting configuration.",
     variant: :h1
   ) %>

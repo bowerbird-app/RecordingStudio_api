@@ -39,6 +39,52 @@ class ProvisionAccessRequestTest < ActiveSupport::TestCase
     assert_not_empty payload.fetch(:token)
   end
 
+  test "creates credentials for the selected API" do
+    RecordingStudioApi.configuration.api(:operations)
+    RecordingStudioApi.register_recordable_type_api("Workspace", api: :operations)
+
+    result = RecordingStudioApi::Services::ProvisionAccessRequest.call(
+      access_point_recording: @root_recording,
+      actor: @user,
+      role: :admin,
+      api_client_name: "Operations client",
+      api: :operations
+    )
+
+    assert result.success?, result.error
+    assert_equal "operations", result.value.fetch(:api_client).api_key
+  end
+
+  test "rejects access points that are not registered for the selected API" do
+    RecordingStudioApi.configuration.api(:operations)
+    RecordingStudioApi.register_recordable_type_api("AdminRoot", api: :operations)
+
+    result = RecordingStudioApi::Services::ProvisionAccessRequest.call(
+      access_point_recording: @root_recording,
+      actor: @user,
+      role: :admin,
+      api_client_name: "Invalid operations client",
+      api: :operations
+    )
+
+    assert result.failure?
+    assert_equal "Access point recording does not allow API access", result.error
+  end
+
+  test "rejects an unknown API without registering it" do
+    assert_raises(RecordingStudioApi::ConfigurationError) do
+      RecordingStudioApi::Services::ProvisionAccessRequest.call(
+        access_point_recording: @root_recording,
+        actor: @user,
+        role: :admin,
+        api_client_name: "Unknown client",
+        api: :unknown
+      )
+    end
+
+    refute_includes RecordingStudioApi.configuration.api_names, "unknown"
+  end
+
   test "creates access client beneath an api access point descendant" do
     folder_recording = RecordingStudio::Recording.create!(
       recordable: Folder.create!(name: "Folder access point"),

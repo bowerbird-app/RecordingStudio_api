@@ -46,6 +46,10 @@ module RecordingStudioApi
           context.api_version
         end
 
+        def api_key
+          context.api_key
+        end
+
         def api_client
           context.api_client
         end
@@ -68,7 +72,7 @@ module RecordingStudioApi
         end
 
         def serialize_recording(target_recording)
-          RecordingStudioApi::Serializers::ResourceRecordingSerializer.call(target_recording, version: api_version)
+          RecordingStudioApi::Serializers::ResourceRecordingSerializer.call(target_recording, version: api_version, api: api_key)
         end
 
         def resource_attributes
@@ -83,7 +87,7 @@ module RecordingStudioApi
         end
 
         def allowed_attribute_keys
-          registration = RecordingStudioApi.recordable_registration_for(recordable_type)
+          registration = RecordingStudioApi.recordable_registration_for(recordable_type, api: api_key)
           Array(registration&.writable_attributes).map(&:to_sym)
         end
 

@@ -82,6 +82,7 @@ module RecordingStudioApi
         end
 
         assert_equal ["Folder"], move_endpoint.fetch(:openapi).fetch(:tags)
+        assert_equal "Move", move_endpoint.fetch(:summary)
         action_data_schema = move_endpoint
           .fetch(:openapi)
           .fetch(:responses)
@@ -270,6 +271,10 @@ module RecordingStudioApi
       end
 
       def test_catalog_uses_explicit_mount_context
+        original_versions = RecordingStudioApi.configuration.api_versions
+        original_version = RecordingStudioApi.configuration.default_api_version
+        RecordingStudioApi.configuration.api_versions = %w[v1 v2]
+
         catalog = with_catalog_stubs(
           recordable_types: ["Page"],
           actions_by_type: { "Page" => [] }
@@ -283,6 +288,9 @@ module RecordingStudioApi
 
         assert_equal "/platform/recording-api/oauth/token", catalog.fetch(:auth_endpoints).first.fetch(:path)
         assert_equal "/platform/recording-api/public-api/v2", catalog.fetch(:root_endpoints).first.fetch(:path)
+      ensure
+        RecordingStudioApi.configuration.api_versions = original_versions
+        RecordingStudioApi.configuration.default_api_version = original_version
       end
 
       def test_catalog_rejects_unsafe_mount_context
@@ -360,6 +368,7 @@ module RecordingStudioApi
           handler: ->(_context) { :current },
           openapi: { summary: "Publish current" }
         )
+        RecordingStudioApi.register_recordable_type_api("Page", capability_actions: %i[publish])
 
         api_singleton.send(:define_method, :api_recordable_types) { ["Page"] }
 
@@ -396,7 +405,7 @@ module RecordingStudioApi
         api_singleton.send(:define_method, :capability_actions_for) do |recordable_type, **|
           actions_by_type.fetch(recordable_type, [])
         end
-        api_singleton.send(:define_method, :recordable_registration_for) do |recordable_type|
+        api_singleton.send(:define_method, :recordable_registration_for) do |recordable_type, **|
           original_registration_for.call(recordable_type) if preserve_recordable_registrations
         end
         declarations_singleton.send(:define_method, :root_allowed?) do |recordable_type|

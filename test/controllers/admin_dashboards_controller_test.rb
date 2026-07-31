@@ -16,6 +16,7 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
   TEST_PASSWORD = "AdminDashboardPassword!2026"
 
   setup do
+    configure_dummy_operations_api!
     @original_admin_dashboard_path_resolver = RecordingStudioApi.configuration.admin_dashboard_path_resolver
     @original_admin_settings_path_resolver = RecordingStudioApi.configuration.admin_settings_path_resolver
     @original_admin_rate_limiting_path_resolver = RecordingStudioApi.configuration.admin_rate_limiting_path_resolver
@@ -378,14 +379,39 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
     get admin_api_settings_path
 
     assert_response :success
-    assert_includes response.body, "Admin API settings"
-    assert_includes response.body, "Read-only view of the current API configuration loaded for this environment."
-    assert_includes response.body, "Current configuration"
-    assert_includes response.body, "API versions"
-    assert_includes response.body, "Default API version"
+    assert_includes response.body, 'data-recording-studio-default-layout="true"'
+    assert_includes response.body, "Public API settings"
+    assert_includes response.body, "Manage public API access and review its runtime configuration."
+    assert_includes response.body, "Runtime configuration"
+    assert_includes response.body, "Configured APIs"
+    assert_includes response.body, "Public API versions"
+    assert_includes response.body, "Operations API versions"
     assert_not_includes response.body, "Rate limit API enabled"
     assert_includes response.body, "API request logging enabled"
     assert_select %(a[href="#{admin_api_path}"]), minimum: 1
+  end
+
+  test "renders named API settings with the Recording Studio core layout" do
+    get admin_api_settings_path(api_key: "operations")
+
+    assert_response :success
+    assert_includes response.body, 'data-recording-studio-default-layout="true"'
+    assert_includes response.body, "Operations API settings"
+  end
+
+  test "allows an API administrator to update site-wide API access" do
+    get admin_api_settings_path
+
+    assert_response :success
+    assert_select %(input[name="api_access[enabled]"][type="checkbox"]), count: 1
+    assert_includes response.body, "Enable Public API access"
+
+    patch recording_studio_api.admin_api_access_settings_path, params: {
+      api_access: { enabled: "0" }
+    }
+
+    assert_redirected_to admin_api_settings_path(close_url: admin_api_path)
+    assert_equal false, RecordingStudioApi::ApiSetting.find_by!(key: "api").api_access_enabled
   end
 
   test "renders the admin api rate limiting page from the configured host route" do

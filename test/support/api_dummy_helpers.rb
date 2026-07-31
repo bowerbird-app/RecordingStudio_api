@@ -24,6 +24,21 @@ module ApiDummyHelpers
     register_dummy_recordable_type_apis!
   end
 
+  def configure_dummy_operations_api!
+    RecordingStudioApi.configuration.api(:operations) do |api|
+      api.openapi_title = "Recording Studio Operations API"
+      api.openapi_description = "Read-only operational access for trusted administrators and automation."
+      api.default_access = :read_only
+      api.api_management_authorization_required = true
+    end
+    RecordingStudioApi.register_recordable_type_api(
+      "AdminRoot",
+      api: :operations,
+      operations: %i[index show],
+      serializer: ->(recordable) { { name: recordable.name } }
+    )
+  end
+
   def reset_recording_studio_capabilities!
     configuration = RecordingStudio.configuration
     configuration.instance_variable_set(:@capabilities, {})
@@ -34,8 +49,8 @@ module ApiDummyHelpers
     RecordingStudio.enable_capability(:accessible, on: "AdminRoot") if defined?(AdminRoot)
     RecordingStudio.enable_capability(:api_access_point, on: "Workspace")
     RecordingStudio.enable_capability(:api_access_point, on: "Folder")
+    RecordingStudio.enable_capability(:api_access_point, on: "AdminRoot") if defined?(AdminRoot)
     RecordingStudio.enable_capability(:movable, on: "Folder")
-    RecordingStudio.enable_capability(:trashable, on: "Page")
   end
 
   def create_user(email: "api-user-#{SecureRandom.hex(4)}@example.com")
@@ -166,6 +181,7 @@ module ApiDummyHelpers
       serializer: ->(recordable) { { name: recordable.name } },
       sortable_attributes: %i[name],
       writable_attributes: %i[name],
+      capability_actions: %i[move],
       openapi: {
         details_schema: {
           type: "object",
@@ -178,17 +194,5 @@ module ApiDummyHelpers
     )
   end
 
-  def register_dummy_capability_actions!
-    RecordingStudioApi.register_capability_action(
-      :trash,
-      capability: :trashable,
-      http_verb: :post,
-      required_role: :edit,
-      handler: ->(context) { Dummy::Api::Actions::TrashRecording.call(context) },
-      openapi: {
-        summary: "Trash",
-        description: "Soft-delete a trashable resource and return the updated recording payload."
-      }
-    ) unless RecordingStudioApi.capability_action(:trash)
-  end
+  def register_dummy_capability_actions!; end
 end

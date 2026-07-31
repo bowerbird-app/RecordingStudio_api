@@ -43,6 +43,90 @@ class ProvisionApiClientTest < ActiveSupport::TestCase
     assert_not_equal payload.fetch(:token), payload.fetch(:credential).token_digest
   end
 
+  test "assigns a provisioned client to the selected api" do
+    RecordingStudioApi.configuration.api(:operations)
+    RecordingStudioApi.register_recordable_type_api("Workspace", api: :operations)
+
+    result = RecordingStudioApi::Services::ProvisionApiClient.call(
+      access_recording: @access_recording,
+      name: "Operations agent",
+      api: :operations
+    )
+
+    assert result.success?, result.error
+    assert_equal "operations", result.value.fetch(:api_client).api_key
+  end
+
+  test "rejects direct provisioning for an access point outside the selected api" do
+    RecordingStudioApi.configuration.api(:operations)
+    RecordingStudioApi.register_recordable_type_api("AdminRoot", api: :operations)
+
+    result = RecordingStudioApi::Services::ProvisionApiClient.call(
+      access_recording: @access_recording,
+      name: "Invalid operations agent",
+      api: :operations
+    )
+
+    assert result.failure?
+    assert_equal "Access point recording does not allow API access", result.error
+  end
+
+  test "rejects protected api provisioning without api management access" do
+    RecordingStudioApi.configuration.api(:operations) do |api|
+      api.api_management_authorization_required = true
+    end
+    RecordingStudio.enable_capability(:accessible, on: "AdminSection")
+    RecordingStudio.enable_capability(:api_access_point, on: "AdminSection")
+    RecordingStudioApi.register_recordable_type_api("AdminSection", api: :operations)
+    _admin_root, admin_root_recording = create_admin_root_recording(name: "Protected API admin")
+    with_access_creation_context do
+      root_access = RecordingStudio::Access.create!(actor: @user, role: :admin)
+      RecordingStudio::Recording.create!(recordable: root_access, parent_recording: admin_root_recording)
+    end
+    admin_section_recording = RecordingStudio::Recording.create!(
+      recordable: AdminSection.create!(key: "delegated_api_access", name: "Delegated API access"),
+      parent_recording: admin_root_recording
+    )
+    delegated_manager = create_user(email: "delegated-api-manager@example.com")
+    grant_result = RecordingStudioAccessible.grant_access(
+      recording: admin_section_recording,
+      actor: delegated_manager,
+      role: :admin,
+      manager_actor: @user
+    )
+
+    assert grant_result.success?, grant_result.error
+    assert RecordingStudioApi::AccessManagementPolicy.new(actor: delegated_manager).can_manage_recording?(admin_section_recording)
+
+    assert_no_difference -> { RecordingStudioApi::ApiClient.count } do
+      result = RecordingStudioApi::Services::ProvisionApiClient.call(
+        access_point_recording: admin_section_recording,
+        manager_actor: delegated_manager,
+        role: :admin,
+        name: "Forged operations agent",
+        api: :operations
+      )
+
+      assert result.failure?
+      assert_equal "Not authorized to manage the selected API", result.error
+    end
+  end
+
+  test "does not allow an existing client audience to change" do
+    payload = RecordingStudioApi::Services::ProvisionApiClient.call(
+      access_recording: @access_recording,
+      name: "Audience-bound client"
+    ).value
+    client = payload.fetch(:api_client)
+
+    RecordingStudioApi.configuration.api(:operations)
+    client.api_key = "operations"
+
+    refute client.save
+    assert_includes client.errors[:api_key], "cannot be changed"
+    assert_equal "public", client.reload.api_key
+  end
+
   test "keeps existing client credentials active when provisioning another client for the same access" do
     first = RecordingStudioApi::Services::ProvisionApiClient.call(
       access_recording: @access_recording,

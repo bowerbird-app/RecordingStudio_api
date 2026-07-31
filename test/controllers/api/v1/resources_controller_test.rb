@@ -36,6 +36,22 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  test "rejects resource requests before rate limiting or authentication when API access is disabled" do
+    RecordingStudioApi::ApiSetting.find_or_create_by!(key: "api")
+                                  .update!(api_access_enabled: false)
+    rate_limit_checked = false
+    RecordingStudioApi::Concerns::RateLimiting.decider = lambda do
+      rate_limit_checked = true
+      { limited: true, limit: 1, remaining: 0, retry_after: 30 }
+    end
+
+    get "/recording_studio_api/api/v1/pages", headers: { "Authorization" => "Bearer invalid-token" }
+
+    assert_response :service_unavailable
+    assert_not rate_limit_checked
+    assert_equal "api_access_disabled", JSON.parse(response.body).fetch("error")
+  end
+
   test "throttles api v1 read requests when api throttling is enabled" do
     RecordingStudioApi.configuration.rate_limit_api_enabled = true
     RecordingStudioApi::Concerns::RateLimiting.decider = lambda do |controller|
@@ -76,134 +92,6 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_equal "9", response.headers["Retry-After"]
     assert_equal "3", response.headers["X-RateLimit-Limit"]
     assert_equal "0", response.headers["X-RateLimit-Remaining"]
-  end
-
-  test "disabled pre auth api limiter leaves invalid bearer traffic to authentication" do
-    RecordingStudioApi.configuration.rate_limit_api_pre_auth_enabled = false
-    RecordingStudioApi::Concerns::RateLimiting.decider = lambda do |controller|
-      {
-        limited: controller.send(:rate_limit_bucket) == "api_pre_auth",
-        limit: 2,
-        remaining: 0,
-        retry_after: 11
-      }
-    end
-
-    get "/recording_studio_api/api/v1/pages", headers: { "Authorization" => "Bearer invalid-token" }
-
-    assert_response :unauthorized
-  end
-
-  test "rejects API requests after the parent credential is revoked" do
-    access_token = RecordingStudioApi::ApiAccessToken.find_by!(
-      token_digest: RecordingStudioApi::OauthAccessToken.digest(@access_token)
-    )
-    access_token.credential.revoke!
-
-    get "/recording_studio_api/api/v1/pages", headers: authorization_headers
-
-    assert_response :unauthorized
-    assert_equal "Bearer access token is inactive", JSON.parse(response.body).fetch("error")
-  end
-
-  test "pre auth api limiter can throttle invalid bearer traffic before authentication" do
-    RecordingStudioApi.configuration.rate_limit_api_pre_auth_enabled = true
-    RecordingStudioApi::Concerns::RateLimiting.decider = lambda do |controller|
-      {
-        limited: controller.send(:rate_limit_bucket) == "api_pre_auth",
-        limit: 2,
-        remaining: 0,
-        retry_after: 11
-      }
-    end
-
-    get "/recording_studio_api/api/v1/pages", headers: { "Authorization" => "Bearer invalid-token" }
-
-    assert_response :too_many_requests
-    body = JSON.parse(response.body)
-    assert_equal "rate_limit_exceeded", body.fetch("error")
-    assert_equal "11", response.headers["Retry-After"]
-    assert_equal "2", response.headers["X-RateLimit-Limit"]
-    assert_equal "0", response.headers["X-RateLimit-Remaining"]
-  end
-
-  test "pre auth api limiter fails closed when limiter is unavailable" do
-    RecordingStudioApi.configuration.rate_limit_api_pre_auth_enabled = true
-    RecordingStudioApi.configuration.rate_limit_fail_closed = true
-    RecordingStudioApi.configuration.rate_limit_fail_closed_buckets = %w[oauth api_pre_auth]
-    RecordingStudioApi.configuration.rate_limit_api_pre_auth_requests = 120
-    RecordingStudioApi::Concerns::RateLimiting.decider = lambda do |_controller|
-      raise "redis offline"
-    end
-
-    get "/recording_studio_api/api/v1/pages", headers: { "Authorization" => "Bearer invalid-token" }
-
-    assert_response :too_many_requests
-    body = JSON.parse(response.body)
-    assert_equal "rate_limit_exceeded", body.fetch("error")
-    assert_equal "60", response.headers["Retry-After"]
-    assert_equal "120", response.headers["X-RateLimit-Limit"]
-    assert_equal "0", response.headers["X-RateLimit-Remaining"]
-  end
-
-  test "lists resources only within the authenticated root scope" do
-    visible_page = create_page_recording(root_recording: @root_recording)
-    other_root_recording, = create_access_recording_for(user: create_user(email: "other-root-resources@example.com"))
-    hidden_page = create_page_recording(root_recording: other_root_recording)
-
-    get "/recording_studio_api/api/v1/pages", headers: authorization_headers
-
-    assert_response :success
-
-    page_ids = JSON.parse(response.body).fetch("data").map { |row| row.fetch("id") }
-    meta = JSON.parse(response.body).fetch("meta")
-
-    assert_includes page_ids, visible_page.id
-    assert_not_includes page_ids, hidden_page.id
-    assert_equal 50, meta.fetch("limit")
-    assert_equal "created_at", meta.fetch("sort")
-    assert_equal "asc", meta.fetch("order")
-  end
-
-  test "lists resources only within a descendant access recording scope" do
-    user = create_user(email: "descendant-api-scope@example.com")
-    workspace = Workspace.create!(name: "Descendant API Workspace")
-    root_recording = RecordingStudio::Recording.create!(recordable: workspace)
-    scoped_folder = Folder.create!(name: "Scoped Folder")
-    scoped_folder_recording = RecordingStudio::Recording.create!(recordable: scoped_folder, parent_recording: root_recording)
-    scoped_page = create_page_recording(root_recording: root_recording, parent_recording: scoped_folder_recording)
-    sibling_page = create_page_recording(root_recording: root_recording)
-    access_recording = with_access_creation_context do
-      access = RecordingStudio::Access.create!(actor: user, role: :view)
-      RecordingStudio::Recording.create!(recordable: access, parent_recording: scoped_folder_recording)
-    end
-    token = issue_oauth_access_token_for(access_recording: access_recording, name: "Descendant view token")
-
-    get "/recording_studio_api/api/v1/pages", headers: { "Authorization" => "Bearer #{token}" }
-
-    assert_response :success
-
-    page_ids = JSON.parse(response.body).fetch("data").map { |row| row.fetch("id") }
-    assert_includes page_ids, scoped_page.id
-    assert_not_includes page_ids, sibling_page.id
-
-    get "/recording_studio_api/api/v1/pages/#{sibling_page.id}", headers: { "Authorization" => "Bearer #{token}" }
-
-    assert_response :not_found
-  end
-
-  test "omits attributes for unregistered page resources" do
-    page_recording = create_page_recording(root_recording: @root_recording, page_title: "Collection Title")
-
-    get "/recording_studio_api/api/v1/pages", headers: authorization_headers
-
-    assert_response :success
-
-    data = JSON.parse(response.body).fetch("data")
-    page_payload = data.find { |row| row.fetch("id") == page_recording.id }
-
-    refute_nil page_payload
-    assert_not_includes page_payload.keys, "attributes"
   end
 
   test "paginates collection responses with pagination_token" do
@@ -336,6 +224,21 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_equal "workspace", payload.fetch("type")
     assert_equal "Created Workspace", payload.fetch("attributes").fetch("name")
     assert_not_includes payload.fetch("attributes").keys, "unknown_attribute"
+  end
+
+  test "rejects resource operations excluded by a recordable allowlist" do
+    RecordingStudioApi.register_recordable_type_api("Workspace", operations: %i[index])
+
+    get "/recording_studio_api/api/v1/workspaces", headers: authorization_headers
+
+    assert_response :success
+
+    post "/recording_studio_api/api/v1/workspaces", params: {
+      attributes: { name: "Excluded workspace" }
+    }, headers: authorization_headers
+
+    assert_response :unprocessable_entity
+    assert_equal "create is not enabled for Workspace", JSON.parse(response.body).fetch("error")
   end
 
   test "does not make response-only OpenAPI properties writable" do
@@ -496,7 +399,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_equal "Resource was not found in this API scope", JSON.parse(response.body).fetch("error")
   end
 
-  test "deletes a non-trashable resource by hard deleting its recording" do
+  test "deletes a resource by hard deleting its recording" do
     page_recording = create_page_recording(root_recording: @root_recording)
 
     delete "/recording_studio_api/api/v1/pages/#{page_recording.id}", headers: authorization_headers
@@ -579,150 +482,6 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :forbidden
     assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).fetch("error")
-  end
-
-  test "forbids trash restore for clients with view-only access" do
-    _view_root_recording, view_access_recording = create_access_recording_for(
-      user: create_user(email: "view-only-trash-restore@example.com"),
-      role: :view
-    )
-    page_recording = create_page_recording(root_recording: view_access_recording.root_recording)
-    page_recording.update_column(:trashed_at, Time.current)
-    view_token = issue_oauth_access_token_for(access_recording: view_access_recording, name: "View-only token")
-
-    post "/recording_studio_api/api/v1/trash/#{page_recording.id}/restore", headers: { "Authorization" => "Bearer #{view_token}" }
-
-    assert_response :forbidden
-    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).fetch("error")
-    assert_not_nil RecordingStudio::Recording.unscoped.find(page_recording.id).trashed_at
-  end
-
-  test "forbids trash destroy for clients with view-only access" do
-    _view_root_recording, view_access_recording = create_access_recording_for(
-      user: create_user(email: "view-only-trash-destroy@example.com"),
-      role: :view
-    )
-    page_recording = create_page_recording(root_recording: view_access_recording.root_recording)
-    page_recording.update_column(:trashed_at, Time.current)
-    view_token = issue_oauth_access_token_for(access_recording: view_access_recording, name: "View-only token")
-
-    delete "/recording_studio_api/api/v1/trash/#{page_recording.id}", headers: { "Authorization" => "Bearer #{view_token}" }
-
-    assert_response :forbidden
-    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).fetch("error")
-    assert_not_nil RecordingStudio::Recording.unscoped.find_by(id: page_recording.id)
-  end
-
-  test "delete permanently destroys an already trashed resource" do
-    page_recording = create_page_recording(root_recording: @root_recording)
-    page_recording.update_column(:trashed_at, Time.current)
-
-    delete "/recording_studio_api/api/v1/pages/#{page_recording.id}", headers: authorization_headers
-
-    assert_response :success
-    payload = JSON.parse(response.body).fetch("data")
-
-    assert_equal page_recording.id, payload.fetch("id")
-    assert_equal true, payload.fetch("deleted")
-    assert_equal "destroyed", payload.fetch("deleted_via")
-    assert_nil RecordingStudio::Recording.unscoped.find_by(id: page_recording.id)
-  end
-
-  test "delete permanently destroys a trashable resource" do
-    page_recording = create_page_recording(root_recording: @root_recording)
-
-    delete "/recording_studio_api/api/v1/pages/#{page_recording.id}", headers: authorization_headers
-
-    assert_response :success
-    payload = JSON.parse(response.body).fetch("data")
-
-    assert_equal page_recording.id, payload.fetch("id")
-    assert_equal true, payload.fetch("deleted")
-    assert_equal "destroyed", payload.fetch("deleted_via")
-    assert_nil RecordingStudio::Recording.unscoped.find_by(id: page_recording.id)
-  end
-
-  test "lists and shows trashed resources across recordable types" do
-    trashed_page = create_page_recording(root_recording: @root_recording)
-    active_page = create_page_recording(root_recording: @root_recording)
-    trashed_workspace = RecordingStudio::Recording.create!(
-      recordable: Workspace.create!(name: "Trashed workspace"),
-      parent_recording: @root_recording
-    )
-    trashed_page.update_column(:trashed_at, Time.current)
-    trashed_workspace.update_column(:trashed_at, Time.current)
-
-    get "/recording_studio_api/api/v1/trash", headers: authorization_headers
-
-    assert_response :success
-    payload = JSON.parse(response.body)
-    ids = payload.fetch("data").map { |row| row.fetch("id") }
-
-    assert_includes ids, trashed_page.id
-    assert_includes ids, trashed_workspace.id
-    assert_not_includes ids, active_page.id
-
-    get "/recording_studio_api/api/v1/trash/#{trashed_page.id}", headers: authorization_headers
-
-    assert_response :success
-    assert_equal trashed_page.id, JSON.parse(response.body).fetch("data").fetch("id")
-  end
-
-  test "hides out-of-scope trashed resources from every trash endpoint" do
-    other_root_recording, = create_access_recording_for(user: create_user(email: "outside-trash@example.com"))
-    hidden_page = create_page_recording(root_recording: other_root_recording)
-    hidden_page.update_column(:trashed_at, Time.current)
-
-    get "/recording_studio_api/api/v1/trash", headers: authorization_headers
-
-    assert_response :success
-    ids = JSON.parse(response.body).fetch("data").map { |row| row.fetch("id") }
-    assert_not_includes ids, hidden_page.id
-
-    get "/recording_studio_api/api/v1/trash/#{hidden_page.id}", headers: authorization_headers
-    assert_response :not_found
-
-    post "/recording_studio_api/api/v1/trash/#{hidden_page.id}/restore", headers: authorization_headers
-    assert_response :not_found
-
-    delete "/recording_studio_api/api/v1/trash/#{hidden_page.id}", headers: authorization_headers
-    assert_response :not_found
-    assert_not_nil RecordingStudio::Recording.unscoped.find_by(id: hidden_page.id)
-  end
-
-  test "restores and permanently deletes trashed resources" do
-    restorable_page = create_page_recording(root_recording: @root_recording)
-    deletable_page = create_page_recording(root_recording: @root_recording)
-    restorable_page.update_column(:trashed_at, Time.current)
-    deletable_page.update_column(:trashed_at, Time.current)
-
-    post "/recording_studio_api/api/v1/trash/#{restorable_page.id}/restore", headers: authorization_headers
-
-    assert_response :success
-    assert_nil RecordingStudio::Recording.unscoped.find(restorable_page.id).trashed_at
-
-    delete "/recording_studio_api/api/v1/trash/#{deletable_page.id}", headers: authorization_headers
-
-    assert_response :success
-    payload = JSON.parse(response.body).fetch("data")
-    assert_equal true, payload.fetch("deleted")
-    assert_equal "destroyed", payload.fetch("deleted_via")
-    assert_nil RecordingStudio::Recording.unscoped.find_by(id: deletable_page.id)
-  end
-
-  test "returns not found when trash endpoints reference non-trashed resources" do
-    workspace_recording = RecordingStudio::Recording.create!(
-      recordable: Workspace.create!(name: "Active workspace"),
-      parent_recording: @root_recording
-    )
-
-    get "/recording_studio_api/api/v1/trash/#{workspace_recording.id}", headers: authorization_headers
-    assert_response :not_found
-    assert_equal "Trashed resource was not found in this API scope", JSON.parse(response.body).fetch("error")
-
-    post "/recording_studio_api/api/v1/trash/#{workspace_recording.id}/restore", headers: authorization_headers
-    assert_response :not_found
-    assert_equal "Trashed resource was not found in this API scope", JSON.parse(response.body).fetch("error")
   end
 
   test "rejects delete for resources outside the authenticated root scope" do

@@ -3,13 +3,14 @@
 module RecordingStudioApi
   module Services
     class TokenAuthenticationBase < BaseService
-      def initialize(authorization_header:)
+      def initialize(authorization_header:, api: :public)
         @authorization_header = authorization_header
+        @api_key = RecordingStudioApi.configuration.fetch_api(api).name
       end
 
       private
 
-      attr_reader :authorization_header
+      attr_reader :authorization_header, :api_key
 
       def perform
         token = parse_bearer_token
@@ -18,6 +19,7 @@ module RecordingStudioApi
 
         credential, token_record = resolve_authenticated_entities(token)
         return failure(AuthenticationError.new(invalid_token_error_message)) if credential.nil?
+        return failure(AuthenticationError.new(invalid_token_error_message)) unless credential.api_client&.api_key == api_key
         return failure(AuthenticationError.new(inactive_token_error_message)) unless token_record_active?(token_record)
         return failure(AuthenticationError.new(inactive_token_error_message)) unless credential.active_for_authentication?
         return failure(AuthenticationError.new(inactive_token_error_message)) unless access_recording_active?(credential)
@@ -32,7 +34,8 @@ module RecordingStudioApi
             api_client: credential.api_client,
             credential: credential,
             access_recording: credential.effective_access_recording,
-            root_recording: root_recording
+            root_recording: root_recording,
+            api_key: api_key
           )
         )
       end
@@ -78,7 +81,7 @@ module RecordingStudioApi
       end
 
       def service_args
-        { authorization_header_present: authorization_header.present? }
+        { authorization_header_present: authorization_header.present?, api_key: api_key }
       end
 
       def missing_token_error_message

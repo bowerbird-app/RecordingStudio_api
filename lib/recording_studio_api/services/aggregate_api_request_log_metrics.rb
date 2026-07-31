@@ -36,7 +36,7 @@ module RecordingStudioApi
 
       def log_rows
         @log_rows ||= ApiRequestLog.where(occurred_at: metric_date.beginning_of_day..metric_date.end_of_day)
-                                   .pluck(:route_name, :controller_name, :action_name, :request_method, :status_code, :rate_limited, :duration_ms)
+                                   .pluck(:api_key, :route_name, :controller_name, :action_name, :request_method, :status_code, :rate_limited, :duration_ms)
       end
 
       def delete_existing_metrics!
@@ -45,19 +45,20 @@ module RecordingStudioApi
       end
 
       def persist_daily_metrics!
-        grouped_rows.each do |(route_name, request_method, status_class), rows|
-          durations = rows.map { |row| row[6] }.compact
+        grouped_rows.each do |(api_key, route_name, request_method, status_class), rows|
+          durations = rows.map { |row| row[7] }.compact
           ApiDailyMetric.create!(
+            api_key: api_key,
             metric_date: metric_date,
             route_name: route_name,
-            controller_name: rows.first[1],
-            action_name: rows.first[2],
+            controller_name: rows.first[2],
+            action_name: rows.first[3],
             request_method: request_method,
             status_class: status_class,
             request_count: rows.size,
-            rate_limited_count: rows.count { |row| row[5] || row[4].to_i == 429 },
-            client_error_count: rows.count { |row| (400..499).cover?(row[4].to_i) },
-            server_error_count: rows.count { |row| (500..599).cover?(row[4].to_i) },
+            rate_limited_count: rows.count { |row| row[6] || row[5].to_i == 429 },
+            client_error_count: rows.count { |row| (400..499).cover?(row[5].to_i) },
+            server_error_count: rows.count { |row| (500..599).cover?(row[5].to_i) },
             duration_count: durations.size,
             duration_sum_ms: durations.sum,
             duration_max_ms: durations.max.to_i
@@ -66,9 +67,10 @@ module RecordingStudioApi
       end
 
       def persist_histogram_buckets!
-        grouped_rows.each do |(route_name, request_method, status_class), rows|
-          rows.map { |row| row[6] }.compact.group_by { |duration| latency_bucket_for(duration) }.each do |upper_bound_ms, durations|
+        grouped_rows.each do |(api_key, route_name, request_method, status_class), rows|
+          rows.map { |row| row[7] }.compact.group_by { |duration| latency_bucket_for(duration) }.each do |upper_bound_ms, durations|
             ApiDailyLatencyHistogramBucket.create!(
+              api_key: api_key,
               metric_date: metric_date,
               route_name: route_name,
               request_method: request_method,
@@ -81,8 +83,8 @@ module RecordingStudioApi
       end
 
       def grouped_rows
-        @grouped_rows ||= log_rows.group_by do |route_name, _controller_name, _action_name, request_method, status_code, *_|
-          [route_name.presence || "unknown", request_method, status_code.to_i / 100]
+        @grouped_rows ||= log_rows.group_by do |api_key, route_name, _controller_name, _action_name, request_method, status_code, *_|
+          [api_key.presence || "public", route_name.presence || "unknown", request_method, status_code.to_i / 100]
         end
       end
 

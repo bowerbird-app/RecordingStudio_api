@@ -28,6 +28,7 @@ Metrics/ClassLength:
 Metrics/BlockLength:
   Exclude:
     - 'test/**/*'
+    - 'config/routes.rb'
 
 Metrics/MethodLength:
   Exclude:
@@ -38,6 +39,7 @@ Metrics/AbcSize:
   Exclude:
     - 'test/**/*'
     - 'lib/generators/**/*'
+    - 'lib/recording_studio_api/admin/api_section_factory.rb'
 
 # Allow empty blocks in tests (common for stubs/mocks)
 Lint/EmptyBlock:

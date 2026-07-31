@@ -53,6 +53,20 @@ class OauthControllerTest < ActionDispatch::IntegrationTest
     assert_equal "rate_limit_exceeded", body.fetch("error")
   end
 
+  test "rejects token issuance when API access is disabled" do
+    RecordingStudioApi::ApiSetting.find_or_create_by!(key: "api")
+                                  .update!(api_access_enabled: false)
+
+    post "/recording_studio_api/oauth/token", params: {
+      grant_type: "client_credentials",
+      client_id: @payload.fetch(:credential).oauth_client_id,
+      client_secret: @payload.fetch(:token)
+    }
+
+    assert_response :service_unavailable
+    assert_equal "api_access_disabled", JSON.parse(response.body).fetch("error")
+  end
+
   test "fails closed when oauth rate limiter is unavailable" do
     RecordingStudioApi.configuration.rate_limit_oauth_enabled = true
     RecordingStudioApi.configuration.rate_limit_fail_closed = true
@@ -149,6 +163,19 @@ class OauthControllerTest < ActionDispatch::IntegrationTest
     assert_equal "[FILTERED]", request_params.fetch("metadata").fetch("credentials").fetch("client_secret")
     assert_equal "[FILTERED]", request_params.fetch("client_secret")
     assert_not_includes request_params, "client_id"
+  end
+
+  test "named oauth route rejects credentials from another api" do
+    RecordingStudioApi.configuration.api(:operations)
+
+    post "/recording_studio_api/apis/operations/oauth/token", params: {
+      grant_type: "client_credentials",
+      client_id: @payload.fetch(:credential).oauth_client_id,
+      client_secret: @payload.fetch(:token)
+    }
+
+    assert_response :unauthorized
+    assert_equal "invalid_client", JSON.parse(response.body).fetch("error")
   end
 
   test "issues access token with valid client credentials" do

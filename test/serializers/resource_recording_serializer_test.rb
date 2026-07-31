@@ -132,6 +132,7 @@ module RecordingStudioApi
           version: "2.0.0",
           handler: ->(_context) { :ok }
         )
+        RecordingStudioApi.register_recordable_type_api("Page", capability_actions: %i[publish])
 
         recording = build_recording(
           recordable_type: "Page",

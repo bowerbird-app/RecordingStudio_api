@@ -9,13 +9,14 @@ module RecordingStudioApi
       OAUTH_TOKEN_PATH = "/recording_studio_api/oauth/token"
 
       class << self
-        def call(version: nil, mount_path: nil, api_mount_path: nil)
-          new(version: version, mount_path: mount_path, api_mount_path: api_mount_path).call
+        def call(version: nil, mount_path: nil, api_mount_path: nil, api: :public)
+          new(version: version, mount_path: mount_path, api_mount_path: api_mount_path, api: api).call
         end
       end
 
-      def initialize(version: nil, mount_path: nil, api_mount_path: nil)
-        @api_version = RecordingStudioApi.resolve_api_version(version)
+      def initialize(version: nil, mount_path: nil, api_mount_path: nil, api: :public)
+        @api_key = RecordingStudioApi.configuration.fetch_api(api).name
+        @api_version = RecordingStudioApi.resolve_api_version(version, api: @api_key)
         @mount_path = mount_path
         @api_mount_path = api_mount_path
       end
@@ -24,13 +25,14 @@ module RecordingStudioApi
         {
           openapi: OPENAPI_VERSION,
           info: {
-            title: RecordingStudioApi.openapi_title,
+            title: RecordingStudioApi.openapi_title(api: @api_key),
             version: RecordingStudioApi::VERSION,
-            description: RecordingStudioApi.openapi_description
+            description: RecordingStudioApi.openapi_description(api: @api_key)
           },
           servers: [
             { url: "/", description: "Host application root" }
           ],
+          tags: tags,
           paths: paths,
           components: components,
           security: [
@@ -51,15 +53,60 @@ module RecordingStudioApi
         end
       end
 
+      def tags
+        tag_descriptions = resource_tag_descriptions
+
+        all_endpoints.flat_map { |endpoint| Array(endpoint.fetch(:openapi, {}).fetch(:tags, [tag_for(endpoint)])) }
+                     .uniq
+                     .map do |name|
+          {
+            name: name,
+            description: tag_descriptions.fetch(name, default_tag_description(name))
+          }
+        end
+      end
+
       def all_endpoints
-        catalog = RecordingStudioApi.documentation_catalog(
-          version: @api_version,
-          mount_path: @mount_path,
-          api_mount_path: @api_mount_path
-        )
+        catalog = documentation_catalog
         resource_endpoints = catalog.fetch(:resources).flat_map { |section| section.fetch(:endpoints) }
 
         catalog.fetch(:auth_endpoints) + catalog.fetch(:root_endpoints) + resource_endpoints
+      end
+
+      def documentation_catalog
+        @documentation_catalog ||= RecordingStudioApi.documentation_catalog(
+          version: @api_version,
+          mount_path: @mount_path,
+          api_mount_path: @api_mount_path,
+          api: @api_key
+        )
+      end
+
+      def resource_tag_descriptions
+        documentation_catalog.fetch(:resources).each_with_object(shared_tag_descriptions) do |section, descriptions|
+          recordable_type = section.fetch(:recordable_type)
+          registration = if @api_key == "public"
+                           RecordingStudioApi.recordable_registration_for(recordable_type)
+                         else
+                           RecordingStudioApi.recordable_registration_for(recordable_type, api: @api_key)
+                         end
+          tag_metadata = registration&.openapi&.fetch(:tag, {})
+          description = tag_metadata.fetch(:description, nil) if tag_metadata.is_a?(Hash)
+          tag_name = section.fetch(:resource).to_s.singularize.humanize.titleize
+
+          descriptions[tag_name] = description.presence || "View and manage #{section.fetch(:resource).to_s.humanize.downcase} available to your client."
+        end
+      end
+
+      def shared_tag_descriptions
+        {
+          "Authentication" => "Authenticate your application with its client credentials to receive a bearer token for API requests.",
+          "resources" => "Discover the resource collections available through this API."
+        }
+      end
+
+      def default_tag_description(name)
+        "Operations related to #{name.to_s.humanize.downcase}."
       end
 
       def operation_for(endpoint)

@@ -4,11 +4,11 @@ module RecordingStudioApi
   module Serializers
     class ResourceRecordingSerializer
       class << self
-        def call(recording, version: nil)
-          base_payload = RecordingSerializer.call(recording, version: version)
+        def call(recording, version: nil, api: :public)
+          base_payload = RecordingSerializer.call(recording, version: version, api: api)
           return base_payload if recording.is_a?(Hash)
 
-          registration = RecordingStudioApi.recordable_registration_for(recording.recordable_type)
+          registration = RecordingStudioApi.recordable_registration_for(recording.recordable_type, api: api)
           attributes = custom_attributes_for(registration, recording.recordable)
 
           return base_payload if attributes.empty?

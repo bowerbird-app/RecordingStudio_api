@@ -100,6 +100,7 @@ module RecordingStudioApi
       return @errors_base_scope if defined?(@errors_base_scope)
 
       scope = RecordingStudioApi::ApiRequestLog.where(
+        api_key: @current_admin_api.name,
         occurred_at: @errors_chart_start_date.beginning_of_day..@errors_chart_end_date.end_of_day,
         status_code: 400..599
       )

@@ -2,13 +2,14 @@
 
 require "rails/generators"
 require "uri"
+require_relative "../test_auth/test_auth_generator"
 
 module RecordingStudioApi
   module Generators
     class ScalarDocsGenerator < Rails::Generators::NamedBase
       source_root File.expand_path("templates", __dir__)
 
-      DEFAULT_SCALAR_SOURCE = "https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.25.118/dist/browser/standalone.js"
+      DEFAULT_SCALAR_SOURCE = "https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.64.0/dist/browser/standalone.js"
       # Add an entry only after fetching and verifying the exact immutable source bundle.
       DEFAULT_SCALAR_INTEGRITY_BY_SOURCE = {}.freeze
 
@@ -16,6 +17,8 @@ module RecordingStudioApi
                                 desc: "Path where the Scalar documentation is mounted"
       class_option :api_mount_path, type: :string, default: "/recording_studio_api",
                                     desc: "Path where RecordingStudioApi::Engine is mounted"
+      class_option :api_surface, type: :string, default: "public",
+                                 desc: "Named RecordingStudioApi surface to document"
       class_option :controller, type: :string, default: nil,
                                 desc: "Controller path (defaults to NAME/scalar_docs)"
       class_option :layout, type: :string, default: "application",
@@ -27,9 +30,11 @@ module RecordingStudioApi
       class_option :scalar_integrity, type: :string, default: nil,
                                       desc: "Optional SRI hash for the Scalar script"
       class_option :default_api_version, type: :string, default: "v1",
-                                        desc: "Default API version for the documentation redirect"
+                                         desc: "Default API version for the documentation redirect"
       class_option :openapi_provider, type: :string, default: "RecordingStudioApi::Services::OpenapiDocument",
                                       desc: "Callable OpenAPI provider constant"
+      class_option :test_auth, type: :boolean, default: false,
+                               desc: "Install the optional local test-credential helper"
 
       desc "Installs named, framework-agnostic Scalar API documentation"
 
@@ -39,12 +44,13 @@ module RecordingStudioApi
         validation_errors << "--mount-path must be a safe absolute path" unless valid_path?(mount_path)
         validation_errors << "--api-mount-path must be a safe absolute path" unless valid_path?(api_mount_path, allow_root: true)
         validation_errors << "--default-api-version must look like v1" unless default_api_version.match?(/\Av[0-9][a-z0-9_-]*\z/i)
+        validation_errors << "--api-surface must contain letters, numbers, underscores, or dashes" unless api_name.match?(/\A[a-z0-9][a-z0-9_-]*\z/i)
         validation_errors << "--controller must be a controller path" unless valid_controller?
         validation_errors << "--layout must be a layout name or false" unless valid_layout?
         validation_errors << "--scalar-source must be an http(s) URL" unless valid_http_url?(scalar_source)
         validation_errors << "--scalar-url must be blank, an absolute path, or an http(s) URL" unless valid_scalar_url?
         validation_errors << "--scalar-integrity must contain valid SRI sha256, sha384, or sha512 hashes" unless valid_scalar_integrity?
-        validation_errors << "--openapi-provider must be a Ruby constant name" unless openapi_provider.match?(/\A[A-Z]\w*(?:::[A-Z]\w*)*\z/)
+        validation_errors << "--openapi-provider must be a Ruby constant name" unless options[:openapi_provider].match?(/\A[A-Z]\w*(?:::[A-Z]\w*)*\z/)
 
         raise Thor::Error, "Scalar documentation generator failed: #{validation_errors.join('; ')}" if validation_errors.any?
       end
@@ -90,9 +96,7 @@ module RecordingStudioApi
           return
         end
 
-        unless File.exist?(routes_file_path)
-          raise Thor::Error, "Scalar documentation generator failed: #{routes_path} was not found."
-        end
+        raise Thor::Error, "Scalar documentation generator failed: #{routes_path} was not found." unless File.exist?(routes_file_path)
 
         source = File.read(routes_file_path)
         if source.include?(route_start_marker)
@@ -107,8 +111,20 @@ module RecordingStudioApi
         inject_into_file routes_path, route_insertion, before: /\nend\s*\z/
       end
 
-      def show_readme
-        readme "README.md" if behavior == :invoke
+      def install_test_auth
+        return unless options[:test_auth]
+
+        child = RecordingStudioApi::Generators::TestAuthGenerator.new(
+          [name],
+          {
+            mount_path: mount_path,
+            api_surface: api_name,
+            controller: controller_path
+          },
+          destination_root: destination_root,
+          behavior: behavior
+        )
+        child.invoke_all
       end
 
       private
@@ -135,10 +151,18 @@ module RecordingStudioApi
         version.start_with?("v") ? version : "v#{version}"
       end
 
+      def api_name
+        options[:api_surface].to_s.strip.downcase
+      end
+
+      def api_mount_path_for_surface
+        api_name == "public" ? "/api" : "/apis/#{api_name}"
+      end
+
       def controller_path
         @controller_path ||= begin
           configured = options[:controller].presence || "#{file_name}/scalar_docs"
-          configured.to_s.underscore.sub(%r{_controller\z}, "").tr("::", "/").squeeze("/")
+          configured.to_s.underscore.sub(/_controller\z/, "").tr("::", "/").squeeze("/")
         end
       end
 
@@ -169,6 +193,7 @@ module RecordingStudioApi
       def route_helper_names
         %W[
           #{route_key}_scalar_docs
+          #{route_key}_scalar_docs_version
           #{route_key}_scalar_docs_openapi
           #{route_key}_scalar_docs_fullscreen
         ]
@@ -205,7 +230,7 @@ module RecordingStudioApi
           get "#{mount_path}", to: redirect("#{mount_path}/#{default_api_version}"), as: :#{route_key}_scalar_docs
           get "#{mount_path}/:version/openapi.json", to: "#{controller_path}#openapi", as: :#{route_key}_scalar_docs_openapi
           get "#{mount_path}/:version/fullscreen", to: "#{controller_path}#fullscreen", as: :#{route_key}_scalar_docs_fullscreen
-          get "#{mount_path}/:version", to: "#{controller_path}#show"
+          get "#{mount_path}/:version", to: "#{controller_path}#show", as: :#{route_key}_scalar_docs_version
           #{route_end_marker}
         RUBY
       end
@@ -233,7 +258,7 @@ module RecordingStudioApi
       end
 
       def valid_name?
-        name.to_s.match?(/\A[a-zA-Z0-9][a-zA-Z0-9_\/-]*\z/) && !name.to_s.include?("..")
+        name.to_s.match?(%r{\A[a-zA-Z0-9][a-zA-Z0-9_/-]*\z}) && !name.to_s.include?("..")
       end
 
       def valid_path?(path, allow_root: false)
@@ -255,7 +280,7 @@ module RecordingStudioApi
 
       def valid_http_url?(value)
         uri = URI.parse(value.to_s)
-        uri.is_a?(URI::HTTP) && uri.host.present? && value.to_s.match?(/\Ahttps?:\/\//)
+        uri.is_a?(URI::HTTP) && uri.host.present? && value.to_s.match?(%r{\Ahttps?://})
       rescue URI::InvalidURIError
         false
       end

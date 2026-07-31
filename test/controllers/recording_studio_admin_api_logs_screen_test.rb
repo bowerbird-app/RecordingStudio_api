@@ -15,6 +15,7 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
   TEST_PASSWORD = "AdminApiLogsPassword!2026"
 
   setup do
+    configure_dummy_operations_api!
     ensure_admin_root_tables!
 
     @user = User.create!(email: "rs-admin-api-logs-#{SecureRandom.hex(4)}@example.com") do |user|
@@ -270,6 +271,7 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Monitor and administer API access across the site."
     assert_includes response.body, "/admin/api/screens/admin_api_requests?anchor_url=%2F"
     assert_includes response.body, "/admin/api/screens/admin_api_failing_endpoints?anchor_url=%2F"
+    assert_includes response.body, "/recording_studio_api/admin_api/settings?anchor_url=%2F"
     assert_includes response.body, "widgets.recording_studio_api.admin.requests_last_four_weeks"
     assert_includes response.body, "widgets.recording_studio_api.admin.api_latency_last_four_weeks"
     assert_includes response.body, "widgets.recording_studio_api.admin.client_errors_last_four_weeks"
@@ -575,6 +577,41 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "First site credential"
     assert_select '[role="tooltip"]', text: "Revoked at #{revoked_at}", count: 1
+  end
+
+  test "admin workspace provisions and monitors operations API credentials separately" do
+    switch_to_root(@admin_root_recording)
+
+    get "/admin/api/operations"
+
+    assert_response :success
+    assert_includes response.body, "Admin Operations API"
+    assert_includes response.body, "api_key=operations"
+
+    post "/recording_studio_api/api_clients", params: {
+      api_client: {
+        api_key: "operations",
+        root_type: "AdminRoot",
+        root_recording_id: @admin_root_recording.id,
+        access_point_recording_id: @admin_root_recording.id,
+        role: "admin",
+        api_client_name: "Operations monitoring client",
+        expires_at: ""
+      }
+    }
+
+    assert_response :created
+    assert_equal "operations", RecordingStudioApi::ApiClient.find_by!(name: "Operations monitoring client").api_key
+
+    get "/admin/api/operations/screens/admin_api_credentials/table", params: { api_key: "operations" }
+
+    assert_response :success
+    assert_includes response.body, "Operations monitoring client"
+
+    get "/admin/api/screens/admin_api_credentials/table"
+
+    assert_response :success
+    assert_not_includes response.body, "Operations monitoring client"
   end
 
   test "API admin viewers cannot revoke credentials" do

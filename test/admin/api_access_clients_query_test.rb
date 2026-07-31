@@ -48,6 +48,21 @@ class ApiAccessClientsQueryTest < ActiveSupport::TestCase
     assert_empty query
   end
 
+  test "scopes visible clients to the selected API" do
+    RecordingStudioApi.configuration.api(:operations)
+    RecordingStudioApi.register_recordable_type_api("Workspace", api: :operations)
+    operations_payload = RecordingStudioApi::Services::ProvisionApiClient.call(
+      access_point_recording: @root_recording,
+      manager_actor: @user,
+      role: :admin,
+      name: "Operations client",
+      api: :operations
+    ).value
+
+    assert_equal [@payload.fetch(:api_client).id], query.map { |row| row.api_client.id }.uniq
+    assert_equal [operations_payload.fetch(:api_client).id], query(api_key: "operations").map { |row| row.api_client.id }.uniq
+  end
+
   private
 
   def remove_credential!
@@ -55,9 +70,10 @@ class ApiAccessClientsQueryTest < ActiveSupport::TestCase
     credential.delete
   end
 
-  def query(status: nil)
+  def query(status: nil, api_key: nil)
     params = {}
     params[:status] = status if status
+    params[:api_key] = api_key if api_key
     context = Context.new(params: params, current_actor: @user, root_recording: @root_recording)
 
     RecordingStudioApi::Admin::Queries::ApiAccessClientsQuery.call(context)

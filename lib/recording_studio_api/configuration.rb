@@ -4,6 +4,7 @@ require_relative "hooks"
 require_relative "action_registry"
 require_relative "api_version_profile"
 require_relative "recordable_registry"
+require_relative "api_definition"
 
 module RecordingStudioApi
   class Configuration
@@ -21,6 +22,7 @@ module RecordingStudioApi
                   :token_authenticators,
                   :access_management_view_role,
                   :access_management_edit_role,
+                  :api_management_authorization_required,
                   :capability_action_role_resolver,
                   :admin_dashboard_path_resolver,
                   :admin_settings_path_resolver,
@@ -67,6 +69,7 @@ module RecordingStudioApi
       @token_authenticators = []
       @access_management_view_role = :view
       @access_management_edit_role = :admin
+      @api_management_authorization_required = false
       @capability_action_roles = {}
       @capability_action_role_resolver = nil
       @admin_dashboard_path_resolver = lambda do |controller:, **|
@@ -122,6 +125,7 @@ module RecordingStudioApi
       @hooks = Hooks.new
       @action_registry = ActionRegistry.new
       @recordable_registry = RecordableRegistry.new
+      @apis = {}
     end
     # rubocop:enable Metrics/AbcSize
 
@@ -131,6 +135,7 @@ module RecordingStudioApi
         timeout: timeout,
         credential_ttl: credential_ttl,
         access_token_ttl: access_token_ttl,
+        api_management_authorization_required: api_management_authorization_required,
         token_authenticators_count: token_authenticators.count,
         capability_action_roles: capability_action_roles,
         capability_action_role_resolver: capability_action_role_resolver.respond_to?(:call),
@@ -145,6 +150,7 @@ module RecordingStudioApi
         api_versions: api_versions,
         default_api_version: default_api_version,
         api_version_profiles: api_version_profiles.transform_values(&:as_json),
+        apis: @apis.transform_values(&:to_h),
         openapi_title: openapi_title,
         openapi_description: openapi_description,
         layout_name: layout_name,
@@ -189,6 +195,45 @@ module RecordingStudioApi
       end
     end
 
+    def name
+      "public"
+    end
+
+    def public_api
+      self
+    end
+
+    def api(name = :public)
+      normalized_name = normalize_api_name(name)
+      definition = normalized_name == "public" ? public_api : (@apis[normalized_name] ||= ApiDefinition.new(normalized_name, defaults: public_api))
+      yield(definition) if block_given?
+      definition
+    end
+
+    def fetch_api(name = :public)
+      normalized_name = normalize_api_name(name)
+      return public_api if normalized_name == "public"
+
+      @apis.fetch(normalized_name) do
+        raise ConfigurationError, "Unknown API: #{normalized_name}"
+      end
+    end
+
+    def api_names
+      ["public", *@apis.keys]
+    end
+
+    def canonical_api_name(value)
+      normalize_api_name(value)
+    end
+
+    def each_api(&block)
+      return enum_for(:each_api) unless block_given?
+
+      block.call(public_api)
+      @apis.each_value(&block)
+    end
+
     def []=(key, value)
       setter = "#{key}="
       public_send(setter, value) if respond_to?(setter)
@@ -197,6 +242,7 @@ module RecordingStudioApi
     def validate!
       action_registry.validate!
       recordable_registry.validate!
+      @apis.each_value(&:validate!)
       validate_access_management_roles!
       validate_capability_action_role_resolver!
       validate_api_versions!
@@ -277,6 +323,16 @@ module RecordingStudioApi
     end
 
     private
+
+    def normalize_api_name(value)
+      raw_name = value.to_s.strip
+      raise ConfigurationError, "API name may contain only letters, numbers, spaces, underscores, and hyphens" unless raw_name.match?(/\A[a-zA-Z0-9 _-]+\z/)
+
+      normalized_name = raw_name.downcase.tr(" -", "__").gsub(/_+/, "_").delete_prefix("_").delete_suffix("_")
+      raise ConfigurationError, "API name is required" if normalized_name.blank?
+
+      normalized_name
+    end
 
     def normalize_access_role(value, default:)
       normalized = value.to_s.strip

@@ -133,6 +133,25 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, access_recording.id.to_s
   end
 
+  test "creates credentials for the selected named API" do
+    RecordingStudioApi.configuration.api(:operations)
+    RecordingStudioApi.register_recordable_type_api("Workspace", api: :operations)
+
+    post "/recording_studio_api/api_clients", params: {
+      api_client: {
+        api_key: "operations",
+        root_type: "Workspace",
+        access_point_recording_id: @workspace_root_recording.id,
+        role: "admin",
+        api_client_name: "Operations UI client",
+        expires_at: ""
+      }
+    }
+
+    assert_response :created
+    assert_equal "operations", RecordingStudioApi::ApiClient.find_by!(name: "Operations UI client").api_key
+  end
+
   test "index lists API access including descendant child access" do
     direct_api_client = create_api_client_for(
       parent_recording: @workspace_root_recording,

@@ -3,113 +3,37 @@
 RecordingStudioApi.configure do |config|
   # Configure timeout, credential TTL, access token TTL, hooks, and action registration here.
 
-  config.admin_layout_name = "flat_pack_sidebar"
+  config.openapi_title = "Recording Studio API"
+  config.openapi_description = "API endpoints for accessing and managing Recording Studio workspaces, folders, and pages."
+  config.admin_layout_name = "recording_studio/default_layout"
   config.rate_limit_api_pre_auth_enabled = true
   config.rate_limit_api_enabled = true
   config.rate_limit_redis_url = ENV.fetch("RECORDING_STUDIO_API_RATE_LIMIT_REDIS_URL", "redis://127.0.0.1:6379/0")
   config.api_request_logging_enabled = true
 
-  config.admin_dashboard_path_resolver = lambda do |controller:, **|
-    "/admin/api"
+  config.api :operations do |api|
+    api.openapi_title = "Recording Studio Operations API"
+    api.openapi_description = "Read-only operational access for trusted administrators and automation."
+    api.authentication = :oauth
+    api.default_access = :read_only
+    api.api_management_authorization_required = true
+    api.rate_limit_oauth_enabled = true
+    api.rate_limit_api_pre_auth_enabled = true
+    api.rate_limit_api_enabled = true
+    api.api_request_logging_enabled = true
   end
 
-  config.action_registry.register(
-    :trash,
-    capability: :trashable,
-    http_verb: :post,
-    required_role: :edit,
-    handler: ->(context) { Dummy::Api::Actions::TrashRecording.call(context) },
-    openapi: {
-      summary: "Trash",
-      description: "Soft-delete a trashable resource and return the updated recording payload.",
-      responses: {
-        "200" => {
-          description: "Recording moved to trash.",
-          content: {
-            "application/json" => {
-              examples: {
-                trashed: {
-                  value: {
-                    data: {
-                      id: "74c7a8bd-9787-45dc-8479-40347f8c0422",
-                      type: "page",
-                      actions: ["trash"],
-                      root_id: "8f8ee9f8-5448-4438-b65f-7578f69009f1",
-                      parent_id: "a8f2ab7d-2f2e-4062-9fe2-10e490a2d664",
-                      trashed_at: "2026-05-26T00:00:00Z",
-                      attributes: {
-                        title: "Homepage"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  )
-
-  config.action_registry.register(
-    :move,
-    capability: :movable,
-    http_verb: :post,
-    required_role: :edit,
-    handler: RecordingStudioApi::Services::MoveRecording,
-    serializer: RecordingStudioApi::Serializers::ResourceRecordingSerializer,
-    openapi: {
-      summary: "Move",
-      description: "Move item to allowed destination",
-      request_body: {
-        required: true,
-        content: {
-          "application/json" => {
-            schema: {
-              type: "object",
-              properties: {
-                parent_id: { type: "string", description: "Destination resource id." }
-              },
-              required: ["parent_id"]
-            },
-            examples: {
-              default: {
-                value: {
-                  parent_id: "a8f2ab7d-2f2e-4062-9fe2-10e490a2d664"
-                }
-              }
-            }
-          }
-        }
-      },
-      responses: {
-        "200" => {
-          description: "Moved recording payload.",
-          content: {
-            "application/json" => {
-              examples: {
-                moved: {
-                  value: {
-                    data: {
-                      id: "74c7a8bd-9787-45dc-8479-40347f8c0422",
-                      type: "folder",
-                      actions: ["move"],
-                      root_id: "8f8ee9f8-5448-4438-b65f-7578f69009f1",
-                      parent_id: "a8f2ab7d-2f2e-4062-9fe2-10e490a2d664",
-                      attributes: {
-                        name: "Marketing"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  )
+  config.admin_dashboard_path_resolver = lambda do |controller:, api_key: "public", **|
+    api_key.to_s == "public" ? "/admin/api" : "/admin/api/#{api_key}"
+  end
 end
+
+RecordingStudioApi.register_recordable_type_api(
+  "AdminRoot",
+  api: :operations,
+  operations: %i[index show],
+  serializer: ->(recordable) { { name: recordable.name } }
+)
 
 RecordingStudioApi.register_recordable_type_api(
   "Workspace",
@@ -197,6 +121,7 @@ RecordingStudioApi.register_recordable_type_api(
   "Folder",
   serializer: ->(recordable) { { name: recordable.name } },
   writable_attributes: %i[name],
+  capability_actions: %i[move],
   openapi: {
     details_schema: {
       type: "object",

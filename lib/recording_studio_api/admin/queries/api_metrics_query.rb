@@ -12,16 +12,17 @@ module RecordingStudioApi
         )
 
         class << self
-          def call(start_date:, end_date:, status_class: nil, rate_limited: nil)
-            new(start_date:, end_date:, status_class:, rate_limited:).call
+          def call(start_date:, end_date:, status_class: nil, rate_limited: nil, api: :public)
+            new(start_date:, end_date:, status_class:, rate_limited:, api: api).call
           end
         end
 
-        def initialize(start_date:, end_date:, status_class:, rate_limited:)
+        def initialize(start_date:, end_date:, status_class:, rate_limited:, api:)
           @start_date = start_date.to_date
           @end_date = end_date.to_date
           @status_class = status_class
           @rate_limited = rate_limited
+          @api_key = RecordingStudioApi::Admin::ApiContext.resolve(api).name
         end
 
         def call
@@ -32,12 +33,12 @@ module RecordingStudioApi
 
         private
 
-        attr_reader :start_date, :end_date, :status_class, :rate_limited
+        attr_reader :start_date, :end_date, :status_class, :rate_limited, :api_key
 
         def aggregate_rows
           return [] unless ApiDailyMetric.table_available?
 
-          scope = ApiDailyMetric.where(metric_date: start_date..aggregate_end_date)
+          scope = ApiDailyMetric.where(api_key: api_key, metric_date: start_date..aggregate_end_date)
           scope = scope.where(status_class: status_class) if status_class
           scope = scope.where("rate_limited_count > 0") if rate_limited == true
           scope.map { |metric| row_from_metric(metric) }
@@ -46,7 +47,7 @@ module RecordingStudioApi
         def raw_rows
           return [] unless ApiRequestLog.table_available?
 
-          scope = ApiRequestLog.where(occurred_at: raw_start_date.beginning_of_day..end_date.end_of_day)
+          scope = ApiRequestLog.where(api_key: api_key, occurred_at: raw_start_date.beginning_of_day..end_date.end_of_day)
           scope = scope.where(status_code: (status_class.to_i * 100)..((status_class.to_i * 100) + 99)) if status_class
           scope = scope.where(rate_limited: true) if rate_limited == true
           scope.pluck(:occurred_at, :route_name, :request_method, :status_code, :rate_limited, :duration_ms)

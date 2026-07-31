@@ -5,12 +5,40 @@ require "test_helper"
 module RecordingStudioApi
   module Services
     class OpenapiDocumentTest < Minitest::Test
+      def test_named_api_document_uses_its_own_resources_metadata_and_paths
+        original_configuration = RecordingStudioApi.configuration
+        configuration = RecordingStudioApi::Configuration.new
+        RecordingStudioApi.instance_variable_set(:@configuration, configuration)
+        operations = configuration.api(:operations)
+        operations.openapi_title = "Operations API"
+        operations.openapi_description = "Operational diagnostics"
+        operations.recordable_registry.register("AdminRoot")
+
+        document = OpenapiDocument.call(api: :operations)
+
+        assert_equal "Operations API", document.dig(:info, :title)
+        assert_equal "Operational diagnostics", document.dig(:info, :description)
+        assert_includes document.fetch(:paths).keys, "/recording_studio_api/apis/operations/v1/admin_roots"
+        refute(document.fetch(:paths).keys.any? { |path| path.include?("workspaces") })
+      ensure
+        RecordingStudioApi.instance_variable_set(:@configuration, original_configuration)
+      end
+
       def test_call_builds_openapi_document_with_paths
         document = OpenapiDocument.call
         expected_title = Rails.application.class.module_parent_name.presence || "RecordingStudioApi"
 
         assert_equal "3.0.3", document.fetch(:openapi)
         assert_equal expected_title, document.fetch(:info).fetch(:title)
+        assert_equal "API endpoints for accessing and managing Recording Studio resources.", document.fetch(:info).fetch(:description)
+        assert_includes document.fetch(:tags), {
+          name: "Authentication",
+          description: "Authenticate your application with its client credentials to receive a bearer token for API requests."
+        }
+        assert_includes document.fetch(:tags), {
+          name: "resources",
+          description: "Discover the resource collections available through this API."
+        }
         assert document.fetch(:paths).key?("/recording_studio_api/oauth/token")
         assert document.fetch(:paths).key?("/recording_studio_api/api/v1")
         assert document.fetch(:components).fetch(:schemas).key?(:OAuthTokenResponse)
@@ -90,28 +118,51 @@ module RecordingStudioApi
         assert delete_operation.fetch(:responses).key?("200")
       end
 
+      def test_resource_tags_have_an_accessible_default_description
+        document = with_recordable_types(["Page"]) { OpenapiDocument.call }
+
+        assert_includes document.fetch(:tags), {
+          name: "Page",
+          description: "View and manage pages available to your client."
+        }
+      end
+
+      def test_resource_tag_description_can_be_customized_in_openapi_metadata
+        with_recordable_registration(
+          "Page",
+          openapi: {
+            tag: {
+              description: "Create and organize the content pages in a workspace."
+            }
+          }
+        ) do
+          document = with_recordable_types(["Page"]) { OpenapiDocument.call }
+
+          assert_includes document.fetch(:tags), {
+            name: "Page",
+            description: "Create and organize the content pages in a workspace."
+          }
+        end
+      end
+
+      def test_resource_operations_respect_recordable_operation_allowlists
+        document = with_recordable_registration("Workspace", openapi: {}, operations: %i[index]) do
+          with_recordable_types(["Workspace"]) { OpenapiDocument.call }
+        end
+
+        collection_operations = document.fetch(:paths).fetch("/recording_studio_api/api/v1/workspaces")
+
+        assert_equal ["get"], collection_operations.keys
+        assert_not document.fetch(:paths).key?("/recording_studio_api/api/v1/workspaces/{id}")
+      end
+
       def test_delete_operation_description_mentions_permanent_delete
-        with_stubbed_recordable_class("Page", [column_stub("id", :uuid, false)], supports_trash: true) do
+        with_stubbed_recordable_class("Page", [column_stub("id", :uuid, false)]) do
           document = with_recordable_types(["Page"]) { OpenapiDocument.call }
           delete_operation = document.fetch(:paths).fetch("/recording_studio_api/api/v1/pages/{id}").fetch("delete")
 
           assert_equal "Delete Page permanently", delete_operation.fetch(:description)
         end
-      end
-
-      def test_global_trash_endpoints_are_present
-        document = with_recordable_types(["Page"]) { OpenapiDocument.call }
-
-        assert document.fetch(:paths).key?("/recording_studio_api/api/v1/trash")
-        assert document.fetch(:paths).key?("/recording_studio_api/api/v1/trash/{id}")
-        assert document.fetch(:paths).key?("/recording_studio_api/api/v1/trash/{id}/restore")
-
-        trash_delete = document
-          .fetch(:paths)
-          .fetch("/recording_studio_api/api/v1/trash/{id}")
-          .fetch("delete")
-
-        assert_equal "Permanently delete trashed", trash_delete.fetch(:description)
       end
 
       def test_call_uses_configured_default_api_version_in_paths
@@ -227,24 +278,6 @@ module RecordingStudioApi
         move_operation = document.fetch(:paths).fetch("/recording_studio_api/api/v1/folders/{id}/actions/move").fetch("post")
 
         assert_equal ["Folder"], move_operation.fetch(:tags)
-      end
-
-      def test_dummy_trash_capability_generates_a_nested_page_path
-        document = with_recordable_types_and_actions(
-          ["Page", "Workspace"],
-          "Page" => [action_stub(name: "trash", http_verb: :post, capability: :trashable, scope: :member)],
-          "Workspace" => []
-        ) do
-          OpenapiDocument.call
-        end
-
-        trash_operation = document
-          .fetch(:paths)
-          .fetch("/recording_studio_api/api/v1/pages/{id}/actions/trash")
-          .fetch("post")
-
-        assert_equal ["Page"], trash_operation.fetch(:tags)
-        refute document.fetch(:paths).key?("/recording_studio_api/api/v1/workspaces/{id}/actions/trash")
       end
 
       def test_components_only_include_shared_schemas
@@ -426,14 +459,13 @@ module RecordingStudioApi
         Struct.new(:name, :type, :null).new(name, type, nullable)
       end
 
-      def with_stubbed_recordable_class(class_name, columns, supports_trash: false, enums: {})
+      def with_stubbed_recordable_class(class_name, columns, enums: {})
         existing_class = Object.const_get(class_name) if Object.const_defined?(class_name)
         Object.send(:remove_const, class_name) if existing_class
 
         klass = Class.new do
           define_singleton_method(:columns) { columns }
           define_singleton_method(:defined_enums) { enums }
-          define_method(:trash!) {} if supports_trash
         end
         Object.const_set(class_name, klass)
 
@@ -443,11 +475,11 @@ module RecordingStudioApi
         Object.const_set(class_name, existing_class) if existing_class
       end
 
-      def with_recordable_registration(recordable_type, openapi:)
+      def with_recordable_registration(recordable_type, openapi:, operations: nil)
         registry = RecordingStudioApi.configuration.recordable_registry
         existing = registry[recordable_type]
 
-        registry.register(recordable_type, openapi: openapi)
+        registry.register(recordable_type, openapi: openapi, operations: operations)
         yield
       ensure
         registrations = registry.instance_variable_get(:@registrations)

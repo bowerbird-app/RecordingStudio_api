@@ -10,6 +10,19 @@
   class: "w-full"
 ) %>
 
+<% if api_options.many? %>
+  <%= render FlatPack::Select::Component.new(
+    name: "api_client[api_key]",
+    options: api_options,
+    value: form_values.fetch(:api_key),
+    label: "API",
+    help_text: "Credentials are permanently restricted to this API",
+    class: "w-full"
+  ) %>
+<% else %>
+  <%= form.hidden_field :api_key, value: form_values.fetch(:api_key) %>
+<% end %>
+
 <%= render FlatPack::Collapse::Component.new(
   id: "api-client-advanced-collapse",
   title: "Advanced",

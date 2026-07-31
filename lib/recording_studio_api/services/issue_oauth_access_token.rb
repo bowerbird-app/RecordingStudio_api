@@ -5,22 +5,25 @@ module RecordingStudioApi
     class IssueOauthAccessToken < BaseService
       SUPPORTED_GRANT_TYPE = "client_credentials"
 
-      def initialize(grant_type:, client_id:, client_secret:)
+      def initialize(grant_type:, client_id:, client_secret:, api: :public)
         @grant_type = grant_type
         @client_id = client_id
         @client_secret = client_secret
+        @api_key = RecordingStudioApi.configuration.fetch_api(api).name
       end
 
       private
 
-      attr_reader :grant_type, :client_id, :client_secret
+      attr_reader :grant_type, :client_id, :client_secret, :api_key
 
       def perform
         return oauth_failure("unsupported_grant_type", "grant_type must be client_credentials") unless grant_type == SUPPORTED_GRANT_TYPE
         return oauth_failure("invalid_request", "client_id is required") if client_id.blank?
         return oauth_failure("invalid_request", "client_secret is required") if client_secret.blank?
 
-        credential = ApiCredential.find_by(token_public_id: client_id)
+        credential = ApiCredential.joins(:api_client)
+                                  .merge(ApiClient.where(api_key: api_key))
+                                  .find_by(token_public_id: client_id)
         return oauth_failure("invalid_client", "client authentication failed") if credential.nil?
         return oauth_failure("invalid_client", "client authentication failed") unless credential.active_for_authentication?
 
@@ -76,13 +79,14 @@ module RecordingStudioApi
       end
 
       def resolved_expiry
-        ttl = RecordingStudioApi.configuration.access_token_ttl
+        ttl = RecordingStudioApi.configuration.fetch_api(api_key).access_token_ttl
         Time.current + (ttl.presence || 1.hour)
       end
 
       def service_args
         {
           grant_type: grant_type,
+          api_key: api_key,
           client_id_present: client_id.present?,
           client_secret_present: client_secret.present?
         }

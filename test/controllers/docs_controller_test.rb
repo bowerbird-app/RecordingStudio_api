@@ -201,7 +201,6 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
       assert_includes response.body, "GET /api/screens/api_keys"
       assert_includes response.body, "resources :api_clients, controller: &quot;access_requests&quot;, only: %i[index show new create edit update]"
       assert_includes response.body, "post &quot;/oauth/token&quot;, to: &quot;oauth#token&quot;"
-      assert_includes response.body, "post &quot;/trash/:id/restore&quot;"
       assert_includes response.body, "namespace :v1 do"
       assert_includes response.body, "RecordingStudioApi.api_versions - ["
       assert_includes response.body, "namespace api_version.to_sym do"
@@ -250,7 +249,7 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
       payload = JSON.parse(response.body)
 
       assert_equal "3.0.3", payload.fetch("openapi")
-      assert_equal Rails.application.class.module_parent_name, payload.fetch("info").fetch("title")
+      assert_equal RecordingStudioApi.openapi_title, payload.fetch("info").fetch("title")
       assert payload.fetch("paths").key?("/recording_studio_api/oauth/token")
       assert payload.fetch("paths").key?("/recording_studio_api/api/v1/workspaces")
       assert payload.fetch("paths").fetch("/recording_studio_api/api/v1/workspaces").key?("post")
@@ -283,7 +282,7 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
   test "scalar page renders successfully" do
     create_manageable_workspace_root(name: "Scalar Form Workspace")
 
-    get docs_scalar_path
+    get public_api_scalar_docs_version_path(version: "v1")
 
     assert_response :success
     assert_select "h1", text: "Scalar API reference"
@@ -292,14 +291,13 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_select %(div[data-controller="flat-pack--collapse"][data-flat-pack--collapse-open-value="false"]), count: 1
     assert_select %(#scalar-test-auth), count: 1
     assert_select %(#scalar-test-auth-collapse-content[hidden]), count: 1
-    assert_select %(form[action="#{scalar_test_token_path}"]), count: 1
+    assert_select %(form[action="#{public_api_scalar_test_credential_path(version: 'v1')}"]), count: 1
     assert_includes response.body, "id=\"scalar-api-reference\""
-    assert_includes response.body, docs_openapi_path(version: "v1")
-    assert_includes response.body, "@scalar/api-reference/dist/browser/standalone.js"
+    assert_includes response.body, public_api_scalar_docs_openapi_path(version: "v1")
+    assert_includes response.body, "@scalar/api-reference@1.64.0/dist/browser/standalone.js"
     assert_includes response.body, "createApiReference"
-    assert_includes response.body, "recordingStudioApiScalarInit"
-    assert_includes response.body, "onload=\"window.recordingStudioApiScalarInit"
-    assert_select %(a[href="#{docs_scalar_fullscreen_path(version: 'v1')}"][target="_blank"]), text: /Full screen/
+    assert_includes response.body, 'source.addEventListener("load", initializeScalar'
+    assert_select %(a[href="#{public_api_scalar_docs_fullscreen_path(version: 'v1')}"][target="_blank"]), text: /Full screen/
   end
 
   test "APIdocs routes render versioned scalar and openapi endpoints" do
@@ -310,8 +308,8 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_includes response.body, "for V2"
-    assert_includes response.body, api_docs_openapi_path(version: "v2")
-    assert_select %(a[href="#{api_docs_fullscreen_path(version: 'v2')}"][target="_blank"]), text: /Full screen/
+    assert_includes response.body, public_api_scalar_docs_openapi_path(version: "v2")
+    assert_select %(a[href="#{public_api_scalar_docs_fullscreen_path(version: 'v2')}"][target="_blank"]), text: /Full screen/
 
     get api_docs_openapi_path(version: "v2")
 
@@ -326,12 +324,12 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
   test "scalar test auth reuses the existing direct access role for the selected access point" do
     root_recording = create_manageable_workspace_root(name: "Scalar Workspace")
 
-    post scalar_test_token_path, params: {
+    post public_api_scalar_test_credential_path(version: "v1"), params: {
       access_point_recording_id: root_recording.id,
       role: "edit"
     }
 
-    assert_redirected_to "#{docs_scalar_path}#scalar-test-auth"
+    assert_redirected_to "#{public_api_scalar_docs_version_path(version: 'v1')}#scalar-test-auth"
 
     follow_redirect!
 
@@ -343,21 +341,21 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_select %(select[name="role"] option[value="admin"][selected="selected"]), count: 1
     assert_includes response.body, "Workspace: Scalar Workspace"
     assert_includes response.body, "Scoped sample IDs"
-    assert_select %(form[action="#{scalar_test_token_path}"] input[name="_method"][value="delete"]), count: 1
+    assert_select %(form[action="#{public_api_scalar_test_credential_path(version: 'v1')}"] input[name="_method"][value="delete"]), count: 1
   end
 
   test "scalar test auth revokes the session bearer token" do
     root_recording = create_manageable_workspace_root(name: "Scalar Revoke Workspace")
 
-    post scalar_test_token_path, params: {
+    post public_api_scalar_test_credential_path(version: "v1"), params: {
       access_point_recording_id: root_recording.id,
       role: "admin"
     }
     token = RecordingStudioApi::ApiAccessToken.order(created_at: :desc).first
 
-    delete scalar_test_token_path
+    delete public_api_scalar_test_credential_path(version: "v1")
 
-    assert_redirected_to "#{docs_scalar_path}#scalar-test-auth"
+    assert_redirected_to "#{public_api_scalar_docs_version_path(version: 'v1')}#scalar-test-auth"
     assert_not_nil token.reload.revoked_at
 
     follow_redirect!
@@ -370,14 +368,14 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
   test "scalar test auth reuses the same access recording for repeated issues" do
     root_recording = create_manageable_workspace_root(name: "Scalar Reissue Workspace")
 
-    post scalar_test_token_path, params: {
+    post public_api_scalar_test_credential_path(version: "v1"), params: {
       access_point_recording_id: root_recording.id,
       role: "admin"
     }
 
     first_credential = RecordingStudioApi::ApiCredential.order(created_at: :desc).first
 
-    post scalar_test_token_path, params: {
+    post public_api_scalar_test_credential_path(version: "v1"), params: {
       access_point_recording_id: root_recording.id,
       role: "admin"
     }
@@ -389,16 +387,15 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "scalar fullscreen page renders successfully" do
-    get docs_scalar_fullscreen_path(version: "v1")
+    get public_api_scalar_docs_fullscreen_path(version: "v1")
 
     assert_response :success
     assert_includes response.body, "id=\"scalar-api-reference\""
     assert_includes response.body, "height: 100vh"
-    assert_includes response.body, docs_openapi_path(version: "v1")
-    assert_includes response.body, "@scalar/api-reference/dist/browser/standalone.js"
+    assert_includes response.body, public_api_scalar_docs_openapi_path(version: "v1")
+    assert_includes response.body, "@scalar/api-reference@1.64.0/dist/browser/standalone.js"
     assert_includes response.body, "createApiReference"
-    assert_includes response.body, "recordingStudioApiScalarInit"
-    assert_includes response.body, "onload=\"window.recordingStudioApiScalarInit"
+    assert_includes response.body, 'source.addEventListener("load", initializeScalar'
   end
 
   test "add capability page renders successfully" do
@@ -441,7 +438,7 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_select %(a[href="#{docs_recordings_tree_path}"]), text: /Recordings tree/
     assert_select %(a[href="#{docs_gem_views_path}"]), text: /Gem Views/
     assert_select %(a[href="#{docs_api_routes_path}"]), text: /API routes/
-    assert_select %(a[href="#{docs_scalar_path}"]), text: /Scalar/
+    assert_select %(a[href="#{public_api_scalar_docs_path}"]), text: /Scalar/
     assert_select %(a[href="#{docs_add_capability_path}"]), text: /Add API capability/
     assert_select %(a[href="#{docs_auth_path}"]), text: /Auth/
     assert_select %(a[href="#{docs_methods_path}"]), text: /Methods/

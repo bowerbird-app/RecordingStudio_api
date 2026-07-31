@@ -53,6 +53,7 @@ module RecordingStudioApi
                    data: { turbo_frame: "_top" }
                  )
                }
+        column :api_name, title: "API", sortable: false, value: ->(row, _context) { row.api_name.humanize }
         column :api_key, title: "API key", sortable: false
         column :access_point, title: "Access point", sortable: false
         column :role, title: "Role", sortable: false
@@ -64,7 +65,7 @@ module RecordingStudioApi
         column :request_count, title: "Requests", sortable: false
         column :last_requested_at, title: "Last request", sortable: false
         column :expires_text, title: "Expires", sortable: false
-        default_columns :name, :api_key, :access_point, :role, :status, :request_count, :last_requested_at
+        default_columns :name, :api_name, :api_key, :access_point, :role, :status, :request_count, :last_requested_at
         paginate per_page: 25, mode: :infinite
 
         action :edit,

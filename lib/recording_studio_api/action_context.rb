@@ -9,5 +9,9 @@ module RecordingStudioApi
     :access_grant,
     :root_recording,
     :params
-  )
+  ) do
+    def api_key
+      api_client&.api_key.presence || "public"
+    end
+  end
 end

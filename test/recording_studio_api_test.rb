@@ -235,9 +235,9 @@ class RecordingStudioApiTest < Minitest::Test
     initializer_path = File.expand_path("dummy/config/initializers/recording_studio_api.rb", __dir__)
     initializer_source = File.read(initializer_path)
 
-    assert_includes initializer_source, 'config.admin_layout_name = "flat_pack_sidebar"'
     assert_includes initializer_source, "config.admin_dashboard_path_resolver"
     assert_includes initializer_source, '"/admin/api"'
+    assert_includes initializer_source, "config.api :operations"
     assert_not_includes initializer_source, "config.admin_requests_path_resolver"
     assert_not_includes initializer_source, "config.admin_errors_path_resolver"
     assert_not_includes initializer_source, "config.admin_logs_path_resolver"

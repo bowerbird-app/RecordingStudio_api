@@ -23,7 +23,7 @@ module RecordingStudioApi
           )
         end
         chart_type :area
-        series { RecordingStudioApi::Admin::AdminApiLatencyLastFourWeeksWidget.series }
+        series { |context| RecordingStudioApi::Admin::AdminApiLatencyLastFourWeeksWidget.series(context) }
         chart_options do
           {
             height: 240,
@@ -40,25 +40,26 @@ module RecordingStudioApi
 
       module_function
 
-      def series
+      def series(context = nil)
         RecordingStudioApi::Admin::AdminApiPerformanceScreen.latency_series_for(
           RecordingStudioApi::Admin::AdminApiPerformanceScreen.default_start_date,
-          Date.current
+          Date.current,
+          api: api_key(context)
         )
       end
 
-      def p95_duration_ms(_context = nil)
-        p95_duration_ms_for(time_range)
+      def p95_duration_ms(context = nil)
+        p95_duration_ms_for(time_range, context)
       end
 
-      def previous_p95_duration_ms(_context = nil)
-        p95_duration_ms_for(previous_time_range)
+      def previous_p95_duration_ms(context = nil)
+        p95_duration_ms_for(previous_time_range, context)
       end
 
-      def p95_duration_ms_for(range)
+      def p95_duration_ms_for(range, context = nil)
         return 0 unless RecordingStudioApi::ApiRequestLog.table_available?
 
-        durations = request_scope.where(occurred_at: range).pluck(:duration_ms).compact
+        durations = request_scope(context).where(occurred_at: range).pluck(:duration_ms).compact
         RecordingStudioApi::Admin::AdminApiPerformanceScreen.percentile(durations, 0.95)
       end
 
@@ -72,8 +73,12 @@ module RecordingStudioApi
         NavigationUrlHelpers.admin_screen_url(context, "admin_api_performance", query)
       end
 
-      def request_scope
-        RecordingStudioApi::ApiRequestLog.all
+      def request_scope(context = nil)
+        RecordingStudioApi::ApiRequestLog.where(api_key: api_key(context))
+      end
+
+      def api_key(context)
+        context ? RecordingStudioApi::Admin::ApiContext.key_from_context(context) : "public"
       end
 
       def time_range

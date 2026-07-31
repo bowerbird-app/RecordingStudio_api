@@ -189,6 +189,106 @@ class InstallGeneratorTest < Minitest::Test
     end
   end
 
+  def test_admin_screens_generator_wires_user_and_admin_api_sections_independently
+    with_temp_app do |destination_root|
+      FileUtils.mkdir_p(File.join(destination_root, "app/models"))
+      %w[workspace admin_root].each do |model_name|
+        class_name = model_name.camelize
+        File.write(File.join(destination_root, "app/models/#{model_name}.rb"), "class #{class_name} < ApplicationRecord\nend\n")
+      end
+
+      generator = build_admin_screens_generator(
+        destination_root,
+        user_roots: ["Workspace"],
+        admin_roots: ["AdminRoot"],
+        user_apis: %w[public],
+        admin_apis: %w[public operations]
+      )
+
+      generator.stub(:say, nil) do
+        generator.add_user_api_sections
+        generator.add_admin_api_sections
+      end
+
+      workspace_source = File.read(File.join(destination_root, "app/models/workspace.rb"))
+      admin_source = File.read(File.join(destination_root, "app/models/admin_root.rb"))
+      assert_includes workspace_source, "section :api"
+      refute_includes workspace_source, "section :operations_api"
+      assert_includes admin_source, "section :admin_api"
+      assert_includes admin_source, "section :admin_operations_api"
+    end
+  end
+
+  def test_admin_screens_generator_adds_user_and_admin_routes_independently
+    generator = build_admin_screens_generator(
+      "/tmp",
+      user_roots: ["Workspace"],
+      admin_roots: ["AdminRoot"],
+      user_apis: %w[public],
+      admin_apis: %w[public operations]
+    )
+    routes = []
+
+    generator.stub(:route, ->(value) { routes << value }) do
+      generator.add_api_route
+      generator.add_admin_api_routes
+    end
+
+    assert_includes routes, 'recording_studio_admin_for :api, at: "/api", root_section: :api'
+    refute_includes routes, 'recording_studio_admin_for :operations_api, at: "/api/operations", root_section: :operations_api'
+    assert_includes routes, 'recording_studio_admin_for :admin_api, at: "/admin/api", root_section: :admin_api'
+    assert_includes routes, 'recording_studio_admin_for :admin_operations_api, at: "/admin/api/operations", root_section: :admin_operations_api'
+  end
+
+  def test_admin_screens_generator_rejects_unconfigured_apis
+    generator = build_admin_screens_generator(
+      "/tmp",
+      user_apis: %w[public],
+      admin_apis: %w[public missing]
+    )
+
+    error = assert_raises(RecordingStudioApi::ConfigurationError) do
+      generator.validate_configured_apis
+    end
+
+    assert_equal "Unknown API: missing", error.message
+  end
+
+  def test_admin_screens_generator_keeps_legacy_shared_api_option
+    generator = build_admin_screens_generator(
+      "/tmp",
+      admin_roots: ["AdminRoot"],
+      apis: %w[public operations]
+    )
+    routes = []
+
+    generator.stub(:route, ->(value) { routes << value }) do
+      generator.add_api_route
+      generator.add_admin_api_routes
+    end
+
+    assert_includes routes, 'recording_studio_admin_for :operations_api, at: "/api/operations", root_section: :operations_api'
+    assert_includes routes, 'recording_studio_admin_for :admin_operations_api, at: "/admin/api/operations", root_section: :admin_operations_api'
+  end
+
+  def test_admin_screens_generator_canonicalizes_api_names
+    generator = build_admin_screens_generator(
+      "/tmp",
+      admin_roots: ["AdminRoot"],
+      user_apis: %w[public],
+      admin_apis: ["Partner-Portal"]
+    )
+    routes = []
+
+    generator.stub(:route, ->(value) { routes << value }) do
+      generator.add_admin_api_routes
+    end
+
+    assert_equal [
+      'recording_studio_admin_for :admin_partner_portal_api, at: "/admin/api/partner_portal", root_section: :admin_partner_portal_api'
+    ], routes
+  end
+
   def test_migrations_generator_reports_when_source_directory_is_missing
     with_temp_app do |destination_root|
       source_root = Dir.mktmpdir
