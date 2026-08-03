@@ -3,17 +3,18 @@
 module RecordingStudioApi
   module Services
     class ProvisionAccessRequest < BaseService
-      def initialize(access_point_recording:, actor:, role:, api_client_name:, expires_at: nil)
+      def initialize(access_point_recording:, actor:, role:, api_client_name:, expires_at: nil, api: :public)
         @access_point_recording = access_point_recording
         @actor = actor
         @role = role
         @api_client_name = api_client_name
         @expires_at = expires_at
+        @api_key = RecordingStudioApi.configuration.fetch_api(api).name
       end
 
       private
 
-      attr_reader :access_point_recording, :actor, :role, :api_client_name, :expires_at
+      attr_reader :access_point_recording, :actor, :role, :api_client_name, :expires_at, :api_key
 
       def perform
         return failure("Access point recording is required") if access_point_recording.nil?
@@ -32,7 +33,8 @@ module RecordingStudioApi
             manager_actor: actor,
             role: role,
             name: api_client_name,
-            expires_at: expires_at
+            expires_at: expires_at,
+            api: api_key
           )
 
           raise RecordingStudioApi::Error, provision_result.error if provision_result.failure?
@@ -50,7 +52,7 @@ module RecordingStudioApi
       end
 
       def valid_access_point_recording?
-        return false unless RecordingStudioApi.api_access_point_recordable_types.include?(access_point_recording.recordable_type)
+        return false unless RecordingStudioApi.api_access_point_recordable_types(api: api_key).include?(access_point_recording.recordable_type)
         return false unless defined?(RecordingStudioAccessible::Compatibility)
 
         RecordingStudioAccessible::Compatibility.access_parent_allowed?(access_point_recording)
@@ -67,7 +69,8 @@ module RecordingStudioApi
           actor_type: actor&.class&.name,
           role: role,
           api_client_name: api_client_name,
-          expires_at: expires_at
+          expires_at: expires_at,
+          api_key: api_key
         }
       end
 

@@ -23,7 +23,7 @@ module RecordingStudioApi
           )
         end
         chart_type :area
-        series { RecordingStudioApi::Admin::AdminApiServerErrorsLastFourWeeksWidget.series }
+        series { |context| RecordingStudioApi::Admin::AdminApiServerErrorsLastFourWeeksWidget.series(context) }
         chart_options do
           {
             height: 240,
@@ -40,15 +40,15 @@ module RecordingStudioApi
 
       module_function
 
-      def series
+      def series(context = nil)
         [{
           name: "Server errors",
-          data: daily_points.map { |point| { x: point[:label], y: point[:count] } }
+          data: daily_points(context).map { |point| { x: point[:label], y: point[:count] } }
         }]
       end
 
-      def total(_context = nil)
-        metric_total_for(time_range)
+      def total(context = nil)
+        metric_total_for(time_range, context)
       end
 
       def link_to(context)
@@ -62,11 +62,11 @@ module RecordingStudioApi
         NavigationUrlHelpers.admin_screen_url(context, "admin_api_requests", query)
       end
 
-      def daily_points
+      def daily_points(context = nil)
         buckets = daily_buckets
         counts = buckets.index_with(0)
 
-        counts.merge!(RecordingStudioApi::Admin::ApiRequestLogHelpers.daily_metric_counts(start_date: buckets.first, end_date: buckets.last, status_class: 5))
+        counts.merge!(RecordingStudioApi::Admin::ApiRequestLogHelpers.daily_metric_counts(start_date: buckets.first, end_date: buckets.last, status_class: 5, api: api_key(context)))
 
         buckets.map do |bucket|
           {
@@ -95,12 +95,16 @@ module RecordingStudioApi
         previous_start.beginning_of_day...previous_end
       end
 
-      def previous_total(_context = nil)
-        metric_total_for(previous_time_range)
+      def previous_total(context = nil)
+        metric_total_for(previous_time_range, context)
       end
 
-      def metric_total_for(range)
-        RecordingStudioApi::Admin::ApiRequestLogHelpers.metric_total(start_date: range.begin.to_date, end_date: range.end.to_date, status_class: 5)
+      def metric_total_for(range, context = nil)
+        RecordingStudioApi::Admin::ApiRequestLogHelpers.metric_total(start_date: range.begin.to_date, end_date: range.end.to_date, status_class: 5, api: api_key(context))
+      end
+
+      def api_key(context)
+        context ? RecordingStudioApi::Admin::ApiContext.key_from_context(context) : "public"
       end
     end
   end

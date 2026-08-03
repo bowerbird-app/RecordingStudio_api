@@ -10,6 +10,7 @@ module RecordingStudioApi
           :api_client,
           :access_point_recording,
           :name,
+          :api_name,
           :api_key,
           :access_point,
           :role,
@@ -89,6 +90,7 @@ module RecordingStudioApi
             api_client: api_client,
             access_point_recording: access_point_recording,
             name: api_client.name,
+            api_name: api_client.api_key,
             api_key: api_credential&.oauth_client_id || "Unknown",
             access_point: access_point_label(access_point_recording),
             role: access_recording.recordable&.try(:role).to_s.humanize.presence || "Unknown",
@@ -121,6 +123,7 @@ module RecordingStudioApi
                                      access_recording: [:recordable, :root_recording, { parent_recording: [:recordable, :parent_recording] }]
                                    )
                                    .where(access_recording_id: visible_api_client_access_recordings.select(:id))
+                                   .where(api_key: RecordingStudioApi::Admin::ApiContext.key_from_context(context))
                                    .reorder(:created_at, :id)
         end
 

@@ -20,7 +20,8 @@ module RecordingStudioApi
 
       def authenticate_api_client!
         result = RecordingStudioApi::Services::AuthenticateOauthAccessToken.call(
-          authorization_header: request.headers["Authorization"]
+          authorization_header: request.headers["Authorization"],
+          api: current_api_key
         )
         raise AuthenticationError, result.error if result.failure?
 

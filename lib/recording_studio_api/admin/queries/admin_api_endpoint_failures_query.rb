@@ -17,14 +17,15 @@ module RecordingStudioApi
         )
 
         class << self
-          def call(start_date:, end_date:)
-            new(start_date:, end_date:).call
+          def call(start_date:, end_date:, api: :public)
+            new(start_date:, end_date:, api: api).call
           end
         end
 
-        def initialize(start_date:, end_date:)
+        def initialize(start_date:, end_date:, api:)
           @start_date = start_date
           @end_date = end_date
+          @api_key = RecordingStudioApi::Admin::ApiContext.resolve(api).name
         end
 
         def call
@@ -52,11 +53,11 @@ module RecordingStudioApi
 
         private
 
-        attr_reader :start_date, :end_date
+        attr_reader :start_date, :end_date, :api_key
 
         def grouped_logs
           RecordingStudioApi::ApiRequestLog
-            .where(occurred_at: start_date.beginning_of_day..end_date.end_of_day)
+            .where(api_key: api_key, occurred_at: start_date.beginning_of_day..end_date.end_of_day)
             .pluck(:request_method, :request_path, :status_code)
             .group_by { |request_method, request_path, _status_code| [request_method, RecordingStudioApi::Admin::ApiRequestLogHelpers.compact_path(request_path)] }
         end

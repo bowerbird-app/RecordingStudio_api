@@ -17,7 +17,7 @@ module RecordingStudioApi
         return failure("API client is required") if api_client.nil?
         return failure("Actor is required") if actor.nil?
         return failure("API client access recording is missing") if api_client.access_recording.nil?
-        return failure("Actor is not authorized to manage API access for this recording") unless access_management_policy.can_manage_recording?(access_point_recording)
+        return failure("Actor is not authorized to manage this API client") unless api_client_management_policy.manage?(api_client)
 
         token = Token.generate
         payload = nil
@@ -65,18 +65,14 @@ module RecordingStudioApi
         @latest_credential ||= api_client.credentials.max_by { |credential| [credential.created_at.to_i, credential.id.to_i] }
       end
 
-      def access_point_recording
-        api_client.access_recording.parent_recording || api_client.access_recording.root_recording
-      end
-
       def resolved_expiry(previous_credential)
         return expires_at if expires_at.present?
 
         previous_credential.expires_at
       end
 
-      def access_management_policy
-        @access_management_policy ||= RecordingStudioApi::AccessManagementPolicy.new(actor: actor)
+      def api_client_management_policy
+        @api_client_management_policy ||= RecordingStudioApi::ApiClientManagementPolicy.new(actor: actor)
       end
 
       def service_args

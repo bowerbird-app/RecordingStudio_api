@@ -44,10 +44,6 @@
         namespace :api, defaults: { format: :json } do
           namespace :v1 do
             get "/", to: "resources#index"
-            get "/trash", to: "resources#trash_index", as: :trash_collection
-            get "/trash/:id", to: "resources#trash_show", as: :trash
-            post "/trash/:id/restore", to: "resources#trash_restore", as: :trash_restore
-            delete "/trash/:id", to: "resources#trash_destroy", as: :trash_destroy
             get "/:resource", to: "resources#index", as: :resource_collection
             post "/:resource", to: "resources#create"
             get "/:resource/:id", to: "resources#show", as: :resource
@@ -66,10 +62,6 @@
           (RecordingStudioApi.api_versions - ["v1"]).each do |api_version|
             namespace api_version.to_sym do
               get "/", to: "/recording_studio_api/api/v1/resources#index"
-              get "/trash", to: "/recording_studio_api/api/v1/resources#trash_index", as: :trash_collection
-              get "/trash/:id", to: "/recording_studio_api/api/v1/resources#trash_show", as: :trash
-              post "/trash/:id/restore", to: "/recording_studio_api/api/v1/resources#trash_restore", as: :trash_restore
-              delete "/trash/:id", to: "/recording_studio_api/api/v1/resources#trash_destroy", as: :trash_destroy
               get "/:resource", to: "/recording_studio_api/api/v1/resources#index", as: :resource_collection
               post "/:resource", to: "/recording_studio_api/api/v1/resources#create"
               get "/:resource/:id", to: "/recording_studio_api/api/v1/resources#show", as: :resource

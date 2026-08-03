@@ -291,8 +291,6 @@ class EngineTest < Minitest::Test
     end
 
     assert_equal :movable, RecordingStudioApi.capability_action(:move).capability
-    assert_equal :trashable, RecordingStudioApi.capability_action(:trash_restore).capability
-    assert_equal :trashable, RecordingStudioApi.capability_action(:trash_destroy).capability
   end
 
   def test_register_default_resource_actions_adds_core_resource_operations

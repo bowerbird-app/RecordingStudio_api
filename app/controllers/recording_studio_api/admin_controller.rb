@@ -29,16 +29,12 @@ module RecordingStudioApi
     end
 
     def load_admin_api_recording!
-      @admin_api = RecordingStudioApi::AdminApi.find_or_create_by!(key: "api") do |record|
-        record.name = "Admin API"
-      end
-
-      @admin_api_recording = RecordingStudio::Recording.unscoped.find_or_create_by!(
-        recordable: @admin_api,
-        root_recording_id: current_root_recording.id,
-        parent_recording_id: current_root_recording.id
+      @current_admin_api = RecordingStudioApi.configuration.fetch_api(params[:api_key].presence || :public)
+      @admin_api_recording = RecordingStudioApi::Admin::ApiAuthorization.recording_for(
+        api: @current_admin_api.name,
+        root_recording: current_root_recording,
+        create: true
       )
-
       @admin_api = @admin_api_recording.recordable
     end
 

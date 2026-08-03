@@ -3,16 +3,22 @@
 module RecordingStudioApi
   module Services
     class DocumentationCatalog # rubocop:disable Metrics/ClassLength
-      BASE_PATH = "/recording_studio_api"
+      DEFAULT_MOUNT_PATH = "/recording_studio_api"
+      DEFAULT_API_MOUNT_PATH = "/api"
+      BASE_PATH = DEFAULT_MOUNT_PATH
 
       class << self
-        def call(version: nil)
-          new(version: version).call
+        def call(version: nil, mount_path: nil, api_mount_path: nil, api: :public)
+          new(version: version, mount_path: mount_path, api_mount_path: api_mount_path, api: api).call
         end
       end
 
-      def initialize(version: nil)
-        @api_version = RecordingStudioApi.resolve_api_version(version)
+      def initialize(version: nil, mount_path: nil, api_mount_path: nil, api: :public)
+        @api_key = RecordingStudioApi.configuration.fetch_api(api).name
+        @api_version = RecordingStudioApi.resolve_api_version(version, api: @api_key)
+        @mount_path = normalized_mount_path(mount_path || DEFAULT_MOUNT_PATH)
+        default_api_mount_path = @api_key == "public" ? DEFAULT_API_MOUNT_PATH : "/apis/#{@api_key}"
+        @api_mount_path = normalized_mount_path(api_mount_path || default_api_mount_path, allow_root: false)
       end
 
       def call
@@ -29,14 +35,14 @@ module RecordingStudioApi
         [
           {
             verb: "POST",
-            path: "#{BASE_PATH}/oauth/token",
+            path: oauth_token_path,
             action: "oauth#token",
             summary: "Exchange OAuth client credentials",
             description: "Exchange client credentials for an OAuth2 access token.",
             capability: nil,
             scope: nil,
             openapi: {
-              tags: ["auth"],
+              tags: ["Authentication"],
               request_body: oauth_token_request_body,
               responses: oauth_token_responses
             }
@@ -83,81 +89,12 @@ module RecordingStudioApi
                 }
               }
             }
-          },
-          {
-            verb: "GET",
-            path: "#{api_root_path}/trash",
-            action: "resources#trash_index",
-            summary: "List trashed",
-            description: "List trashed",
-            capability: nil,
-            scope: nil,
-            openapi: {
-              tags: ["trash"],
-              parameters: [
-                {
-                  name: "limit",
-                  in: "query",
-                  required: false,
-                  description: "Maximum number of trashed resources to return (default: 50).",
-                  schema: {
-                    type: "integer",
-                    minimum: 1,
-                    default: 50,
-                    maximum: 100
-                  }
-                }
-              ],
-              responses: global_trash_list_responses
-            }
-          },
-          {
-            verb: "GET",
-            path: "#{api_root_path}/trash/:id",
-            action: "resources#trash_show",
-            summary: "Get trashed",
-            description: "Get trashed",
-            capability: nil,
-            scope: nil,
-            openapi: {
-              tags: ["trash"],
-              parameters: [id_parameter],
-              responses: global_trash_item_responses
-            }
-          },
-          {
-            verb: "POST",
-            path: "#{api_root_path}/trash/:id/restore",
-            action: "resources#trash_restore",
-            summary: "Restore trashed",
-            description: "Restore trashed",
-            capability: nil,
-            scope: nil,
-            openapi: {
-              tags: ["trash"],
-              parameters: [id_parameter],
-              responses: global_trash_item_responses
-            }
-          },
-          {
-            verb: "DELETE",
-            path: "#{api_root_path}/trash/:id",
-            action: "resources#trash_destroy",
-            summary: "Delete trashed",
-            description: "Permanently delete trashed",
-            capability: nil,
-            scope: nil,
-            openapi: {
-              tags: ["trash"],
-              parameters: [id_parameter],
-              responses: global_trash_delete_responses
-            }
           }
         ]
       end
 
       def resource_sections
-        RecordingStudioApi.api_recordable_types
+        api_recordable_types
           .map do |recordable_type|
             resource_name = RecordingStudioApi.resource_name_for(recordable_type)
 
@@ -173,7 +110,7 @@ module RecordingStudioApi
       def default_resource_endpoints(resource_name, recordable_type)
         openapi_tag = openapi_tag_for(resource_name, recordable_type)
         docs_resource_name = docs_resource_name_for(resource_name, recordable_type)
-        registration = RecordingStudioApi.recordable_registration_for(recordable_type)
+        registration = recordable_registration_for(recordable_type)
         openapi_overrides = registration&.openapi || {}
 
         endpoints = [
@@ -267,21 +204,23 @@ module RecordingStudioApi
           }
         ]
 
-        endpoints
+        endpoints.select do |endpoint|
+          registration.nil? || registration.supports_operation?(endpoint.fetch(:action).split("#").last)
+        end
       end
 
       def action_endpoints(resource_name, recordable_type)
-        RecordingStudioApi.capability_actions_for(recordable_type, version: @api_version)
+        capability_actions_for(recordable_type)
           .sort_by(&:name)
           .map do |action|
             action_openapi = action.respond_to?(:openapi) && action.openapi.is_a?(Hash) ? action.openapi : {}
-            docs_resource_name = docs_resource_name_for(resource_name, recordable_type)
+            docs_resource_name_for(resource_name, recordable_type)
 
             {
               verb: action.http_verb.to_s.upcase,
               path: "#{api_root_path}/#{resource_name}/:id/actions/#{action.name}",
               action: "member_actions#create",
-              summary: action_openapi.fetch(:summary, "Execute #{action.name} for #{docs_resource_name}"),
+              summary: action_openapi.fetch(:summary, action.name.humanize),
               description: "Execute the #{action.name} action.",
               action_name: action.capability.to_s,
               capability: action.capability.to_s,
@@ -304,7 +243,58 @@ module RecordingStudioApi
       end
 
       def api_root_path
-        RecordingStudioApi.api_base_path(version: @api_version)
+        RecordingStudioApi.api_base_path(
+          version: @api_version,
+          mount_path: @mount_path,
+          api_mount_path: @api_mount_path,
+          api: @api_key
+        )
+      end
+
+      def oauth_token_path
+        return mounted_path("/oauth/token") if @api_key == "public"
+
+        mounted_path("/apis/#{@api_key}/oauth/token")
+      end
+
+      def api_recordable_types
+        return RecordingStudioApi.api_recordable_types if @api_key == "public"
+
+        RecordingStudioApi.api_recordable_types(api: @api_key)
+      end
+
+      def recordable_registration_for(recordable_type)
+        return RecordingStudioApi.recordable_registration_for(recordable_type) if @api_key == "public"
+
+        RecordingStudioApi.recordable_registration_for(recordable_type, api: @api_key)
+      end
+
+      def capability_actions_for(recordable_type)
+        return RecordingStudioApi.capability_actions_for(recordable_type, version: @api_version) if @api_key == "public"
+
+        RecordingStudioApi.capability_actions_for(recordable_type, version: @api_version, api: @api_key)
+      end
+
+      def sortable_attributes_for(recordable_type)
+        return RecordingStudioApi.sortable_attributes_for(recordable_type) if @api_key == "public"
+
+        RecordingStudioApi.sortable_attributes_for(recordable_type, api: @api_key)
+      end
+
+      def mounted_path(path)
+        "/#{[@mount_path, path].flat_map { |entry| entry.split('/') }.reject(&:blank?).join('/')}"
+      end
+
+      def normalized_mount_path(value, allow_root: true)
+        path = value.to_s.strip
+        path = "/#{path}" unless path.start_with?("/")
+        path = path.squeeze("/").sub(%r{/\z}, "")
+        path = "/" if path.empty?
+        raise ArgumentError, "mount paths must be safe absolute paths" unless path.match?(%r{\A/[a-zA-Z0-9._~!$&'()*+,;=@/-]*\z}) && !path.include?("..")
+
+        raise ArgumentError, "api_mount_path must not be the root path" if !allow_root && path == "/"
+
+        path
       end
 
       def default_action_openapi(resource_name, recordable_type, action)
@@ -452,7 +442,7 @@ module RecordingStudioApi
       end
 
       def pagination_parameters(recordable_type)
-        allowed_sorts = RecordingStudioApi.sortable_attributes_for(recordable_type)
+        allowed_sorts = sortable_attributes_for(recordable_type)
 
         [
           {
@@ -548,7 +538,7 @@ module RecordingStudioApi
 
         {
           "200" => {
-            description: "Resource deleted or already trashed.",
+            description: "Resource permanently deleted.",
             content: {
               "application/json" => {
                 schema: {
@@ -561,7 +551,7 @@ module RecordingStudioApi
                           type: "object",
                           properties: {
                             deleted: { type: "boolean" },
-                            deleted_via: { type: "string", enum: ["trashed", "destroyed"] }
+                            deleted_via: { type: "string", enum: ["destroyed"] }
                           },
                           required: %w[deleted deleted_via]
                         }
@@ -574,49 +564,6 @@ module RecordingStudioApi
             }
           }
         }
-      end
-
-      def global_trash_list_responses
-        {
-          "200" => {
-            description: "List trashed resources visible in scope.",
-            content: {
-              "application/json" => {
-                schema: {
-                  type: "object",
-                  properties: {
-                    resource: { type: "string", example: "trash" },
-                    data: {
-                      type: "array",
-                      items: recording_schema
-                    },
-                    meta: {
-                      type: "object",
-                      properties: {
-                        limit: { type: "integer", minimum: 1 },
-                        returned: { type: "integer", minimum: 0 }
-                      },
-                      required: %w[limit returned]
-                    }
-                  },
-                  required: %w[resource data meta]
-                }
-              }
-            }
-          }
-        }
-      end
-
-      def global_trash_item_responses
-        response = resource_item_responses(nil)
-        response["200"][:description] = "Single trashed record payload."
-        response
-      end
-
-      def global_trash_delete_responses
-        response = resource_delete_responses(nil)
-        response["200"][:description] = "Trashed item permanently deleted."
-        response
       end
 
       def resource_write_request_body(recordable_type)
@@ -681,7 +628,7 @@ module RecordingStudioApi
       def recordable_details_schema(recordable_type)
         return if recordable_type.blank?
 
-        details_schema = RecordingStudioApi.recordable_registration_for(recordable_type)&.openapi&.dig(:details_schema)
+        details_schema = recordable_registration_for(recordable_type)&.openapi&.dig(:details_schema)
         return unless details_schema.is_a?(Hash)
 
         properties = details_schema[:properties] || details_schema["properties"]

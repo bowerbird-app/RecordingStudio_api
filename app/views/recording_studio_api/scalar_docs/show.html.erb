@@ -1,0 +1,23 @@
+<% content_for :page_nav_right do %>
+  <%= render FlatPack::Button::Component.new(
+    text: "Full width",
+    icon: "arrows-pointing-out",
+    style: :secondary,
+    size: :md,
+    url: @fullscreen_url
+  ) %>
+<% end %>
+
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <%= render FlatPack::PageTitle::Component.new(
+    title: @api_title,
+    subtitle: "Interactive API explorer for #{@api_version.upcase}",
+    variant: :h1
+  ) %>
+
+  <% if lookup_context.exists?("recording_studio_api/scalar_docs/extension", [], true) %>
+    <%= render "recording_studio_api/scalar_docs/extension" %>
+  <% end %>
+
+  <%= render "recording_studio_api/scalar_docs/scalar" %>
+</div>

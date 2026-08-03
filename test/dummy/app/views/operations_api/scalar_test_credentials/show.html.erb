@@ -1,0 +1,77 @@
+<% content_for :page_nav_back_url, @scalar_test_auth_docs_path %>
+<% content_for :page_nav_back_label, "Back to Operations API docs" %>
+
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "Operations API test token",
+    subtitle: "Create a short-lived, Operations-scoped bearer token for local API testing.",
+    variant: :h1
+  ) %>
+
+  <div>
+    <%= render FlatPack::Button::Component.new(
+      text: "Open Operations API docs",
+      style: :default,
+      size: :md,
+      url: @scalar_test_auth_docs_path
+    ) %>
+  </div>
+
+  <% if @scalar_test_error.present? %>
+    <%= render FlatPack::Alert::Component.new(description: @scalar_test_error, style: :danger) %>
+  <% end %>
+
+  <% if @scalar_test_notice.present? %>
+    <%= render FlatPack::Alert::Component.new(description: @scalar_test_notice, style: :success) %>
+  <% end %>
+
+  <% if @scalar_test_access_points.any? %>
+    <%= form_with url: operations_api_scalar_test_credential_path(version: @scalar_test_auth_version), method: :post, local: true, class: "w-full max-w-xl space-y-4" do %>
+      <%= render FlatPack::Select::Component.new(
+        name: "access_point_recording_id",
+        label: "Access point",
+        options: @scalar_test_access_points.map { |entry| [entry.fetch(:label), entry.fetch(:id)] },
+        value: @scalar_test_selected_access_point_id,
+        class: "w-full"
+      ) %>
+
+      <%= render FlatPack::Select::Component.new(
+        name: "role",
+        label: "Role",
+        options: @scalar_test_roles.map { |role| [role.humanize, role] },
+        value: @scalar_test_token&.fetch("role", "admin") || "admin",
+        class: "w-full"
+      ) %>
+
+      <div>
+        <%= render FlatPack::Button::Component.new(text: "Generate token", style: :primary, size: :md, type: :submit) %>
+      </div>
+    <% end %>
+  <% end %>
+
+  <% if @scalar_test_context_rows.any? %>
+    <section class="space-y-3">
+      <%= render FlatPack::SectionTitle::Component.new(
+        title: "Current Operations bearer token",
+        subtitle: "Paste this bearer value into the Operations API reference authentication panel."
+      ) %>
+      <pre class="overflow-x-auto rounded-md border border-(--surface-border-color) bg-(--surface-background-color) p-4 text-sm text-(--surface-content-color)"><%= "Bearer #{@scalar_test_token.fetch("access_token")}" %></pre>
+      <%= button_to "Revoke token", operations_api_scalar_test_credential_path(version: @scalar_test_auth_version), method: :delete, class: "inline-flex items-center justify-center rounded-(--button-border-radius) border border-(--surface-border-color) px-(--button-padding-x-md) py-(--button-padding-y-md) text-sm font-medium" %>
+      <%= render FlatPack::Table::Component.new(data: @scalar_test_context_rows) do |table| %>
+        <% table.column(title: "Field", html: ->(row) { row.fetch(:field) }) %>
+        <% table.column(title: "Value", html: ->(row) { row.fetch(:value) }) %>
+      <% end %>
+    </section>
+  <% end %>
+
+  <% if @scalar_test_sample_rows.any? %>
+    <section class="space-y-3">
+      <%= render FlatPack::SectionTitle::Component.new(title: "Scoped sample IDs", subtitle: "Use these IDs for Operations API path parameters.") %>
+      <%= render FlatPack::Table::Component.new(data: @scalar_test_sample_rows) do |table| %>
+        <% table.column(title: "Resource", html: ->(row) { row.fetch(:resource) }) %>
+        <% table.column(title: "Label", html: ->(row) { row.fetch(:label) }) %>
+        <% table.column(title: "ID", html: ->(row) { row.fetch(:id) }) %>
+      <% end %>
+    </section>
+  <% end %>
+</div>

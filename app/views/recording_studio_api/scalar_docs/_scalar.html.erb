@@ -1,0 +1,48 @@
+<div id="scalar-api-reference" style="min-height: 100vh;">Loading API documentation...</div>
+<%= javascript_include_tag RecordingStudioApi::ScalarAsset::LOGICAL_PATH,
+                           id: "scalar-api-reference-source",
+                           defer: true,
+                           nonce: true %>
+<%= javascript_tag nonce: true do %>
+  (function () {
+    function scalarTarget() {
+      return document.getElementById("scalar-api-reference");
+    }
+
+    function initializeScalar() {
+      var target = scalarTarget();
+      if (!target || target.dataset.scalarInitialized === "true") return;
+      if (!window.Scalar || typeof window.Scalar.createApiReference !== "function") {
+        displayScalarLoadFailure();
+        return;
+      }
+
+      try {
+        target.textContent = "";
+        window.Scalar.createApiReference("#scalar-api-reference", <%= raw @scalar_configuration_json %>);
+        target.dataset.scalarInitialized = "true";
+      } catch (error) {
+        displayScalarLoadFailure();
+      }
+    }
+
+    function displayScalarLoadFailure() {
+      var target = scalarTarget();
+      if (target && target.dataset.scalarInitialized !== "true") {
+        target.textContent = "Unable to load Scalar API documentation. Verify the configured Scalar source.";
+      }
+    }
+
+    var source = document.getElementById("scalar-api-reference-source");
+    source.addEventListener("load", initializeScalar, { once: true });
+    source.addEventListener("error", displayScalarLoadFailure, { once: true });
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", initializeScalar, { once: true });
+    } else {
+      initializeScalar();
+    }
+
+    window.addEventListener("load", initializeScalar, { once: true });
+  }());
+<% end %>

@@ -23,7 +23,9 @@ module RecordingStudioApi
              inverse_of: :api_client
 
     validates :name, presence: true
+    validates :api_key, presence: true, inclusion: { in: ->(_) { RecordingStudioApi.configuration.api_names } }
     validate :access_recording_must_reference_access
+    validate :api_key_must_not_change, on: :update
 
     def recording
       @recording ||= RecordingStudio::Recording.unscoped.find_by(
@@ -52,6 +54,10 @@ module RecordingStudioApi
       return if access_recording.recordable_type == "RecordingStudio::Access"
 
       errors.add(:access_recording, "must point to a RecordingStudio::Access recording")
+    end
+
+    def api_key_must_not_change
+      errors.add(:api_key, "cannot be changed") if will_save_change_to_api_key?
     end
   end
 end

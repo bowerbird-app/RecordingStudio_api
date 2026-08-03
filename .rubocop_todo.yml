@@ -119,12 +119,16 @@ Lint/RedundantSafeNavigation:
 # Configuration parameters: AllowedMethods, AllowedPatterns, CountRepeatedAttributes.
 Metrics/AbcSize:
   Max: 57
+  Exclude:
+    - 'lib/recording_studio_api/admin/api_section_factory.rb'
 
 # Offense count: 19
 # Configuration parameters: CountComments, CountAsOne, AllowedMethods, AllowedPatterns.
 # AllowedMethods: refine
 Metrics/BlockLength:
   Max: 57
+  Exclude:
+    - 'config/routes.rb'
 
 # Offense count: 8
 # Configuration parameters: CountComments, CountAsOne.
@@ -145,6 +149,8 @@ Metrics/MethodLength:
 # Configuration parameters: CountComments, CountAsOne.
 Metrics/ModuleLength:
   Max: 180
+  Exclude:
+    - 'app/controllers/recording_studio_api/concerns/rate_limiting.rb'
 
 # Offense count: 5
 # Configuration parameters: CountKeywordArgs, MaxOptionalParameters.

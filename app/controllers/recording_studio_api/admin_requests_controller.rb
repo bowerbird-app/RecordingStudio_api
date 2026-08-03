@@ -184,7 +184,7 @@ module RecordingStudioApi
     end
 
     def filtered_requests_scope_for(occurred_at:)
-      scope = RecordingStudioApi::ApiRequestLog.where(occurred_at: occurred_at)
+      scope = RecordingStudioApi::ApiRequestLog.where(api_key: @current_admin_api.name, occurred_at: occurred_at)
 
       case @requests_chart_status
       when "success"

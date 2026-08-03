@@ -25,7 +25,7 @@ module RecordingStudioApi
       module_function
 
       def items(context)
-        rows = failing_endpoints
+        rows = failing_endpoints(context)
         return [{ text: "No failing endpoints", trailing: "Last 4 weeks" }] if rows.empty?
 
         rows.map do |row|
@@ -55,9 +55,13 @@ module RecordingStudioApi
         end
       end
 
-      def failing_endpoints
+      def failing_endpoints(context = nil)
         RecordingStudioApi::Admin::Queries::AdminApiEndpointFailuresQuery
-          .call(start_date: daily_buckets.first, end_date: Date.current)
+          .call(
+            start_date: daily_buckets.first,
+            end_date: Date.current,
+            api: context ? RecordingStudioApi::Admin::ApiContext.key_from_context(context) : :public
+          )
           .sort_by { |row| [-row.failure_count, -row.server_error_count, row.request_method.to_s, row.request_path.to_s] }
           .first(LIMIT)
           .map do |row|

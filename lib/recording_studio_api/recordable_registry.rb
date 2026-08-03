@@ -9,13 +9,15 @@ module RecordingStudioApi
       @registrations = {}
     end
 
-    def register(recordable_type, serializer: nil, openapi: nil, sortable_attributes: nil, writable_attributes: nil)
+    def register(recordable_type, serializer: nil, openapi: nil, sortable_attributes: nil, writable_attributes: nil, operations: nil, capability_actions: nil)
       registration = RecordableRegistration.new(
         recordable_type: recordable_type,
         serializer: serializer,
         openapi: openapi,
         sortable_attributes: sortable_attributes,
-        writable_attributes: writable_attributes
+        writable_attributes: writable_attributes,
+        operations: operations,
+        capability_actions: capability_actions
       )
       registration.validate!
 
@@ -49,7 +51,9 @@ module RecordingStudioApi
         serializer: compose_serializers(existing.serializer, incoming.serializer),
         openapi: deep_merge_hashes(existing.openapi, incoming.openapi),
         sortable_attributes: existing.sortable_attributes | incoming.sortable_attributes,
-        writable_attributes: (existing.writable_attributes | incoming.writable_attributes).sort
+        writable_attributes: (existing.writable_attributes | incoming.writable_attributes).sort,
+        operations: existing.operations & incoming.operations,
+        capability_actions: (existing.capability_actions | incoming.capability_actions).sort
       )
       merged.validate!
       merged

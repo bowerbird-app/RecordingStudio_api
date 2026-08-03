@@ -65,7 +65,8 @@ module RecordingStudioApi
 
     def log_scope
       @log_scope ||= begin
-        scope = RecordingStudioApi::ApiRequestLog.order(current_sort_column => @direction.to_sym, id: @direction.to_sym)
+        scope = RecordingStudioApi::ApiRequestLog.where(api_key: @current_admin_api.name)
+                                                 .order(current_sort_column => @direction.to_sym, id: @direction.to_sym)
         scope = scope.where("occurred_at >= ?", @logs_start_date.beginning_of_day) if @logs_start_date.present?
         scope = scope.where("occurred_at <= ?", @logs_end_date.end_of_day) if @logs_end_date.present?
         scope

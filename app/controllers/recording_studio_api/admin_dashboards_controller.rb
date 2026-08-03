@@ -25,12 +25,14 @@ module RecordingStudioApi
 
       @last_24_hours_requests_path = RecordingStudioApi.admin_requests_path(
         controller: self,
+        **RecordingStudioApi::Admin::ApiContext.query_params(@current_admin_api.name),
         close_url: request.fullpath,
         range: "last_24_hours",
         group_by: "hour"
       )
       @last_30_days_requests_path = RecordingStudioApi.admin_requests_path(
         controller: self,
+        **RecordingStudioApi::Admin::ApiContext.query_params(@current_admin_api.name),
         close_url: request.fullpath,
         start_date: 29.days.ago.to_date.iso8601,
         end_date: Date.current.iso8601,
@@ -38,6 +40,7 @@ module RecordingStudioApi
       )
       @last_30_days_errors_path = RecordingStudioApi.admin_errors_path(
         controller: self,
+        **RecordingStudioApi::Admin::ApiContext.query_params(@current_admin_api.name),
         close_url: request.fullpath,
         start_date: 29.days.ago.to_date.iso8601,
         end_date: Date.current.iso8601
@@ -46,9 +49,10 @@ module RecordingStudioApi
 
     private
 
-    def build_log_chart_points(buckets:, scope: RecordingStudioApi::ApiRequestLog.all)
+    def build_log_chart_points(buckets:, scope: nil)
       return buckets.map { |time| chart_point(time, 0) } unless RecordingStudioApi::ApiRequestLog.table_available?
 
+      scope ||= RecordingStudioApi::ApiRequestLog.where(api_key: @current_admin_api.name)
       counts_by_bucket = buckets.index_with(0)
       counts_by_hour = scope.where(
         occurred_at: buckets.first..Time.current
@@ -74,12 +78,12 @@ module RecordingStudioApi
     end
 
     def rate_limited_logs_scope
-      scope = RecordingStudioApi::ApiRequestLog.where(rate_limited: true)
-      scope.or(RecordingStudioApi::ApiRequestLog.where(status_code: 429))
+      scope = RecordingStudioApi::ApiRequestLog.where(api_key: @current_admin_api.name, rate_limited: true)
+      scope.or(RecordingStudioApi::ApiRequestLog.where(api_key: @current_admin_api.name, status_code: 429))
     end
 
     def errors_logs_scope
-      RecordingStudioApi::ApiRequestLog.where(status_code: 400..599)
+      RecordingStudioApi::ApiRequestLog.where(api_key: @current_admin_api.name, status_code: 400..599)
     end
   end
 end

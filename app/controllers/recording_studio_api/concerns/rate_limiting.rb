@@ -74,7 +74,7 @@ module RecordingStudioApi
         return nil if limit <= 0 || period <= 0
 
         current_window = (Time.current.to_i / period).to_i
-        key = "#{rate_limit_namespace}:#{rate_limit_bucket}:#{rate_limit_identifier}:#{current_window}"
+        key = "#{rate_limit_scoped_namespace}:#{rate_limit_bucket}:#{rate_limit_identifier}:#{current_window}"
 
         count = redis.incr(key)
         redis.expire(key, period) if count == 1
@@ -128,17 +128,17 @@ module RecordingStudioApi
         @rate_limit_bucket_override = previous_bucket
       end
 
-      def api_pre_auth_rate_limit_enabled_for_request? = RecordingStudioApi.configuration.rate_limit_api_pre_auth_enabled && api_rate_limited_path?
+      def api_pre_auth_rate_limit_enabled_for_request? = rate_limit_api.rate_limit_api_pre_auth_enabled && api_rate_limited_path?
 
       def rate_limit_enabled_for_request?
         if rate_limit_bucket_override == "api_pre_auth"
           return api_pre_auth_rate_limit_enabled_for_request?
         end
         if oauth_rate_limited_path?
-          return RecordingStudioApi.configuration.rate_limit_oauth_enabled
+          return rate_limit_api.rate_limit_oauth_enabled
         end
 
-        return false unless RecordingStudioApi.configuration.rate_limit_api_enabled
+        return false unless rate_limit_api.rate_limit_api_enabled
 
         api_rate_limited_path?
       end
@@ -158,30 +158,30 @@ module RecordingStudioApi
       def rate_limit_window_limit
         case rate_limit_bucket
         when "oauth"
-          RecordingStudioApi.configuration.rate_limit_oauth_requests.to_i
+          rate_limit_api.rate_limit_oauth_requests.to_i
         when "api_pre_auth"
-          RecordingStudioApi.configuration.rate_limit_api_pre_auth_requests.to_i
+          rate_limit_api.rate_limit_api_pre_auth_requests.to_i
         when "api_read"
-          RecordingStudioApi.configuration.rate_limit_api_read_requests.to_i.nonzero? ||
-            RecordingStudioApi.configuration.rate_limit_api_requests.to_i
+          rate_limit_api.rate_limit_api_read_requests.to_i.nonzero? ||
+            rate_limit_api.rate_limit_api_requests.to_i
         else
-          RecordingStudioApi.configuration.rate_limit_api_write_requests.to_i.nonzero? ||
-            RecordingStudioApi.configuration.rate_limit_api_requests.to_i
+          rate_limit_api.rate_limit_api_write_requests.to_i.nonzero? ||
+            rate_limit_api.rate_limit_api_requests.to_i
         end
       end
 
       def rate_limit_window_period
         case rate_limit_bucket
         when "oauth"
-          RecordingStudioApi.configuration.rate_limit_oauth_period_seconds.to_i
+          rate_limit_api.rate_limit_oauth_period_seconds.to_i
         when "api_pre_auth"
-          RecordingStudioApi.configuration.rate_limit_api_pre_auth_period_seconds.to_i
+          rate_limit_api.rate_limit_api_pre_auth_period_seconds.to_i
         when "api_read"
-          RecordingStudioApi.configuration.rate_limit_api_read_period_seconds.to_i.nonzero? ||
-            RecordingStudioApi.configuration.rate_limit_api_period_seconds.to_i
+          rate_limit_api.rate_limit_api_read_period_seconds.to_i.nonzero? ||
+            rate_limit_api.rate_limit_api_period_seconds.to_i
         else
-          RecordingStudioApi.configuration.rate_limit_api_write_period_seconds.to_i.nonzero? ||
-            RecordingStudioApi.configuration.rate_limit_api_period_seconds.to_i
+          rate_limit_api.rate_limit_api_write_period_seconds.to_i.nonzero? ||
+            rate_limit_api.rate_limit_api_period_seconds.to_i
         end
       end
 
@@ -202,6 +202,19 @@ module RecordingStudioApi
         configured.present? ? configured : "recording_studio_api"
       end
 
+      def rate_limit_api
+        return current_api if respond_to?(:current_api, true)
+
+        RecordingStudioApi.configuration
+      end
+
+      def rate_limit_scoped_namespace
+        api_key = respond_to?(:current_api_key, true) ? current_api_key.to_s : "public"
+        return rate_limit_namespace if api_key.blank? || api_key == "public"
+
+        "#{rate_limit_namespace}:#{api_key}"
+      end
+
       def rate_limit_bucket_override = @rate_limit_bucket_override
 
       def oauth_rate_limited_path?
@@ -209,9 +222,12 @@ module RecordingStudioApi
       end
 
       def api_rate_limited_path?
-        RecordingStudioApi.api_versions.any? do |version|
+        public_api_path = RecordingStudioApi.api_versions.any? do |version|
           request.path.include?("/api/#{version}/") || request.path.end_with?("/api/#{version}")
         end
+        named_api_path = request.path.match?(%r{/apis/[a-z0-9_-]+/v[a-z0-9_-]+(?:/|\z)}i)
+
+        public_api_path || named_api_path
       end
 
       def api_read_request?

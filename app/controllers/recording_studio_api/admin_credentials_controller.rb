@@ -24,7 +24,10 @@ module RecordingStudioApi
     end
 
     def load_credential
-      @credential = RecordingStudioApi::ApiCredential.find(params[:id])
+      @credential = RecordingStudioApi::ApiCredential
+                    .joins(:api_client)
+                    .where(api_client: { api_key: @current_admin_api.name })
+                    .find(params[:id])
     end
   end
 end

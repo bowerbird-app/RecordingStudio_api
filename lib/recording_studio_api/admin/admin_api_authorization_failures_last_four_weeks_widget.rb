@@ -27,7 +27,7 @@ module RecordingStudioApi
           )
         end
         chart_type :area
-        series { RecordingStudioApi::Admin::AdminApiAuthorizationFailuresLastFourWeeksWidget.series }
+        series { |context| RecordingStudioApi::Admin::AdminApiAuthorizationFailuresLastFourWeeksWidget.series(context) }
         chart_options do
           {
             height: 240,
@@ -44,21 +44,21 @@ module RecordingStudioApi
 
       module_function
 
-      def series
+      def series(context = nil)
         STATUS_CODES.map do |label, status_code|
           {
             name: label,
-            data: daily_points_for(status_code).map { |point| { x: point[:label], y: point[:count] } }
+            data: daily_points_for(status_code, context).map { |point| { x: point[:label], y: point[:count] } }
           }
         end
       end
 
-      def total(_context = nil)
-        request_scope.where(occurred_at: time_range).count
+      def total(context = nil)
+        request_scope(context).where(occurred_at: time_range).count
       end
 
-      def previous_total(_context = nil)
-        request_scope.where(occurred_at: previous_time_range).count
+      def previous_total(context = nil)
+        request_scope(context).where(occurred_at: previous_time_range).count
       end
 
       def link_to(context)
@@ -72,10 +72,10 @@ module RecordingStudioApi
         NavigationUrlHelpers.admin_screen_url(context, "admin_api_requests", query)
       end
 
-      def request_scope
+      def request_scope(context = nil)
         return RecordingStudioApi::ApiRequestLog.none unless RecordingStudioApi::ApiRequestLog.table_available?
 
-        RecordingStudioApi::ApiRequestLog.where(status_code: STATUS_CODES.values)
+        RecordingStudioApi::ApiRequestLog.where(api_key: api_key(context), status_code: STATUS_CODES.values)
       end
 
       def daily_buckets
@@ -93,11 +93,11 @@ module RecordingStudioApi
         previous_start.beginning_of_day...previous_end
       end
 
-      def daily_points_for(status_code)
+      def daily_points_for(status_code, context = nil)
         buckets = daily_buckets
         counts = buckets.index_with(0)
 
-        request_scope.where(status_code:, occurred_at: time_range).pluck(:occurred_at).each do |occurred_at|
+        request_scope(context).where(status_code:, occurred_at: time_range).pluck(:occurred_at).each do |occurred_at|
           next if occurred_at.nil?
 
           day = occurred_at.in_time_zone.to_date
@@ -105,6 +105,10 @@ module RecordingStudioApi
         end
 
         buckets.map { |bucket| { label: bucket.strftime("%b %-d"), count: counts.fetch(bucket, 0) } }
+      end
+
+      def api_key(context)
+        context ? RecordingStudioApi::Admin::ApiContext.key_from_context(context) : "public"
       end
     end
   end

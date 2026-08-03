@@ -133,6 +133,25 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, access_recording.id.to_s
   end
 
+  test "creates credentials for the selected named API" do
+    RecordingStudioApi.configuration.api(:operations)
+    RecordingStudioApi.register_recordable_type_api("Workspace", api: :operations)
+
+    post "/recording_studio_api/api_clients", params: {
+      api_client: {
+        api_key: "operations",
+        root_type: "Workspace",
+        access_point_recording_id: @workspace_root_recording.id,
+        role: "admin",
+        api_client_name: "Operations UI client",
+        expires_at: ""
+      }
+    }
+
+    assert_response :created
+    assert_equal "operations", RecordingStudioApi::ApiClient.find_by!(name: "Operations UI client").api_key
+  end
+
   test "index lists API access including descendant child access" do
     direct_api_client = create_api_client_for(
       parent_recording: @workspace_root_recording,
@@ -708,6 +727,32 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_nil credential.reload.revoked_at
   end
 
+  test "protected API clients are hidden from recording managers without API admin access" do
+    api_client = create_protected_operations_client_for_delegated_manager
+    credential = api_client.credentials.max_by(&:created_at)
+
+    get "/recording_studio_api/api_clients"
+    assert_response :success
+    assert_not_includes response.body, api_client.name
+
+    get "/recording_studio_api/api_clients/#{api_client.id}"
+    assert_response :not_found
+
+    patch "/recording_studio_api/api_clients/#{api_client.id}", params: {
+      api_client: { api_client_name: "Blocked protected rename", expires_at: "" }
+    }
+    assert_response :not_found
+    assert_equal "Hidden protected operations client", api_client.reload.name
+
+    post "/recording_studio_api/api_clients/#{api_client.id}/rotate"
+    assert_response :not_found
+    assert_nil credential.reload.revoked_at
+
+    post "/recording_studio_api/api_clients/#{api_client.id}/revoke"
+    assert_response :not_found
+    assert_nil credential.reload.revoked_at
+  end
+
   test "show does not render token count rows" do
     api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Activity API client")
     latest_credential = api_client.credentials.max_by(&:created_at)
@@ -838,6 +883,47 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
   end
 
   private
+
+  def create_protected_operations_client_for_delegated_manager
+    configure_dummy_operations_api!
+    RecordingStudio.enable_capability(:accessible, on: "AdminSection")
+    RecordingStudio.enable_capability(:api_access_point, on: "AdminSection")
+    RecordingStudioApi.register_recordable_type_api("AdminSection", api: :operations)
+
+    owner = create_user(email: "protected-api-owner@example.com")
+    _admin_root, admin_root_recording = create_admin_root_recording(name: "Protected API admin")
+    with_access_creation_context do
+      access = RecordingStudio::Access.create!(actor: owner, role: :admin)
+      RecordingStudio::Recording.create!(recordable: access, parent_recording: admin_root_recording)
+    end
+
+    admin_section_recording = RecordingStudio::Recording.create!(
+      recordable: AdminSection.create!(key: "protected_api", name: "Protected API"),
+      parent_recording: admin_root_recording
+    )
+    delegated_access = RecordingStudioAccessible.grant_access(
+      recording: admin_section_recording,
+      actor: @user,
+      role: :admin,
+      manager_actor: owner
+    )
+    assert delegated_access.success?, delegated_access.error
+
+    RecordingStudioApi::Admin::ApiAuthorization.recording_for(
+      api: :operations,
+      root_recording: admin_root_recording,
+      create: true
+    )
+    provision = RecordingStudioApi::Services::ProvisionApiClient.call(
+      access_point_recording: admin_section_recording,
+      manager_actor: owner,
+      role: :admin,
+      name: "Hidden protected operations client",
+      api: :operations
+    )
+    assert provision.success?, provision.error
+    provision.value.fetch(:api_client)
+  end
 
   def assert_secret_response_not_stored
     assert_includes response.headers["Cache-Control"], "no-store"

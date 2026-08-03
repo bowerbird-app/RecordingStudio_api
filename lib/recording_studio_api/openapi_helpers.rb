@@ -2,12 +2,22 @@
 
 module RecordingStudioApi
   module OpenapiHelpers
-    def documentation_catalog(version: nil)
-      RecordingStudioApi::Services::DocumentationCatalog.call(version: version)
+    def documentation_catalog(version: nil, mount_path: nil, api_mount_path: nil, api: :public)
+      RecordingStudioApi::Services::DocumentationCatalog.call(
+        version: version,
+        mount_path: mount_path,
+        api_mount_path: api_mount_path,
+        api: api
+      )
     end
 
-    def openapi_document(version: nil)
-      RecordingStudioApi::Services::OpenapiDocument.call(version: version)
+    def openapi_document(version: nil, mount_path: nil, api_mount_path: nil, api: :public)
+      RecordingStudioApi::Services::OpenapiDocument.call(
+        version: version,
+        mount_path: mount_path,
+        api_mount_path: api_mount_path,
+        api: api
+      )
     end
 
     def recordable_details_schema_name_for(recordable_type)
@@ -18,18 +28,18 @@ module RecordingStudioApi
       "#{recordable_type.to_s.delete(':')}Recording"
     end
 
-    def openapi_title
-      configured_title = @configuration&.openapi_title if instance_variable_defined?(:@configuration)
+    def openapi_title(api: :public)
+      configured_title = configuration.fetch_api(api).openapi_title
       return configured_title if configured_title.present?
 
       host_application_name || "RecordingStudioApi"
     end
 
-    def openapi_description
-      configured_description = @configuration&.openapi_description if instance_variable_defined?(:@configuration)
+    def openapi_description(api: :public)
+      configured_description = configuration.fetch_api(api).openapi_description
       return configured_description if configured_description.present?
 
-      "Add you API intro description in the config file"
+      "API endpoints for accessing and managing Recording Studio resources."
     end
 
     private

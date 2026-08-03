@@ -244,7 +244,6 @@ def seeded_api_request_scenarios(resource_recordings:)
 
   resource_scenarios + [
     { method: "GET", path: api_base_path, action: "index", controller: resources_controller, success_statuses: [200], weight: 3 },
-    { method: "GET", path: "#{api_base_path}/trash", action: "trash_index", controller: resources_controller, success_statuses: [200], weight: 1 },
     { method: "POST", path: "/recording_studio_api/oauth/token", action: "token", controller: "recording_studio_api/oauth", success_statuses: [200], weight: 2 }
   ]
 end

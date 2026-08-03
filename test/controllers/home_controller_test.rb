@@ -15,6 +15,7 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
   TEST_PASSWORD = "HomeTestPassword!2026"
 
   setup do
+    configure_dummy_operations_api!
     @user = User.create!(email: "home-test-#{SecureRandom.hex(4)}@example.com") do |user|
       user.password = TEST_PASSWORD
       user.password_confirmation = TEST_PASSWORD
@@ -39,6 +40,7 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Demo to add and remove API access"
     assert_includes response.body, "RecordingStudio API"
     assert_select %(a[href="/api?anchor_url=%2F"]), text: "API settings", count: 1
+    assert_select %(a[href="/docs/scalar/v1/test-credential"]), text: "Create API test token", count: 1
     assert_not_includes response.body, "API keys"
     assert_not_includes response.body, "Child access recording"
     assert_select %(a[href="#{docs_install_path}"]), count: 1
@@ -65,11 +67,122 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "Recording Studio API demo"
     assert_includes response.body, "RecordingStudio API"
     assert_includes response.body, "Admin API"
-    assert_includes response.body, "Open Admin API"
-    assert_select %(a[href="/admin/api?anchor_url=%2F"]), text: "Open Admin API", count: 1
+    assert_select "#public-api h2", text: "Public API", count: 1
+    assert_select %(a[href="#public-api"][aria-label="Copy link to Public API"]), count: 1
+    assert_select %(a[href="/admin/api?anchor_url=%2F"]), text: "Public API Admin dashboard", count: 1
+    assert_select %(a[href="/docs/scalar"]), text: "Public API docs", count: 1
+    assert_select %(a[href="/docs/scalar/v1/test-credential"]), text: "Create API test token", count: 1
+    assert_select "#operations-api h2", text: "Operations API", count: 1
+    assert_select %(a[href="#operations-api"][aria-label="Copy link to Operations API"]), count: 1
+    assert_select "#operations-api p", text: "Private API for admin use only", count: 1
+    assert_select %(a[href="/admin/api/operations"]), text: "Operations API Admin dashboard", count: 1
+    assert_select %(a[href="/admin/operations-api/docs"]), text: "Operations API docs", count: 1
+    assert_select %(a[href="/admin/operations-api/docs/v1/test-credential"]), text: "Create Operations API test token", count: 1
+    assert_includes response.body, "Operations credentials"
+    assert_includes response.body, "Operations API docs"
     # The shared layout now surfaces root-switch choices, including other roots.
     assert_includes response.body, "Old Workspace"
     assert_not_includes response.body, "API keys"
+  end
+
+  test "operations test token page issues an operations-scoped token" do
+    _, admin_root_recording = create_admin_root_recording
+    create_access_recording(parent_recording: admin_root_recording, user: @user, role: :admin)
+
+    workspace = Workspace.create!(name: "Public-only token scope")
+    workspace_recording = RecordingStudio::Recording.create!(recordable: workspace)
+    create_access_recording(parent_recording: workspace_recording, user: @user, role: :admin)
+
+    get operations_api_scalar_test_credential_path(version: "v1")
+
+    assert_response :success
+    assert_select %(body[data-recording-studio-default-layout="true"]), count: 1
+    assert_select "h1", text: "Operations API test token"
+    assert_select %(form[action="#{operations_api_scalar_test_credential_path(version: 'v1')}"]), count: 1
+    assert_select %(select[name="access_point_recording_id"]), count: 1
+    assert_select %(select[name="role"]), count: 1
+    assert_select %(button[type="submit"]), text: "Generate token", count: 1
+    assert_includes response.body, "Admin root: Admin"
+    assert_not_includes response.body, "Workspace: Public-only token scope"
+
+    post operations_api_scalar_test_credential_path(version: "v1"), params: {
+      access_point_recording_id: workspace_recording.id,
+      role: "view"
+    }
+
+    assert_redirected_to operations_api_scalar_test_credential_path(version: "v1")
+    assert_not RecordingStudioApi::ApiClient.exists?(api_key: "operations")
+
+    post operations_api_scalar_test_credential_path(version: "v1"), params: {
+      access_point_recording_id: admin_root_recording.id,
+      role: "view"
+    }
+
+    assert_redirected_to operations_api_scalar_test_credential_path(version: "v1")
+    assert_equal "operations", RecordingStudioApi::ApiClient.order(created_at: :desc).first.api_key
+
+    follow_redirect!
+
+    assert_response :success
+    assert_includes response.body, "Operations API test bearer token issued."
+    assert_includes response.body, "Bearer rsapi_at_"
+  end
+
+  test "standard workspace sidebar omits operations administration links" do
+    workspace = Workspace.create!(name: "Public API Workspace")
+    workspace_root_recording = RecordingStudio::Recording.create!(recordable: workspace)
+    create_access_recording(parent_recording: workspace_root_recording, user: @user, role: :admin)
+
+    get root_path
+
+    assert_response :success
+    assert_select %(a[href="/admin/api/operations"]), count: 0
+    assert_select %(a[href="/admin/operations-api/docs"]), count: 0
+    assert_select %(a[href="/admin/operations-api/docs/v1/test-credential"]), count: 0
+
+    get operations_api_scalar_test_credential_path(version: "v1")
+
+    assert_response :forbidden
+  end
+
+  test "operations Scalar docs require the operations admin workspace" do
+    _, admin_root_recording = create_admin_root_recording
+    create_access_recording(parent_recording: admin_root_recording, user: @user, role: :admin)
+
+    get "/admin/operations-api/docs/v1"
+
+    assert_response :success
+    assert_select %(body[data-recording-studio-default-layout="true"]), count: 1
+    assert_select "#scalar-api-reference", text: "Loading API documentation...", count: 1
+    assert_select "#scalar-api-reference-source[src^='/assets/recording_studio_api/scalar-1.64.0']", count: 1
+    assert_select "#scalar-api-reference-source[src^='http']", count: 0
+    assert_select %(a[href="/admin/operations-api/docs/v1/fullscreen"]), text: "Full width"
+    assert_includes response.body, 'source.addEventListener("load", initializeScalar'
+    assert_includes response.body, '"url":"/admin/operations-api/docs/v1/openapi.json"'
+
+    get "/admin/operations-api/docs/v1/openapi.json"
+
+    assert_response :success, response.body
+    paths = JSON.parse(response.body).fetch("paths").keys
+    assert_includes paths, "/recording_studio_api/apis/operations/v1/admin_roots"
+    assert_not_includes paths, "/recording_studio_api/api/v1/workspaces"
+
+    workspace = Workspace.create!(name: "Non-admin docs workspace")
+    workspace_root_recording = RecordingStudio::Recording.create!(recordable: workspace)
+    create_access_recording(parent_recording: workspace_root_recording, user: @user, role: :admin)
+    switch_to_root(workspace_root_recording)
+
+    get "/admin/operations-api/docs/v1"
+
+    assert_response :forbidden
+
+    get "/admin/operations-api/docs/v1/fullscreen"
+
+    assert_response :forbidden
+
+    get "/admin/operations-api/docs/v1/openapi.json"
+
+    assert_response :forbidden
   end
 
   test "workspace page renders its child recordings tree" do
@@ -178,6 +291,15 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
   end
 
   private
+
+  def switch_to_root(root_recording)
+    patch recording_studio_root_switchable.root_switch_path(scope: "all_roots"), params: {
+      root_switch: {
+        root_recording_id: root_recording.id,
+        return_to: root_path
+      }
+    }
+  end
 
   def create_access_recording(parent_recording:, user:, role:)
     with_access_creation_context do

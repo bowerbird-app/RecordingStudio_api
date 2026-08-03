@@ -66,8 +66,19 @@ module RecordingStudioApi
 
       class << self
         def endpoint_rows(context)
+          return [] unless RecordingStudioApi::Admin::ApiAuthorization.authorized?(
+            actor: context.current_actor,
+            api: RecordingStudioApi::Admin::ApiContext.key_from_context(context),
+            root_recording: context.root_recording,
+            role: RecordingStudioApi.configuration.access_management_view_role
+          )
+
           start_date, end_date = date_range_from_context(context)
-          RecordingStudioApi::Admin::Queries::AdminApiEndpointFailuresQuery.call(start_date:, end_date:)
+          RecordingStudioApi::Admin::Queries::AdminApiEndpointFailuresQuery.call(
+            start_date: start_date,
+            end_date: end_date,
+            api: RecordingStudioApi::Admin::ApiContext.key_from_context(context)
+          )
         end
 
         def failure_rate_series(context)

@@ -20,6 +20,10 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
       http_verb: :post,
       handler: ->(context) { context.recording }
     )
+    RecordingStudioApi.register_recordable_type_api(
+      "Page",
+      capability_actions: %i[echo echo_access_grant echo_params versioned_echo]
+    )
   end
 
   teardown do
@@ -28,10 +32,11 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
     Current.actor = nil if defined?(Current)
   end
 
-  test "executes move only for folder resources when movable is enabled on Folder" do
+  test "executes move only for recordable types that explicitly allow the action" do
     folder_recording = @page_recording.parent_recording
 
     RecordingStudio.enable_capability(:movable, on: "Folder")
+    RecordingStudio.enable_capability(:movable, on: "Page")
     RecordingStudioApi.configuration.action_registry.instance_variable_get(:@registrations).delete("move")
     RecordingStudioApi.register_capability_action(
       :move,
@@ -39,6 +44,7 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
       http_verb: :post,
       handler: ->(context) { context.recording }
     )
+    RecordingStudioApi.register_recordable_type_api("Folder", capability_actions: %i[move])
 
     post "/recording_studio_api/api/v1/folders/#{folder_recording.id}/actions/move",
         headers: authorization_headers
@@ -96,26 +102,6 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_equal "legacy", JSON.parse(response.body).fetch("data").fetch("version")
-  end
-
-  test "exposes trash for trashable recordables through the nested resource route" do
-    post "/recording_studio_api/api/v1/pages/#{@page_recording.id}/trash",
-         headers: authorization_headers
-
-    assert_response :success
-    payload = JSON.parse(response.body).fetch("data")
-    assert_equal @page_recording.id, payload.fetch("id")
-    assert_not_nil RecordingStudio::Recording.unscoped.find(@page_recording.id).trashed_at
-  end
-
-  test "does not expose trash for non-trashable recordables" do
-    workspace_recording = @root_recording
-
-    post "/recording_studio_api/api/v1/workspaces/#{workspace_recording.id}/trash",
-         headers: authorization_headers
-
-    assert_response :unprocessable_entity
-    assert_equal "trash is not enabled for Workspace", JSON.parse(response.body).fetch("error")
   end
 
   test "passes only action payload params to handlers" do
@@ -260,23 +246,11 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
     assert_response :forbidden
   end
 
-  test "trash capability owns write authorization for view-only clients" do
-    view_user = create_user(email: "view-only-trash-action@example.com")
-    view_root_recording, view_access_recording = create_access_recording_for(user: view_user, role: :view)
-    view_page_recording = create_page_recording(root_recording: view_root_recording)
-    view_token = issue_oauth_access_token_for(access_recording: view_access_recording, name: "View-only trash token")
-
-    post "/recording_studio_api/api/v1/pages/#{view_page_recording.id}/actions/trash",
-         headers: { "Authorization" => "Bearer #{view_token}" }
-
-    assert_response :forbidden
-    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).fetch("error")
-    assert_nil RecordingStudio::Recording.unscoped.find(view_page_recording.id).trashed_at
-  end
-
   private
 
   def authorization_headers
     { "Authorization" => "Bearer #{@access_token}" }
   end
 end
+
+

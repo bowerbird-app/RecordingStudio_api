@@ -1,0 +1,150 @@
+# frozen_string_literal: true
+
+module PublicApi::ScalarTestAuth
+  extend ActiveSupport::Concern
+
+  private
+
+  def load_scalar_test_auth
+    @scalar_test_auth_enabled = scalar_test_auth_enabled?
+    return unless @scalar_test_auth_enabled
+
+    @scalar_test_token = session[scalar_test_auth_session_key]
+    @scalar_test_notice = session.delete(scalar_test_auth_notice_key)
+    @scalar_test_error = session.delete(scalar_test_auth_error_key)
+    @scalar_test_access_points = scalar_test_auth_access_points
+    @scalar_test_roles = scalar_test_auth_roles
+    @scalar_test_selected_access_point_id = @scalar_test_token&.fetch("scope_recording_id", nil) || @scalar_test_access_points.first&.fetch(:id)
+    @scalar_test_context_rows = scalar_test_auth_context_rows
+    @scalar_test_sample_rows = scalar_test_auth_sample_rows
+    @scalar_test_auth_version = params.fetch(:version).to_s.downcase
+    @scalar_test_auth_docs_path = public_api_scalar_docs_version_path(version: @scalar_test_auth_version)
+  end
+
+  def scalar_test_auth_enabled?
+    Rails.env.local?
+  end
+
+  def scalar_test_auth_api
+    "public"
+  end
+
+  def scalar_test_auth_actor
+    return current_user if respond_to?(:current_user, true) && current_user.present?
+    return Current.actor if defined?(Current) && Current.respond_to?(:actor)
+
+    nil
+  end
+
+  def scalar_test_auth_roles
+    %w[view edit admin]
+  end
+
+  def scalar_test_auth_policy
+    @scalar_test_auth_policy ||= RecordingStudioApi::AccessManagementPolicy.new(actor: scalar_test_auth_actor)
+  end
+
+  def scalar_test_auth_access_points
+    allowed_types = RecordingStudioApi.api_recordable_types(api: scalar_test_auth_api) - ["RecordingStudio::Access"]
+    scalar_test_auth_policy.manageable_root_recordings.flat_map do |root_recording|
+      root_recording.subtree_recordings(include_self: true)
+        .includes(:recordable)
+        .where(recordable_type: allowed_types, trashed_at: nil)
+        .reorder(:created_at, :id)
+        .map { |recording| { id: recording.id, label: scalar_test_auth_recording_label(recording) } }
+    end.uniq { |entry| entry.fetch(:id) }
+  end
+
+  def scalar_test_auth_session_payload(payload)
+    credential = payload.fetch(:credential)
+    access_recording = payload.fetch(:access_recording)
+    access_token_record = payload.fetch(:access_token_record)
+
+    {
+      "access_token" => payload.fetch(:access_token),
+      "access_token_id" => access_token_record.id,
+      "credential_id" => credential.id,
+      "client_id" => credential.oauth_client_id,
+      "role" => payload.fetch(:role),
+      "scope_recording_id" => payload.fetch(:scope_recording).id,
+      "scope_label" => scalar_test_auth_recording_label(payload.fetch(:scope_recording)),
+      "root_label" => scalar_test_auth_recording_label(payload.fetch(:root_recording)),
+      "access_recording_id" => access_recording.id,
+      "expires_at" => access_token_record.expires_at&.iso8601
+    }
+  end
+
+  def scalar_test_auth_context_rows
+    return [] if @scalar_test_token.blank?
+
+    [
+      { field: "Bearer token", value: "Bearer #{@scalar_test_token.fetch("access_token")}" },
+      { field: "Role", value: @scalar_test_token.fetch("role").humanize },
+      { field: "Scope", value: @scalar_test_token.fetch("scope_label") },
+      { field: "Root", value: @scalar_test_token.fetch("root_label") },
+      { field: "Client ID", value: @scalar_test_token.fetch("client_id") },
+      { field: "Access recording ID", value: @scalar_test_token.fetch("access_recording_id") },
+      { field: "Expires", value: scalar_test_auth_timestamp(@scalar_test_token["expires_at"]) }
+    ]
+  end
+
+  def scalar_test_auth_sample_rows
+    return [] if @scalar_test_token.blank?
+
+    scope_recording = RecordingStudio::Recording.unscoped.find_by(id: @scalar_test_token["scope_recording_id"])
+    access_recording = RecordingStudio::Recording.unscoped.find_by(id: @scalar_test_token["access_recording_id"])
+    return [] if scope_recording.nil? || access_recording.nil?
+
+    allowed_types = RecordingStudioApi.api_recordable_types(api: scalar_test_auth_api)
+    RecordingStudioApi::AccessibleRecordingScope.new(
+      scope_recording: scope_recording,
+      access_recording: access_recording,
+      include_trashed: true
+    ).relation
+      .includes(:recordable)
+      .where(recordable_type: allowed_types)
+      .reorder(:created_at, :id)
+      .limit(8)
+      .map do |recording|
+        {
+          resource: RecordingStudioApi.resource_name_for(recording.recordable_type),
+          label: scalar_test_auth_recording_label(recording),
+          id: recording.id
+        }
+      end
+  end
+
+  def scalar_test_auth_timestamp(value)
+    return "Unavailable" if value.blank?
+
+    timestamp = Time.zone.parse(value.to_s)
+    "#{timestamp.strftime("%B %-d, %Y at %-l:%M %p")} #{timestamp.strftime("%Z")}".strip
+  rescue ArgumentError
+    "Unavailable"
+  end
+
+  def scalar_test_auth_return_path
+    public_api_scalar_test_credential_path(version: params.fetch(:version))
+  end
+
+  def scalar_test_auth_session_key
+    "recording_studio_api.public_api.test_credential"
+  end
+
+  def scalar_test_auth_notice_key
+    "#{scalar_test_auth_session_key}.notice"
+  end
+
+  def scalar_test_auth_error_key
+    "#{scalar_test_auth_session_key}.error"
+  end
+
+  def scalar_test_auth_recording_label(recording)
+    recordable = recording.recordable
+    identifier = %i[name title email label slug identifier].filter_map do |attribute|
+      recordable.public_send(attribute) if recordable&.respond_to?(attribute)
+    end.find(&:present?)
+
+    "#{recording.recordable_type.to_s.demodulize.underscore.humanize}: #{identifier.presence || "##{recordable&.id}"}"
+  end
+end

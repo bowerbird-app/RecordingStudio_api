@@ -2,12 +2,12 @@
 
  Mountable Rails engine for a programmable Recording Studio API.
 
-This repository now completes the last unfinished agent pass by renaming the live engine surfaces to `recording_studio_api` / `RecordingStudioApi` and replacing the placeholder docs with the original architecture handoff for the API gem.
+`RecordingStudioApi` is a mountable Rails engine that provides authenticated, capability-backed JSON APIs for Recording Studio addons.
 
 ## Current Scope
 
-- OAuth2 client_credentials authentication backed by `RecordingStudioApi::ApiClient`, `ApiCredential`, and issued access tokens
-- OAuth2 Authorization Code + PKCE, refresh-token rotation, and revocation for public mobile clients
+- OAuth2 `client_credentials` authentication backed by `RecordingStudioApi::ApiClient`, `ApiCredential`, and issued access tokens
+- external bearer-token authenticator support for host application authentication systems
 - API client recordables stored beneath `RecordingStudio::Access` recordings in the Recording Studio tree
 - authenticated API requests resolved into a `RecordingStudioApi::AccessGrant` that is passed to capability handlers
 - capability-backed action registry with automatic action exposure when a recordable type enables that capability
@@ -40,6 +40,86 @@ RecordingStudioApi.configure do |config|
   end
 end
 ```
+
+## Scalar API documentation
+
+Install a named Scalar reference in a host application:
+
+```sh
+bin/rails generate recording_studio_api:scalar_docs public_api \
+  --mount-path=/api-docs \
+  --api-mount-path=/recording_studio_api
+```
+
+The gem owns the Scalar controller, default views, OpenAPI endpoint, version checks, and access
+enforcement, so gem upgrades update existing installations automatically. The generator adds a
+marked route declaration and a small initializer; it does not copy controllers or views into the
+host application.
+
+The routes serve `/api-docs/v1`, `/api-docs/v1/fullscreen`, and
+`/api-docs/v1/openapi.json`. Unsupported versions and disabled documentation return `404`.
+The generated access mode defaults to `authenticated`; pass `--access=public` only when publishing
+the API schema is intentional.
+
+Configure a callable policy for private APIs in the main initializer:
+
+```ruby
+RecordingStudioApi.configure do |config|
+  config.api :operations do |api|
+    api.documentation_enabled = true
+    api.documentation_access = lambda do |controller:, actor:, api:|
+      OperationsDocsPolicy.allowed?(controller: controller, actor: actor, api: api)
+    end
+  end
+end
+```
+
+The policy protects the embedded page, fullscreen page, and OpenAPI JSON. It receives the engine
+controller, resolved actor, and canonical API name. A missing actor returns `401`; a rejected
+authenticated actor returns `403`.
+
+When documentation access is `:public`, the canonical version URL renders the standalone,
+full-width reference for anonymous visitors. Signed-in visitors receive the configured embedded
+layout and its **Full width** action. Responses from the canonical public URL vary on the session
+cookie so shared caches do not mix the two presentations.
+
+Install a named API at a host-selected path with:
+
+```sh
+bin/rails generate recording_studio_api:scalar_docs operations_api \
+  --mount-path=/admin/operations-api/docs \
+  --api-surface=operations
+```
+
+The equivalent manual route declaration is:
+
+```ruby
+recording_studio_api_scalar_docs_for :operations,
+  at: "/admin/operations-api/docs",
+  as: :operations_api_scalar_docs,
+  engine_mount_path: "/recording_studio_api"
+```
+
+Embedded docs use `api.documentation_layout_name`, then `config.layout_name`, then
+`recording_studio/default_layout`. Custom layouts should render the `page_nav_right` content slot
+to display the **Full width** action. The fullscreen response is layout-free. A host may override
+the gem views through normal Rails view lookup or add
+`recording_studio_api/scalar_docs/_extension.html.erb` for application-specific content.
+
+An optional local test-token page can be installed separately after the Scalar routes:
+
+```sh
+bin/rails generate recording_studio_api:test_auth public_api \
+  --mount-path=/docs/scalar \
+  --api-surface=public
+```
+
+This generates a standalone host-owned page at
+`/docs/scalar/:version/test-credential`; it does not add token controls to the API documentation.
+The page and its create/revoke actions are local-only by default and require both an authenticated
+actor and manageable API access. Disabled access returns `404`, missing authentication returns
+`401`, and insufficient access returns `403`. Generated tokens are real, scoped, audited, and
+revocable credentials, so production enablement must use an explicit host policy.
 
 Example addon registration:
 
@@ -76,6 +156,72 @@ Validation rules:
 
 ## API Architecture
 
+### Named APIs
+
+The legacy configuration is the `public` API. Additional APIs have independent versions,
+registries, OpenAPI metadata, enablement, logging, and request dispatch while sharing host-level
+infrastructure such as Redis connectivity and access-role policy.
+
+```ruby
+RecordingStudioApi.configure do |config|
+  config.api :operations do |api|
+    api.openapi_title = "Operations API"
+    api.openapi_description = "Read-only diagnostics for trusted automation."
+    api.api_versions = %w[v1]
+    api.default_access = :read_only
+    api.api_management_authorization_required = true
+    api.credential_ttl = 12.hours
+    api.access_token_ttl = 15.minutes
+    api.rate_limit_api_read_requests = 30
+    api.api_request_logging_enabled = true
+  end
+end
+
+RecordingStudioApi.register_recordable_type_api(
+  "AdminRoot",
+  api: :operations,
+  operations: %i[index show]
+)
+```
+
+Public routes remain `/recording_studio_api/api/<version>`. Named APIs use
+`/recording_studio_api/apis/<api-name>/<version>` and obtain tokens from
+`/recording_studio_api/apis/<api-name>/oauth/token`.
+
+API clients are bound to exactly one API. Provision and authenticate named clients with `api:`;
+a public token is rejected on every named API and vice versa. The existing site-wide API switch
+remains a global kill switch, while `ApiSetting.for_api` supports additional per-API switches.
+
+Named APIs inherit credential and token TTLs, rate-limit windows, and request-payload logging policy
+from the public configuration when declared. Each definition can then override those values without
+changing another API. Redis connectivity, namespaces, and telemetry retention remain shared
+infrastructure.
+
+Set `api_management_authorization_required` for trusted APIs. Credential creation then requires both
+the requested RecordingStudioAccessible data grant and management access to that API's `AdminApi`
+recording beneath the configured admin root. Public and unprotected named APIs retain the existing
+access-point delegation behavior.
+
+### Admin surfaces
+
+Generate host integration declarations for the public and named APIs together:
+
+```sh
+bin/rails generate recording_studio_api:admin_screens \
+  --user-roots Workspace \
+  --user-apis public \
+  --admin-roots AdminRoot \
+  --admin-apis public operations
+```
+
+This adds RecordingStudioAdmin routes and section declarations only. RecordingStudioApi owns and
+registers the shared screens, widgets, queries, and state-changing credential controllers, so gem
+upgrades do not leave copied host files behind. Named surfaces pass an API context into those shared
+definitions and remain independently authorized, configured, and filtered. Keeping `operations` out
+of `--user-apis` makes it available only from the site administration root. Every recordable used as
+an API credential access point must enable Recording Studio's `api_access_point` capability; the gem
+then intersects that capability with the selected API's registered recordables.
+
 ### Core registries
 
 `RecordingStudioApi` is intended to expose explicit registration layers for:
@@ -90,7 +236,7 @@ Recording Studio 3.x requires every configured ActiveRecord recordable to declar
 for every recordable that can own direct access grants. Enable `RecordingStudio.enable_capability(:api_access_point, on: ...)`
 for recordables that may act as API key access points. The dummy app marks `Workspace` and `Folder` as root-capable,
 keeps `Page` as a child recordable, and the API engine registers its internal `RecordingStudio::Access`, API client,
-credential, token, OAuth, and admin API recordables with explicit parent rules.
+credential, access-token, and admin API recordables with explicit parent rules.
 
 Each action declares its verb, capability mapping, handler, and serializer so addon gems can register an API action once and let the API expose it automatically for any recordable type that enables the capability.
 
@@ -105,7 +251,7 @@ Each action declares its verb, capability mapping, handler, and serializer so ad
 - the API core authenticates credentials and resolves the `RecordingStudio::Access` recording attached to those credentials
 - `RecordingStudioApi::AccessGrant` carries `api_client`, `credential`, `access_recording`, `root_recording`, and the access actor into handlers
 - capability handlers own authorization and should call `context.access_grant.authorize!` or `RecordingStudioAccessible.authorized?` before doing work
-- the built-in resource, trash, and move handlers already perform their own grant checks
+- the built-in resource and move handlers already perform their own grant checks
 - `ApiClient` is the API credential principal for audit metadata, while the `RecordingStudio::Access` actor remains the Recording Studio authorization actor
 - each access recording owns at most one active API credential record
 - raw secrets should only be revealed at creation or rotation time
@@ -137,7 +283,9 @@ RecordingStudioApi::Hooks.run(:before_initialize)
 RecordingStudioApi.register_recordable_type_api(
   "Page",
   serializer: PageSerializer,
-  writable_attributes: %i[title]
+  writable_attributes: %i[title],
+  operations: %i[index show create update],
+  capability_actions: %i[publish]
 )
 RecordingStudioApi.register_capability_action(
   :publish,
@@ -164,6 +312,29 @@ end
 
 `writable_attributes` is an explicit allowlist for API create and update operations. OpenAPI
 `details_schema` properties describe response data only and never grant write access.
+
+Scalar section descriptions are generated from OpenAPI tags. Resource sections default to a
+plain-language description and can be customized through the existing `openapi` metadata:
+
+```ruby
+RecordingStudioApi.register_recordable_type_api(
+  "Page",
+  openapi: {
+    tag: {
+      description: "Create and organize the content pages in a workspace."
+    }
+  }
+)
+```
+
+`operations` controls which standard resource operations are exposed for that recordable type.
+It accepts any of `:index`, `:show`, `:create`, `:update`, and `:destroy`; when omitted, all five
+remain available for backward compatibility. For a collection-only resource, use
+`operations: %i[index]`. Disabled operations are rejected by the API and omitted from OpenAPI.
+
+`capability_actions` is a default-deny allowlist for custom capability actions. A capability action
+requires the underlying Recording Studio capability, a registered API action handler, and an entry
+in the recordable type's `capability_actions` list before it is callable or appears in OpenAPI.
 
 ### Access management role settings
 
@@ -355,15 +526,17 @@ end
 - `GET /api/screens/api_requests` — RecordingStudioAdmin API request screen when the host mounts the API surface
 - `GET /recording_studio_api/admin_api/logs` — browser admin request-log route
 - `POST /recording_studio_api/oauth/token` — issue OAuth2 bearer access tokens using `client_credentials`
+- `POST /recording_studio_api/apis/<api-name>/oauth/token` — issue OAuth2 bearer access tokens for a named API using `client_credentials`
 - `GET /recording_studio_api/api/<version>` — list available API resources for the selected public API version
 - `GET /recording_studio_api/api/<version>/:resource` — list recordings of a resource type inside the authenticated root
 - `GET /recording_studio_api/api/<version>/:resource/:id` — show one recording
-- `GET /recording_studio_api/api/<version>/trash` — list trashed recordings across all resource types in the authenticated root
-- `GET /recording_studio_api/api/<version>/trash/:id` — show one trashed recording
-- `POST /recording_studio_api/api/<version>/trash/:id/restore` — restore one trashed recording
-- `DELETE /recording_studio_api/api/<version>/trash/:id` — permanently delete one trashed recording
+- `POST /recording_studio_api/api/<version>/:resource` — create a recording when the resource permits `:create`
+- `PATCH /recording_studio_api/api/<version>/:resource/:id` — update a recording when the resource permits `:update`
+- `DELETE /recording_studio_api/api/<version>/:resource/:id` — destroy a recording when the resource permits `:destroy`
 - `POST|PATCH|PUT|DELETE /recording_studio_api/api/<version>/:resource/:id/actions/:action_name` — execute the newest compatible contribution contract for that public API version
 - `POST|PATCH|PUT|DELETE /recording_studio_api/api/<version>/:resource/:id/:action_name` — compatibility alias for existing clients
+
+Named API resource routes use `/recording_studio_api/apis/<api-name>/<version>` with the same resource and action shapes.
 
 Additional configured public API versions currently alias the shared controller implementation while still selecting version-specific contribution contracts and OpenAPI documents.
 
@@ -399,11 +572,11 @@ Sign in with:
 | Component       | Version |
 |-----------------|---------|
 | Ruby            | 3.3+    |
-| Rails           | 8.1+    |
+| Rails           | ~> 8.1.1 |
 | PostgreSQL      | 16      |
 | TailwindCSS     | 4       |
-| RecordingStudio | v1.2.0 (pinned in `test/dummy/Gemfile`) |
-| FlatPack        | v0.1.33 (pinned in `test/dummy/Gemfile`) |
+| RecordingStudio | v3.0.2 (pinned in `test/dummy/Gemfile`) |
+| FlatPack        | v0.1.124 (pinned in `test/dummy/Gemfile`) |
 | Devise          | latest  |
 
 ## Documentation

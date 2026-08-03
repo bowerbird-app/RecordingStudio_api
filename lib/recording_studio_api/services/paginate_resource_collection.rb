@@ -10,7 +10,7 @@ module RecordingStudioApi
       PAGINATION_TOKEN_VERSION = 1
       PAGINATION_TOKEN_PURPOSE = "recording_studio_api.pagination.v1"
 
-      def initialize(relation:, resource:, recordable_type:, limit:, pagination_token:, sort:, order:)
+      def initialize(relation:, resource:, recordable_type:, limit:, pagination_token:, sort:, order:, api: :public)
         @relation = relation
         @resource = resource.to_s
         @recordable_type = recordable_type.to_s
@@ -18,11 +18,12 @@ module RecordingStudioApi
         @pagination_token = pagination_token
         @sort = sort
         @order = order
+        @api_key = RecordingStudioApi.configuration.fetch_api(api).name
       end
 
       private
 
-      attr_reader :relation, :resource, :recordable_type, :limit, :pagination_token, :sort, :order
+      attr_reader :relation, :resource, :recordable_type, :limit, :pagination_token, :sort, :order, :api_key
 
       def perform
         sortable_context = resolve_sortable_context
@@ -174,7 +175,7 @@ module RecordingStudioApi
         end
 
         recordable_table_name = recordable_class.table_name
-        allowed_sort_attributes = RecordingStudioApi.sortable_attributes_for(recordable_type).select do |attribute|
+        allowed_sort_attributes = RecordingStudioApi.sortable_attributes_for(recordable_type, api: api_key).select do |attribute|
           attribute == "created_at" || recordable_class.column_names.include?(attribute)
         end
 

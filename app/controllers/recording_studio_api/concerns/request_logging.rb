@@ -40,7 +40,7 @@ module RecordingStudioApi
       end
 
       def write_request_log(started_at, monotonic_start, raised_error)
-        return unless RecordingStudioApi.configuration.api_request_logging_enabled
+        return unless current_api.api_request_logging_enabled
 
         duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - monotonic_start) * 1000).round
         payload = {
@@ -54,6 +54,7 @@ module RecordingStudioApi
           status_code: response&.status || 500,
           duration_ms: duration_ms,
           rate_limited: !!@rate_limited_request,
+          api_key: current_api_key,
           api_client_id: safe_id_for(:current_api_client),
           api_credential_id: safe_id_for(:current_api_credential),
           access_recording_id: safe_id_for(:current_access_recording),
@@ -91,7 +92,7 @@ module RecordingStudioApi
       end
 
       def log_request_params?
-        PARAM_PAYLOAD_MODES.include?(RecordingStudioApi.configuration.api_request_logging_payload_mode.to_s)
+        PARAM_PAYLOAD_MODES.include?(current_api.api_request_logging_payload_mode.to_s)
       end
 
       def request_parameter_filter
@@ -104,7 +105,7 @@ module RecordingStudioApi
       end
 
       def allowed_request_params(params)
-        allowed_keys = Array(RecordingStudioApi.configuration.api_request_log_allowed_param_keys).map(&:to_s)
+        allowed_keys = Array(current_api.api_request_log_allowed_param_keys).map(&:to_s)
         params.slice(*allowed_keys)
       end
     end

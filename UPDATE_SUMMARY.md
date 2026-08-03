@@ -1,6 +1,6 @@
 # Historical Note: RecordingStudio Gem Update Summary
 
-> This file is retained as historical context from earlier template maintenance work. It is not part of the current RecordingStudio API handoff; use `README.md` and `test/dummy/` for the current project narrative.
+> This file is an archival snapshot from February 17, 2026. Its dependency versions, test counts, and API notes are not current; use `README.md` and `test/dummy/` for the current project narrative.
 
 
 ## Update Completed: February 17, 2026

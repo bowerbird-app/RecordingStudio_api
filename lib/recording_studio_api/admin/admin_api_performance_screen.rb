@@ -36,7 +36,7 @@ module RecordingStudioApi
         type :area
         series lambda { |context|
           start_date, end_date = RecordingStudioApi::Admin::AdminApiPerformanceScreen.date_range_from_context(context)
-          RecordingStudioApi::Admin::AdminApiPerformanceScreen.latency_series_for(start_date, end_date)
+          RecordingStudioApi::Admin::AdminApiPerformanceScreen.latency_series_for(start_date, end_date, api: RecordingStudioApi::Admin::ApiContext.key_from_context(context))
         }
         options lambda { |_context|
           {
@@ -80,6 +80,7 @@ module RecordingStudioApi
       class << self
         def endpoint_rows(context)
           return [] unless RecordingStudioApi::ApiRequestLog.table_available?
+          return [] unless authorized?(context)
 
           logs = request_scope(context).pluck(:request_method, :request_path, :duration_ms, :status_code, :rate_limited)
           grouped = logs.group_by { |request_method, request_path, *_| [request_method, request_path] }
@@ -103,14 +104,14 @@ module RecordingStudioApi
           rows.sort_by { |row| [-row.p95_duration_ms.to_i, -row.average_duration_ms.to_i, row.request_path.to_s] }
         end
 
-        def latency_series_for(start_date, end_date)
+        def latency_series_for(start_date, end_date, api: :public)
           return [] unless RecordingStudioApi::ApiRequestLog.table_available?
 
           buckets = daily_buckets(start_date, end_date)
           durations_by_bucket = buckets.index_with { [] }
 
           RecordingStudioApi::ApiRequestLog
-            .where(occurred_at: start_date.beginning_of_day..end_date.end_of_day)
+            .where(api_key: RecordingStudioApi::Admin::ApiContext.resolve(api).name, occurred_at: start_date.beginning_of_day..end_date.end_of_day)
             .pluck(:occurred_at, :duration_ms)
             .each do |occurred_at, duration_ms|
               next if occurred_at.nil? || duration_ms.nil?
@@ -133,7 +134,19 @@ module RecordingStudioApi
 
         def request_scope(context)
           start_date, end_date = date_range_from_context(context)
-          RecordingStudioApi::ApiRequestLog.where(occurred_at: start_date.beginning_of_day..end_date.end_of_day)
+          RecordingStudioApi::ApiRequestLog.where(
+            api_key: RecordingStudioApi::Admin::ApiContext.key_from_context(context),
+            occurred_at: start_date.beginning_of_day..end_date.end_of_day
+          )
+        end
+
+        def authorized?(context)
+          RecordingStudioApi::Admin::ApiAuthorization.authorized?(
+            actor: context.current_actor,
+            api: RecordingStudioApi::Admin::ApiContext.key_from_context(context),
+            root_recording: context.root_recording,
+            role: RecordingStudioApi.configuration.access_management_view_role
+          )
         end
 
         def date_range_from_context(context)

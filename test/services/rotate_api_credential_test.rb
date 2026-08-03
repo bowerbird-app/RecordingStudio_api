@@ -65,6 +65,6 @@ class RotateApiCredentialTest < ActiveSupport::TestCase
     )
 
     assert result.failure?
-    assert_equal "Actor is not authorized to manage API access for this recording", result.error
+    assert_equal "Actor is not authorized to manage this API client", result.error
   end
 end

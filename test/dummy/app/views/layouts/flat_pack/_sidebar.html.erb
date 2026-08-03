@@ -21,6 +21,18 @@
           href: "/admin/api",
           icon: :queue_list
         ) %>
+
+        <%= render FlatPack::Sidebar::Item::Component.new(
+          label: "Operations credentials",
+          href: main_app.recording_studio_admin_admin_operations_api_path,
+          icon: :key
+        ) %>
+
+        <%= render FlatPack::Sidebar::Item::Component.new(
+          label: "Operations API docs",
+          href: main_app.operations_api_scalar_docs_path,
+          icon: :document_text
+        ) %>
       <% else %>
         <%= render FlatPack::Sidebar::Item::Component.new(
           label: "Install",
@@ -54,7 +66,7 @@
 
         <%= render FlatPack::Sidebar::Item::Component.new(
           label: "Scalar",
-          href: main_app.docs_scalar_path,
+          href: main_app.public_api_scalar_docs_path,
           icon: :document_text
         ) %>
 

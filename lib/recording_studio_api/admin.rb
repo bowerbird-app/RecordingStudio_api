@@ -11,6 +11,8 @@ require "recording_studio_api/admin/select_filter_default_patch"
 module RecordingStudioApi
   module Admin
     DEFINITION_FILES = %w[
+      recording_studio_api/admin/api_context
+      recording_studio_api/admin/api_authorization
       recording_studio_api/admin/api_request_log_helpers
       recording_studio_api/admin/queries/api_metrics_query
       recording_studio_api/admin/queries/api_access_clients_query
@@ -30,6 +32,7 @@ module RecordingStudioApi
       recording_studio_api/admin/admin_api_rate_limited_requests_last_four_weeks_widget
       recording_studio_api/admin/api_section
       recording_studio_api/admin/admin_api_section
+      recording_studio_api/admin/api_section_factory
       recording_studio_api/admin/api_keys_screen
       recording_studio_api/admin/api_access_requests_screen
       recording_studio_api/admin/admin_api_requests_screen
@@ -49,6 +52,12 @@ module RecordingStudioApi
       load_definitions!
       ::RecordingStudioAdmin.register_section(ApiSection)
       ::RecordingStudioAdmin.register_section(AdminApiSection)
+      RecordingStudioApi.configuration.each_api do |api|
+        next if api.name == "public"
+
+        ::RecordingStudioAdmin.register_section(ApiSectionFactory.user_section(api.name))
+        ::RecordingStudioAdmin.register_section(ApiSectionFactory.admin_section(api.name))
+      end
       ::RecordingStudioAdmin.register_widget(ApiRequestsLastFourWeeksWidget::Definition)
       ::RecordingStudioAdmin.register_widget(MostUsedApiKeysWidget::Definition)
       ::RecordingStudioAdmin.register_widget(AdminApiRequestsLastFourWeeksWidget::Definition)

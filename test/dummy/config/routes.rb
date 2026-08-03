@@ -16,7 +16,7 @@ Rails.application.routes.draw do
   get "/folder", to: "home#folder", as: :folder
   recording_studio_admin_for :api, at: "/api", root_section: :api
   recording_studio_admin_for :admin_api, at: "/admin/api", root_section: :admin_api
-  resource :scalar_test_token, only: %i[create destroy]
+  recording_studio_admin_for :admin_operations_api, at: "/admin/api/operations", root_section: :admin_operations_api
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
   # Can be used by load balancers and uptime monitors to verify that the app is live.
@@ -34,12 +34,11 @@ Rails.application.routes.draw do
   get "docs/gem_views", to: "docs#gem_views", as: :docs_gem_views
   get "docs/api_routes", to: "docs#api_routes", as: :docs_api_routes
   get "docs/openapi.json", to: "docs#openapi", as: :docs_openapi
-  get "APIdocs", to: redirect("/APIdocs/#{RecordingStudioApi.default_api_version}"), as: :api_docs_root
-  get "APIdocs/:version", to: "docs#scalar", as: :api_docs
-  get "APIdocs/:version/fullscreen", to: "docs#scalar_fullscreen", as: :api_docs_fullscreen
-  get "APIdocs/:version/openapi.json", to: "docs#openapi", as: :api_docs_openapi
-  get "docs/scalar", to: "docs#scalar", as: :docs_scalar
-  get "docs/scalar/fullscreen", to: "docs#scalar_fullscreen", as: :docs_scalar_fullscreen
+  get "APIdocs", to: "recording_studio_api/scalar_docs#redirect_to_default", defaults: { api_key: "public", engine_mount_path: "/recording_studio_api" }, as: :api_docs_root
+  get "APIdocs/:version/openapi.json", to: "recording_studio_api/scalar_docs#openapi", defaults: { api_key: "public", engine_mount_path: "/recording_studio_api" }, as: :api_docs_openapi
+  get "APIdocs/:version/fullscreen", to: "recording_studio_api/scalar_docs#fullscreen", defaults: { api_key: "public", engine_mount_path: "/recording_studio_api" }, as: :api_docs_fullscreen
+  get "APIdocs/:version", to: "recording_studio_api/scalar_docs#show", defaults: { api_key: "public", engine_mount_path: "/recording_studio_api" }, as: :api_docs
+  get "docs/scalar/fullscreen", to: redirect("/docs/scalar/#{RecordingStudioApi.default_api_version}/fullscreen"), as: :docs_scalar_fullscreen
   get "docs/add_capability", to: "docs#add_capability", as: :docs_add_capability
   get "docs/auth", to: "docs#auth", as: :docs_auth
   get "docs/methods", to: "docs#methods", as: :docs_methods
@@ -47,4 +46,24 @@ Rails.application.routes.draw do
 
   # Defines the root path route ("/")
   root "home#index"
+  recording_studio_api_scalar_docs_for :operations,
+    at: "/admin/operations-api/docs",
+    as: :operations_api_scalar_docs
+
+  recording_studio_api_scalar_docs_for :public,
+    at: "/docs/scalar",
+    as: :public_api_scalar_docs
+
+# BEGIN RecordingStudioApi test auth routes: public_api
+get "/docs/scalar/:version/test-credential", to: "public_api/scalar_test_credentials#show", as: :public_api_scalar_test_credential
+post "/docs/scalar/:version/test-credential", to: "public_api/scalar_test_credentials#create"
+delete "/docs/scalar/:version/test-credential", to: "public_api/scalar_test_credentials#destroy"
+# END RecordingStudioApi test auth routes: public_api
+
+# BEGIN RecordingStudioApi test auth routes: operations_api
+get "/admin/operations-api/docs/:version/test-credential", to: "operations_api/scalar_test_credentials#show", as: :operations_api_scalar_test_credential
+post "/admin/operations-api/docs/:version/test-credential", to: "operations_api/scalar_test_credentials#create"
+delete "/admin/operations-api/docs/:version/test-credential", to: "operations_api/scalar_test_credentials#destroy"
+# END RecordingStudioApi test auth routes: operations_api
+
 end

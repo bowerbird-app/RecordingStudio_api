@@ -5,6 +5,8 @@ require "recording_studio_accessible"
 require "recording_studio_api/engine"
 require "recording_studio_api/errors"
 require "recording_studio_api/configuration"
+require "recording_studio_api/scalar_asset"
+require "recording_studio_api/routing"
 require "recording_studio_api/authenticated_client"
 require "recording_studio_api/access_grant"
 require "recording_studio_api/integration"
@@ -22,6 +24,7 @@ require "recording_studio_api/serializers/resource_recording_serializer"
 require "recording_studio_api/services/base_service"
 require "recording_studio_api/services/token_authentication_base"
 require "recording_studio_api/access_management_policy"
+require "recording_studio_api/api_client_management_policy"
 require "recording_studio_api/services/example_service"
 require "recording_studio_api/services/provision_api_client"
 require "recording_studio_api/services/provision_access_request"
@@ -29,6 +32,8 @@ require "recording_studio_api/services/rotate_api_credential"
 require "recording_studio_api/services/authenticate_bearer_token"
 require "recording_studio_api/services/issue_oauth_access_token"
 require "recording_studio_api/services/authenticate_oauth_access_token"
+require "recording_studio_api/services/issue_test_credential"
+require "recording_studio_api/services/revoke_test_credential"
 require "recording_studio_api/services/move_recording"
 require "recording_studio_api/services/documentation_catalog"
 require "recording_studio_api/services/openapi_document"
@@ -41,8 +46,6 @@ require "recording_studio_api/services/resource_operations/show"
 require "recording_studio_api/services/resource_operations/create"
 require "recording_studio_api/services/resource_operations/update"
 require "recording_studio_api/services/resource_operations/destroy"
-require "recording_studio_api/services/trashable_operations/restore"
-require "recording_studio_api/services/trashable_operations/destroy"
 require "recording_studio_api/admin"
 
 # rubocop:disable Metrics/ModuleLength
@@ -58,6 +61,10 @@ module RecordingStudioApi
       yield(configuration) if block_given?
     end
 
+    def api(name = :public)
+      configuration.fetch_api(name)
+    end
+
     def register_token_authenticator(authenticator = nil, &block)
       resolved = authenticator || block
       raise ArgumentError, "A callable authenticator is required" unless resolved.respond_to?(:call)
@@ -70,16 +77,16 @@ module RecordingStudioApi
       configuration.token_authenticators
     end
 
-    def authenticate_authorization_header(authorization_header:)
-      Integration.authenticate_authorization_header(authorization_header: authorization_header)
+    def authenticate_authorization_header(authorization_header:, api: :public)
+      Integration.authenticate_authorization_header(authorization_header: authorization_header, api: api)
     end
 
     def build_access_grant(authenticated_client:)
       Integration.build_access_grant(authenticated_client: authenticated_client)
     end
 
-    def access_grant_from_authorization_header(authorization_header:)
-      Integration.access_grant_from_authorization_header(authorization_header: authorization_header)
+    def access_grant_from_authorization_header(authorization_header:, api: :public)
+      Integration.access_grant_from_authorization_header(authorization_header: authorization_header, api: api)
     end
 
     def actor_access_recordings(actor:)
@@ -102,8 +109,8 @@ module RecordingStudioApi
     end
 
     # rubocop:disable Metrics/ParameterLists
-    def register_capability_action(name, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil)
-      configuration.action_registry.register(
+    def register_capability_action(name, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil, api: :public)
+      configuration.api(api).action_registry.register(
         name,
         capability: capability,
         version: version,
@@ -120,13 +127,18 @@ module RecordingStudioApi
     end
     # rubocop:enable Metrics/ParameterLists
 
-    def register_recordable_type_api(recordable_type, serializer: nil, openapi: nil, sortable_attributes: nil, writable_attributes: nil)
-      configuration.recordable_registry.register(
+    def register_recordable_type_api(recordable_type, serializer: nil, openapi: nil, sortable_attributes: nil, writable_attributes: nil, operations: nil, capability_actions: nil, api: :public)
+      definition = configuration.api(api)
+      resolved_operations = operations
+      resolved_operations = %i[index show] if resolved_operations.nil? && definition.respond_to?(:default_access) && definition.default_access == :read_only
+      definition.recordable_registry.register(
         recordable_type,
         serializer: serializer,
         openapi: openapi,
         sortable_attributes: sortable_attributes,
-        writable_attributes: writable_attributes
+        writable_attributes: writable_attributes,
+        operations: resolved_operations,
+        capability_actions: capability_actions
       )
     end
 
@@ -134,31 +146,41 @@ module RecordingStudioApi
       Admin.register!
     end
 
-    def capability_action(name, version: nil)
-      configuration.action_registry.resolve(name, profile: api_version_profile_for(version))
+    def capability_action(name, version: nil, api: :public)
+      definition = configuration.fetch_api(api)
+      definition.action_registry.resolve(name, profile: api_version_profile_for(version, api: api))
     end
 
-    def capability_actions_for(recordable_type, version: nil)
-      configuration.action_registry.available_for(recordable_type, scope: :member, profile: api_version_profile_for(version))
+    def capability_actions_for(recordable_type, version: nil, api: :public)
+      definition = configuration.fetch_api(api)
+      definition.action_registry.available_for(recordable_type, scope: :member, profile: api_version_profile_for(version, api: api)).select do |action|
+        capability_action_enabled_for?(action, recordable_type, api: api)
+      end
     end
 
-    def resource_actions_for(recordable_type, scope: nil, version: nil)
+    def capability_action_enabled_for?(action, recordable_type, api: :public)
+      registration = recordable_registration_for(recordable_type, api: api)
+      registration&.supports_capability_action?(action.name)
+    end
+
+    def resource_actions_for(recordable_type, scope: nil, version: nil, api: :public)
+      definition = configuration.fetch_api(api)
       scopes = Array(scope.presence || %i[collection resource])
       scopes.flat_map do |entry_scope|
-        configuration.action_registry.available_for(recordable_type, scope: entry_scope, profile: api_version_profile_for(version))
+        definition.action_registry.available_for(recordable_type, scope: entry_scope, profile: api_version_profile_for(version, api: api))
       end.uniq
     end
 
-    def resource_action(name, version: nil)
-      capability_action("resource_#{name}", version: version)
+    def resource_action(name, version: nil, api: :public)
+      capability_action("resource_#{name}", version: version, api: api)
     end
 
-    def recordable_registration_for(recordable_type)
-      configuration.recordable_registry[recordable_type]
+    def recordable_registration_for(recordable_type, api: :public)
+      configuration.fetch_api(api).recordable_registry[recordable_type]
     end
 
-    def sortable_attributes_for(recordable_type)
-      registration = recordable_registration_for(recordable_type)
+    def sortable_attributes_for(recordable_type, api: :public)
+      registration = recordable_registration_for(recordable_type, api: api)
       configured = Array(registration&.sortable_attributes).map(&:to_s)
 
       (["created_at"] + configured).uniq
@@ -170,15 +192,15 @@ module RecordingStudioApi
       recordable_type.to_s.demodulize.underscore.pluralize
     end
 
-    def admin_dashboard_path(controller:, admin_api_recording: nil)
+    def admin_dashboard_path(controller:, admin_api_recording: nil, **params)
       resolver = configuration.admin_dashboard_path_resolver
 
       if resolver.respond_to?(:call)
-        path = resolver.call(controller: controller, admin_api_recording: admin_api_recording)
+        path = resolver.call(controller: controller, admin_api_recording: admin_api_recording, **params)
         return path if path.present?
       end
 
-      controller.recording_studio_api.admin_dashboard_path
+      controller.recording_studio_api.admin_dashboard_path(params)
     end
 
     def admin_settings_path(controller:, **params)
@@ -236,11 +258,13 @@ module RecordingStudioApi
       controller.recording_studio_api.admin_logs_path(params)
     end
 
-    def recordable_type_for_resource(resource_name)
-      api_recordable_types.find { |recordable_type| resource_name_for(recordable_type) == resource_name.to_s }
+    def recordable_type_for_resource(resource_name, api: :public)
+      api_recordable_types(api: api).find { |recordable_type| resource_name_for(recordable_type) == resource_name.to_s }
     end
 
-    def api_recordable_types
+    def api_recordable_types(api: :public)
+      definition = configuration.fetch_api(api)
+      return definition.recordable_registry.to_h.keys unless definition.equal?(configuration.public_api)
       return [] unless defined?(RecordingStudio) && RecordingStudio.respond_to?(:configuration)
 
       Array(RecordingStudio.configuration.recordable_types).map(&:to_s).uniq.reject do |recordable_type|
@@ -248,129 +272,150 @@ module RecordingStudioApi
       end
     end
 
-    def api_access_point_recordable_types
-      api_recordable_types.select { |recordable_type| api_access_point_recordable_type?(recordable_type) }
+    def api_access_point_recordable_types(api: :public)
+      api_recordable_types(api: api).select do |recordable_type|
+        api_access_point_recordable_type?(recordable_type, api: api)
+      end
     end
 
-    def api_access_point_recordable_type?(recordable_type)
+    def api_access_point_recordable_type?(recordable_type, api: :public)
       type_name = recordable_type.to_s
       return false if type_name.blank?
-      return false unless api_recordable_types.include?(type_name)
+      return false unless api_recordable_types(api: api).include?(type_name)
       return false unless defined?(RecordingStudio) && RecordingStudio.respond_to?(:capability_enabled?)
 
       RecordingStudio.capability_enabled?(:accessible, for: type_name) &&
         RecordingStudio.capability_enabled?(:api_access_point, for: type_name)
     end
 
-    def api_versions
-      configured_versions = Array(configuration.api_versions).filter_map { |version| normalize_api_version(version) }.uniq
+    def api_versions(api: :public)
+      definition = configuration.fetch_api(api)
+      configured_versions = Array(definition.api_versions).filter_map { |version| normalize_api_version(version) }.uniq
       configured_versions.presence || [Configuration::DEFAULT_API_VERSION]
     end
 
-    def default_api_version
-      configured_default = normalize_api_version(configuration.default_api_version)
-      return configured_default if configured_default.present? && api_versions.include?(configured_default)
+    def default_api_version(api: :public)
+      definition = configuration.fetch_api(api)
+      configured_default = normalize_api_version(definition.default_api_version)
+      return configured_default if configured_default.present? && api_versions(api: api).include?(configured_default)
 
-      api_versions.first
+      api_versions(api: api).first
     end
 
-    def supported_api_version?(version)
+    def supported_api_version?(version, api: :public)
       normalized_version = normalize_api_version(version)
-      normalized_version.present? && api_versions.include?(normalized_version)
+      normalized_version.present? && api_versions(api: api).include?(normalized_version)
     end
 
-    def resolve_api_version(version)
+    def resolve_api_version(version, api: :public)
       normalized_version = normalize_api_version(version)
-      return default_api_version if normalized_version.blank?
+      return default_api_version(api: api) if normalized_version.blank?
 
-      supported_api_version?(normalized_version) ? normalized_version : default_api_version
+      supported_api_version?(normalized_version, api: api) ? normalized_version : default_api_version(api: api)
     end
 
-    def api_base_path(version: default_api_version)
-      normalized_version = resolve_api_version(version)
-      "/recording_studio_api/api/#{normalized_version}"
+    def api_base_path(version: nil, mount_path: "/recording_studio_api", api_mount_path: "/api", api: :public)
+      normalized_version = resolve_api_version(version, api: api)
+      path_segments = [
+        normalize_documentation_mount_path(mount_path),
+        normalize_documentation_mount_path(api_mount_path, allow_root: false),
+        normalized_version
+      ].flat_map { |path| path.split("/") }.reject(&:blank?)
+
+      "/#{path_segments.join('/')}"
     end
 
-    def api_version_profile_for(version)
+    def api_version_profile_for(version, api: :public)
       return if version.blank?
 
-      configuration.api_version_profile_for(resolve_api_version(version))
+      configuration.fetch_api(api).api_version_profile_for(resolve_api_version(version, api: api))
     end
 
-    def register_default_capability_actions!
-      if moveable_available? && capability_action(:move).nil?
-        register_capability_action(
-          :move,
-          capability: :movable,
-          http_verb: :post,
-          required_role: :edit,
-          handler: RecordingStudioApi::Services::MoveRecording,
-          serializer: RecordingStudioApi::Serializers::ResourceRecordingSerializer
-        )
+    def register_default_capability_actions!(api: nil)
+      if api.nil?
+        configuration.each_api { |definition| register_default_capability_actions!(api: definition.name) }
+        return
       end
+      return unless moveable_available? && capability_action(:move, api: api).nil?
 
       register_capability_action(
-        :trash_restore,
-        capability: :trashable,
+        :move,
+        capability: :movable,
         http_verb: :post,
         required_role: :edit,
-        handler: RecordingStudioApi::Services::TrashableOperations::Restore,
-        scope: :resource
-      ) unless capability_action(:trash_restore)
-
-      register_capability_action(
-        :trash_destroy,
-        capability: :trashable,
-        http_verb: :delete,
-        required_role: :edit,
-        handler: RecordingStudioApi::Services::TrashableOperations::Destroy,
-        scope: :resource
-      ) unless capability_action(:trash_destroy)
+        handler: RecordingStudioApi::Services::MoveRecording,
+        serializer: RecordingStudioApi::Serializers::ResourceRecordingSerializer,
+        api: api
+      )
     end
 
-    def register_default_resource_actions!
+    def register_default_resource_actions!(api: nil)
+      if api.nil?
+        configuration.each_api { |definition| register_default_resource_actions!(api: definition.name) }
+        return
+      end
+
       register_capability_action(
         :resource_index,
         capability: nil,
         http_verb: :get,
         handler: RecordingStudioApi::Services::ResourceOperations::Index,
-        scope: :collection
-      ) unless capability_action(:resource_index)
+        scope: :collection,
+        api: api
+      ) unless capability_action(:resource_index, api: api)
 
       register_capability_action(
         :resource_show,
         capability: nil,
         http_verb: :get,
         handler: RecordingStudioApi::Services::ResourceOperations::Show,
-        scope: :resource
-      ) unless capability_action(:resource_show)
+        scope: :resource,
+        api: api
+      ) unless capability_action(:resource_show, api: api)
 
       register_capability_action(
         :resource_create,
         capability: nil,
         http_verb: :post,
         handler: RecordingStudioApi::Services::ResourceOperations::Create,
-        scope: :collection
-      ) unless capability_action(:resource_create)
+        scope: :collection,
+        api: api
+      ) unless capability_action(:resource_create, api: api)
 
       register_capability_action(
         :resource_update,
         capability: nil,
         http_verb: :patch,
         handler: RecordingStudioApi::Services::ResourceOperations::Update,
-        scope: :resource
-      ) unless capability_action(:resource_update)
+        scope: :resource,
+        api: api
+      ) unless capability_action(:resource_update, api: api)
 
       register_capability_action(
         :resource_destroy,
         capability: nil,
         http_verb: :delete,
         handler: RecordingStudioApi::Services::ResourceOperations::Destroy,
-        scope: :resource
-      ) unless capability_action(:resource_destroy)
+        scope: :resource,
+        api: api
+      ) unless capability_action(:resource_destroy, api: api)
     end
 
     private
+
+    def normalize_documentation_mount_path(value, allow_root: true)
+      path = value.to_s.strip
+      path = "/#{path}" unless path.start_with?("/")
+      path = path.squeeze("/").sub(%r{/\z}, "")
+      path = "/" if path.empty?
+      unless path.match?(%r{\A/[a-zA-Z0-9._~!$&'()*+,;=@/-]*\z}) && !path.include?("..")
+        raise ArgumentError, "mount paths must be safe absolute paths"
+      end
+
+      return path if allow_root || path != "/"
+
+      raise ArgumentError, "api_mount_path must not be the root path"
+    end
 
     def normalize_api_version(value)
       normalized = value.to_s.strip.downcase
