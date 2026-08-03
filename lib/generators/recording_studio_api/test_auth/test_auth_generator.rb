@@ -14,7 +14,7 @@ module RecordingStudioApi
       class_option :controller, type: :string, default: nil,
                                 desc: "Scalar controller path (defaults to NAME/scalar_docs)"
 
-      desc "Installs an optional local test-credential helper for generated Scalar documentation"
+      desc "Installs an optional local test-token page for a generated API reference"
 
       def validate_configuration
         errors = []
@@ -29,10 +29,11 @@ module RecordingStudioApi
       def ensure_scalar_installation
         return if behavior == :revoke
 
-        scalar_routes_installed = File.exist?(routes_file_path) && File.read(routes_file_path).match?(/as:\s*:#{Regexp.escape(route_key)}_scalar_docs_version\b/)
-        return if File.exist?(scalar_controller_file) && File.exist?(scalar_show_view_file) && scalar_routes_installed
+        scalar_routes_installed = File.exist?(routes_file_path) &&
+                                  File.read(routes_file_path).match?(/recording_studio_api_scalar_docs_for\s+:#{Regexp.escape(api_name)}.*?as:\s*:#{Regexp.escape(route_key)}_scalar_docs\b/m)
+        return if scalar_routes_installed
 
-        raise Thor::Error, "Test auth generator failed: install matching Scalar docs with a versioned route helper before adding test auth."
+        raise Thor::Error, "Test auth generator failed: install matching gem-owned Scalar docs before adding test auth."
       end
 
       def check_for_route_collisions
@@ -56,28 +57,8 @@ module RecordingStudioApi
         template "scalar_test_auth.rb.erb", concern_file
       end
 
-      def create_partial
-        template "_test_auth.html.erb", test_auth_partial_file
-      end
-
-      def integrate_scalar_controller
-        update_marked_file(
-          scalar_controller_file,
-          controller_start_marker,
-          controller_end_marker,
-          controller_integration,
-          after: /class\s+\w+\s+<\s+ApplicationController\n/
-        )
-      end
-
-      def integrate_scalar_view
-        update_marked_file(
-          scalar_show_view_file,
-          view_start_marker,
-          view_end_marker,
-          view_integration,
-          before: /\s*<%= render "scalar" %>/
-        )
+      def create_view
+        template "test_auth.html.erb", test_auth_view_file
       end
 
       def add_routes
@@ -137,14 +118,6 @@ module RecordingStudioApi
         concern_path.camelize
       end
 
-      def scalar_controller_file
-        File.join(destination_root, "app/controllers/#{controller_path}_controller.rb")
-      end
-
-      def scalar_show_view_file
-        File.join(destination_root, "app/views/#{controller_path}/show.html.erb")
-      end
-
       def credentials_controller_file
         "app/controllers/#{credentials_controller_path}_controller.rb"
       end
@@ -153,8 +126,8 @@ module RecordingStudioApi
         "app/controllers/concerns/#{concern_path}.rb"
       end
 
-      def test_auth_partial_file
-        "app/views/#{controller_path}/_test_auth.html.erb"
+      def test_auth_view_file
+        "app/views/#{credentials_controller_path}/show.html.erb"
       end
 
       def route_key
@@ -177,22 +150,6 @@ module RecordingStudioApi
         "recording_studio_api.#{route_key}.test_credential"
       end
 
-      def controller_start_marker
-        "# BEGIN RecordingStudioApi test auth: #{route_key}"
-      end
-
-      def controller_end_marker
-        "# END RecordingStudioApi test auth: #{route_key}"
-      end
-
-      def view_start_marker
-        "<%# BEGIN RecordingStudioApi test auth: #{route_key} %>"
-      end
-
-      def view_end_marker
-        "<%# END RecordingStudioApi test auth: #{route_key} %>"
-      end
-
       def route_start_marker
         "# BEGIN RecordingStudioApi test auth routes: #{route_key}"
       end
@@ -201,28 +158,11 @@ module RecordingStudioApi
         "# END RecordingStudioApi test auth routes: #{route_key}"
       end
 
-      def controller_integration
-        <<~RUBY.indent(2)
-          #{controller_start_marker}
-          include #{concern_module_name}
-          before_action :load_scalar_test_auth, only: :show
-          #{controller_end_marker}
-        RUBY
-      end
-
-      def view_integration
-        <<~ERB
-
-          #{view_start_marker}
-          <%= render "test_auth" %>
-          #{view_end_marker}
-        ERB
-      end
-
       def route_block
         <<~RUBY
           #{route_start_marker}
-          post "#{mount_path}/:version/test-credential", to: "#{credentials_route_controller}#create", as: :#{route_key}_scalar_test_credential
+          get "#{mount_path}/:version/test-credential", to: "#{credentials_route_controller}#show", as: :#{route_key}_scalar_test_credential
+          post "#{mount_path}/:version/test-credential", to: "#{credentials_route_controller}#create"
           delete "#{mount_path}/:version/test-credential", to: "#{credentials_route_controller}#destroy"
           #{route_end_marker}
         RUBY
@@ -238,25 +178,6 @@ module RecordingStudioApi
 
       def valid_mount_path?
         mount_path.match?(%r{\A/[a-zA-Z0-9._~!$&'+,;=@/-]+\z}) && !mount_path.include?("..") && !mount_path.include?("//")
-      end
-
-      def update_marked_file(path, start_marker, end_marker, content, after: nil, before: nil)
-        if behavior == :revoke
-          remove_marked_block(path, start_marker, end_marker)
-          return
-        end
-
-        source = File.read(path)
-        return say("Test auth integration already exists in #{relative_path(path)}.", :yellow) if source.include?(start_marker)
-
-        insertion_pattern = after || before
-        raise Thor::Error, "Test auth generator failed: integration point was not found in #{relative_path(path)}." unless source.match?(insertion_pattern)
-
-        if after
-          inject_into_file relative_path(path), content, after: after
-        else
-          inject_into_file relative_path(path), content, before: before
-        end
       end
 
       def remove_marked_block(path, start_marker, end_marker)

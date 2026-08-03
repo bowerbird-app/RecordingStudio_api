@@ -17,8 +17,8 @@ module PublicApi::ScalarTestAuth
     @scalar_test_selected_access_point_id = @scalar_test_token&.fetch("scope_recording_id", nil) || @scalar_test_access_points.first&.fetch(:id)
     @scalar_test_context_rows = scalar_test_auth_context_rows
     @scalar_test_sample_rows = scalar_test_auth_sample_rows
-    @scalar_test_auth_open = @scalar_test_token.present? || @scalar_test_notice.present? || @scalar_test_error.present?
-    @scalar_test_auth_version = api_version
+    @scalar_test_auth_version = params.fetch(:version).to_s.downcase
+    @scalar_test_auth_docs_path = public_api_scalar_docs_version_path(version: @scalar_test_auth_version)
   end
 
   def scalar_test_auth_enabled?
@@ -124,7 +124,7 @@ module PublicApi::ScalarTestAuth
   end
 
   def scalar_test_auth_return_path
-    helpers.public_api_scalar_docs_version_path(version: params.fetch(:version), anchor: "scalar-test-auth")
+    public_api_scalar_test_credential_path(version: params.fetch(:version))
   end
 
   def scalar_test_auth_session_key

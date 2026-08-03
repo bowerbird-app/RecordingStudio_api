@@ -10,33 +10,32 @@
 3. ✅ Updated copilot instructions to reference local docs
 4. ✅ Replaced `makeup_artist` with `flat_pack` in `test/dummy/Gemfile`
 
-## Next Steps (Requires Ruby 3.3.0+)
+## Historical Follow-Up (Completed)
 
-The following steps need to be completed in an environment with Ruby 3.3.0 or higher:
+The following steps were completed during the migration. They are retained for historical context only;
+do not rerun them as part of RecordingStudioApi setup.
 
-1. **Update Gemfile.lock**: Run `bundle install` in the test/dummy directory to update the lockfile
+1. **Updated Gemfile.lock**: Ran `bundle install` in the test/dummy directory.
    ```bash
    cd test/dummy
    bundle install
    ```
 
-2. **Run FlatPack installer**: After bundle install, run the FlatPack installation generator
+2. **Installed FlatPack**: Ran the FlatPack installation generator after bundle installation.
    ```bash
    cd test/dummy
    rails generate flat_pack:install
    ```
 
-3. **Update views**: Replace any `makeup_artist` component references with `flat_pack` components
-   - Search for: `MakeupArtist::`, `makeup_artist/`
-   - Replace with equivalent FlatPack components
+3. **Updated views**: Replaced `makeup_artist` component references with FlatPack components.
 
-4. **Test the application**: Start the dummy app and verify all UI components work
+4. **Verified the application**: Started the dummy app and verified its UI components.
    ```bash
    cd test/dummy
    bin/dev
    ```
 
-5. **Run tests**: Execute the test suite
+5. **Ran the test suite**:
    ```bash
    bundle exec rake test
    ```

@@ -28,6 +28,17 @@ module ApiDummyHelpers
     RecordingStudioApi.configuration.api(:operations) do |api|
       api.openapi_title = "Recording Studio Operations API"
       api.openapi_description = "Read-only operational access for trusted administrators and automation."
+      api.documentation_enabled = true
+      api.documentation_access = lambda do |controller:, actor:, api:|
+        root_recording = controller.send(:current_root_recording)
+        controller.send(:admin_root_current?) && RecordingStudioApi::Admin::ApiAuthorization.authorized?(
+          actor: actor,
+          api: api,
+          root_recording: root_recording,
+          role: RecordingStudioApi.configuration.access_management_view_role,
+          create: true
+        )
+      end
       api.default_access = :read_only
       api.api_management_authorization_required = true
     end

@@ -34,6 +34,9 @@ module RecordingStudioApi
                   :admin_root_recordable_type_names,
                   :openapi_title,
                   :openapi_description,
+                  :documentation_enabled,
+                  :documentation_access,
+                  :documentation_layout_name,
                   :layout_name,
                   :pagination_default_limit,
                   :pagination_max_limit,
@@ -97,6 +100,9 @@ module RecordingStudioApi
       @api_version_profiles = {}
       @openapi_title = nil
       @openapi_description = nil
+      @documentation_enabled = false
+      @documentation_access = nil
+      @documentation_layout_name = nil
       @layout_name = "recording_studio/default_layout"
       @pagination_default_limit = 50
       @pagination_max_limit = 100
@@ -153,6 +159,9 @@ module RecordingStudioApi
         apis: @apis.transform_values(&:to_h),
         openapi_title: openapi_title,
         openapi_description: openapi_description,
+        documentation_enabled: documentation_enabled,
+        documentation_access: documentation_access.respond_to?(:call) ? :callable : documentation_access,
+        documentation_layout_name: documentation_layout_name,
         layout_name: layout_name,
         pagination_default_limit: pagination_default_limit,
         pagination_max_limit: pagination_max_limit,
@@ -246,6 +255,7 @@ module RecordingStudioApi
       validate_access_management_roles!
       validate_capability_action_role_resolver!
       validate_api_versions!
+      validate_documentation!
       validate_security_configuration!
     end
 
@@ -323,6 +333,13 @@ module RecordingStudioApi
     end
 
     private
+
+    def validate_documentation!
+      return unless documentation_enabled
+      return if %i[public authenticated].include?(documentation_access) || documentation_access.respond_to?(:call)
+
+      raise ConfigurationError, "documentation_access must be public, authenticated, or callable when documentation is enabled"
+    end
 
     def normalize_api_name(value)
       raw_name = value.to_s.strip

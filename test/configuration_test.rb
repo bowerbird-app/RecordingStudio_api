@@ -54,6 +54,9 @@ class ConfigurationTest < Minitest::Test
     assert_equal "v1", configuration.default_api_version
     assert_nil configuration.openapi_title
     assert_nil configuration.openapi_description
+    assert_equal false, configuration.documentation_enabled
+    assert_nil configuration.documentation_access
+    assert_nil configuration.documentation_layout_name
     assert_equal "recording_studio/default_layout", configuration.layout_name
     assert_equal false, configuration.rate_limit_oauth_enabled
     assert_equal false, configuration.rate_limit_api_enabled
@@ -92,6 +95,24 @@ class ConfigurationTest < Minitest::Test
     assert_equal "Operations API", operations_api.openapi_title
     assert operations_api.recordable_registry["AdminRoot"]
     assert_nil @configuration.public_api.recordable_registry["AdminRoot"]
+  end
+
+  def test_documentation_requires_an_explicit_access_policy_when_enabled
+    @configuration.documentation_enabled = true
+
+    error = assert_raises(RecordingStudioApi::ConfigurationError) { @configuration.validate! }
+    assert_includes error.message, "documentation_access"
+
+    @configuration.documentation_access = :authenticated
+    @configuration.validate!
+
+    operations = @configuration.api(:operations)
+    operations.documentation_enabled = true
+    error = assert_raises(RecordingStudioApi::ConfigurationError) { @configuration.validate! }
+    assert_includes error.message, "documentation_access"
+
+    operations.documentation_access = ->(**) { true }
+    @configuration.validate!
   end
 
   def test_named_api_policies_inherit_public_defaults_and_can_override_them

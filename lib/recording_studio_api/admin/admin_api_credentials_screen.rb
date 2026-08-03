@@ -122,18 +122,12 @@ module RecordingStudioApi
           root_recording = context.root_recording
           return false if root_recording.nil?
 
-          admin_api = RecordingStudioApi::AdminApi.find_by(key: "api")
-          admin_api_recording = RecordingStudio::Recording.unscoped.find_by(
-            recordable: admin_api,
-            root_recording_id: root_recording.id,
-            parent_recording_id: root_recording.id
-          )
-          return false if admin_api_recording.nil?
-
-          RecordingStudioAccessible.authorized?(
+          RecordingStudioApi::Admin::ApiAuthorization.authorized?(
             actor: context.current_actor,
-            recording: admin_api_recording,
-            role: RecordingStudioApi.configuration.access_management_edit_role
+            api: RecordingStudioApi::Admin::ApiContext.key_from_context(context),
+            root_recording: root_recording,
+            role: RecordingStudioApi.configuration.access_management_edit_role,
+            create: false
           )
         end
 

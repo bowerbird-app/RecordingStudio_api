@@ -4,12 +4,66 @@
     variant: :h1
   ) %>
 
-  <div class="inline-flex self-start">
-    <%= render FlatPack::Button::Component.new(
-      text: "Open Admin API",
-      style: :primary,
-      size: :md,
-      url: ["/admin/api", { anchor_url: root_path }.to_query].join("?")
+  <section class="flex flex-col gap-3">
+    <%= render FlatPack::SectionTitle::Component.new(
+      title: "Public API",
+      anchor_link: true,
+      anchor_id: "public-api"
     ) %>
-  </div>
+
+    <div class="flex flex-wrap gap-3">
+      <%= render FlatPack::Button::Component.new(
+        text: "Public API Admin dashboard",
+        style: :default,
+        size: :md,
+        url: ["/admin/api", { anchor_url: root_path }.to_query].join("?")
+      ) %>
+
+      <%= render FlatPack::Button::Component.new(
+        text: "Public API docs",
+        style: :default,
+        size: :md,
+        url: "/docs/scalar"
+      ) %>
+
+      <%= render FlatPack::Button::Component.new(
+        text: "Create API test token",
+        style: :default,
+        size: :md,
+        url: public_api_scalar_test_credential_path(version: RecordingStudioApi.default_api_version)
+      ) %>
+    </div>
+  </section>
+
+  <section class="flex flex-col gap-3">
+    <%= render FlatPack::SectionTitle::Component.new(
+      title: "Operations API",
+      subtitle: "Private API for admin use only",
+      anchor_link: true,
+      anchor_id: "operations-api"
+    ) %>
+
+    <div class="flex flex-wrap gap-3">
+      <%= render FlatPack::Button::Component.new(
+        text: "Operations API Admin dashboard",
+        style: :default,
+        size: :md,
+        url: "/admin/api/operations"
+      ) %>
+
+      <%= render FlatPack::Button::Component.new(
+        text: "Operations API docs",
+        style: :default,
+        size: :md,
+        url: "/admin/operations-api/docs"
+      ) %>
+
+      <%= render FlatPack::Button::Component.new(
+        text: "Create Operations API test token",
+        style: :default,
+        size: :md,
+        url: operations_api_scalar_test_credential_path(version: RecordingStudioApi.default_api_version(api: :operations))
+      ) %>
+    </div>
+  </section>
 </div>

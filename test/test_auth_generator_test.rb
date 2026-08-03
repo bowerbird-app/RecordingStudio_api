@@ -7,7 +7,7 @@ require "generators/recording_studio_api/scalar_docs/scalar_docs_generator"
 require "generators/recording_studio_api/test_auth/test_auth_generator"
 
 class TestAuthGeneratorTest < Minitest::Test
-  def test_installs_api_scoped_test_auth_into_matching_scalar_docs
+  def test_installs_api_scoped_standalone_test_token_page
     with_temp_app do |destination_root|
       install_scalar(destination_root, "operations_api", mount_path: "/admin/operations-api/docs", api_surface: "operations")
       generator = build_generator(
@@ -19,20 +19,33 @@ class TestAuthGeneratorTest < Minitest::Test
 
       generator.invoke_all
 
-      scalar_controller = read(destination_root, "app/controllers/operations_api/scalar_docs_controller.rb")
       credentials_controller = read(destination_root, "app/controllers/operations_api/scalar_test_credentials_controller.rb")
       concern = read(destination_root, "app/controllers/concerns/operations_api/scalar_test_auth.rb")
-      show_view = read(destination_root, "app/views/operations_api/scalar_docs/show.html.erb")
+      token_view = read(destination_root, "app/views/operations_api/scalar_test_credentials/show.html.erb")
       routes = read(destination_root, "config/routes.rb")
 
-      assert_includes scalar_controller, "include OperationsApi::ScalarTestAuth"
-      assert_includes scalar_controller, "before_action :load_scalar_test_auth"
+      assert_includes credentials_controller, "def show"
+      assert_includes credentials_controller, 'layout "recording_studio/default_layout"'
+      assert_includes credentials_controller, "authorize_scalar_test_auth!"
+      assert_includes credentials_controller, "return head :unauthorized"
+      assert_includes credentials_controller, "head :forbidden"
+      assert_includes credentials_controller, "scalar_test_auth_access_points.empty?"
+      assert_includes credentials_controller, "RecordingStudioApi.api_recordable_types(api: scalar_test_auth_api)"
       assert_includes credentials_controller, "RecordingStudioApi::Services::IssueTestCredential.call"
       assert_includes credentials_controller, "RecordingStudioApi::Services::RevokeTestCredential.call"
+      refute_includes credentials_controller, "can_manage_recording?"
       assert_includes concern, '"operations"'
       assert_includes concern, "RecordingStudioApi.api_recordable_types(api: scalar_test_auth_api)"
       assert_includes concern, "Rails.env.local?"
-      assert_includes show_view, '<%= render "test_auth" %>'
+      assert_includes token_view, "API test token"
+      assert_includes token_view, 'class: "w-full max-w-xl space-y-4"'
+      assert_includes token_view, "FlatPack::Select::Component"
+      assert_includes token_view, "FlatPack::Button::Component"
+      refute_includes token_view, "form.select"
+      refute_includes token_view, "form.submit"
+      refute_includes token_view, "md:grid-cols"
+      refute File.exist?(File.join(destination_root, "app/views/recording_studio_api/scalar_docs/_extension.html.erb"))
+      assert_includes routes, 'get "/admin/operations-api/docs/:version/test-credential"'
       assert_includes routes, 'post "/admin/operations-api/docs/:version/test-credential"'
       assert_includes routes, "as: :operations_api_scalar_test_credential"
 
@@ -53,8 +66,7 @@ class TestAuthGeneratorTest < Minitest::Test
 
       assert File.exist?(File.join(destination_root, "app/controllers/developer_docs/scalar_test_credentials_controller.rb"))
       assert File.exist?(File.join(destination_root, "app/controllers/concerns/developer_docs/scalar_test_auth.rb"))
-      assert_includes read(destination_root, "app/controllers/developer_docs/reference_controller.rb"),
-                      "include DeveloperDocs::ScalarTestAuth"
+      assert File.exist?(File.join(destination_root, "app/views/developer_docs/scalar_test_credentials/show.html.erb"))
     end
   end
 
@@ -70,12 +82,9 @@ class TestAuthGeneratorTest < Minitest::Test
       revoke = build_generator(destination_root, ["public_api"])
       revoke.stub(:behavior, :revoke) { revoke.invoke_all }
 
-      assert File.exist?(File.join(destination_root, "app/controllers/public_api/scalar_docs_controller.rb"))
       refute File.exist?(File.join(destination_root, "app/controllers/public_api/scalar_test_credentials_controller.rb"))
       refute File.exist?(File.join(destination_root, "app/controllers/concerns/public_api/scalar_test_auth.rb"))
-      refute File.exist?(File.join(destination_root, "app/views/public_api/scalar_docs/_test_auth.html.erb"))
-      refute_includes read(destination_root, "app/controllers/public_api/scalar_docs_controller.rb"), "BEGIN RecordingStudioApi test auth"
-      refute_includes read(destination_root, "app/views/public_api/scalar_docs/show.html.erb"), "BEGIN RecordingStudioApi test auth"
+      refute File.exist?(File.join(destination_root, "app/views/public_api/scalar_test_credentials/show.html.erb"))
       refute_includes read(destination_root, "config/routes.rb"), "BEGIN RecordingStudioApi test auth routes"
       assert_includes read(destination_root, "config/routes.rb"), "BEGIN RecordingStudioApi Scalar docs"
     end
@@ -87,7 +96,7 @@ class TestAuthGeneratorTest < Minitest::Test
 
       error = assert_raises(Thor::Error) { generator.ensure_scalar_installation }
 
-      assert_includes error.message, "install matching Scalar docs"
+      assert_includes error.message, "install matching gem-owned Scalar docs"
     end
   end
 

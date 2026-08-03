@@ -1,0 +1,70 @@
+<%% content_for :page_nav_back_url, @scalar_test_auth_docs_path %>
+<%% content_for :page_nav_back_label, "Back to API docs" %>
+
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
+  <%%= render FlatPack::PageTitle::Component.new(
+    title: "API test token",
+    subtitle: "Create a short-lived, scoped bearer token for local API testing.",
+    variant: :h1
+  ) %>
+
+  <div>
+    <%%= render FlatPack::Button::Component.new(
+      text: "Open API docs",
+      style: :default,
+      size: :md,
+      url: @scalar_test_auth_docs_path
+    ) %>
+  </div>
+
+    <%% if @scalar_test_error.present? %><p role="alert"><%%= @scalar_test_error %></p><%% end %>
+    <%% if @scalar_test_notice.present? %><p><%%= @scalar_test_notice %></p><%% end %>
+
+    <%% if @scalar_test_access_points.any? %>
+      <%%= form_with url: <%= credential_route_helper %>(version: @scalar_test_auth_version), method: :post, local: true, class: "w-full max-w-xl space-y-4" do %>
+        <%%= render FlatPack::Select::Component.new(
+          name: "access_point_recording_id",
+          label: "Access point",
+          options: @scalar_test_access_points.map { |entry| [entry.fetch(:label), entry.fetch(:id)] },
+          value: @scalar_test_selected_access_point_id,
+          class: "w-full"
+        ) %>
+
+        <%%= render FlatPack::Select::Component.new(
+          name: "role",
+          label: "Role",
+          options: @scalar_test_roles.map { |role| [role.humanize, role] },
+          value: @scalar_test_token&.fetch("role", "admin") || "admin",
+          class: "w-full"
+        ) %>
+
+        <div>
+          <%%= render FlatPack::Button::Component.new(text: "Generate token", style: :primary, size: :md, type: :submit) %>
+        </div>
+      <%% end %>
+    <%% else %>
+      <p>No manageable API scope is available.</p>
+    <%% end %>
+
+    <%% if @scalar_test_token.present? %>
+      <p>Paste this bearer value into Scalar:</p>
+      <pre>Bearer <%%= @scalar_test_token.fetch("access_token") %></pre>
+      <%%= button_to "Revoke token", <%= credential_route_helper %>(version: @scalar_test_auth_version), method: :delete %>
+
+      <dl>
+        <%% @scalar_test_context_rows.each do |row| %>
+          <dt><%%= row.fetch(:field) %></dt>
+          <dd><%%= row.fetch(:value) %></dd>
+        <%% end %>
+      </dl>
+
+      <table>
+        <thead><tr><th>Resource</th><th>Label</th><th>ID</th></tr></thead>
+        <tbody>
+          <%% @scalar_test_sample_rows.each do |row| %>
+            <tr><td><%%= row.fetch(:resource) %></td><td><%%= row.fetch(:label) %></td><td><%%= row.fetch(:id) %></td></tr>
+          <%% end %>
+        </tbody>
+      </table>
+    <%% end %>
+</div>

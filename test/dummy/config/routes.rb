@@ -34,10 +34,10 @@ Rails.application.routes.draw do
   get "docs/gem_views", to: "docs#gem_views", as: :docs_gem_views
   get "docs/api_routes", to: "docs#api_routes", as: :docs_api_routes
   get "docs/openapi.json", to: "docs#openapi", as: :docs_openapi
-  get "APIdocs", to: redirect("/APIdocs/#{RecordingStudioApi.default_api_version}"), as: :api_docs_root
-  get "APIdocs/:version", to: "public_api/scalar_docs#show", as: :api_docs
-  get "APIdocs/:version/fullscreen", to: "public_api/scalar_docs#fullscreen", as: :api_docs_fullscreen
-  get "APIdocs/:version/openapi.json", to: "public_api/scalar_docs#openapi", as: :api_docs_openapi
+  get "APIdocs", to: "recording_studio_api/scalar_docs#redirect_to_default", defaults: { api_key: "public", engine_mount_path: "/recording_studio_api" }, as: :api_docs_root
+  get "APIdocs/:version/openapi.json", to: "recording_studio_api/scalar_docs#openapi", defaults: { api_key: "public", engine_mount_path: "/recording_studio_api" }, as: :api_docs_openapi
+  get "APIdocs/:version/fullscreen", to: "recording_studio_api/scalar_docs#fullscreen", defaults: { api_key: "public", engine_mount_path: "/recording_studio_api" }, as: :api_docs_fullscreen
+  get "APIdocs/:version", to: "recording_studio_api/scalar_docs#show", defaults: { api_key: "public", engine_mount_path: "/recording_studio_api" }, as: :api_docs
   get "docs/scalar/fullscreen", to: redirect("/docs/scalar/#{RecordingStudioApi.default_api_version}/fullscreen"), as: :docs_scalar_fullscreen
   get "docs/add_capability", to: "docs#add_capability", as: :docs_add_capability
   get "docs/auth", to: "docs#auth", as: :docs_auth
@@ -46,23 +46,24 @@ Rails.application.routes.draw do
 
   # Defines the root path route ("/")
   root "home#index"
-# BEGIN RecordingStudioApi Scalar docs: operations_api
-get "/admin/operations-api/docs", to: redirect("/admin/operations-api/docs/v1"), as: :operations_api_scalar_docs
-get "/admin/operations-api/docs/:version/openapi.json", to: "operations_api/scalar_docs#openapi", as: :operations_api_scalar_docs_openapi
-get "/admin/operations-api/docs/:version/fullscreen", to: "operations_api/scalar_docs#fullscreen", as: :operations_api_scalar_docs_fullscreen
-get "/admin/operations-api/docs/:version", to: "operations_api/scalar_docs#show", as: :operations_api_scalar_docs_version
-# END RecordingStudioApi Scalar docs: operations_api
+  recording_studio_api_scalar_docs_for :operations,
+    at: "/admin/operations-api/docs",
+    as: :operations_api_scalar_docs
 
-# BEGIN RecordingStudioApi Scalar docs: public_api
-get "/docs/scalar", to: redirect("/docs/scalar/v1"), as: :public_api_scalar_docs
-get "/docs/scalar/:version/openapi.json", to: "public_api/scalar_docs#openapi", as: :public_api_scalar_docs_openapi
-get "/docs/scalar/:version/fullscreen", to: "public_api/scalar_docs#fullscreen", as: :public_api_scalar_docs_fullscreen
-get "/docs/scalar/:version", to: "public_api/scalar_docs#show", as: :public_api_scalar_docs_version
-# END RecordingStudioApi Scalar docs: public_api
+  recording_studio_api_scalar_docs_for :public,
+    at: "/docs/scalar",
+    as: :public_api_scalar_docs
 
 # BEGIN RecordingStudioApi test auth routes: public_api
-post "/docs/scalar/:version/test-credential", to: "public_api/scalar_test_credentials#create", as: :public_api_scalar_test_credential
+get "/docs/scalar/:version/test-credential", to: "public_api/scalar_test_credentials#show", as: :public_api_scalar_test_credential
+post "/docs/scalar/:version/test-credential", to: "public_api/scalar_test_credentials#create"
 delete "/docs/scalar/:version/test-credential", to: "public_api/scalar_test_credentials#destroy"
 # END RecordingStudioApi test auth routes: public_api
+
+# BEGIN RecordingStudioApi test auth routes: operations_api
+get "/admin/operations-api/docs/:version/test-credential", to: "operations_api/scalar_test_credentials#show", as: :operations_api_scalar_test_credential
+post "/admin/operations-api/docs/:version/test-credential", to: "operations_api/scalar_test_credentials#create"
+delete "/admin/operations-api/docs/:version/test-credential", to: "operations_api/scalar_test_credentials#destroy"
+# END RecordingStudioApi test auth routes: operations_api
 
 end

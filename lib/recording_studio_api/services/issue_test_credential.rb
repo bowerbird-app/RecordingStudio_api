@@ -23,10 +23,11 @@ module RecordingStudioApi
 
         payload = nil
         ActiveRecord::Base.transaction do
-          access_recording = grant_access!
           provision = ProvisionApiClient.call(
             api: api_key,
-            access_recording: access_recording,
+            access_point_recording: access_point_recording,
+            manager_actor: actor,
+            role: role,
             name: name
           )
           raise RecordingStudioApi::Error, provision.error if provision.failure?
@@ -47,7 +48,7 @@ module RecordingStudioApi
             access_token_record: access_token_record,
             scope_recording: access_point_recording,
             root_recording: access_point_recording.root_recording || access_point_recording,
-            role: access_recording.recordable.role.to_s,
+            role: provision.value.fetch(:access_recording).recordable.role.to_s,
             api: api_key
           )
         end
@@ -55,28 +56,6 @@ module RecordingStudioApi
         success(payload)
       rescue ActiveRecord::ActiveRecordError, RecordingStudioApi::Error => e
         failure(e.message)
-      end
-
-      def grant_access!
-        result = RecordingStudioAccessible.grant_access(
-          recording: access_point_recording,
-          actor: actor,
-          role: effective_role,
-          manager_actor: actor
-        )
-        raise RecordingStudioApi::Error, result.error if result.failure?
-
-        result.value
-      end
-
-      def effective_role
-        existing_role = RecordingStudioAccessible.access_recordings_for_actor(
-          recording: access_point_recording,
-          actor: actor
-        ).first&.recordable&.role.to_s.presence
-        return role if existing_role.blank?
-
-        [existing_role, role].max_by { |value| RecordingStudio::Access.roles.fetch(value) }
       end
 
       def oauth_error_message(error)

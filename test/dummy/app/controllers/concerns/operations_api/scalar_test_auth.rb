@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-module <%= concern_module_name %>
+module OperationsApi::ScalarTestAuth
   extend ActiveSupport::Concern
 
   private
@@ -18,7 +18,7 @@ module <%= concern_module_name %>
     @scalar_test_context_rows = scalar_test_auth_context_rows
     @scalar_test_sample_rows = scalar_test_auth_sample_rows
     @scalar_test_auth_version = params.fetch(:version).to_s.downcase
-    @scalar_test_auth_docs_path = scalar_test_auth_docs_path
+    @scalar_test_auth_docs_path = operations_api_scalar_docs_version_path(version: @scalar_test_auth_version)
   end
 
   def scalar_test_auth_enabled?
@@ -26,7 +26,7 @@ module <%= concern_module_name %>
   end
 
   def scalar_test_auth_api
-    <%= api_name.inspect %>
+    "operations"
   end
 
   def scalar_test_auth_actor
@@ -79,6 +79,7 @@ module <%= concern_module_name %>
 
     [
       { field: "Bearer token", value: "Bearer #{@scalar_test_token.fetch("access_token")}" },
+      { field: "API", value: "Operations" },
       { field: "Role", value: @scalar_test_token.fetch("role").humanize },
       { field: "Scope", value: @scalar_test_token.fetch("scope_label") },
       { field: "Root", value: @scalar_test_token.fetch("root_label") },
@@ -124,15 +125,11 @@ module <%= concern_module_name %>
   end
 
   def scalar_test_auth_return_path
-    helpers.<%= credential_route_helper %>(version: params.fetch(:version))
-  end
-
-  def scalar_test_auth_docs_path
-    helpers.<%= version_route_helper %>(version: params.fetch(:version))
+    operations_api_scalar_test_credential_path(version: params.fetch(:version))
   end
 
   def scalar_test_auth_session_key
-    <%= session_key.inspect %>
+    "recording_studio_api.operations_api.test_credential"
   end
 
   def scalar_test_auth_notice_key

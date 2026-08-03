@@ -231,8 +231,7 @@ module RecordingStudioApi
     end
 
     def authorize_access_management_edit_for_loaded_client!
-      access_point_recording = access_point_recording_for(@api_client&.access_recording)
-      return if access_management_policy.can_manage_recording?(access_point_recording)
+      return if api_client_management_policy.manage?(@api_client)
 
       raise RecordingStudioApi::AuthorizationError, "API access management requires higher access"
     end
@@ -274,12 +273,24 @@ module RecordingStudioApi
       @access_management_policy ||= RecordingStudioApi::AccessManagementPolicy.new(actor: current_request_actor)
     end
 
+    def api_client_management_policy
+      @api_client_management_policy ||= RecordingStudioApi::ApiClientManagementPolicy.new(actor: current_request_actor)
+    end
+
     def visible_access_recordings
       access_management_policy.visible_access_recordings
     end
 
     def visible_api_client_access_recordings
       access_management_policy.visible_api_client_access_recordings
+    end
+
+    def visible_api_client_ids
+      @visible_api_client_ids ||= RecordingStudioApi::ApiClient
+                                  .includes(access_recording: [:recordable, { parent_recording: :parent_recording }])
+                                  .where(access_recording_id: visible_api_client_access_recordings.map(&:id))
+                                  .select { |api_client| api_client_management_policy.view?(api_client) }
+                                  .map(&:id)
     end
 
     def visible_root_recordings
@@ -352,6 +363,7 @@ module RecordingStudioApi
       api_clients = RecordingStudioApi::ApiClient
         .includes(:credentials, access_recording: [:recordable, { parent_recording: :parent_recording }])
         .where(access_recording_id: visible_access_recording_ids)
+        .where(id: visible_api_client_ids)
         .reorder(:created_at, :id)
         .to_a
 
@@ -681,12 +693,12 @@ module RecordingStudioApi
     def load_api_access_detail
       @api_client = RecordingStudioApi::ApiClient
         .includes(:credentials, access_recording: [:recordable, { parent_recording: :parent_recording }])
-        .where(access_recording_id: visible_api_client_access_recordings.map(&:id))
+        .where(id: visible_api_client_ids)
         .find(params[:id])
 
       @access_recording = @api_client.access_recording
       @root_recording = @access_recording&.root_recording
-      @can_manage_access_request = access_management_policy.can_manage_recording?(access_point_recording_for(@access_recording))
+      @can_manage_access_request = api_client_management_policy.manage?(@api_client)
       @latest_credential = @api_client.credentials.max_by { |credential| [credential.created_at.to_i, credential.id.to_i] }
       @rotated_credential_rows = rotated_credential_rows_for(@api_client.credentials, @latest_credential)
     rescue ActiveRecord::RecordNotFound

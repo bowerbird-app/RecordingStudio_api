@@ -1,63 +1,38 @@
 # frozen_string_literal: true
 
 require "rails/generators"
-require "uri"
-require_relative "../test_auth/test_auth_generator"
+require "fileutils"
 
 module RecordingStudioApi
   module Generators
     class ScalarDocsGenerator < Rails::Generators::NamedBase
-      source_root File.expand_path("templates", __dir__)
-
-      DEFAULT_SCALAR_SOURCE = "https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.64.0/dist/browser/standalone.js"
-      # Add an entry only after fetching and verifying the exact immutable source bundle.
-      DEFAULT_SCALAR_INTEGRITY_BY_SOURCE = {}.freeze
-
       class_option :mount_path, type: :string, default: "/api-docs",
                                 desc: "Path where the Scalar documentation is mounted"
       class_option :api_mount_path, type: :string, default: "/recording_studio_api",
                                     desc: "Path where RecordingStudioApi::Engine is mounted"
       class_option :api_surface, type: :string, default: "public",
                                  desc: "Named RecordingStudioApi surface to document"
-      class_option :controller, type: :string, default: nil,
-                                desc: "Controller path (defaults to NAME/scalar_docs)"
-      class_option :layout, type: :string, default: "application",
-                            desc: "Layout used by the embedded documentation page (or false)"
-      class_option :scalar_source, type: :string, default: DEFAULT_SCALAR_SOURCE,
-                                   desc: "Pinned Scalar standalone JavaScript URL"
-      class_option :scalar_url, type: :string, default: nil,
-                                desc: "OpenAPI URL for Scalar (defaults to the generated OpenAPI route)"
-      class_option :scalar_integrity, type: :string, default: nil,
-                                      desc: "Optional SRI hash for the Scalar script"
-      class_option :default_api_version, type: :string, default: "v1",
-                                         desc: "Default API version for the documentation redirect"
-      class_option :openapi_provider, type: :string, default: "RecordingStudioApi::Services::OpenapiDocument",
-                                      desc: "Callable OpenAPI provider constant"
-      class_option :test_auth, type: :boolean, default: false,
-                               desc: "Install the optional local test-credential helper"
+      class_option :access, type: :string, default: "authenticated",
+                            desc: "Documentation access mode: authenticated or public"
+      class_option :layout, type: :string, default: nil,
+                            desc: "Optional layout override for this API's documentation"
 
-      desc "Installs named, framework-agnostic Scalar API documentation"
+      desc "Installs routes and configuration for gem-owned Scalar API documentation"
 
       def validate_configuration
-        validation_errors = []
-        validation_errors << "NAME must contain letters, numbers, underscores, dashes, or slashes" unless valid_name?
-        validation_errors << "--mount-path must be a safe absolute path" unless valid_path?(mount_path)
-        validation_errors << "--api-mount-path must be a safe absolute path" unless valid_path?(api_mount_path, allow_root: true)
-        validation_errors << "--default-api-version must look like v1" unless default_api_version.match?(/\Av[0-9][a-z0-9_-]*\z/i)
-        validation_errors << "--api-surface must contain letters, numbers, underscores, or dashes" unless api_name.match?(/\A[a-z0-9][a-z0-9_-]*\z/i)
-        validation_errors << "--controller must be a controller path" unless valid_controller?
-        validation_errors << "--layout must be a layout name or false" unless valid_layout?
-        validation_errors << "--scalar-source must be an http(s) URL" unless valid_http_url?(scalar_source)
-        validation_errors << "--scalar-url must be blank, an absolute path, or an http(s) URL" unless valid_scalar_url?
-        validation_errors << "--scalar-integrity must contain valid SRI sha256, sha384, or sha512 hashes" unless valid_scalar_integrity?
-        validation_errors << "--openapi-provider must be a Ruby constant name" unless options[:openapi_provider].match?(/\A[A-Z]\w*(?:::[A-Z]\w*)*\z/)
+        errors = []
+        errors << "NAME must contain letters, numbers, underscores, dashes, or slashes" unless valid_name?
+        errors << "--mount-path must be a safe absolute path" unless valid_path?(mount_path)
+        errors << "--api-mount-path must be a safe absolute path" unless valid_path?(api_mount_path, allow_root: true)
+        errors << "--api-surface must contain letters, numbers, underscores, or dashes" unless api_name.match?(/\A[a-z0-9][a-z0-9_-]*\z/i)
+        errors << "--access must be authenticated or public" unless %w[authenticated public].include?(access_mode)
+        errors << "--layout must be a layout name" unless valid_layout?
 
-        raise Thor::Error, "Scalar documentation generator failed: #{validation_errors.join('; ')}" if validation_errors.any?
+        raise Thor::Error, "Scalar documentation generator failed: #{errors.join('; ')}" if errors.any?
       end
 
       def check_for_route_collisions
         return unless behavior == :invoke
-        return if options[:skip]
         return unless File.exist?(routes_file_path)
 
         source = File.read(routes_file_path)
@@ -69,62 +44,48 @@ module RecordingStudioApi
         path_collisions = scalar_route_paths.select { |path| route_path_declared?(source, path) }
         return if collisions.empty? && path_collisions.empty?
 
-        collision_descriptions = []
-        collision_descriptions << "route helper (#{collisions.join(', ')})" if collisions.any?
-        collision_descriptions << "route path (#{path_collisions.join(', ')})" if path_collisions.any?
-        raise Thor::Error, "Scalar documentation generator failed: route collision #{collision_descriptions.join(' and ')}. Choose another NAME or mount path."
-      end
-
-      def create_controller
-        template "scalar_docs_controller.rb.erb", controller_file
-      end
-
-      def create_views
-        template "show.html.erb", File.join(view_directory, "show.html.erb")
-        template "fullscreen.html.erb", File.join(view_directory, "fullscreen.html.erb")
-        template "_scalar.html.erb", File.join(view_directory, "_scalar.html.erb")
+        descriptions = []
+        descriptions << "route helper (#{collisions.join(', ')})" if collisions.any?
+        descriptions << "route path (#{path_collisions.join(', ')})" if path_collisions.any?
+        raise Thor::Error, "Scalar documentation generator failed: route collision #{descriptions.join(' and ')}. Choose another NAME or mount path."
       end
 
       def add_routes
-        if behavior == :revoke
-          remove_marked_route_block
-          return
-        end
+        return remove_marked_route_block if behavior == :revoke
 
-        if options[:skip]
-          say "Skipping Scalar documentation routes for #{name}.", :yellow
-          return
-        end
-
-        raise Thor::Error, "Scalar documentation generator failed: #{routes_path} was not found." unless File.exist?(routes_file_path)
+        raise Thor::Error, "Scalar documentation generator failed: config/routes.rb was not found." unless File.exist?(routes_file_path)
 
         source = File.read(routes_file_path)
         if source.include?(route_start_marker)
-          if source.include?(route_block.strip)
-            say "Scalar documentation routes already exist for #{name}.", :yellow
-            return
-          end
+          return say("Scalar documentation routes already exist for #{name}.", :yellow) if source.include?(route_block.strip)
 
           raise Thor::Error, "Scalar documentation generator failed: existing route block for #{name} differs from this configuration."
         end
 
-        inject_into_file routes_path, route_insertion, before: /\nend\s*\z/
+        inject_into_file routes_path, "\n#{route_block}", before: /\nend\s*\z/
       end
 
-      def install_test_auth
-        return unless options[:test_auth]
+      def create_configuration
+        if behavior == :revoke
+          configuration_file = File.join(destination_root, configuration_path)
+          if File.exist?(configuration_file)
+            say_status :remove, configuration_path
+            FileUtils.rm_f(configuration_file) unless options[:pretend]
+          end
+          return
+        end
 
-        child = RecordingStudioApi::Generators::TestAuthGenerator.new(
-          [name],
-          {
-            mount_path: mount_path,
-            api_surface: api_name,
-            controller: controller_path
-          },
-          destination_root: destination_root,
-          behavior: behavior
-        )
-        child.invoke_all
+        create_file configuration_path, configuration_source
+      end
+
+      def report_legacy_files
+        legacy_paths = [
+          File.join(destination_root, "app/controllers/#{file_name}/scalar_docs_controller.rb"),
+          File.join(destination_root, "app/views/#{file_name}/scalar_docs")
+        ].select { |path| File.exist?(path) }
+        return if legacy_paths.empty?
+
+        say "Legacy host-owned Scalar files remain and are no longer used by the generated routes: #{legacy_paths.join(', ')}", :yellow
       end
 
       private
@@ -133,57 +94,16 @@ module RecordingStudioApi
         @mount_path ||= normalized_path(options[:mount_path])
       end
 
-      def scalar_source
-        options[:scalar_source].to_s.strip
-      end
-
-      def scalar_integrity
-        explicit_integrity = options[:scalar_integrity].to_s.strip.presence
-        explicit_integrity || DEFAULT_SCALAR_INTEGRITY_BY_SOURCE[scalar_source]
-      end
-
       def api_mount_path
         @api_mount_path ||= normalized_path(options[:api_mount_path])
-      end
-
-      def default_api_version
-        version = options[:default_api_version].to_s.strip.downcase
-        version.start_with?("v") ? version : "v#{version}"
       end
 
       def api_name
         options[:api_surface].to_s.strip.downcase
       end
 
-      def api_mount_path_for_surface
-        api_name == "public" ? "/api" : "/apis/#{api_name}"
-      end
-
-      def controller_path
-        @controller_path ||= begin
-          configured = options[:controller].presence || "#{file_name}/scalar_docs"
-          configured.to_s.underscore.sub(/_controller\z/, "").tr("::", "/").squeeze("/")
-        end
-      end
-
-      def controller_class_name
-        "#{controller_path.camelize}Controller"
-      end
-
-      def controller_namespace
-        controller_class_name.deconstantize.presence
-      end
-
-      def controller_short_class_name
-        controller_class_name.demodulize
-      end
-
-      def controller_file
-        File.join("app/controllers", "#{controller_path}_controller.rb")
-      end
-
-      def view_directory
-        File.join("app/views", controller_path)
+      def access_mode
+        options[:access].to_s.strip.downcase
       end
 
       def route_key
@@ -200,20 +120,7 @@ module RecordingStudioApi
       end
 
       def scalar_route_paths
-        [
-          mount_path,
-          "#{mount_path}/:version/openapi.json",
-          "#{mount_path}/:version/fullscreen",
-          "#{mount_path}/:version"
-        ]
-      end
-
-      def openapi_route_helper
-        "#{route_key}_scalar_docs_openapi_path"
-      end
-
-      def fullscreen_route_helper
-        "#{route_key}_scalar_docs_fullscreen_path"
+        [mount_path, "#{mount_path}/:version/openapi.json", "#{mount_path}/:version/fullscreen", "#{mount_path}/:version"]
       end
 
       def route_start_marker
@@ -227,20 +134,34 @@ module RecordingStudioApi
       def route_block
         <<~RUBY
           #{route_start_marker}
-          get "#{mount_path}", to: redirect("#{mount_path}/#{default_api_version}"), as: :#{route_key}_scalar_docs
-          get "#{mount_path}/:version/openapi.json", to: "#{controller_path}#openapi", as: :#{route_key}_scalar_docs_openapi
-          get "#{mount_path}/:version/fullscreen", to: "#{controller_path}#fullscreen", as: :#{route_key}_scalar_docs_fullscreen
-          get "#{mount_path}/:version", to: "#{controller_path}#show", as: :#{route_key}_scalar_docs_version
+          recording_studio_api_scalar_docs_for :#{api_name},
+            at: #{mount_path.inspect},
+            as: :#{route_key}_scalar_docs,
+            engine_mount_path: #{api_mount_path.inspect}
           #{route_end_marker}
         RUBY
       end
 
-      def route_insertion
-        "\n#{route_block}"
+      def configuration_path
+        "config/initializers/recording_studio_api_scalar_docs_#{route_key}.rb"
       end
 
-      def route_block_pattern
-        /\n?#{Regexp.escape(route_start_marker)}.*?#{Regexp.escape(route_end_marker)}\n?/m
+      def configuration_source
+        layout_assignment = if options[:layout].present?
+                              "\n  api.documentation_layout_name = #{options[:layout].to_s.inspect}"
+                            else
+                              ""
+                            end
+
+        <<~RUBY
+          # frozen_string_literal: true
+
+          RecordingStudioApi.configure do |config|
+            api = config.api(:#{api_name})
+            api.documentation_enabled = true
+            api.documentation_access = :#{access_mode}#{layout_assignment}
+          end
+        RUBY
       end
 
       def routes_path
@@ -264,35 +185,11 @@ module RecordingStudioApi
       def valid_path?(path, allow_root: false)
         return false if path == "/" && !allow_root
 
-        path.match?(%r{\A/[a-zA-Z0-9._~!$&'+,;=@/-]*\z}) &&
-          !path.include?("..") &&
-          !path.include?("//")
-      end
-
-      def valid_controller?
-        controller_path.match?(%r{\A[a-z][a-z0-9_]*(?:/[a-z][a-z0-9_]*)*\z})
+        path.match?(%r{\A/[a-zA-Z0-9._~!$&'+,;=@/-]*\z}) && !path.include?("..") && !path.include?("//")
       end
 
       def valid_layout?
-        layout = options[:layout]
-        layout == false || layout.to_s.match?(%r{\A[a-zA-Z][a-zA-Z0-9_/-]*\z})
-      end
-
-      def valid_http_url?(value)
-        uri = URI.parse(value.to_s)
-        uri.is_a?(URI::HTTP) && uri.host.present? && value.to_s.match?(%r{\Ahttps?://})
-      rescue URI::InvalidURIError
-        false
-      end
-
-      def valid_scalar_url?
-        value = options[:scalar_url].to_s.strip
-        value.blank? || valid_http_url?(value) || value.match?(%r{\A/[^\s"'<>\u0000]*\z})
-      end
-
-      def valid_scalar_integrity?
-        integrity = scalar_integrity.to_s
-        integrity.blank? || integrity.match?(%r{\Asha(?:256|384|512)-[A-Za-z0-9+/]+={0,2}(?:\s+sha(?:256|384|512)-[A-Za-z0-9+/]+={0,2})*\z})
+        options[:layout].blank? || options[:layout].to_s.match?(%r{\A[a-zA-Z][a-zA-Z0-9_/-]*\z})
       end
 
       def route_path_declared?(source, path)
@@ -305,8 +202,9 @@ module RecordingStudioApi
         return unless File.exist?(routes_file_path)
 
         source = File.read(routes_file_path)
-        updated_source = source.gsub(route_block_pattern, "")
-        return say "No Scalar documentation route block found for #{name}.", :yellow if source == updated_source
+        pattern = /\n?#{Regexp.escape(route_start_marker)}.*?#{Regexp.escape(route_end_marker)}\n?/m
+        updated_source = source.gsub(pattern, "")
+        return say("No Scalar documentation route block found for #{name}.", :yellow) if source == updated_source
 
         say_status :remove, routes_path
         File.write(routes_file_path, updated_source) unless options[:pretend]

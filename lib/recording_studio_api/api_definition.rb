@@ -13,6 +13,9 @@ module RecordingStudioApi
                   :openapi_description,
                   :authentication,
                   :default_access,
+                  :documentation_enabled,
+                  :documentation_access,
+                  :documentation_layout_name,
                   :api_management_authorization_required,
                   :credential_ttl,
                   :access_token_ttl,
@@ -41,6 +44,9 @@ module RecordingStudioApi
       @openapi_description = nil
       @authentication = :oauth
       @default_access = :read_write
+      @documentation_enabled = false
+      @documentation_access = nil
+      @documentation_layout_name = nil
       inherit_policy_defaults(defaults)
       @api_versions = [DEFAULT_API_VERSION]
       @default_api_version = DEFAULT_API_VERSION
@@ -84,6 +90,8 @@ module RecordingStudioApi
       recordable_registry.validate!
       raise ConfigurationError, "authentication must be oauth for #{name}" unless authentication == :oauth
       raise ConfigurationError, "default_access must be read_only or read_write for #{name}" unless %i[read_only read_write].include?(default_access)
+
+      validate_documentation!
       return if api_versions.include?(default_api_version)
 
       raise ConfigurationError, "default_api_version must be included in api_versions for #{name}"
@@ -100,6 +108,9 @@ module RecordingStudioApi
         openapi_description: openapi_description,
         authentication: authentication,
         default_access: default_access,
+        documentation_enabled: documentation_enabled,
+        documentation_access: documentation_access.respond_to?(:call) ? :callable : documentation_access,
+        documentation_layout_name: documentation_layout_name,
         api_management_authorization_required: api_management_authorization_required,
         credential_ttl: credential_ttl,
         access_token_ttl: access_token_ttl,
@@ -109,6 +120,13 @@ module RecordingStudioApi
     end
 
     private
+
+    def validate_documentation!
+      return unless documentation_enabled
+      return if %i[public authenticated].include?(documentation_access) || documentation_access.respond_to?(:call)
+
+      raise ConfigurationError, "documentation_access must be public, authenticated, or callable for #{name} when documentation is enabled"
+    end
 
     def inherit_policy_defaults(defaults)
       policy_attributes = %i[

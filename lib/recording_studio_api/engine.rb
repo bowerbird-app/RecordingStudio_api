@@ -120,6 +120,12 @@ module RecordingStudioApi
       RecordingStudioApi::Hooks.run(:on_configuration, RecordingStudioApi.configuration)
     end
 
+    initializer "recording_studio_api.assets" do |app|
+      next unless app.config.respond_to?(:assets)
+
+      app.config.assets.precompile += [RecordingStudioApi::ScalarAsset::LOGICAL_PATH]
+    end
+
     initializer "recording_studio_api.register_recordable_types", after: "recording_studio.load_config" do
       RecordingStudio::RecordableDeclarations.install_active_record_macro! if defined?(RecordingStudio::RecordableDeclarations)
       RecordingStudioApi::Engine.load_recordable_models!

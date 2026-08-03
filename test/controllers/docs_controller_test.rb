@@ -13,6 +13,8 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
   TEST_PASSWORD = "DocsTestPassword!2026"
 
   setup do
+    RecordingStudioApi.configuration.documentation_enabled = true
+    RecordingStudioApi.configuration.documentation_access = :public
     @user = User.find_or_create_by!(email: "docs-test@example.com") do |user|
       user.password = TEST_PASSWORD
       user.password_confirmation = TEST_PASSWORD
@@ -280,24 +282,22 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "scalar page renders successfully" do
-    create_manageable_workspace_root(name: "Scalar Form Workspace")
-
     get public_api_scalar_docs_version_path(version: "v1")
 
     assert_response :success
-    assert_select "h1", text: "Scalar API reference"
+    assert_select "h1", text: "Recording Studio API"
     assert_includes response.body, "Interactive API explorer"
-    assert_includes response.body, "Test auth helper"
-    assert_select %(div[data-controller="flat-pack--collapse"][data-flat-pack--collapse-open-value="false"]), count: 1
-    assert_select %(#scalar-test-auth), count: 1
-    assert_select %(#scalar-test-auth-collapse-content[hidden]), count: 1
-    assert_select %(form[action="#{public_api_scalar_test_credential_path(version: 'v1')}"]), count: 1
+    assert_not_includes response.body, "Test auth helper"
+    assert_select %(form[action="#{public_api_scalar_test_credential_path(version: 'v1')}"]), count: 0
     assert_includes response.body, "id=\"scalar-api-reference\""
     assert_includes response.body, public_api_scalar_docs_openapi_path(version: "v1")
-    assert_includes response.body, "@scalar/api-reference@1.64.0/dist/browser/standalone.js"
+    assert_select "#scalar-api-reference-source[src^='/assets/recording_studio_api/scalar-1.64.0']", count: 1
+    assert_select "#scalar-api-reference-source[src^='http']", count: 0
     assert_includes response.body, "createApiReference"
     assert_includes response.body, 'source.addEventListener("load", initializeScalar'
-    assert_select %(a[href="#{public_api_scalar_docs_fullscreen_path(version: 'v1')}"][target="_blank"]), text: /Full screen/
+    assert_select %(body[data-recording-studio-default-layout="true"]), count: 1
+    assert_select %(a[href="#{public_api_scalar_docs_fullscreen_path(version: 'v1')}"]), text: "Full width"
+    assert_includes response.headers.fetch("Vary"), "Cookie"
   end
 
   test "APIdocs routes render versioned scalar and openapi endpoints" do
@@ -308,8 +308,8 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_includes response.body, "for V2"
-    assert_includes response.body, public_api_scalar_docs_openapi_path(version: "v2")
-    assert_select %(a[href="#{public_api_scalar_docs_fullscreen_path(version: 'v2')}"][target="_blank"]), text: /Full screen/
+    assert_includes response.body, api_docs_openapi_path(version: "v2")
+    assert_select %(a[href="#{api_docs_fullscreen_path(version: 'v2')}"]), text: "Full width"
 
     get api_docs_openapi_path(version: "v2")
 
@@ -321,7 +321,7 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     RecordingStudioApi.configuration.default_api_version = "v1"
   end
 
-  test "scalar test auth reuses the existing direct access role for the selected access point" do
+  test "scalar test auth uses the requested assignable role for the selected access point" do
     root_recording = create_manageable_workspace_root(name: "Scalar Workspace")
 
     post public_api_scalar_test_credential_path(version: "v1"), params: {
@@ -329,16 +329,20 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
       role: "edit"
     }
 
-    assert_redirected_to "#{public_api_scalar_docs_version_path(version: 'v1')}#scalar-test-auth"
+    assert_redirected_to public_api_scalar_test_credential_path(version: "v1")
 
     follow_redirect!
 
     assert_response :success
-    assert_select %(div[data-controller="flat-pack--collapse"][data-flat-pack--collapse-open-value="true"]), count: 1
-    assert_includes response.body, "Scalar test bearer token issued."
+    assert_select %(body[data-recording-studio-default-layout="true"]), count: 1
+    assert_select "h1", text: "API test token"
+    assert_select %(a[href="#{public_api_scalar_docs_version_path(version: 'v1')}"]), minimum: 1
+    assert_includes response.body, "API test bearer token issued."
     assert_includes response.body, "Bearer rsapi_at_"
     assert_includes response.body, "Admin"
-    assert_select %(select[name="role"] option[value="admin"][selected="selected"]), count: 1
+    assert_select %(select[name="access_point_recording_id"]), count: 1
+    assert_select %(select[name="role"] option[value="edit"][selected="selected"]), count: 1
+    assert_select %(button[type="submit"]), text: "Generate token", count: 1
     assert_includes response.body, "Workspace: Scalar Workspace"
     assert_includes response.body, "Scoped sample IDs"
     assert_select %(form[action="#{public_api_scalar_test_credential_path(version: 'v1')}"] input[name="_method"][value="delete"]), count: 1
@@ -355,14 +359,48 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
 
     delete public_api_scalar_test_credential_path(version: "v1")
 
-    assert_redirected_to "#{public_api_scalar_docs_version_path(version: 'v1')}#scalar-test-auth"
+    assert_redirected_to public_api_scalar_test_credential_path(version: "v1")
     assert_not_nil token.reload.revoked_at
 
     follow_redirect!
 
     assert_response :success
-    assert_includes response.body, "Scalar test bearer token revoked."
+    assert_includes response.body, "API test bearer token revoked."
     assert_not_includes response.body, "Bearer rsapi_at_"
+  end
+
+  test "standalone test token page requires authentication" do
+    sign_out @user
+
+    get public_api_scalar_test_credential_path(version: "v1")
+    assert_response :unauthorized
+
+    post public_api_scalar_test_credential_path(version: "v1")
+    assert_response :unauthorized
+
+    delete public_api_scalar_test_credential_path(version: "v1")
+    assert_response :unauthorized
+  end
+
+  test "standalone test token page requires manageable API access" do
+    get public_api_scalar_test_credential_path(version: "v1")
+    assert_response :forbidden
+
+    post public_api_scalar_test_credential_path(version: "v1")
+    assert_response :forbidden
+  end
+
+  test "standalone test token page is hidden when disabled" do
+    Rails.env.stub(:local?, false) do
+      get public_api_scalar_test_credential_path(version: "v1")
+      assert_response :not_found
+
+      post public_api_scalar_test_credential_path(version: "v1")
+      assert_response :not_found
+
+      delete public_api_scalar_test_credential_path(version: "v1")
+      assert_response :not_found
+    end
   end
 
   test "scalar test auth reuses the same access recording for repeated issues" do
@@ -393,9 +431,55 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "id=\"scalar-api-reference\""
     assert_includes response.body, "height: 100vh"
     assert_includes response.body, public_api_scalar_docs_openapi_path(version: "v1")
-    assert_includes response.body, "@scalar/api-reference@1.64.0/dist/browser/standalone.js"
+    assert_select "#scalar-api-reference-source[src^='/assets/recording_studio_api/scalar-1.64.0']", count: 1
+    assert_select "#scalar-api-reference-source[src^='http']", count: 0
     assert_includes response.body, "createApiReference"
     assert_includes response.body, 'source.addEventListener("load", initializeScalar'
+    assert_select %(body[data-recording-studio-default-layout]), count: 0
+  end
+
+  test "anonymous public scalar documentation uses the standalone layout" do
+    sign_out @user
+
+    get public_api_scalar_docs_version_path(version: "v1")
+
+    assert_response :success
+    assert_select %(body[data-recording-studio-default-layout]), count: 0
+    assert_includes response.body, "height: 100vh"
+    assert_includes response.body, public_api_scalar_docs_openapi_path(version: "v1")
+    assert_includes response.headers.fetch("Vary"), "Cookie"
+
+    get public_api_scalar_docs_fullscreen_path(version: "v1")
+    assert_response :success
+
+    get public_api_scalar_docs_openapi_path(version: "v1")
+    assert_response :success
+  end
+
+  test "private scalar documentation requires authentication for every endpoint" do
+    RecordingStudioApi.configuration.documentation_access = :authenticated
+    sign_out @user
+
+    get public_api_scalar_docs_version_path(version: "v1")
+    assert_response :unauthorized
+
+    get public_api_scalar_docs_fullscreen_path(version: "v1")
+    assert_response :unauthorized
+
+    get public_api_scalar_docs_openapi_path(version: "v1")
+    assert_response :unauthorized
+  ensure
+    RecordingStudioApi.configuration.documentation_access = :public
+  end
+
+  test "disabled scalar documentation is not routably exposed" do
+    RecordingStudioApi.configuration.documentation_enabled = false
+
+    get public_api_scalar_docs_version_path(version: "v1")
+
+    assert_response :not_found
+  ensure
+    RecordingStudioApi.configuration.documentation_enabled = true
   end
 
   test "add capability page renders successfully" do

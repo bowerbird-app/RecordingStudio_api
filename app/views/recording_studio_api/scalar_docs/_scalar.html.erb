@@ -1,6 +1,9 @@
 <div id="scalar-api-reference" style="min-height: 100vh;">Loading API documentation...</div>
-<script id="scalar-api-reference-source" src="<%= ERB::Util.html_escape(scalar_source) %>"<% if scalar_integrity.present? %> integrity="<%= ERB::Util.html_escape(scalar_integrity) %>" crossorigin="anonymous"<% end %> defer></script>
-<script>
+<%= javascript_include_tag RecordingStudioApi::ScalarAsset::LOGICAL_PATH,
+                           id: "scalar-api-reference-source",
+                           defer: true,
+                           nonce: true %>
+<%= javascript_tag nonce: true do %>
   (function () {
     function scalarTarget() {
       return document.getElementById("scalar-api-reference");
@@ -16,7 +19,7 @@
 
       try {
         target.textContent = "";
-        window.Scalar.createApiReference("#scalar-api-reference", <%%= raw @scalar_configuration_json %>);
+        window.Scalar.createApiReference("#scalar-api-reference", <%= raw @scalar_configuration_json %>);
         target.dataset.scalarInitialized = "true";
       } catch (error) {
         displayScalarLoadFailure();
@@ -40,8 +43,6 @@
       initializeScalar();
     }
 
-    window.addEventListener("load", function () {
-      initializeScalar();
-    }, { once: true });
+    window.addEventListener("load", initializeScalar, { once: true });
   }());
-</script>
+<% end %>

@@ -9,7 +9,7 @@ class TestCredentialServicesTest < ActiveSupport::TestCase
     reset_recording_studio_api_configuration!
     reset_recording_studio_capabilities!
     @user = create_user
-    @root_recording, = create_access_recording_for(user: @user, role: :admin)
+    @root_recording, @access_recording = create_access_recording_for(user: @user, role: :admin)
   end
 
   teardown do
@@ -18,12 +18,13 @@ class TestCredentialServicesTest < ActiveSupport::TestCase
     Current.actor = nil if defined?(Current)
   end
 
-  test "issues a scoped public test credential and preserves stronger existing access" do
+  test "issues a scoped public test credential with the requested role" do
     result = issue_test_credential(role: :view)
 
     assert result.success?, result.error
     assert_equal "public", result.value.fetch(:api_client).api_key
-    assert_equal "admin", result.value.fetch(:role)
+    assert_equal "view", result.value.fetch(:role)
+    assert_equal "view", result.value.fetch(:access_recording).recordable.role
     assert_match(/\Arsapi_at_/, result.value.fetch(:access_token))
     assert_equal result.value.fetch(:credential), result.value.fetch(:access_token_record).credential
     assert_equal @root_recording, result.value.fetch(:scope_recording)
@@ -58,6 +59,79 @@ class TestCredentialServicesTest < ActiveSupport::TestCase
 
       assert result.failure?
       assert_equal "Access role is invalid", result.error
+    end
+  end
+
+  test "rejects an actor without RecordingStudioAccessible access to the scope" do
+    outsider = create_user(email: "test-credential-outsider@example.com")
+
+    assert_no_difference -> { RecordingStudioApi::ApiClient.count } do
+      result = RecordingStudioApi::Services::IssueTestCredential.call(
+        api: :public,
+        actor: outsider,
+        access_point_recording: @root_recording,
+        role: :view,
+        name: "Unauthorized test credential"
+      )
+
+      assert result.failure?
+      assert_equal "Not authorized to manage access", result.error
+    end
+  end
+
+  test "rejects a role stronger than the actor can assign" do
+    RecordingStudio::Access.where(id: @access_recording.recordable_id).update_all(role: "edit")
+    RecordingStudioApi.configuration.access_management_edit_role = :edit
+
+    assert_no_difference -> { RecordingStudioApi::ApiClient.count } do
+      result = issue_test_credential(role: :admin)
+
+      assert result.failure?
+      assert_equal "Requested API access role exceeds the manager's access", result.error
+    end
+  end
+
+  test "rejects protected API issuance without access to its admin section" do
+    configure_dummy_operations_api!
+    RecordingStudio.enable_capability(:accessible, on: "AdminSection")
+    RecordingStudio.enable_capability(:api_access_point, on: "AdminSection")
+    RecordingStudioApi.register_recordable_type_api("AdminSection", api: :operations)
+
+    owner = create_user(email: "test-credential-owner@example.com")
+    delegated_manager = create_user(email: "test-credential-delegated@example.com")
+    _admin_root, admin_root_recording = create_admin_root_recording(name: "Test credential admin")
+    with_access_creation_context do
+      access = RecordingStudio::Access.create!(actor: owner, role: :admin)
+      RecordingStudio::Recording.create!(recordable: access, parent_recording: admin_root_recording)
+    end
+    admin_section_recording = RecordingStudio::Recording.create!(
+      recordable: AdminSection.create!(key: "test_credentials", name: "Test credentials"),
+      parent_recording: admin_root_recording
+    )
+    delegated_access = RecordingStudioAccessible.grant_access(
+      recording: admin_section_recording,
+      actor: delegated_manager,
+      role: :admin,
+      manager_actor: owner
+    )
+    assert delegated_access.success?, delegated_access.error
+    RecordingStudioApi::Admin::ApiAuthorization.recording_for(
+      api: :operations,
+      root_recording: admin_root_recording,
+      create: true
+    )
+
+    assert_no_difference -> { RecordingStudioApi::ApiClient.count } do
+      result = RecordingStudioApi::Services::IssueTestCredential.call(
+        api: :operations,
+        actor: delegated_manager,
+        access_point_recording: admin_section_recording,
+        role: :view,
+        name: "Unauthorized operations test credential"
+      )
+
+      assert result.failure?
+      assert_equal "Not authorized to manage the selected API", result.error
     end
   end
 

@@ -19,6 +19,13 @@
       size: :md,
       url: "/docs/scalar"
     ) %>
+
+    <%= render FlatPack::Button::Component.new(
+      text: "Create API test token",
+      style: :default,
+      size: :md,
+      url: public_api_scalar_test_credential_path(version: RecordingStudioApi.default_api_version)
+    ) %>
   </div>
 
 </div>

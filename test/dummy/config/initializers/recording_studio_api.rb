@@ -5,6 +5,9 @@ RecordingStudioApi.configure do |config|
 
   config.openapi_title = "Recording Studio API"
   config.openapi_description = "API endpoints for accessing and managing Recording Studio workspaces, folders, and pages."
+  config.documentation_enabled = true
+  config.documentation_access = :public
+  config.layout_name = "recording_studio/default_layout"
   config.admin_layout_name = "recording_studio/default_layout"
   config.rate_limit_api_pre_auth_enabled = true
   config.rate_limit_api_enabled = true
@@ -14,6 +17,17 @@ RecordingStudioApi.configure do |config|
   config.api :operations do |api|
     api.openapi_title = "Recording Studio Operations API"
     api.openapi_description = "Read-only operational access for trusted administrators and automation."
+    api.documentation_enabled = true
+    api.documentation_access = lambda do |controller:, actor:, api:|
+      root_recording = controller.send(:current_root_recording)
+      controller.send(:admin_root_current?) && RecordingStudioApi::Admin::ApiAuthorization.authorized?(
+        actor: actor,
+        api: api,
+        root_recording: root_recording,
+        role: RecordingStudioApi.configuration.access_management_view_role,
+        create: true
+      )
+    end
     api.authentication = :oauth
     api.default_access = :read_only
     api.api_management_authorization_required = true
