@@ -308,9 +308,9 @@ module RecordingStudioApi
         refute_nil parent_schema.fetch("example")
       end
 
-      def test_resource_response_schema_actions_defaults_to_empty_array_example
+      def test_resource_response_schema_has_flat_canonical_keys_without_actions
         document = with_recordable_types(["Workspace"]) { OpenapiDocument.call }
-        actions_schema = document
+        schema = document
           .fetch(:paths)
           .fetch("/recording_studio_api/api/v1/workspaces/{id}")
           .fetch("get")
@@ -319,17 +319,126 @@ module RecordingStudioApi
           .fetch("content")
           .fetch("application/json")
           .fetch("schema")
-          .fetch("properties")
-          .fetch("actions")
 
-        assert_equal [], actions_schema.fetch("example")
+        assert_equal %w[id type root_id parent_id created_at updated_at], schema.fetch("properties").keys.map(&:to_s) & %w[id type root_id parent_id created_at updated_at]
+        refute schema.fetch("properties").key?("actions")
+      end
+
+      def test_flat_schema_documents_serializer_fields_relationships_and_meta
+        relationships = {
+          folders: {
+            source: :children, child_type: "Folder", many: true, include: true,
+            serializer: ->(*) { { label: "Folder" } }, output_keys: %i[label], limit: 20,
+            endpoints: %i[index]
+          },
+          owner: {
+            source: :custom, many: false, include: true, resolver: ->(*) { nil },
+            serializer: ->(*) { { name: "Owner" } }, output_keys: %i[name]
+          }
+        }
+        fields = { title: { resolver: ->(*) { "Title" }, include: true, openapi: { type: :string } } }
+
+        with_recordable_registration("Page", serializer: ->(*) { { slug: "page" } }, output_keys: %i[slug], fields: fields, relationships: relationships, openapi: {}) do
+          document = with_recordable_types(%w[Page Folder]) { OpenapiDocument.call }
+          properties = document.dig(:paths, "/recording_studio_api/api/v1/pages/{id}", "get", :responses, "200", "content", "application/json", "schema", "properties")
+
+          assert_equal "string", properties.fetch("slug").fetch("type")
+          assert_equal "string", properties.fetch("title").fetch("type")
+          assert_equal "array", properties.fetch("folders").fetch("type")
+          assert_equal true, properties.fetch("owner").fetch("nullable")
+          assert_equal %w[limit has_more], properties.fetch("_meta").fetch("properties").fetch("folders").fetch("required")
+        end
+      end
+
+      def test_include_parameter_only_documents_request_enabled_registered_names
+        fields = { summary: { resolver: ->(*) { "Summary" }, include: :request } }
+        relationships = {
+          comments: {
+            source: :children, child_type: "Comment", many: true, include: :request,
+            serializer: ->(*) { { body: "Body" } }, output_keys: %i[body], limit: 20
+          },
+          author: {
+            source: :custom, many: false, include: true, resolver: ->(*) { nil },
+            serializer: ->(*) { { name: "Author" } }, output_keys: %i[name]
+          }
+        }
+
+        with_recordable_registration("Page", fields: fields, relationships: relationships, openapi: {}) do
+          document = with_recordable_types(["Page"]) { OpenapiDocument.call }
+          parameters = document.dig(:paths, "/recording_studio_api/api/v1/pages", "get", :parameters)
+          include_parameter = parameters.find { |parameter| parameter.fetch("name") == "include" }
+
+          assert_equal "summary,comments", include_parameter.fetch("schema").fetch("example")
+          refute include_parameter.fetch("schema").key?("enum")
+          assert_includes include_parameter.fetch("description"), "summary, comments"
+          refute_includes include_parameter.fetch("description"), "true"
+        end
+      end
+
+      def test_nested_index_uses_the_standard_paginated_collection_contract
+        relationships = {
+          folders: {
+            source: :children, child_type: "Folder", many: true, serializer: ->(*) { { name: "Folder" } },
+            output_keys: %i[name], limit: 20, endpoints: %i[index]
+          }
+        }
+
+        with_recordable_registration("Workspace", relationships: relationships, openapi: {}) do
+          with_recordable_registration("Folder", openapi: {}) do
+            document = with_recordable_types(%w[Workspace Folder]) { OpenapiDocument.call }
+            normal_schema = document.dig(:paths, "/recording_studio_api/api/v1/folders", "get", :responses, "200", "content", "application/json", "schema")
+            nested_schema = document.dig(:paths, "/recording_studio_api/api/v1/workspaces/{id}/folders", "get", :responses, "200", "content", "application/json", "schema")
+
+            assert_equal normal_schema.fetch("required"), nested_schema.fetch("required")
+            assert_equal normal_schema.fetch("properties").keys.sort, nested_schema.fetch("properties").keys.sort
+            refute nested_schema.fetch("properties").key?("relationship")
+            assert_equal "string", nested_schema.fetch("properties").fetch("records").fetch("items").fetch("properties").fetch("name").fetch("type")
+          end
+        end
+      end
+
+      def test_named_api_nested_paths_are_isolated_and_respect_child_operations
+        original_configuration = RecordingStudioApi.configuration
+        configuration = RecordingStudioApi::Configuration.new
+        RecordingStudioApi.instance_variable_set(:@configuration, configuration)
+        configuration.recordable_registry.register(
+          "Workspace",
+          relationships: {
+            public_folders: { source: :children, child_type: "Folder", many: true, serializer: ->(*) {},
+                              output_keys: %i[name], limit: 20, endpoints: %i[index] }
+          }
+        )
+        operations = configuration.api(:operations)
+        operations.recordable_registry.register(
+          "Workspace",
+          relationships: {
+            folders: { source: :children, child_type: "Folder", many: true, serializer: ->(*) {},
+                       output_keys: %i[name], limit: 20, endpoints: %i[index create] }
+          }
+        )
+        operations.recordable_registry.register("Folder", operations: %i[index])
+
+        document = OpenapiDocument.call(api: :operations)
+        paths = document.fetch(:paths).keys
+
+        assert_includes paths, "/recording_studio_api/apis/operations/v1/workspaces/{id}/folders"
+        refute(paths.any? { |path| path.include?("public_folders") })
+        refute document.fetch(:paths).fetch("/recording_studio_api/apis/operations/v1/workspaces/{id}/folders").key?("post")
+      ensure
+        RecordingStudioApi.instance_variable_set(:@configuration, original_configuration)
+      end
+
+      def test_generated_document_is_json_structurally_valid
+        document = with_recordable_types(["Workspace"]) { OpenapiDocument.call }
+
+        assert_equal "3.0.3", JSON.parse(JSON.generate(document)).fetch("openapi")
       end
 
       def test_registered_enum_attribute_is_documented_as_named_enum
         with_recordable_registration(
           "Page",
+          serializer: ->(*) { { role: "view" } },
           output_keys: %i[role],
-          fields: { role: :role },
           openapi: {
             details_schema: {
               type: "object",
@@ -466,11 +575,11 @@ module RecordingStudioApi
         Object.const_set(class_name, existing_class) if existing_class
       end
 
-      def with_recordable_registration(recordable_type, openapi:, operations: nil)
+      def with_recordable_registration(recordable_type, serializer: nil, output_keys: nil, fields: nil, relationships: nil, openapi:, operations: nil)
         registry = RecordingStudioApi.configuration.recordable_registry
         existing = registry[recordable_type]
 
-        registry.register(recordable_type, openapi: openapi, operations: operations)
+        registry.register(recordable_type, serializer: serializer, output_keys: output_keys, fields: fields, relationships: relationships, openapi: openapi, operations: operations)
         yield
       ensure
         registrations = registry.instance_variable_get(:@registrations)

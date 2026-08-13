@@ -4,57 +4,70 @@
 module RecordingStudioApi
   module Api
     module V1
-      # Generic endpoints for registered relationships. Only relationships backed
-      # by the Recording Studio child edge can be mutated by the engine; custom
-      # sources remain application-owned and are intentionally read-only here.
+      # Generic endpoints for configured, direct child collections.
       class RelationshipResourcesController < ResourcesController
         def index
-          current_access_grant.authorize!(recording: parent_recording, role: :view)
-          assert_readable!
+          assert_nested_operation!(:index, role: :view)
 
-          values = relationship_context.relationship_value(parent_recording, relationship_name, relationship)
-          records = relationship_values(values).map { |value| serialize_relationship_value(value) }
-          render json: { relationship: relationship_name, records: records }
+          pagination = RecordingStudioApi::Services::PaginateResourceCollection.call(
+            relation: child_scope,
+            resource: child_resource_name,
+            recordable_type: relationship.child_type,
+            limit: params[:limit],
+            pagination_token: params[:pagination_token],
+            sort: params[:sort],
+            order: params[:order],
+            api: current_api_key
+          )
+          raise RecordingStudioApi::InvalidPaginationTokenError, pagination.error if pagination.failure?
+
+          payload = pagination.value
+          children = authorized_children(payload.fetch(:rows))
+          render json: {
+            resource: child_resource_name,
+            type: relationship.child_type.demodulize,
+            records: children.map { |child| serialize_recording(child, context: relationship_context.nested) },
+            meta: payload.fetch(:meta)
+          }
         end
 
         def show
-          assert_readable_children!
+          assert_nested_operation!(:show, role: :view)
           child = child_recording
-          assert_operation_enabled!(child.recordable_type, :show)
+          authorize_child!(child)
 
           render json: serialize_recording(child, context: relationship_context.nested)
         end
 
         def create
-          assert_writable_children!
-          child_type = resolve_child_type!
-          assert_child_type_allowed!(child_type)
-          assert_operation_enabled!(child_type, :create)
+          assert_nested_operation!(:create, role: :edit)
+          reject_nested_type_or_parent_input!
 
           result = RecordingStudioApi::Services::ResourceOperations::Create.call(
-            relationship_operation_context(recordable_type: child_type)
+            relationship_operation_context(recordable_type: relationship.child_type)
           )
           render json: result.fetch(:json), status: result.fetch(:status, :created)
         end
 
         def update
-          assert_writable_children!
+          assert_nested_operation!(:update, role: :edit)
+          reject_nested_parent_input!
           child = child_recording
-          assert_operation_enabled!(child.recordable_type, :update)
+          authorize_child!(child)
 
           result = RecordingStudioApi::Services::ResourceOperations::Update.call(
-            relationship_operation_context(recording: child, recordable_type: child.recordable_type)
+            relationship_operation_context(recording: child, recordable_type: relationship.child_type)
           )
           render json: result.fetch(:json), status: result.fetch(:status, :ok)
         end
 
         def destroy
-          assert_writable_children!
+          assert_nested_operation!(:destroy, role: :edit, include_trashed: true)
           child = child_recording(include_trashed: true)
-          assert_operation_enabled!(child.recordable_type, :destroy)
+          authorize_child!(child)
 
           result = RecordingStudioApi::Services::ResourceOperations::Destroy.call(
-            relationship_operation_context(recording: child, recordable_type: child.recordable_type)
+            relationship_operation_context(recording: child, recordable_type: relationship.child_type)
           )
           render json: result.fetch(:json), status: result.fetch(:status, :ok)
         end
@@ -62,7 +75,14 @@ module RecordingStudioApi
         private
 
         def parent_recording
-          @parent_recording ||= resource_recording
+          @parent_recording ||= begin
+            recordable_type = resolve_recordable_type!
+            recording = scoped_recordings.find_by(id: params[:parent_id])
+            raise RecordingStudioApi::NotFoundError, "Parent resource was not found in this API scope" if recording.nil?
+            raise RecordingStudioApi::NotFoundError, "Parent resource type does not match #{recordable_type}" unless recording.recordable_type == recordable_type
+
+            recording
+          end
         end
 
         def relationship_name = params[:relationship].to_s
@@ -82,78 +102,13 @@ module RecordingStudioApi
         def relationship_context
           @relationship_context ||= RecordingStudioApi::RelationshipContext.for(
             recordings: [parent_recording],
-            include_values: [relationship_name],
+            include_values: nil,
             scoped_recordings: scoped_recordings,
-            api: current_api_key,
-            version: current_api_version
+            api_key: current_api_key,
+            api_version: current_api_version,
+            access_grant: current_access_grant,
+            params: {}
           )
-        end
-
-        def serialize_relationship_value(value)
-          return serialize_recording(value, context: relationship_context.nested) if recording?(value)
-
-          serializer = relationship[:serializer]
-          return call_relationship_serializer(serializer, value) if serializer.respond_to?(:call)
-
-          project_relationship_value(value)
-        end
-
-        def call_relationship_serializer(serializer, value)
-          serializer.call(value, context: relationship_context)
-        rescue ArgumentError
-          serializer.call(value)
-        end
-
-        def recording?(value)
-          value.respond_to?(:recordable_type) && value.respond_to?(:recordable) && value.respond_to?(:id)
-        end
-
-        def relationship_values(value)
-          return [] if value.nil?
-          return value if value.is_a?(Array)
-
-          [value]
-        end
-
-        def project_relationship_value(value)
-          fields = relationship[:fields]
-          return {} unless fields
-
-          resolved_fields = if fields.respond_to?(:call)
-                              normalize_hash(call_relationship_serializer(fields, value))
-                            else
-                              fields.each_with_object({}) do |(name, definition), output|
-                                output[name.to_s] = resolve_relationship_field(value, name, definition)
-                              end
-                            end
-          relationship[:output_keys].each_with_object({}) do |key, output|
-            output[key.to_sym] = resolved_fields[key] if resolved_fields.key?(key)
-          end
-        end
-
-        def resolve_relationship_field(value, name, definition)
-          return call_relationship_serializer(definition, value) if definition.respond_to?(:call)
-          return read_relationship_field(value, name, definition) unless definition.is_a?(Hash)
-
-          resolver = definition[:resolver] || definition[:value]
-          return call_relationship_serializer(resolver, value) if resolver.respond_to?(:call)
-          return resolver unless resolver.nil?
-
-          read_relationship_field(value, name, definition[:source] || definition[:method] || name)
-        end
-
-        def read_relationship_field(value, name, source)
-          return value.public_send(source) if source.respond_to?(:to_sym) && value.respond_to?(source)
-          return value[source] if value.respond_to?(:[]) && value.respond_to?(:key?) && value.key?(source)
-          return value[source.to_s] if value.respond_to?(:[]) && value.respond_to?(:key?) && value.key?(source.to_s)
-
-          value.public_send(name) if value.respond_to?(name)
-        end
-
-        def normalize_hash(value)
-          return {} unless value.respond_to?(:to_h)
-
-          value.to_h.each_with_object({}) { |(key, item), output| output[key.to_s] = item }
         end
 
         def child_recording(include_trashed: false)
@@ -164,57 +119,64 @@ module RecordingStudioApi
         end
 
         def child_scope(include_trashed: false)
-          relation = scoped_recordings(include_trashed: include_trashed).where(parent_recording_id: parent_recording.id)
-          types = relationship.fetch(:types)
-          types.empty? ? relation : relation.where(recordable_type: types)
+          scoped_recordings(include_trashed: include_trashed).where(
+            parent_recording_id: parent_recording.id,
+            recordable_type: relationship.child_type
+          )
         end
 
-        def assert_readable!
-          return if relationship.fetch(:read)
-
-          raise RecordingStudioApi::UnsupportedActionError,
-                "#{relationship_name} is not readable for #{parent_recording.recordable_type}"
-        end
-
-        def assert_readable_children!
-          current_access_grant.authorize!(recording: parent_recording, role: :view)
-          assert_readable!
-          return if relationship.fetch(:source) == :children
-
-          raise RecordingStudioApi::UnsupportedActionError,
-                "#{relationship_name} is not a child relationship"
-        end
-
-        def assert_writable_children!
-          current_access_grant.authorize!(recording: parent_recording, role: :edit)
-          unless relationship.fetch(:source) == :children
-            raise RecordingStudioApi::UnsupportedActionError, "#{relationship_name} is not a writable child relationship"
+        def authorized_children(children)
+          children.select do |child|
+            authorize_child!(child)
+            true
+          rescue RecordingStudioApi::NotFoundError
+            false
           end
-          return if relationship.fetch(:write) && !parent_registration.immutable_relationships.include?(relationship_name)
-
-          raise RecordingStudioApi::UnsupportedActionError,
-                "#{relationship_name} is immutable for #{parent_recording.recordable_type}"
         end
 
-        def resolve_child_type!
-          requested_type = params[:type].to_s
-          recordable_type = RecordingStudioApi.recordable_type_for_resource(requested_type, api: current_api_key)
-          raise RecordingStudioApi::NotFoundError, "Unknown relationship resource #{requested_type}" if recordable_type.blank?
-
-          recordable_type
+        def authorize_child!(child)
+          relationship_context.authorized_targets([child], parent_recording, relationship_name, relationship)
+          child
+        rescue RecordingStudioApi::AuthorizationError
+          raise RecordingStudioApi::NotFoundError, "Relationship resource was not found in this API scope"
         end
 
-        def assert_child_type_allowed!(recordable_type)
-          allowed_types = relationship.fetch(:types)
-          return if allowed_types.empty? || allowed_types.include?(recordable_type)
+        def assert_nested_operation!(operation, role:, include_trashed: false)
+          current_access_grant.authorize!(recording: parent_recording, role: role, include_trashed: include_trashed)
+          unless relationship.source == :children && relationship.many
+            raise RecordingStudioApi::UnsupportedActionError,
+                  "#{relationship_name} is not a direct child collection"
+          end
+          unless relationship.endpoints.include?(operation)
+            raise RecordingStudioApi::UnsupportedActionError, "#{operation} is not enabled for #{relationship_name}"
+          end
 
-          raise RecordingStudioApi::UnsupportedActionError,
-                "#{recordable_type} is not allowed for #{relationship_name} on #{parent_recording.recordable_type}"
+          assert_operation_enabled!(relationship.child_type, operation)
+          relationship_context.authorize_relationship!(parent_recording, relationship_name, relationship)
+        end
+
+        def reject_nested_type_or_parent_input!
+          reject_nested_type_input!
+          reject_nested_parent_input!
+        end
+
+        def reject_nested_type_input!
+          raise RecordingStudioApi::InvalidActionInputError, "type is not permitted for nested relationship creation" if params.key?(:type)
+        end
+
+        def reject_nested_parent_input!
+          return unless request.request_parameters.key?("parent_id") || request.request_parameters.key?(:parent_id)
+
+          raise RecordingStudioApi::InvalidActionInputError, "parent_id is not permitted for nested relationship operations"
+        end
+
+        def child_resource_name
+          RecordingStudioApi.resource_name_for(relationship.child_type)
         end
 
         def assert_operation_enabled!(recordable_type, operation)
           registration = RecordingStudioApi.recordable_registration_for(recordable_type, api: current_api_key)
-          return unless registration && !registration.supports_operation?(operation)
+          return if registration&.supports_operation?(operation)
 
           raise RecordingStudioApi::UnsupportedActionError, "#{operation} is not enabled for #{recordable_type}"
         end
@@ -230,8 +192,9 @@ module RecordingStudioApi
             access_grant: current_access_grant,
             root_recording: current_root_recording,
             api_version: current_api_version,
-            params: params.merge(parent_id: parent_recording.id),
-            scoped_recordings: scoped_recordings
+            params: params.to_unsafe_h,
+            scoped_recordings: scoped_recordings,
+            parent_recording: parent_recording
           )
         end
       end

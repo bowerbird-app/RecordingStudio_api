@@ -183,7 +183,10 @@ module RecordingStudioApi
       def test_named_relationship_adds_generic_relationship_endpoints_to_documentation
         with_recordable_registration(
           "Workspace",
-          relationships: { folders: { source: :children, types: ["Folder"], write: true } }
+          relationships: {
+            folders: { source: :children, child_type: "Folder", many: true, serializer: ->(*) {},
+                       output_keys: %i[name], limit: 20, endpoints: %i[index show create] }
+          }
         ) do
           catalog = with_catalog_stubs(
             recordable_types: ["Workspace"],
@@ -204,12 +207,13 @@ module RecordingStudioApi
       def test_named_relationship_responses_describe_declared_child_types
         with_recordable_registration(
           "Workspace",
-          relationships: { folders: { source: :children, types: ["Folder"], write: true } }
+          relationships: {
+            folders: { source: :children, child_type: "Folder", many: true, serializer: ->(*) {},
+                       output_keys: %i[name], limit: 20, endpoints: %i[index show create] }
+          }
         ) do
           with_recordable_registration(
             "Folder",
-            output_keys: %i[name],
-            fields: { name: :name },
             openapi: {
               details_schema: {
                 properties: {
@@ -240,10 +244,11 @@ module RecordingStudioApi
             relationships: {
               owner: {
                 source: :custom,
+                many: false,
                 include: true,
                 resolver: ->(_workspace) { nil },
+                serializer: ->(*) {},
                 output_keys: %i[name],
-                fields: { name: :name }
               }
             }
           ) do
@@ -263,7 +268,10 @@ module RecordingStudioApi
         def test_relationship_show_endpoint_is_omitted_when_no_child_type_supports_show
           with_recordable_registration(
             "Workspace",
-            relationships: { folders: { source: :children, types: ["Folder"] } }
+            relationships: {
+              folders: { source: :children, child_type: "Folder", many: true, serializer: ->(*) {},
+                         output_keys: %i[name], limit: 20, endpoints: %i[index show] }
+            }
           ) do
             with_recordable_registration("Folder", operations: %i[index]) do
               catalog = with_catalog_stubs(
@@ -322,6 +330,76 @@ module RecordingStudioApi
         assert_equal "number", schema.fetch(:properties).fetch("score").fetch(:type)
         assert_equal "array", schema.fetch(:properties).fetch("tags").fetch(:type)
         assert_equal %w[draft final], schema.fetch(:properties).fetch("mode").fetch(:enum)
+      end
+
+      def test_nested_endpoints_require_many_children_endpoints_and_child_operations
+        relationships = {
+          folders: { source: :children, child_type: "Folder", many: true, serializer: ->(*) {},
+                     output_keys: %i[name], limit: 20, endpoints: %i[index create] },
+          owner: { source: :custom, many: false, include: true, resolver: ->(*) { nil },
+                   serializer: ->(*) {}, output_keys: %i[name] }
+        }
+
+        with_recordable_registration("Workspace", relationships: relationships) do
+          with_recordable_registration("Folder", operations: %i[index]) do
+            catalog = with_catalog_stubs(
+              recordable_types: %w[Workspace Folder],
+              actions_by_type: { "Workspace" => [], "Folder" => [] },
+              preserve_recordable_registrations: true
+            ) { DocumentationCatalog.call }
+
+            paths = catalog.fetch(:resources).find { |section| section.fetch(:resource) == "workspaces" }
+              .fetch(:endpoints).map { |endpoint| [endpoint.fetch(:verb), endpoint.fetch(:path)] }
+            assert_includes paths, ["GET", "/recording_studio_api/api/v1/workspaces/:id/folders"]
+            refute_includes paths, ["POST", "/recording_studio_api/api/v1/workspaces/:id/folders"]
+            refute(paths.any? { |_verb, path| path.include?("/owner") })
+          end
+        end
+      end
+
+      def test_nested_create_request_body_contains_attributes_only
+        relationships = {
+          folders: { source: :children, child_type: "Folder", many: true, serializer: ->(*) {},
+                     output_keys: %i[name], limit: 20, endpoints: %i[create] }
+        }
+
+        with_recordable_registration("Workspace", relationships: relationships) do
+          with_recordable_registration("Folder", operations: %i[create]) do
+            catalog = with_catalog_stubs(
+              recordable_types: %w[Workspace Folder],
+              actions_by_type: { "Workspace" => [], "Folder" => [] },
+              preserve_recordable_registrations: true
+            ) { DocumentationCatalog.call }
+            endpoint = catalog.fetch(:resources).find { |section| section.fetch(:resource) == "workspaces" }
+              .fetch(:endpoints).find { |entry| entry.fetch(:verb) == "POST" && entry.fetch(:path).end_with?("/folders") }
+            schema = endpoint.fetch(:openapi).fetch(:request_body).fetch(:content).fetch("application/json").fetch(:schema)
+
+            assert_equal ["attributes"], schema.fetch(:required)
+            assert_equal [:attributes], schema.fetch(:properties).keys
+          end
+        end
+      end
+
+      def test_nested_show_endpoint_is_documented_without_index
+        relationships = {
+          folders: { source: :children, child_type: "Folder", many: true, serializer: ->(*) {},
+                     output_keys: %i[name], limit: 20, endpoints: %i[show] }
+        }
+
+        with_recordable_registration("Workspace", relationships: relationships) do
+          with_recordable_registration("Folder", operations: %i[show]) do
+            catalog = with_catalog_stubs(
+              recordable_types: %w[Workspace Folder],
+              actions_by_type: { "Workspace" => [], "Folder" => [] },
+              preserve_recordable_registrations: true
+            ) { DocumentationCatalog.call }
+            paths = catalog.fetch(:resources).find { |section| section.fetch(:resource) == "workspaces" }
+              .fetch(:endpoints).map { |endpoint| [endpoint.fetch(:verb), endpoint.fetch(:path)] }
+
+            assert_includes paths, ["GET", "/recording_studio_api/api/v1/workspaces/:id/folders/:relationship_id"]
+            refute_includes paths, ["GET", "/recording_studio_api/api/v1/workspaces/:id/folders"]
+          end
+        end
       end
 
       def test_catalog_uses_configured_default_api_version_in_paths
@@ -518,13 +596,14 @@ module RecordingStudioApi
         declarations_singleton.send(:define_method, :root_allowed?, original_root_allowed)
       end
 
-      def with_recordable_registration(recordable_type, output_keys: nil, fields: nil, openapi: {}, relationships: nil,
+      def with_recordable_registration(recordable_type, serializer: nil, output_keys: nil, fields: nil, openapi: {}, relationships: nil,
                                        immutable_relationships: nil, operations: nil)
         registry = RecordingStudioApi.configuration.recordable_registry
         existing = registry[recordable_type]
 
         registry.register(
           recordable_type,
+          serializer: serializer,
           output_keys: output_keys,
           fields: fields,
           openapi: openapi,

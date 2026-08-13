@@ -112,8 +112,10 @@ module RecordingStudioApi
             recordings: recordings,
             include_values: params[:include],
             scoped_recordings: scoped_recordings,
-            api: current_api_key,
-            version: current_api_version
+            api_key: current_api_key,
+            api_version: current_api_version,
+            access_grant: current_access_grant,
+            params: params
           )
         end
 

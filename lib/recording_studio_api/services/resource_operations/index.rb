@@ -21,7 +21,7 @@ module RecordingStudioApi
 
           payload = pagination.value
           recordings = payload.fetch(:rows)
-          relationship_context = relationship_context_for(recordings)
+          relationship_context = relationship_context_for(recordings, batch: true)
 
           {
             json: {

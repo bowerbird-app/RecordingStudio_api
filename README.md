@@ -282,8 +282,11 @@ RecordingStudioApi.configuration
 RecordingStudioApi::Hooks.run(:before_initialize)
 RecordingStudioApi.register_recordable_type_api(
   "Page",
+  serializer: ->(recordable, **) { { title: recordable.title } },
   output_keys: %i[title],
-  fields: { title: :title },
+  fields: {
+    cover_image_url: { resolver: ->(context) { context.recordable.cover_image_url }, include: true }
+  },
   writable_attributes: %i[title],
   operations: %i[index show create update],
   capability_actions: %i[publish]
@@ -317,27 +320,34 @@ field metadata describes response data only and never grants write access.
 ### Fields, relationships, and includes
 
 Resource registration declares the flat fields and named relationships an API may expose.
-`output_keys` is the explicit response allowlist. `fields` maps each output key to a recordable
-method, a callable, or a hash with `source:`/`resolver:` and optional OpenAPI metadata.
+`output_keys` is the serializer response allowlist. `fields` declares separately resolved flat
+response fields with a callable `resolver`, an `include` policy, and optional OpenAPI metadata.
 
 ```ruby
 RecordingStudioApi.register_recordable_type_api(
   "Project",
+  serializer: ->(project, **) { { name: project.name, external_key: project.external_key } },
   output_keys: %i[name external_key],
   fields: {
-    name: :name,
-    external_key: { source: :external_key, type: :string }
+    cover_image_url: {
+      resolver: ->(context) { context.recordable.cover_image_url },
+      include: true,
+      openapi: { type: :string }
+    }
   },
   writable_attributes: %i[name external_key],
   immutable_fields: %i[external_key],
   relationships: {
-    tasks: { source: :children, types: ["Task"], include: :request, write: true },
+    tasks: { source: :children, child_type: "Task", many: true, include: :request,
+         serializer: ->(task, **) { { name: task.name } }, output_keys: %i[name], limit: 20,
+         endpoints: %i[index show create update destroy] },
     owner: {
       source: :custom,
+      many: false,
       include: true,
-      resolver: ->(project, context:) { project.owner },
-      output_keys: %i[name],
-      fields: { name: :name }
+      resolver: ->(context) { context.recordable.owner },
+      serializer: ->(owner, **) { { name: owner.name } },
+      output_keys: %i[name]
     }
   }
 )
@@ -346,32 +356,45 @@ RecordingStudioApi.register_recordable_type_api(
 `immutable_fields` must be a subset of `writable_attributes`: it may be supplied at create time
 but is ignored on updates. Relationship names are application-defined. A `children` source reads
 the real Recording Studio child edge and can opt into generic writes. A `custom` source uses its
-resolver (or a same-named recordable method) and is read-only through the engine. `include: true`
+resolver and is read-only through the engine. `include: true`
 always emits a relationship; `include: :request` emits it only when requested. `?include=tasks`
-selects named request-driven relationships, while `?include=true` selects all of them.
+selects only configured request-enabled names. There is no `?include=true`, wildcard, nested-path,
+or arbitrary-name form.
 
-Responses are flat. A record always includes `id`, `type`, `actions`, `root_id`, `parent_id`,
-`created_at`, and `updated_at`; declared output keys and expanded relationship names sit beside
-those keys. There are no `data`, `attributes`, or `relationships` wrappers. Collections use
-`records` plus `meta`.
+Responses are flat. A record always includes `id`, `type`, `root_id`, `parent_id`, `created_at`,
+and `updated_at`; serializer output keys, always-included fields, and expanded relationship names
+sit beside those keys. There are no `data`, `attributes`, or `relationships` wrappers. Collections
+use `records` plus `meta`; a record's `_meta` reports `limit` and `has_more` for emitted collection
+relationships.
 
 The engine fetches requested `children` relationships in one scoped query per response,
 preventing serializer-driven N+1 queries. A custom resolver is application code and may issue
 queries; preload its associations where needed and use `context.scoped_recordings` when resolving
-Recording Studio records. Custom relationships must declare output fields or a serializer, so
+Recording Studio records. Custom relationships must declare a serializer and output keys, so
 the engine never serializes arbitrary model attributes. Registered writable child relationships expose
 generic named endpoints:
 
 ```text
-GET    /api/v1/projects/:id/tasks
-GET    /api/v1/projects/:id/tasks/:relationship_id
-POST   /api/v1/projects/:id/tasks                    # { type: "tasks", attributes: { ... } }
-PATCH  /api/v1/projects/:id/tasks/:relationship_id
-DELETE /api/v1/projects/:id/tasks/:relationship_id
+GET    /api/v1/projects/:parent_id/tasks
+GET    /api/v1/projects/:parent_id/tasks/:relationship_id
+POST   /api/v1/projects/:parent_id/tasks              # { attributes: { ... } }
+PATCH  /api/v1/projects/:parent_id/tasks/:relationship_id # { attributes: { ... } }
+DELETE /api/v1/projects/:parent_id/tasks/:relationship_id
 ```
 
 All structural operations remain scoped and role-authorized, and enforce the host application's
 Recording Studio parent declarations.
+
+## Flat Response Upgrade
+
+This pre-production release is a breaking API contract change with no runtime legacy compatibility.
+
+- Former `attributes` values are top-level: replace `response.attributes.title` with `response.title`.
+- There is no `relationships` object or relationship `data` wrapper: replace `response.relationships.comments.data` with `response.comments`.
+- Recording wrapper keys (`id`, `type`, `parent_id`, `root_id`, `created_at`, and `updated_at`) remain top-level metadata.
+- Replace legacy registration DSL with the explicit `fields:` and `relationships:` definitions above.
+- `?include=comments` selects only configured request-enabled entries.
+- Upgrade OpenAPI snapshots, fixtures, and consumer tests with the new flat payloads and nested endpoint bodies.
 
 Scalar section descriptions are generated from OpenAPI tags. Resource sections default to a
 plain-language description and can be customized through the existing `openapi` metadata:

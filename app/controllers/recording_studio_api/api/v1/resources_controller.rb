@@ -158,7 +158,8 @@ module RecordingStudioApi
             root_recording: current_root_recording,
             api_version: current_api_version,
             params: params,
-            scoped_recordings: scoped_recordings
+            scoped_recordings: scoped_recordings,
+            parent_recording: nil
           )
         end
 

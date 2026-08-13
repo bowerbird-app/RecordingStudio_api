@@ -405,8 +405,8 @@ class ConfigurationTest < Minitest::Test
   def test_register_recordable_type_api_tracks_registry_entries
     @configuration.recordable_registry.register(
       "Page",
+      serializer: ->(*) { { title: "Title" } },
       output_keys: %i[title],
-      fields: { title: :title },
       writable_attributes: %i[title],
       openapi: { details_schema: { type: "object" } }
     )
@@ -415,7 +415,7 @@ class ConfigurationTest < Minitest::Test
 
     assert_equal "Page", registration.fetch(:recordable_type)
     assert_equal ["title"], registration.fetch(:output_keys)
-    assert_equal :title, registration.fetch(:fields).fetch("title")
+    assert_equal({}, registration.fetch(:fields))
     assert_equal ["title"], registration.fetch(:writable_attributes)
     assert_equal %i[create destroy index show update], registration.fetch(:operations)
     assert_equal [], registration.fetch(:capability_actions)
@@ -487,8 +487,8 @@ class ConfigurationTest < Minitest::Test
   def test_register_recordable_type_api_composes_multiple_registrations_for_same_type
     @configuration.recordable_registry.register(
       "Page",
+      serializer: ->(*) { { title: "Title" } },
       output_keys: %i[title],
-      fields: { title: :title },
       writable_attributes: %i[title],
       openapi: {
         details_schema: {
@@ -501,8 +501,7 @@ class ConfigurationTest < Minitest::Test
 
     @configuration.recordable_registry.register(
       "Page",
-      output_keys: %i[summary],
-      fields: { summary: ->(recordable) { "Summary: #{recordable.title}" } },
+      fields: { summary: { resolver: ->(recordable) { "Summary: #{recordable.title}" } } },
       writable_attributes: %i[summary],
       openapi: {
         details_schema: {
@@ -516,8 +515,7 @@ class ConfigurationTest < Minitest::Test
     registration = @configuration.recordable_registry.fetch("Page")
     recordable = Struct.new(:title).new("Docs")
 
-    assert_equal :title, registration.fields.fetch("title")
-    assert_equal "Summary: Docs", registration.fields.fetch("summary").call(recordable)
+    assert_equal "Summary: Docs", registration.fields.fetch("summary").resolver.call(recordable)
     properties = registration.openapi.fetch(:details_schema).fetch(:properties)
     assert_equal "string", properties.fetch(:title).fetch(:type)
     assert_equal "string", properties.fetch(:summary).fetch(:type)

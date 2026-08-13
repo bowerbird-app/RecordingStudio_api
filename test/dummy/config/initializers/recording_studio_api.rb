@@ -46,14 +46,14 @@ RecordingStudioApi.register_recordable_type_api(
   "AdminRoot",
   api: :operations,
   operations: %i[index show],
+  serializer: ->(recordable, **) { { name: recordable.name } },
   output_keys: %i[name],
-  fields: { name: :name }
 )
 
 RecordingStudioApi.register_recordable_type_api(
   "Workspace",
+  serializer: ->(recordable, **) { { name: recordable.name } },
   output_keys: %i[name],
-  fields: { name: :name },
   writable_attributes: %i[name],
   openapi: {
     details_schema: {
@@ -79,7 +79,6 @@ RecordingStudioApi.register_recordable_type_api(
                       {
                         id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f",
                         type: "workspace",
-                        actions: [],
                         root_id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f",
                         parent_id: nil,
                         created_at: "2026-01-01T00:00:00Z",
@@ -114,7 +113,6 @@ RecordingStudioApi.register_recordable_type_api(
                   value: {
                     id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f",
                     type: "workspace",
-                    actions: [],
                     root_id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f",
                     parent_id: nil,
                     created_at: "2026-01-01T00:00:00Z",
@@ -133,8 +131,8 @@ RecordingStudioApi.register_recordable_type_api(
 
 RecordingStudioApi.register_recordable_type_api(
   "Folder",
+  serializer: ->(recordable, **) { { name: recordable.name } },
   output_keys: %i[name],
-  fields: { name: :name },
   writable_attributes: %i[name],
   capability_actions: %i[move],
   openapi: {
@@ -161,7 +159,6 @@ RecordingStudioApi.register_recordable_type_api(
                       {
                         id: "74c7a8bd-9787-45dc-8479-40347f8c0422",
                         type: "folder",
-                        actions: ["move"],
                         root_id: "8f8ee9f8-5448-4438-b65f-7578f69009f1",
                         parent_id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f",
                         created_at: "2026-01-01T00:00:00Z",
@@ -196,7 +193,6 @@ RecordingStudioApi.register_recordable_type_api(
                   value: {
                     id: "74c7a8bd-9787-45dc-8479-40347f8c0422",
                     type: "folder",
-                    actions: ["move"],
                     root_id: "8f8ee9f8-5448-4438-b65f-7578f69009f1",
                     parent_id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f",
                     created_at: "2026-01-01T00:00:00Z",

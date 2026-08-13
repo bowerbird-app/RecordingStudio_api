@@ -12,7 +12,8 @@ module RecordingStudioApi
     :root_recording,
     :api_version,
     :params,
-    :scoped_recordings
+    :scoped_recordings,
+    :parent_recording
   ) do
     def api_key
       api_client&.api_key.presence || "public"

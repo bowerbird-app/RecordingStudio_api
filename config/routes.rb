@@ -46,11 +46,11 @@ RecordingStudioApi::Engine.routes.draw do
         via: %i[post patch put delete],
         constraints: short_action_constraint,
         as: :resource_nested_action
-      get "/:resource/:id/:relationship", to: "relationship_resources#index", as: :resource_relationship
-      post "/:resource/:id/:relationship", to: "relationship_resources#create"
-      get "/:resource/:id/:relationship/:relationship_id", to: "relationship_resources#show", as: :resource_relationship_item
-      patch "/:resource/:id/:relationship/:relationship_id", to: "relationship_resources#update"
-      delete "/:resource/:id/:relationship/:relationship_id", to: "relationship_resources#destroy"
+      get "/:resource/:parent_id/:relationship", to: "relationship_resources#index", as: :resource_relationship
+      post "/:resource/:parent_id/:relationship", to: "relationship_resources#create"
+      get "/:resource/:parent_id/:relationship/:relationship_id", to: "relationship_resources#show", as: :resource_relationship_item
+      patch "/:resource/:parent_id/:relationship/:relationship_id", to: "relationship_resources#update"
+      delete "/:resource/:parent_id/:relationship/:relationship_id", to: "relationship_resources#destroy"
       match "/:resource/:id/actions/:action_name",
             to: "member_actions#create",
             via: %i[post patch put delete],
@@ -70,11 +70,11 @@ RecordingStudioApi::Engine.routes.draw do
           via: %i[post patch put delete],
           constraints: short_action_constraint,
           as: :resource_nested_action
-        get "/:resource/:id/:relationship", to: "/recording_studio_api/api/v1/relationship_resources#index", as: :resource_relationship
-        post "/:resource/:id/:relationship", to: "/recording_studio_api/api/v1/relationship_resources#create"
-        get "/:resource/:id/:relationship/:relationship_id", to: "/recording_studio_api/api/v1/relationship_resources#show", as: :resource_relationship_item
-        patch "/:resource/:id/:relationship/:relationship_id", to: "/recording_studio_api/api/v1/relationship_resources#update"
-        delete "/:resource/:id/:relationship/:relationship_id", to: "/recording_studio_api/api/v1/relationship_resources#destroy"
+        get "/:resource/:parent_id/:relationship", to: "/recording_studio_api/api/v1/relationship_resources#index", as: :resource_relationship
+        post "/:resource/:parent_id/:relationship", to: "/recording_studio_api/api/v1/relationship_resources#create"
+        get "/:resource/:parent_id/:relationship/:relationship_id", to: "/recording_studio_api/api/v1/relationship_resources#show", as: :resource_relationship_item
+        patch "/:resource/:parent_id/:relationship/:relationship_id", to: "/recording_studio_api/api/v1/relationship_resources#update"
+        delete "/:resource/:parent_id/:relationship/:relationship_id", to: "/recording_studio_api/api/v1/relationship_resources#destroy"
         match "/:resource/:id/actions/:action_name",
               to: "/recording_studio_api/api/v1/member_actions#create",
               via: %i[post patch put delete],
@@ -95,11 +95,11 @@ RecordingStudioApi::Engine.routes.draw do
           via: %i[post patch put delete],
           constraints: short_action_constraint,
           as: :resource_nested_action
-    get "/:resource/:id/:relationship", to: "api/v1/relationship_resources#index", as: :resource_relationship
-    post "/:resource/:id/:relationship", to: "api/v1/relationship_resources#create"
-    get "/:resource/:id/:relationship/:relationship_id", to: "api/v1/relationship_resources#show", as: :resource_relationship_item
-    patch "/:resource/:id/:relationship/:relationship_id", to: "api/v1/relationship_resources#update"
-    delete "/:resource/:id/:relationship/:relationship_id", to: "api/v1/relationship_resources#destroy"
+    get "/:resource/:parent_id/:relationship", to: "api/v1/relationship_resources#index", as: :resource_relationship
+    post "/:resource/:parent_id/:relationship", to: "api/v1/relationship_resources#create"
+    get "/:resource/:parent_id/:relationship/:relationship_id", to: "api/v1/relationship_resources#show", as: :resource_relationship_item
+    patch "/:resource/:parent_id/:relationship/:relationship_id", to: "api/v1/relationship_resources#update"
+    delete "/:resource/:parent_id/:relationship/:relationship_id", to: "api/v1/relationship_resources#destroy"
     match "/:resource/:id/actions/:action_name",
           to: "api/v1/member_actions#create",
           via: %i[post patch put delete],

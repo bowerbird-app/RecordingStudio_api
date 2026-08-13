@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Breaking (pre-production):** API responses now use the flat recording contract. Former
+  `attributes` values are top-level, relationship values have no `relationships` or `data` wrapper,
+  and `actions` is removed. Upgrade consumer snapshots, fixtures, and tests; no runtime legacy
+  response compatibility is provided.
 - Replaced recordable serializers and the child-only relationship DSL with explicit `output_keys`,
   `fields`, and named `children`/`custom` relationship sources
 - Flattened API record responses and generated OpenAPI schemas; timestamps are now canonical

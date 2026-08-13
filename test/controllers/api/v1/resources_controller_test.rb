@@ -194,7 +194,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
 
     payload = JSON.parse(response.body)
     assert_equal page_recording.id, payload.fetch("id")
-    assert_equal "page", payload.fetch("type")
+    assert_equal "Page", payload.fetch("type")
     assert_not_includes payload.keys, "attributes"
     assert payload.fetch("created_at")
     assert payload.fetch("updated_at")
@@ -203,7 +203,11 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
   test "expands a request-driven named children relationship in the flat payload" do
     RecordingStudioApi.register_recordable_type_api(
       "Workspace",
-      relationships: { folders: { source: :children, types: ["Folder"], include: :request } }
+      relationships: {
+        folders: { source: :children, child_type: "Folder", many: true, include: :request,
+                   serializer: ->(recordable, **) { { name: recordable.name } }, output_keys: %i[name], limit: 20,
+                   endpoints: %i[index show] }
+      }
     )
     folder_recording = RecordingStudio::Recording.create!(
       recordable: Folder.create!(name: "Included folder"),
@@ -211,7 +215,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     )
 
     get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}",
-        params: { include: true },
+      params: { include: "folders" },
         headers: authorization_headers
 
     assert_response :success
@@ -223,10 +227,93 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     refute payload.key?("data")
   end
 
+  test "enforces the flat API contract across includes, batching, and nested writes" do
+    RecordingStudioApi.register_recordable_type_api(
+      "Workspace",
+      fields: {
+        status: { include: true, resolver: ->(_context) { "active" } },
+        requested_label: { include: :request, resolver: ->(context) { "requested-#{context.recordable.name}" } }
+      },
+      relationships: {
+        folders: {
+          source: :children, child_type: "Folder", many: true, include: true, limit: 1,
+          serializer: ->(folder, **) { { name: folder.name } }, output_keys: %i[name],
+          endpoints: %i[index show create update]
+        },
+        featured_folder: {
+          source: :custom, many: false, include: :request,
+          resolver: ->(context) { context.scoped_recordings.where(parent_recording_id: context.recording.id, recordable_type: "Folder").order(:created_at, :id).first },
+          serializer: ->(folder, **) { { name: folder.name } }, output_keys: %i[name]
+        }
+      }
+    )
+    second_workspace = RecordingStudio::Recording.create!(recordable: Workspace.create!(name: "Second"), parent_recording: @root_recording)
+    first_folder = RecordingStudio::Recording.create!(recordable: Folder.create!(name: "First"), parent_recording: @root_recording)
+    second_root_folder = RecordingStudio::Recording.create!(recordable: Folder.create!(name: "Second folder"), parent_recording: @root_recording)
+    second_folder = RecordingStudio::Recording.create!(recordable: Folder.create!(name: "Third"), parent_recording: second_workspace)
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}", headers: authorization_headers
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert_flat_record(payload, @root_recording, type: "Workspace")
+    assert payload.key?("name")
+    assert_equal "active", payload.fetch("status")
+    assert_equal [first_folder.id], payload.fetch("folders").map { |folder| folder.fetch("id") }
+    assert_equal({ "limit" => 1, "has_more" => true }, payload.fetch("_meta").fetch("folders"))
+    payload.fetch("folders").each do |folder|
+      assert_equal "Folder", folder.fetch("type")
+      assert_equal @root_recording.id, folder.fetch("parent_id")
+    end
+    refute payload.key?("requested_label")
+    refute payload.key?("featured_folder")
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}",
+        params: { include: "requested_label,featured_folder" }, headers: authorization_headers
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert_equal "requested-#{@root_recording.recordable.name}", payload.fetch("requested_label")
+    assert_equal first_folder.id, payload.fetch("featured_folder").fetch("id")
+    assert_equal "First", payload.fetch("featured_folder").fetch("name")
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}", params: { include: "unknown" }, headers: authorization_headers
+
+    assert_response :unprocessable_entity
+
+    get "/recording_studio_api/api/v1/workspaces", headers: authorization_headers
+
+    assert_response :success
+    records = JSON.parse(response.body).fetch("records")
+    root_payload = records.find { |record| record.fetch("id") == @root_recording.id }
+    second_payload = records.find { |record| record.fetch("id") == second_workspace.id }
+    assert_equal({ "limit" => 1, "has_more" => true }, root_payload.fetch("_meta").fetch("folders"))
+    assert_equal [first_folder.id], root_payload.fetch("folders").map { |folder| folder.fetch("id") }
+    assert_equal [second_folder.id], second_payload.fetch("folders").map { |folder| folder.fetch("id") }
+    refute second_payload.fetch("_meta", {}).key?("folders")
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders/#{first_folder.id}", headers: authorization_headers
+
+    assert_response :success
+    assert_flat_record(JSON.parse(response.body), first_folder, type: "Folder")
+
+    patch "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders/#{first_folder.id}", params: {
+      parent_id: second_workspace.id,
+      attributes: { name: "Move attempt" }
+    }, headers: authorization_headers
+
+    assert_response :unprocessable_entity
+    assert_equal @root_recording.id, first_folder.reload.parent_recording_id
+  end
+
   test "shows a direct configured child relationship record with a flat payload" do
     RecordingStudioApi.register_recordable_type_api(
       "Workspace",
-      relationships: { folders: { source: :children, types: ["Folder"] } }
+      relationships: {
+        folders: { source: :children, child_type: "Folder", many: true,
+                   serializer: ->(recordable, **) { { name: recordable.name } }, output_keys: %i[name], limit: 20,
+                   endpoints: %i[index show] }
+      }
     )
     folder_recording = RecordingStudio::Recording.create!(
       recordable: Folder.create!(name: "Direct child"),
@@ -239,7 +326,14 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     payload = JSON.parse(response.body)
     assert_equal folder_recording.id, payload.fetch("id")
-    assert_equal "folder", payload.fetch("type")
+    assert_equal(
+      RecordingStudioApi::Serializers::ResourceRecordingSerializer.call(
+        folder_recording,
+        version: "v1",
+        api: "public"
+      ).fetch(:type),
+      payload.fetch("type")
+    )
     assert_equal "Direct child", payload.fetch("name")
     refute payload.key?("data")
     refute payload.key?("attributes")
@@ -251,9 +345,10 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
       relationships: {
         summary: {
           source: :custom,
+          many: false,
           resolver: ->(workspace) { { label: workspace.name } },
+          serializer: ->(value, **) { value },
           output_keys: %i[label],
-          fields: { label: :label }
         }
       }
     )
@@ -266,48 +361,42 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
         headers: authorization_headers
 
     assert_response :unprocessable_entity
-    assert_includes JSON.parse(response.body).fetch("error"), "summary is not a child relationship"
+    assert_includes JSON.parse(response.body).fetch("error"), "summary is not a direct child collection"
   end
 
-  test "exposes a named custom relationship without a relationship wrapper" do
+  test "rejects custom relationships from nested routing" do
     RecordingStudioApi.register_recordable_type_api(
       "Workspace",
       relationships: {
         summary: {
           source: :custom,
+          many: false,
           include: true,
           resolver: ->(workspace) { { label: workspace.name.upcase } },
+          serializer: ->(value, **) { value },
           output_keys: %i[label],
-          fields: { label: :label }
         }
       }
     )
 
-    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}", headers: authorization_headers
-
-    assert_response :success
-    payload = JSON.parse(response.body)
-    assert_equal({ "label" => @root_recording.recordable.name.upcase }, payload.fetch("summary"))
-    refute payload.key?("relationships")
-
     get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/summary",
         headers: authorization_headers
 
-    assert_response :success
-    assert_equal(
-      [{ "label" => @root_recording.recordable.name.upcase }],
-      JSON.parse(response.body).fetch("records")
-    )
+    assert_response :unprocessable_entity
+    assert_includes JSON.parse(response.body).fetch("error"), "summary is not a direct child collection"
   end
 
   test "creates and updates declared children through a named relationship endpoint" do
     RecordingStudioApi.register_recordable_type_api(
       "Workspace",
-      relationships: { folders: { source: :children, types: ["Folder"], write: true } }
+      relationships: {
+        folders: { source: :children, child_type: "Folder", many: true,
+                   serializer: ->(recordable, **) { { name: recordable.name } }, output_keys: %i[name], limit: 20,
+                   endpoints: %i[index show create update] }
+      }
     )
 
     post "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders", params: {
-      type: "folders",
       attributes: { name: "Nested folder" }
     }, headers: authorization_headers
 
@@ -319,13 +408,17 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     }, headers: authorization_headers
 
     assert_response :success
-    assert_equal "Renamed nested folder", RecordingStudio::Recording.find(child_id).recordable.name
+    assert_equal @root_recording.id, JSON.parse(response.body).fetch("parent_id")
   end
 
-  test "does not expose writes for child relationships without an explicit write opt-in" do
+  test "does not expose writes for child relationships without a create endpoint" do
     RecordingStudioApi.register_recordable_type_api(
       "Workspace",
-      relationships: { folders: { source: :children, types: ["Folder"] } }
+      relationships: {
+        folders: { source: :children, child_type: "Folder", many: true,
+                   serializer: ->(recordable, **) { { name: recordable.name } }, output_keys: %i[name], limit: 20,
+                   endpoints: %i[index show] }
+      }
     )
 
     post "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders", params: {
@@ -334,23 +427,216 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     }, headers: authorization_headers
 
     assert_response :unprocessable_entity
-    assert_includes JSON.parse(response.body).fetch("error"), "folders is immutable"
+    assert_includes JSON.parse(response.body).fetch("error"), "create is not enabled for folders"
   end
 
-  test "does not expose writes for immutable named relationships" do
+  test "does not expose writes when the child registration disables create" do
+    RecordingStudioApi.register_recordable_type_api(
+      "Folder",
+      operations: %i[index show update destroy]
+    )
     RecordingStudioApi.register_recordable_type_api(
       "Workspace",
-      relationships: { folders: { source: :children, types: ["Folder"], write: true } },
-      immutable_relationships: %i[folders]
+      relationships: {
+        folders: { source: :children, child_type: "Folder", many: true,
+                   serializer: ->(recordable, **) { { name: recordable.name } }, output_keys: %i[name], limit: 20,
+                   endpoints: %i[index show create update] }
+      }
     )
 
     post "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders", params: {
-      type: "folders",
       attributes: { name: "Blocked folder" }
     }, headers: authorization_headers
 
     assert_response :unprocessable_entity
-    assert_includes JSON.parse(response.body).fetch("error"), "folders is immutable"
+    assert_includes JSON.parse(response.body).fetch("error"), "create is not enabled for Folder"
+  end
+
+  test "does not resolve the direct child relationship before paginating nested index" do
+    RecordingStudioApi.register_recordable_type_api(
+      "Workspace",
+      relationships: {
+        folders: {
+          source: :children, child_type: "Folder", many: true,
+          serializer: ->(recordable, **) { { name: recordable.name } }, output_keys: %i[name], limit: 20,
+          endpoints: %i[index]
+        }
+      }
+    )
+    child = RecordingStudio::Recording.create!(recordable: Folder.create!(name: "Direct"), parent_recording: @root_recording)
+    original = RecordingStudioApi::RelationshipContext.instance_method(:relationship_value)
+    RecordingStudioApi::RelationshipContext.define_method(:relationship_value) do |*|
+      raise "Nested structural index must not resolve the entire relationship"
+    end
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders?limit=1", headers: authorization_headers
+
+    assert_response :success
+    assert_equal [child.id], JSON.parse(response.body).fetch("records").map { |record| record.fetch("id") }
+  ensure
+    RecordingStudioApi::RelationshipContext.define_method(:relationship_value, original) if original
+  end
+
+  test "conceals direct children rejected by relationship authorization" do
+    RecordingStudioApi.register_recordable_type_api(
+      "Workspace",
+      relationships: {
+        folders: {
+          source: :children, child_type: "Folder", many: true,
+          serializer: ->(recordable, **) { { name: recordable.name } }, output_keys: %i[name], limit: 20,
+          endpoints: %i[index show update destroy],
+          authorize: ->(context) { context.target_recording.nil? }
+        }
+      }
+    )
+    denied = RecordingStudio::Recording.create!(recordable: Folder.create!(name: "Denied"), parent_recording: @root_recording)
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders", headers: authorization_headers
+    assert_response :success
+    assert_empty JSON.parse(response.body).fetch("records")
+
+    [
+      [:get, "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders/#{denied.id}"],
+      [:patch, "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders/#{denied.id}"],
+      [:delete, "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders/#{denied.id}"]
+    ].each do |method, path|
+      public_send(method, path, params: method == :patch ? { attributes: { name: "Hidden move" } } : {}, headers: authorization_headers)
+      assert_response :not_found
+    end
+  end
+
+  test "enforces nested member endpoint and child operation gates" do
+    child = RecordingStudio::Recording.create!(recordable: Folder.create!(name: "Gated"), parent_recording: @root_recording)
+    RecordingStudioApi.register_recordable_type_api(
+      "Workspace",
+      relationships: {
+        endpoint_folders: { source: :children, child_type: "Folder", many: true,
+                   serializer: ->(recordable, **) { { name: recordable.name } }, output_keys: %i[name], limit: 20,
+                   endpoints: %i[index] }
+      }
+    )
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/endpoint_folders/#{child.id}", headers: authorization_headers
+    assert_response :unprocessable_entity
+    patch "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/endpoint_folders/#{child.id}", params: { attributes: { name: "Blocked" } }, headers: authorization_headers
+    assert_response :unprocessable_entity
+    delete "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/endpoint_folders/#{child.id}", headers: authorization_headers
+    assert_response :unprocessable_entity
+
+    RecordingStudioApi.register_recordable_type_api("Folder", operations: %i[index show create])
+    RecordingStudioApi.register_recordable_type_api(
+      "Workspace",
+      relationships: {
+        operation_folders: { source: :children, child_type: "Folder", many: true,
+                   serializer: ->(recordable, **) { { name: recordable.name } }, output_keys: %i[name], limit: 20,
+                   endpoints: %i[index show update destroy] }
+      }
+    )
+
+    patch "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/operation_folders/#{child.id}", params: { attributes: { name: "Blocked" } }, headers: authorization_headers
+    assert_response :unprocessable_entity
+    delete "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/operation_folders/#{child.id}", headers: authorization_headers
+    assert_response :unprocessable_entity
+  end
+
+  test "destroys a trashed direct child through the nested route" do
+    RecordingStudioApi.register_recordable_type_api(
+      "Workspace",
+      relationships: {
+        folders: { source: :children, child_type: "Folder", many: true,
+                   serializer: ->(recordable, **) { { name: recordable.name } }, output_keys: %i[name], limit: 20,
+                   endpoints: %i[show destroy] }
+      }
+    )
+    child = RecordingStudio::Recording.create!(recordable: Folder.create!(name: "Trashed"), parent_recording: @root_recording)
+    child.update_column(:trashed_at, Time.current)
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders/#{child.id}", headers: authorization_headers
+    assert_response :not_found
+
+    delete "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders/#{child.id}", headers: authorization_headers
+    assert_response :success
+    assert_equal true, JSON.parse(response.body).fetch("deleted")
+  end
+
+  test "enforces nested relationship structure, type, and path parent" do
+    RecordingStudioApi.register_recordable_type_api(
+      "Workspace",
+      relationships: {
+        folders: { source: :children, child_type: "Folder", many: true,
+                   serializer: ->(recordable, **) { { name: recordable.name } }, output_keys: %i[name], limit: 20,
+                   endpoints: %i[index show create update destroy] },
+        owner: { source: :children, child_type: "Folder", many: false,
+                 serializer: ->(recordable, **) { { name: recordable.name } }, output_keys: %i[name] }
+      }
+    )
+    other_parent = RecordingStudio::Recording.create!(recordable: Workspace.create!(name: "Other"))
+    direct_child = RecordingStudio::Recording.create!(recordable: Folder.create!(name: "Direct"), parent_recording: @root_recording)
+    descendant = RecordingStudio::Recording.create!(recordable: Folder.create!(name: "Descendant"), parent_recording: direct_child)
+    wrong_type = RecordingStudio::Recording.create!(recordable: Page.create!(title: "Wrong"), parent_recording: @root_recording)
+
+    get "/recording_studio_api/api/v1/unknown/#{@root_recording.id}/folders", headers: authorization_headers
+    assert_response :not_found
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/unknown", headers: authorization_headers
+    assert_response :unprocessable_entity
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/owner", headers: authorization_headers
+    assert_response :unprocessable_entity
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders", headers: authorization_headers
+    assert_response :success
+    assert_equal [direct_child.id], JSON.parse(response.body).fetch("records").map { |record| record.fetch("id") }
+
+    [other_parent.id, descendant.id, wrong_type.id].each do |child_id|
+      get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders/#{child_id}", headers: authorization_headers
+      assert_response :not_found
+    end
+
+    post "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders", params: {
+      type: "folders", attributes: { name: "Blocked type" }
+    }, headers: authorization_headers
+    assert_response :unprocessable_entity
+
+    post "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders", params: {
+      parent_id: other_parent.id, attributes: { name: "Blocked parent" }
+    }, headers: authorization_headers
+    assert_response :unprocessable_entity
+
+    post "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders", params: {
+      attributes: { name: "Created child" }
+    }, headers: authorization_headers
+    assert_response :created
+    created = RecordingStudio::Recording.find(JSON.parse(response.body).fetch("id"))
+    assert_equal @root_recording, created.parent_recording
+    assert_equal "Folder", created.recordable_type
+
+    patch "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders/#{direct_child.id}", params: {
+      parent_id: other_parent.id, attributes: { name: "Move attempt" }
+    }, headers: authorization_headers
+    assert_response :unprocessable_entity
+    assert_equal @root_recording, direct_child.reload.parent_recording
+
+    delete "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders/#{created.id}", headers: authorization_headers
+    assert_response :success
+    assert_equal true, JSON.parse(response.body).fetch("deleted")
+  end
+
+  test "serves configured nested routes through a named API" do
+    RecordingStudioApi.register_recordable_type_api(
+      "Workspace",
+      relationships: {
+        folders: { source: :children, child_type: "Folder", many: true,
+                   serializer: ->(recordable, **) { { name: recordable.name } }, output_keys: %i[name], limit: 20,
+                   endpoints: %i[index] }
+      }
+    )
+    child = RecordingStudio::Recording.create!(recordable: Folder.create!(name: "Named"), parent_recording: @root_recording)
+
+    get "/recording_studio_api/apis/public/v1/workspaces/#{@root_recording.id}/folders", headers: authorization_headers
+
+    assert_response :success
+    assert_equal [child.id], JSON.parse(response.body).fetch("records").map { |record| record.fetch("id") }
   end
 
   test "lists available API resources when no resource param is provided" do
@@ -376,7 +662,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_response :created
 
     payload = JSON.parse(response.body)
-    assert_equal "workspace", payload.fetch("type")
+    assert_equal "Workspace", payload.fetch("type")
     assert_equal "Created Workspace", payload.fetch("name")
     assert_not_includes payload.keys, "unknown_attribute"
   end
@@ -427,7 +713,11 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "allows immutable fields on create but ignores them on update" do
-    RecordingStudioApi.register_recordable_type_api("Workspace", immutable_fields: %i[name])
+    RecordingStudioApi.register_recordable_type_api(
+      "Workspace",
+      writable_attributes: %i[name],
+      immutable_fields: %i[name]
+    )
     original_name = @root_recording.recordable.name
 
     patch "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}", params: {
@@ -669,6 +959,22 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
   end
 
   private
+
+  def assert_flat_record(payload, recording, type:)
+    assert_equal recording.id, payload.fetch("id")
+    assert_equal type, payload.fetch("type")
+    assert_nullable_equal recording.parent_recording_id, payload.fetch("parent_id")
+    assert_nullable_equal recording.root_recording_id, payload.fetch("root_id")
+    assert_match(/\A\d{4}-\d{2}-\d{2}T/, payload.fetch("created_at"))
+    assert_match(/\A\d{4}-\d{2}-\d{2}T/, payload.fetch("updated_at"))
+    %w[attributes relationships data actions].each { |key| refute payload.key?(key) }
+  end
+
+  def assert_nullable_equal(expected, actual)
+    return assert_nil actual if expected.nil?
+
+    assert_equal expected, actual
+  end
 
   def authorization_headers
     { "Authorization" => "Bearer #{@access_token}" }

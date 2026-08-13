@@ -80,13 +80,16 @@ module RecordingStudioApi
           )
         end
 
-        def relationship_context_for(recordings)
+        def relationship_context_for(recordings, batch: false)
           RecordingStudioApi::RelationshipContext.for(
             recordings: recordings,
             include_values: params[:include],
             scoped_recordings: scoped_recordings,
-            api: api_key,
-            version: api_version
+            api_key: api_key,
+            api_version: api_version,
+            access_grant: access_grant,
+            params: params,
+            batch: batch
           )
         end
 
@@ -112,6 +115,8 @@ module RecordingStudioApi
         end
 
         def parent_recording_for_create
+          return context.parent_recording if context.parent_recording
+
           if params[:parent_id].blank?
             return access_scope_recording if root_recordable_type?
 
