@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Replaced recordable serializers and the child-only relationship DSL with explicit `output_keys`,
+  `fields`, and named `children`/`custom` relationship sources
+- Flattened API record responses and generated OpenAPI schemas; timestamps are now canonical
+  response keys and collection entries are exposed as `records`
+- Added generic named relationship endpoints and request-driven relationship expansion
+
 ## [0.2.0] - 2026-08-03
 
 ### Added

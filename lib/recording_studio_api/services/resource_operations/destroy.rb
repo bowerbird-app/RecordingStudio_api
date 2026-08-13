@@ -10,7 +10,7 @@ module RecordingStudioApi
           serialized_recording = serialize_recording(recording)
           destroy_resource!(recording)
 
-          { json: { data: serialize_delete_result(serialized_recording, deleted_via: "destroyed") } }
+          { json: serialize_delete_result(serialized_recording, deleted_via: "destroyed") }
         end
       end
     end

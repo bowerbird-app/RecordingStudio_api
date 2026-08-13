@@ -282,7 +282,8 @@ RecordingStudioApi.configuration
 RecordingStudioApi::Hooks.run(:before_initialize)
 RecordingStudioApi.register_recordable_type_api(
   "Page",
-  serializer: PageSerializer,
+  output_keys: %i[title],
+  fields: { title: :title },
   writable_attributes: %i[title],
   operations: %i[index show create update],
   capability_actions: %i[publish]
@@ -311,7 +312,65 @@ end
 ```
 
 `writable_attributes` is an explicit allowlist for API create and update operations. OpenAPI
-`details_schema` properties describe response data only and never grant write access.
+field metadata describes response data only and never grants write access.
+
+### Fields, relationships, and includes
+
+Resource registration declares the flat fields and named relationships an API may expose.
+`output_keys` is the explicit response allowlist. `fields` maps each output key to a recordable
+method, a callable, or a hash with `source:`/`resolver:` and optional OpenAPI metadata.
+
+```ruby
+RecordingStudioApi.register_recordable_type_api(
+  "Project",
+  output_keys: %i[name external_key],
+  fields: {
+    name: :name,
+    external_key: { source: :external_key, type: :string }
+  },
+  writable_attributes: %i[name external_key],
+  immutable_fields: %i[external_key],
+  relationships: {
+    tasks: { source: :children, types: ["Task"], include: :request, write: true },
+    owner: {
+      source: :custom,
+      include: true,
+      resolver: ->(project, context:) { project.owner },
+      output_keys: %i[name],
+      fields: { name: :name }
+    }
+  }
+)
+```
+
+`immutable_fields` must be a subset of `writable_attributes`: it may be supplied at create time
+but is ignored on updates. Relationship names are application-defined. A `children` source reads
+the real Recording Studio child edge and can opt into generic writes. A `custom` source uses its
+resolver (or a same-named recordable method) and is read-only through the engine. `include: true`
+always emits a relationship; `include: :request` emits it only when requested. `?include=tasks`
+selects named request-driven relationships, while `?include=true` selects all of them.
+
+Responses are flat. A record always includes `id`, `type`, `actions`, `root_id`, `parent_id`,
+`created_at`, and `updated_at`; declared output keys and expanded relationship names sit beside
+those keys. There are no `data`, `attributes`, or `relationships` wrappers. Collections use
+`records` plus `meta`.
+
+The engine fetches requested `children` relationships in one scoped query per response,
+preventing serializer-driven N+1 queries. A custom resolver is application code and may issue
+queries; preload its associations where needed and use `context.scoped_recordings` when resolving
+Recording Studio records. Custom relationships must declare output fields or a serializer, so
+the engine never serializes arbitrary model attributes. Registered writable child relationships expose
+generic named endpoints:
+
+```text
+GET    /api/v1/projects/:id/tasks
+POST   /api/v1/projects/:id/tasks                    # { type: "tasks", attributes: { ... } }
+PATCH  /api/v1/projects/:id/tasks/:relationship_id
+DELETE /api/v1/projects/:id/tasks/:relationship_id
+```
+
+All structural operations remain scoped and role-authorized, and enforce the host application's
+Recording Studio parent declarations.
 
 Scalar section descriptions are generated from OpenAPI tags. Resource sections default to a
 plain-language description and can be customized through the existing `openapi` metadata:
@@ -533,6 +592,8 @@ end
 - `POST /recording_studio_api/api/<version>/:resource` — create a recording when the resource permits `:create`
 - `PATCH /recording_studio_api/api/<version>/:resource/:id` — update a recording when the resource permits `:update`
 - `DELETE /recording_studio_api/api/<version>/:resource/:id` — destroy a recording when the resource permits `:destroy`
+- `GET /recording_studio_api/api/<version>/:resource/:id/:relationship` — list a registered named relationship
+- `POST /recording_studio_api/api/<version>/:resource/:id/:relationship` and `PATCH|DELETE /.../:relationship/:relationship_id` — mutate a writable `children` relationship
 - `POST|PATCH|PUT|DELETE /recording_studio_api/api/<version>/:resource/:id/actions/:action_name` — execute the newest compatible contribution contract for that public API version
 - `POST|PATCH|PUT|DELETE /recording_studio_api/api/<version>/:resource/:id/:action_name` — compatibility alias for existing clients
 

@@ -405,7 +405,8 @@ class ConfigurationTest < Minitest::Test
   def test_register_recordable_type_api_tracks_registry_entries
     @configuration.recordable_registry.register(
       "Page",
-      serializer: ->(recordable) { { title: recordable.title } },
+      output_keys: %i[title],
+      fields: { title: :title },
       writable_attributes: %i[title],
       openapi: { details_schema: { type: "object" } }
     )
@@ -413,7 +414,8 @@ class ConfigurationTest < Minitest::Test
     registration = @configuration.to_h.fetch(:recordable_registrations).fetch("Page")
 
     assert_equal "Page", registration.fetch(:recordable_type)
-    assert_equal true, registration.fetch(:serializer)
+    assert_equal ["title"], registration.fetch(:output_keys)
+    assert_equal :title, registration.fetch(:fields).fetch("title")
     assert_equal ["title"], registration.fetch(:writable_attributes)
     assert_equal %i[create destroy index show update], registration.fetch(:operations)
     assert_equal [], registration.fetch(:capability_actions)
@@ -485,7 +487,8 @@ class ConfigurationTest < Minitest::Test
   def test_register_recordable_type_api_composes_multiple_registrations_for_same_type
     @configuration.recordable_registry.register(
       "Page",
-      serializer: ->(recordable) { { title: recordable.title } },
+      output_keys: %i[title],
+      fields: { title: :title },
       writable_attributes: %i[title],
       openapi: {
         details_schema: {
@@ -498,7 +501,8 @@ class ConfigurationTest < Minitest::Test
 
     @configuration.recordable_registry.register(
       "Page",
-      serializer: ->(recordable) { { summary: "Summary: #{recordable.title}" } },
+      output_keys: %i[summary],
+      fields: { summary: ->(recordable) { "Summary: #{recordable.title}" } },
       writable_attributes: %i[summary],
       openapi: {
         details_schema: {
@@ -510,9 +514,10 @@ class ConfigurationTest < Minitest::Test
     )
 
     registration = @configuration.recordable_registry.fetch("Page")
-    payload = registration.serializer.call(Struct.new(:title).new("Docs"))
+    recordable = Struct.new(:title).new("Docs")
 
-    assert_equal({ title: "Docs", summary: "Summary: Docs" }, payload)
+    assert_equal :title, registration.fields.fetch("title")
+    assert_equal "Summary: Docs", registration.fields.fetch("summary").call(recordable)
     properties = registration.openapi.fetch(:details_schema).fetch(:properties)
     assert_equal "string", properties.fetch(:title).fetch(:type)
     assert_equal "string", properties.fetch(:summary).fetch(:type)

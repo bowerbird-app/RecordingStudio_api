@@ -262,7 +262,7 @@ module RecordingStudioApi
           .fetch("application/json")
           .fetch("schema")
 
-        assert_equal %w[resource type data meta], list_schema.fetch("required")
+        assert_equal %w[resource type records meta], list_schema.fetch("required")
         assert_equal %w[limit sort order has_more next_pagination_token],
                      list_schema.fetch("properties").fetch("meta").fetch("required")
       end
@@ -302,8 +302,6 @@ module RecordingStudioApi
           .fetch("application/json")
           .fetch("schema")
           .fetch("properties")
-          .fetch("data")
-          .fetch("properties")
           .fetch("parent_id")
 
         assert_equal true, parent_schema.fetch("nullable")
@@ -322,8 +320,6 @@ module RecordingStudioApi
           .fetch("application/json")
           .fetch("schema")
           .fetch("properties")
-          .fetch("data")
-          .fetch("properties")
           .fetch("actions")
 
         assert_equal [], actions_schema.fetch("example")
@@ -332,6 +328,8 @@ module RecordingStudioApi
       def test_registered_enum_attribute_is_documented_as_named_enum
         with_recordable_registration(
           "Page",
+          output_keys: %i[role],
+          fields: { role: :role },
           openapi: {
             details_schema: {
               type: "object",
@@ -355,10 +353,6 @@ module RecordingStudioApi
             .fetch("content")
             .fetch("application/json")
             .fetch("schema")
-            .fetch("properties")
-            .fetch("data")
-            .fetch("properties")
-            .fetch("attributes")
             .fetch("properties")
             .fetch("role")
 
@@ -386,14 +380,14 @@ module RecordingStudioApi
         assert_nil meta_schema.fetch("example").fetch("next_pagination_token")
       end
 
-      def test_unregistered_page_schema_uses_closed_attributes_schema
+      def test_unregistered_page_schema_has_no_attributes_wrapper
         with_stubbed_recordable_class("Page", [
                                       column_stub("id", :uuid, false),
                                       column_stub("title", :string, true),
                                       column_stub("created_at", :datetime, false)
                                     ]) do
           document = with_recordable_types(["Page"]) { OpenapiDocument.call }
-          attributes_schema = document
+          properties = document
             .fetch(:paths)
             .fetch("/recording_studio_api/api/v1/pages/{id}")
             .fetch("get")
@@ -403,13 +397,10 @@ module RecordingStudioApi
             .fetch("application/json")
             .fetch("schema")
             .fetch("properties")
-            .fetch("data")
-            .fetch("properties")
-            .fetch("attributes")
 
-          assert_equal "object", attributes_schema.fetch("type")
-          assert_equal({}, attributes_schema.fetch("properties"))
-          assert_equal false, attributes_schema.fetch("additionalProperties")
+          refute properties.key?("attributes")
+          assert_equal "string", properties.fetch("created_at").fetch("type")
+          assert_equal "string", properties.fetch("updated_at").fetch("type")
         end
       end
 

@@ -71,8 +71,23 @@ module RecordingStudioApi
           access_grant.scope_recording || root_recording
         end
 
-        def serialize_recording(target_recording)
-          RecordingStudioApi::Serializers::ResourceRecordingSerializer.call(target_recording, version: api_version, api: api_key)
+        def serialize_recording(target_recording, context: nil)
+          RecordingStudioApi::Serializers::ResourceRecordingSerializer.call(
+            target_recording,
+            version: api_version,
+            api: api_key,
+            context: context
+          )
+        end
+
+        def relationship_context_for(recordings)
+          RecordingStudioApi::RelationshipContext.for(
+            recordings: recordings,
+            include_values: params[:include],
+            scoped_recordings: scoped_recordings,
+            api: api_key,
+            version: api_version
+          )
         end
 
         def resource_attributes
@@ -89,6 +104,11 @@ module RecordingStudioApi
         def allowed_attribute_keys
           registration = RecordingStudioApi.recordable_registration_for(recordable_type, api: api_key)
           Array(registration&.writable_attributes).map(&:to_sym)
+        end
+
+        def mutable_attribute_keys
+          registration = RecordingStudioApi.recordable_registration_for(recordable_type, api: api_key)
+          allowed_attribute_keys - Array(registration&.immutable_fields).map(&:to_sym)
         end
 
         def parent_recording_for_create

@@ -7,7 +7,7 @@ module RecordingStudioApi
         def call
           authorize_access!(recording, role: :view)
 
-          { json: { data: serialize_recording(recording) } }
+          { json: serialize_recording(recording, context: relationship_context_for([recording])) }
         end
       end
     end

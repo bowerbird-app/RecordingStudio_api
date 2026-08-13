@@ -20,7 +20,7 @@ module RecordingStudioApi
           context = action_context(action)
           authorize_action!(action, context)
           result = action.handler.call(context)
-          render json: { data: serialize_result(action, result) }
+          render json: serialize_result(action, result)
         end
 
         private
@@ -93,9 +93,28 @@ module RecordingStudioApi
 
         def serialize_result(action, result)
           serializer = action.serializer || RecordingStudioApi::Serializers::ResourceRecordingSerializer
+          if serializer == RecordingStudioApi::Serializers::ResourceRecordingSerializer
+            return serializer.call(
+              result,
+              version: current_api_version,
+              api: current_api_key,
+              context: relationship_context_for(result)
+            )
+          end
           return serializer.call(result, version: current_api_version, api: current_api_key) if versioned_recording_serializer?(serializer)
 
           serializer.call(result)
+        end
+
+        def relationship_context_for(result)
+          recordings = result.respond_to?(:recordable_type) && result.respond_to?(:recordable) ? [result] : []
+          RecordingStudioApi::RelationshipContext.for(
+            recordings: recordings,
+            include_values: params[:include],
+            scoped_recordings: scoped_recordings,
+            api: current_api_key,
+            version: current_api_version
+          )
         end
 
         def versioned_recording_serializer?(serializer)

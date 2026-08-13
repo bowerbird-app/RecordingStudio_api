@@ -19,7 +19,7 @@ module RecordingStudioApi
           end
 
           {
-            json: { data: serialize_recording(created_recording) },
+            json: serialize_recording(created_recording, context: relationship_context_for([created_recording])),
             status: :created
           }
         rescue RecordingStudio::InvalidParent => e

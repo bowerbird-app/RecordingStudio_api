@@ -83,17 +83,15 @@ module RecordingStudioApi
 
         assert_equal ["Folder"], move_endpoint.fetch(:openapi).fetch(:tags)
         assert_equal "Move", move_endpoint.fetch(:summary)
-        action_data_schema = move_endpoint
+        action_response_schema = move_endpoint
           .fetch(:openapi)
           .fetch(:responses)
           .fetch("200")
           .fetch(:content)
           .fetch("application/json")
           .fetch(:schema)
-          .fetch(:properties)
-          .fetch(:data)
-        assert_equal "object", action_data_schema.fetch(:type)
-        assert action_data_schema.fetch(:properties).key?(:id)
+        assert_equal "object", action_response_schema.fetch(:type)
+        assert action_response_schema.fetch(:properties).key?(:id)
       end
 
       def test_default_resource_tags_are_human_readable_for_access
@@ -138,7 +136,7 @@ module RecordingStudioApi
           .fetch("application/json")
           .fetch(:schema)
           .fetch(:properties)
-          .fetch(:data)
+          .fetch(:records)
           .fetch(:items)
 
         assert_equal "object", item_schema.fetch(:type)
@@ -179,6 +177,59 @@ module RecordingStudioApi
           end
 
           assert_equal "Get page details", show_endpoint.fetch(:openapi).fetch(:summary)
+        end
+      end
+
+      def test_named_relationship_adds_generic_relationship_endpoints_to_documentation
+        with_recordable_registration(
+          "Workspace",
+          relationships: { folders: { source: :children, types: ["Folder"], write: true } }
+        ) do
+          catalog = with_catalog_stubs(
+            recordable_types: ["Workspace"],
+            actions_by_type: { "Workspace" => [] },
+            preserve_recordable_registrations: true
+          ) { DocumentationCatalog.call }
+
+          endpoints = catalog.fetch(:resources).first.fetch(:endpoints)
+          assert_includes endpoints.map { |endpoint| [endpoint.fetch(:verb), endpoint.fetch(:path)] },
+                          ["GET", "/recording_studio_api/api/v1/workspaces/:id/folders"]
+          assert_includes endpoints.map { |endpoint| [endpoint.fetch(:verb), endpoint.fetch(:path)] },
+                          ["POST", "/recording_studio_api/api/v1/workspaces/:id/folders"]
+        end
+      end
+
+      def test_named_relationship_responses_describe_declared_child_types
+        with_recordable_registration(
+          "Workspace",
+          relationships: { folders: { source: :children, types: ["Folder"], write: true } }
+        ) do
+          with_recordable_registration(
+            "Folder",
+            output_keys: %i[name],
+            fields: { name: :name },
+            openapi: {
+              details_schema: {
+                properties: {
+                  name: { type: "string" }
+                }
+              }
+            }
+          ) do
+            catalog = with_catalog_stubs(
+              recordable_types: %w[Workspace Folder],
+              actions_by_type: { "Workspace" => [], "Folder" => [] },
+              preserve_recordable_registrations: true
+            ) { DocumentationCatalog.call }
+
+            endpoint = catalog.fetch(:resources).find { |section| section.fetch(:resource) == "workspaces" }
+              .fetch(:endpoints).find { |entry| entry.fetch(:verb) == "POST" && entry.fetch(:path).end_with?("/folders") }
+            properties = endpoint.fetch(:openapi).fetch(:responses).fetch("201")
+              .fetch(:content).fetch("application/json").fetch(:schema)
+              .fetch(:properties)
+
+            assert_equal "string", properties.fetch(:name).fetch(:type)
+          end
         end
       end
 
@@ -420,18 +471,23 @@ module RecordingStudioApi
         declarations_singleton.send(:define_method, :root_allowed?, original_root_allowed)
       end
 
-      def with_recordable_registration(recordable_type, serializer: nil, openapi:)
+      def with_recordable_registration(recordable_type, output_keys: nil, fields: nil, openapi: {}, relationships: nil,
+                                       immutable_relationships: nil)
         registry = RecordingStudioApi.configuration.recordable_registry
         existing = registry[recordable_type]
 
-        registry.register(recordable_type, serializer: serializer, openapi: openapi)
+        registry.register(
+          recordable_type,
+          output_keys: output_keys,
+          fields: fields,
+          openapi: openapi,
+          relationships: relationships,
+          immutable_relationships: immutable_relationships
+        )
         yield
       ensure
-        if existing
-          registry.register(recordable_type, serializer: existing.serializer, openapi: existing.openapi)
-        else
-          registry.instance_variable_get(:@registrations).delete(recordable_type)
-        end
+        registrations = registry.instance_variable_get(:@registrations)
+        existing ? registrations[recordable_type] = existing : registrations.delete(recordable_type)
       end
     end
   end

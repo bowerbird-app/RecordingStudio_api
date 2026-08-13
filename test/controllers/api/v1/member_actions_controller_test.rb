@@ -50,7 +50,7 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
         headers: authorization_headers
 
     assert_response :success
-    assert_equal folder_recording.id, JSON.parse(response.body).fetch("data").fetch("id")
+    assert_equal folder_recording.id, JSON.parse(response.body).fetch("id")
 
     post "/recording_studio_api/api/v1/pages/#{@page_recording.id}/actions/move",
         headers: authorization_headers
@@ -64,7 +64,7 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
          headers: authorization_headers
 
     assert_response :success
-    assert_equal @page_recording.id, JSON.parse(response.body).fetch("data").fetch("id")
+    assert_equal @page_recording.id, JSON.parse(response.body).fetch("id")
   end
 
   test "dispatches a registered capability action through the nested child route" do
@@ -72,7 +72,7 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
          headers: authorization_headers
 
     assert_response :success
-    assert_equal @page_recording.id, JSON.parse(response.body).fetch("data").fetch("id")
+    assert_equal @page_recording.id, JSON.parse(response.body).fetch("id")
   end
 
   test "dispatches the contribution version selected by the request api version" do
@@ -101,7 +101,7 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
          headers: authorization_headers
 
     assert_response :success
-    assert_equal "legacy", JSON.parse(response.body).fetch("data").fetch("version")
+    assert_equal "legacy", JSON.parse(response.body).fetch("version")
   end
 
   test "passes only action payload params to handlers" do
@@ -126,7 +126,7 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
 
-    payload = JSON.parse(response.body).fetch("data")
+    payload = JSON.parse(response.body)
     assert_equal "safe", payload.fetch("custom_value")
     assert_equal({ "key" => "value" }, payload.fetch("nested"))
     refute_includes payload.keys, "action_name"
@@ -157,7 +157,7 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
 
-    payload = JSON.parse(response.body).fetch("data")
+    payload = JSON.parse(response.body)
     api_client = RecordingStudioApi::ApiClient.find_by!(name: "Integration token")
     assert_equal api_client.access_recording.id, payload.fetch("access_recording_id")
     assert_equal api_client.access_recording.id, payload.fetch("access_grant_recording_id")
@@ -228,7 +228,7 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
          headers: { "Authorization" => "Bearer #{view_token}" }
 
     assert_response :success
-    assert_equal view_page_recording.id, JSON.parse(response.body).fetch("data").fetch("id")
+    assert_equal view_page_recording.id, JSON.parse(response.body).fetch("id")
   end
 
   test "uses a host action role resolver" do
@@ -252,5 +252,4 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
     { "Authorization" => "Bearer #{@access_token}" }
   end
 end
-
 

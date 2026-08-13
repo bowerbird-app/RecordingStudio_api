@@ -6,6 +6,15 @@ module RecordingStudioApi
   module Serializers
     class ResourceRecordingSerializerTest < Minitest::Test
       RecordableStub = Struct.new(:id, :name, :title, :attributes, keyword_init: true)
+      RelationshipContextStub = Struct.new(:included, keyword_init: true) do
+        def include?(_name, _definition)
+          included
+        end
+
+        def relationship_value(_recording, _name, definition)
+          definition.fetch(:resolver).call
+        end
+      end
 
       def setup
         @original_configuration_defined = RecordingStudioApi.instance_variable_defined?(:@configuration)
@@ -21,7 +30,7 @@ module RecordingStudioApi
         end
       end
 
-      def test_call_omits_recordable_attributes_when_no_custom_serializer_is_registered
+      def test_call_returns_the_canonical_flat_payload_when_no_fields_are_registered
         recording = build_recording(
           recordable_type: "Folder",
           recordable: RecordableStub.new(
@@ -41,12 +50,16 @@ module RecordingStudioApi
 
         refute payload.key?(:title)
         refute payload.key?(:attributes)
+        refute payload.key?(:relationships)
+        assert payload.key?(:created_at)
+        assert payload.key?(:updated_at)
       end
 
-      def test_call_uses_registered_serializer_attributes_without_default_model_attributes
+      def test_call_uses_registered_output_keys_and_fields_at_the_top_level
         RecordingStudioApi.register_recordable_type_api(
           "Page",
-          serializer: ->(recordable) { { summary: "Summary: #{recordable.title}" } }
+          output_keys: %i[summary],
+          fields: { summary: ->(recordable) { "Summary: #{recordable.title}" } }
         )
 
         recording = build_recording(
@@ -65,23 +78,21 @@ module RecordingStudioApi
         payload = ResourceRecordingSerializer.call(recording)
 
         refute payload.key?(:title)
-        assert_equal(
-          {
-            "summary" => "Summary: Docs Landing"
-          },
-          payload.fetch(:attributes)
-        )
+        assert_equal "Summary: Docs Landing", payload.fetch(:summary)
+        refute payload.key?(:attributes)
       end
 
-      def test_call_supports_app_level_enrichment_on_top_of_recordable_registration
+      def test_call_merges_fields_from_multiple_registrations
         RecordingStudioApi.register_recordable_type_api(
           "Page",
-          serializer: ->(recordable) { { label: recordable.title } }
+          output_keys: %i[label],
+          fields: { label: ->(recordable) { recordable.title } }
         )
 
         RecordingStudioApi.register_recordable_type_api(
           "Page",
-          serializer: ->(_recordable) { { source: "host_app" } }
+          output_keys: %i[source],
+          fields: { source: ->(_recordable) { "host_app" } }
         )
 
         recording = build_recording(
@@ -99,16 +110,11 @@ module RecordingStudioApi
         payload = ResourceRecordingSerializer.call(recording)
 
         refute payload.key?(:title)
-        assert_equal(
-          {
-            "label" => "Changelog",
-            "source" => "host_app"
-          },
-          payload.fetch(:attributes)
-        )
+        assert_equal "Changelog", payload.fetch(:label)
+        assert_equal "host_app", payload.fetch(:source)
       end
 
-      def test_call_omits_attributes_when_merged_attributes_are_empty
+      def test_call_omits_unregistered_fields
         recording = build_recording(
           recordable_type: "Note",
           recordable: RecordableStub.new(
@@ -120,6 +126,80 @@ module RecordingStudioApi
         payload = ResourceRecordingSerializer.call(recording)
 
         refute payload.key?(:attributes)
+      end
+
+      def test_call_does_not_allow_output_fields_to_override_canonical_keys
+        RecordingStudioApi.register_recordable_type_api(
+          "Page",
+          output_keys: %i[external_key id],
+          fields: {
+            external_key: ->(recordable, context: nil) { "#{recordable.id}:#{context}" },
+            id: ->(_recordable) { "must-not-overwrite" }
+          }
+        )
+        recording = build_recording(
+          recordable_type: "Page",
+          recordable: RecordableStub.new(id: "page-4", title: "Flat", attributes: {})
+        )
+
+        payload = ResourceRecordingSerializer.call(recording, context: "request-context")
+
+        assert_equal "page-4:request-context", payload.fetch(:external_key)
+        assert_equal "recording-1", payload.fetch(:id)
+      end
+
+      def test_call_does_not_invoke_an_unreadable_always_included_relationship_resolver
+        RecordingStudioApi.register_recordable_type_api(
+          "Page",
+          relationships: {
+            owner: {
+              source: :custom,
+              include: true,
+              read: false,
+              resolver: ->(_recordable) { raise "owner resolver invoked" },
+              output_keys: %i[name],
+              fields: { name: :name }
+            }
+          }
+        )
+        recording = build_recording(
+          recordable_type: "Page",
+          recordable: RecordableStub.new(id: "page-5", attributes: {})
+        )
+
+        payload = ResourceRecordingSerializer.call(
+          recording,
+          context: RelationshipContextStub.new(included: true)
+        )
+
+        refute payload.key?(:owner)
+      end
+
+      def test_call_does_not_invoke_an_unreadable_request_included_relationship_resolver
+        RecordingStudioApi.register_recordable_type_api(
+          "Page",
+          relationships: {
+            owner: {
+              source: :custom,
+              include: :request,
+              read: false,
+              resolver: ->(_recordable) { raise "owner resolver invoked" },
+              output_keys: %i[name],
+              fields: { name: :name }
+            }
+          }
+        )
+        recording = build_recording(
+          recordable_type: "Page",
+          recordable: RecordableStub.new(id: "page-6", attributes: {})
+        )
+
+        payload = ResourceRecordingSerializer.call(
+          recording,
+          context: RelationshipContextStub.new(included: true)
+        )
+
+        refute payload.key?(:owner)
       end
 
       def test_call_filters_actions_by_api_version_profile

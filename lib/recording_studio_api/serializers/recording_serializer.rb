@@ -18,7 +18,9 @@ module RecordingStudioApi
             type: resource_type_for(recording.recordable_type),
             actions: action_names_for(recording.recordable_type, version: version, api: api),
             root_id: recording.root_recording_id,
-            parent_id: recording.parent_recording_id
+            parent_id: recording.parent_recording_id,
+            created_at: recording.respond_to?(:created_at) ? recording.created_at : nil,
+            updated_at: recording.respond_to?(:updated_at) ? recording.updated_at : nil
           }
         end
 

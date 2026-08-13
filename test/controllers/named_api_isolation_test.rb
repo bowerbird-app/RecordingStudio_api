@@ -11,12 +11,14 @@ class NamedApiIsolationTest < ActionDispatch::IntegrationTest
     RecordingStudioApi.configuration.api(:operations) { |api| api.default_access = :read_only }
     RecordingStudioApi.register_recordable_type_api(
       "Workspace",
-      serializer: ->(_workspace) { { audience: "public" } }
+      output_keys: %i[audience],
+      fields: { audience: ->(_workspace) { "public" } }
     )
     RecordingStudioApi.register_recordable_type_api(
       "Workspace",
       api: :operations,
-      serializer: ->(_workspace) { { audience: "operations" } }
+      output_keys: %i[audience],
+      fields: { audience: ->(_workspace) { "operations" } }
     )
     RecordingStudioApi.register_default_resource_actions!
 
@@ -45,9 +47,9 @@ class NamedApiIsolationTest < ActionDispatch::IntegrationTest
     get "#{operations_root_path}/workspaces", headers: bearer_headers(@operations_token)
 
     assert_response :success
-    data = JSON.parse(response.body).fetch("data")
-    assert_not_empty data
-    assert_equal({ "audience" => "operations" }, data.first.fetch("attributes"))
+    records = JSON.parse(response.body).fetch("records")
+    assert_not_empty records
+    assert_equal "operations", records.first.fetch("audience")
 
     post "#{operations_root_path}/workspaces",
          params: { attributes: { name: "Blocked write" } },

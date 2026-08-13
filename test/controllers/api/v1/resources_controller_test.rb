@@ -109,7 +109,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
 
     first_payload = JSON.parse(response.body)
     first_meta = first_payload.fetch("meta")
-    first_page_ids = first_payload.fetch("data").map { |row| row.fetch("id") }
+    first_page_ids = first_payload.fetch("records").map { |row| row.fetch("id") }
 
     assert_equal 2, first_meta.fetch("limit")
     assert_equal "created_at", first_meta.fetch("sort")
@@ -123,7 +123,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
 
     second_payload = JSON.parse(response.body)
     second_meta = second_payload.fetch("meta")
-    second_page_ids = second_payload.fetch("data").map { |row| row.fetch("id") }
+    second_page_ids = second_payload.fetch("records").map { |row| row.fetch("id") }
 
     assert_equal false, second_meta.fetch("has_more")
     assert_nil second_meta.fetch("next_pagination_token")
@@ -168,9 +168,9 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
 
     payload = JSON.parse(response.body)
-    data = payload.fetch("data")
-    workspace_ids = data.map { |row| row.fetch("id") }
-    workspace_names = data.map { |row| row.fetch("attributes").fetch("name") }
+    records = payload.fetch("records")
+    workspace_ids = records.map { |row| row.fetch("id") }
+    workspace_names = records.map { |row| row.fetch("name") }
 
     assert_equal "name", payload.fetch("meta").fetch("sort")
     assert workspace_ids.include?(workspace_a_recording.id)
@@ -192,10 +192,104 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
 
-    payload = JSON.parse(response.body).fetch("data")
+    payload = JSON.parse(response.body)
     assert_equal page_recording.id, payload.fetch("id")
     assert_equal "page", payload.fetch("type")
     assert_not_includes payload.keys, "attributes"
+    assert payload.fetch("created_at")
+    assert payload.fetch("updated_at")
+  end
+
+  test "expands a request-driven named children relationship in the flat payload" do
+    RecordingStudioApi.register_recordable_type_api(
+      "Workspace",
+      relationships: { folders: { source: :children, types: ["Folder"], include: :request } }
+    )
+    folder_recording = RecordingStudio::Recording.create!(
+      recordable: Folder.create!(name: "Included folder"),
+      parent_recording: @root_recording
+    )
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}",
+        params: { include: true },
+        headers: authorization_headers
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    folders = payload.fetch("folders")
+
+    assert_equal [folder_recording.id], folders.map { |child| child.fetch("id") }
+    refute payload.key?("relationships")
+    refute payload.key?("data")
+  end
+
+  test "exposes a named custom relationship without a relationship wrapper" do
+    RecordingStudioApi.register_recordable_type_api(
+      "Workspace",
+      relationships: {
+        summary: {
+          source: :custom,
+          include: true,
+          resolver: ->(workspace) { { label: workspace.name.upcase } },
+          output_keys: %i[label],
+          fields: { label: :label }
+        }
+      }
+    )
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}", headers: authorization_headers
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert_equal({ "label" => @root_recording.recordable.name.upcase }, payload.fetch("summary"))
+    refute payload.key?("relationships")
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/summary",
+        headers: authorization_headers
+
+    assert_response :success
+    assert_equal(
+      [{ "label" => @root_recording.recordable.name.upcase }],
+      JSON.parse(response.body).fetch("records")
+    )
+  end
+
+  test "creates and updates declared children through a named relationship endpoint" do
+    RecordingStudioApi.register_recordable_type_api(
+      "Workspace",
+      relationships: { folders: { source: :children, types: ["Folder"], write: true } }
+    )
+
+    post "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders", params: {
+      type: "folders",
+      attributes: { name: "Nested folder" }
+    }, headers: authorization_headers
+
+    assert_response :created
+    child_id = JSON.parse(response.body).fetch("id")
+
+    patch "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders/#{child_id}", params: {
+      attributes: { name: "Renamed nested folder" }
+    }, headers: authorization_headers
+
+    assert_response :success
+    assert_equal "Renamed nested folder", RecordingStudio::Recording.find(child_id).recordable.name
+  end
+
+  test "does not expose writes for immutable named relationships" do
+    RecordingStudioApi.register_recordable_type_api(
+      "Workspace",
+      relationships: { folders: { source: :children, types: ["Folder"], write: true } },
+      immutable_relationships: %i[folders]
+    )
+
+    post "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders", params: {
+      type: "folders",
+      attributes: { name: "Blocked folder" }
+    }, headers: authorization_headers
+
+    assert_response :unprocessable_entity
+    assert_includes JSON.parse(response.body).fetch("error"), "folders is immutable"
   end
 
   test "lists available API resources when no resource param is provided" do
@@ -220,10 +314,10 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :created
 
-    payload = JSON.parse(response.body).fetch("data")
+    payload = JSON.parse(response.body)
     assert_equal "workspace", payload.fetch("type")
-    assert_equal "Created Workspace", payload.fetch("attributes").fetch("name")
-    assert_not_includes payload.fetch("attributes").keys, "unknown_attribute"
+    assert_equal "Created Workspace", payload.fetch("name")
+    assert_not_includes payload.keys, "unknown_attribute"
   end
 
   test "rejects resource operations excluded by a recordable allowlist" do
@@ -269,6 +363,25 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     workspace = workspace_recording.reload.recordable
     assert_equal "Updated", workspace.name
     assert_not_equal requested_created_at, workspace.created_at.iso8601
+  end
+
+  test "allows immutable fields on create but ignores them on update" do
+    RecordingStudioApi.register_recordable_type_api("Workspace", immutable_fields: %i[name])
+    original_name = @root_recording.recordable.name
+
+    patch "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}", params: {
+      attributes: { name: "Attempted rename" }
+    }, headers: authorization_headers
+
+    assert_response :success
+    assert_equal original_name, @root_recording.recordable.reload.name
+
+    post "/recording_studio_api/api/v1/workspaces", params: {
+      attributes: { name: "Write-once workspace" }
+    }, headers: authorization_headers
+
+    assert_response :created
+    assert_equal "Write-once workspace", JSON.parse(response.body).fetch("name")
   end
 
   test "returns validation errors when creating a page without a title" do
@@ -353,7 +466,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
 
     assert_equal original_title, page_recording.recordable.reload.title
-    assert_not_includes JSON.parse(response.body).fetch("data").keys, "attributes"
+    assert_not_includes JSON.parse(response.body).keys, "attributes"
   end
 
   test "rejects create when parent is outside authenticated scope" do
@@ -405,7 +518,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     delete "/recording_studio_api/api/v1/pages/#{page_recording.id}", headers: authorization_headers
 
     assert_response :success
-    payload = JSON.parse(response.body).fetch("data")
+    payload = JSON.parse(response.body)
 
     assert_equal page_recording.id, payload.fetch("id")
     assert_equal true, payload.fetch("deleted")

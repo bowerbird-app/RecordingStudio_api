@@ -46,7 +46,8 @@ module ApiDummyHelpers
       "AdminRoot",
       api: :operations,
       operations: %i[index show],
-      serializer: ->(recordable) { { name: recordable.name } }
+      output_keys: %i[name],
+      fields: { name: :name }
     )
   end
 
@@ -173,7 +174,8 @@ module ApiDummyHelpers
   def register_dummy_recordable_type_apis!
     RecordingStudioApi.register_recordable_type_api(
       "Workspace",
-      serializer: ->(recordable) { { name: recordable.name } },
+      output_keys: %i[name],
+      fields: { name: :name },
       sortable_attributes: %i[name],
       writable_attributes: %i[name],
       openapi: {
@@ -189,7 +191,8 @@ module ApiDummyHelpers
 
     RecordingStudioApi.register_recordable_type_api(
       "Folder",
-      serializer: ->(recordable) { { name: recordable.name } },
+      output_keys: %i[name],
+      fields: { name: :name },
       sortable_attributes: %i[name],
       writable_attributes: %i[name],
       capability_actions: %i[move],
