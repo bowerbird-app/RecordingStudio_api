@@ -195,6 +195,8 @@ module RecordingStudioApi
           assert_includes endpoints.map { |endpoint| [endpoint.fetch(:verb), endpoint.fetch(:path)] },
                           ["GET", "/recording_studio_api/api/v1/workspaces/:id/folders"]
           assert_includes endpoints.map { |endpoint| [endpoint.fetch(:verb), endpoint.fetch(:path)] },
+                          ["GET", "/recording_studio_api/api/v1/workspaces/:id/folders/:relationship_id"]
+          assert_includes endpoints.map { |endpoint| [endpoint.fetch(:verb), endpoint.fetch(:path)] },
                           ["POST", "/recording_studio_api/api/v1/workspaces/:id/folders"]
         end
       end

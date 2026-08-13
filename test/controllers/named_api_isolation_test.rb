@@ -18,12 +18,13 @@ class NamedApiIsolationTest < ActionDispatch::IntegrationTest
       "Workspace",
       api: :operations,
       output_keys: %i[audience],
-      fields: { audience: ->(_workspace) { "operations" } }
+      fields: { audience: ->(_workspace) { "operations" } },
+      relationships: { folders: { source: :children, types: ["Folder"] } }
     )
     RecordingStudioApi.register_default_resource_actions!
 
     user = create_user
-    _root_recording, @access_recording = create_access_recording_for(user: user)
+    @root_recording, @access_recording = create_access_recording_for(user: user)
     @public_token = issue_oauth_access_token_for(access_recording: @access_recording)
     @operations_token = issue_operations_token
   end
@@ -57,6 +58,22 @@ class NamedApiIsolationTest < ActionDispatch::IntegrationTest
 
     assert_response :unprocessable_content
     assert_equal 0, Workspace.where(name: "Blocked write").count
+  end
+
+  test "named api shows a direct configured child relationship record" do
+    folder_recording = RecordingStudio::Recording.create!(
+      recordable: Folder.create!(name: "Operations child"),
+      parent_recording: @root_recording
+    )
+
+    get "#{operations_root_path}/workspaces/#{@root_recording.id}/folders/#{folder_recording.id}",
+        headers: bearer_headers(@operations_token)
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert_equal folder_recording.id, payload.fetch("id")
+    assert_equal "folder", payload.fetch("type")
+    refute payload.key?("data")
   end
 
   private

@@ -236,6 +236,22 @@ module RecordingStudioApi
               responses: relationship_collection_responses(relationship)
             }
           }
+          if relationship.fetch(:source) == :children
+            endpoints << {
+              verb: "GET",
+              path: "#{path}/:relationship_id",
+              action: "relationship_resources#show",
+              summary: "Show #{name.humanize.downcase}",
+              description: "Show a direct child record in the #{name} relationship.",
+              capability: nil,
+              scope: :resource,
+              openapi: {
+                tags: [openapi_tag_for(resource_name, recordable_type)],
+                parameters: [id_parameter, relationship_id_parameter],
+                responses: relationship_item_responses(relationship, operation: :show)
+              }
+            }
+          end
         end
         return endpoints unless writable_child_relationship?(relationship, registration, name)
 

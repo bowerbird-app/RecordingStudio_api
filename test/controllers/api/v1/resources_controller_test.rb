@@ -223,6 +223,52 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     refute payload.key?("data")
   end
 
+  test "shows a direct configured child relationship record with a flat payload" do
+    RecordingStudioApi.register_recordable_type_api(
+      "Workspace",
+      relationships: { folders: { source: :children, types: ["Folder"] } }
+    )
+    folder_recording = RecordingStudio::Recording.create!(
+      recordable: Folder.create!(name: "Direct child"),
+      parent_recording: @root_recording
+    )
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders/#{folder_recording.id}",
+        headers: authorization_headers
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert_equal folder_recording.id, payload.fetch("id")
+    assert_equal "folder", payload.fetch("type")
+    assert_equal "Direct child", payload.fetch("name")
+    refute payload.key?("data")
+    refute payload.key?("attributes")
+  end
+
+  test "does not expose direct records through a custom relationship" do
+    RecordingStudioApi.register_recordable_type_api(
+      "Workspace",
+      relationships: {
+        summary: {
+          source: :custom,
+          resolver: ->(workspace) { { label: workspace.name } },
+          output_keys: %i[label],
+          fields: { label: :label }
+        }
+      }
+    )
+    folder_recording = RecordingStudio::Recording.create!(
+      recordable: Folder.create!(name: "Not a custom relationship child"),
+      parent_recording: @root_recording
+    )
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/summary/#{folder_recording.id}",
+        headers: authorization_headers
+
+    assert_response :unprocessable_entity
+    assert_includes JSON.parse(response.body).fetch("error"), "summary is not a child relationship"
+  end
+
   test "exposes a named custom relationship without a relationship wrapper" do
     RecordingStudioApi.register_recordable_type_api(
       "Workspace",

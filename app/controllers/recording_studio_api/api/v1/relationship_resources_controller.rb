@@ -17,6 +17,14 @@ module RecordingStudioApi
           render json: { relationship: relationship_name, records: records }
         end
 
+        def show
+          assert_readable_children!
+          child = child_recording
+          assert_operation_enabled!(child.recordable_type, :show)
+
+          render json: serialize_recording(child, context: relationship_context.nested)
+        end
+
         def create
           assert_writable_children!
           child_type = resolve_child_type!
@@ -166,6 +174,15 @@ module RecordingStudioApi
 
           raise RecordingStudioApi::UnsupportedActionError,
                 "#{relationship_name} is not readable for #{parent_recording.recordable_type}"
+        end
+
+        def assert_readable_children!
+          current_access_grant.authorize!(recording: parent_recording, role: :view)
+          assert_readable!
+          return if relationship.fetch(:source) == :children
+
+          raise RecordingStudioApi::UnsupportedActionError,
+                "#{relationship_name} is not a child relationship"
         end
 
         def assert_writable_children!
