@@ -130,6 +130,7 @@ module RecordingStudioApi
 
     def parse_include_values(value)
       return [] if value.nil?
+
       raise_invalid_include!("must be one comma-separated string") unless value.is_a?(String)
 
       names = value.split(",", -1)
@@ -180,6 +181,7 @@ module RecordingStudioApi
 
     def normalize_custom_targets(value, name, definition)
       return [] if value.nil?
+
       if definition.many
         raise_invalid_target!(name, "must return a collection of recordings") unless collection?(value)
 

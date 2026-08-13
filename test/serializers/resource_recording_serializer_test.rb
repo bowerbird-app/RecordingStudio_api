@@ -134,7 +134,7 @@ module RecordingStudioApi
 
         assert_equal "child-1", payload.fetch("owner").fetch(:id)
         assert_equal "Child", payload.fetch("owner").fetch(:label)
-        assert_equal ["child-1"], payload.fetch("children").map { |entry| entry.fetch(:id) }
+        assert_equal(["child-1"], payload.fetch("children").map { |entry| entry.fetch(:id) })
         assert_equal({ "count" => 1 }, payload.fetch(:_meta).fetch("children"))
 
         null_context = PreparedRelationshipContext.new(selected: ["owner"], values: { "owner" => nil })
@@ -149,7 +149,7 @@ module RecordingStudioApi
         )
         child_registration = registration(
           "Folder", serializer: ->(_recordable) { { child_label: "wrong serializer" } }, output_keys: ["child_label"],
-          relationships: { "nested" => relationship }
+                    relationships: { "nested" => relationship }
         )
         context = PreparedRelationshipContext.new(selected: ["owner"], values: { "owner" => child })
 
@@ -195,7 +195,7 @@ module RecordingStudioApi
       end
 
       def relationship(many: false, serializer: ->(recordable) { { label: recordable.title } }, output_keys: ["label"])
-        options = { source: :custom, many: many, include: :request, resolver: ->(_context) { nil }, serializer: serializer, output_keys: output_keys }
+        options = { source: :custom, many: many, include: :request, resolver: ->(_context) {}, serializer: serializer, output_keys: output_keys }
         options[:limit] = 10 if many
         options
       end
@@ -214,8 +214,8 @@ module RecordingStudioApi
         end
       end
 
-      def with_registrations(registrations)
-        RecordingStudioApi.stub(:recordable_registration_for, ->(type, **) { registrations.fetch(type.to_s) }) { yield }
+      def with_registrations(registrations, &)
+        RecordingStudioApi.stub(:recordable_registration_for, ->(type, **) { registrations.fetch(type.to_s) }, &)
       end
     end
   end

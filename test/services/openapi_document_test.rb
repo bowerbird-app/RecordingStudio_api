@@ -332,7 +332,7 @@ module RecordingStudioApi
             endpoints: %i[index]
           },
           owner: {
-            source: :custom, many: false, include: true, resolver: ->(*) { nil },
+            source: :custom, many: false, include: true, resolver: ->(*) {},
             serializer: ->(*) { { name: "Owner" } }, output_keys: %i[name]
           }
         }
@@ -358,7 +358,7 @@ module RecordingStudioApi
             serializer: ->(*) { { body: "Body" } }, output_keys: %i[body], limit: 20
           },
           author: {
-            source: :custom, many: false, include: true, resolver: ->(*) { nil },
+            source: :custom, many: false, include: true, resolver: ->(*) {},
             serializer: ->(*) { { name: "Author" } }, output_keys: %i[name]
           }
         }
@@ -372,6 +372,64 @@ module RecordingStudioApi
           refute include_parameter.fetch("schema").key?("enum")
           assert_includes include_parameter.fetch("description"), "summary, comments"
           refute_includes include_parameter.fetch("description"), "true"
+        end
+      end
+
+      def test_relationship_get_documentation_generates_descriptions_and_examples
+        relationships = {
+          folders: {
+            source: :children, child_type: "Folder", many: true, include: true,
+            serializer: ->(*) { { name: "Folder" } }, output_keys: %i[name], limit: 20,
+            endpoints: %i[index show], description: "The folders directly inside this workspace."
+          },
+          pages: {
+            source: :children, child_type: "Page", many: true, include: :request,
+            serializer: ->(*) { { title: "Page" } }, output_keys: %i[title], limit: 20,
+            endpoints: %i[index show], description: "The pages directly inside this workspace."
+          },
+          featured_folder: {
+            source: :custom, many: false, include: :request, resolver: ->(*) {},
+            serializer: ->(*) { { name: "Folder" } }, output_keys: %i[name],
+            description: "The first Folder directly inside this workspace."
+          }
+        }
+
+        with_recordable_registration(
+          "Workspace",
+          relationships: relationships,
+          openapi: {
+            show: {
+              responses: {
+                "200" => {
+                  content: {
+                    "application/json" => {
+                      examples: {
+                        host_example: { value: { id: "host-controlled-example" } }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ) do
+          document = with_recordable_types(%w[Workspace Folder Page]) { OpenapiDocument.call }
+          operation = document.fetch(:paths).fetch("/recording_studio_api/api/v1/workspaces/{id}").fetch("get")
+          response_examples = operation.fetch(:responses).fetch("200").fetch("content").fetch("application/json").fetch("examples")
+
+          assert_includes operation.fetch(:description), "The response includes `folders`, an array of Folder records with `name` (up to 20). The folders directly inside this workspace."
+          assert_includes operation.fetch(:description), "Add `include=pages` to also receive `pages`, an array of Page records with `title` (up to 20). The pages directly inside this workspace."
+          assert_includes operation.fetch(:description), "Add `include=featured_folder` to also receive `featured_folder`, one related record or `null` with `name`. The first Folder directly inside this workspace."
+          assert_includes operation.fetch(:description), "To browse folders separately, use `GET /recording_studio_api/api/v1/workspaces/{id}/folders`."
+          assert_includes operation.fetch(:description), "`featured_folder` is available only in this response; there is no separate endpoint for it."
+          assert response_examples.key?("default_relationships")
+          assert_equal "Workspace with included fields", response_examples.fetch("default_relationships").fetch("summary")
+          assert_equal "Workspace with requested details", response_examples.fetch("requested_relationships").fetch("summary")
+          assert_equal "host-controlled-example", response_examples.fetch("host_example").fetch("value").fetch("id")
+          assert_equal ["Folder"], response_examples.fetch("default_relationships").fetch("value").fetch("folders").map { |folder| folder.fetch("type") }
+          refute response_examples.fetch("default_relationships").fetch("value").key?("pages")
+          assert_equal ["Page"], response_examples.fetch("requested_relationships").fetch("value").fetch("pages").map { |page| page.fetch("type") }
+          assert_equal "Custom relationship", response_examples.fetch("requested_relationships").fetch("value").fetch("featured_folder").fetch("type")
         end
       end
 
@@ -575,7 +633,7 @@ module RecordingStudioApi
         Object.const_set(class_name, existing_class) if existing_class
       end
 
-      def with_recordable_registration(recordable_type, serializer: nil, output_keys: nil, fields: nil, relationships: nil, openapi:, operations: nil)
+      def with_recordable_registration(recordable_type, openapi:, serializer: nil, output_keys: nil, fields: nil, relationships: nil, operations: nil)
         registry = RecordingStudioApi.configuration.recordable_registry
         existing = registry[recordable_type]
 

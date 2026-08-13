@@ -200,6 +200,92 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert payload.fetch("updated_at")
   end
 
+  test "expands the dummy Workspace relationship demonstration" do
+    RecordingStudioApi.register_recordable_type_api(
+      "Workspace",
+      relationships: {
+        folders: {
+          source: :children, child_type: "Folder", many: true, include: true,
+          serializer: ->(folder, **) { { name: folder.name } }, output_keys: %i[name], limit: 20,
+          endpoints: %i[index show]
+        },
+        pages: {
+          source: :children, child_type: "Page", many: true, include: :request,
+          serializer: ->(page, **) { { title: page.title } }, output_keys: %i[title], limit: 20,
+          endpoints: %i[index show]
+        },
+        featured_folder: {
+          source: :custom, many: false, include: :request,
+          resolver: lambda do |context|
+            context.scoped_recordings.where(
+              parent_recording_id: context.recording.id,
+              recordable_type: "Folder"
+            ).order(:created_at, :id).first
+          end,
+          serializer: ->(folder, **) { { name: folder.name } }, output_keys: %i[name]
+        }
+      }
+    )
+    RecordingStudioApi.register_recordable_type_api(
+      "Page",
+      operations: %i[index show],
+      serializer: ->(page, **) { { title: page.title } },
+      output_keys: %i[title]
+    )
+    first_folder = RecordingStudio::Recording.create!(recordable: Folder.create!(name: "Included folder"), parent_recording: @root_recording)
+    second_folder = RecordingStudio::Recording.create!(recordable: Folder.create!(name: "Featured folder"), parent_recording: @root_recording)
+    first_page = RecordingStudio::Recording.create!(recordable: Page.create!(title: "Included page"), parent_recording: @root_recording)
+    second_page = RecordingStudio::Recording.create!(recordable: Page.create!(title: "Second page"), parent_recording: @root_recording)
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}", headers: authorization_headers
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert_equal([first_folder.id, second_folder.id], payload.fetch("folders").map { |folder| folder.fetch("id") })
+    refute payload.key?("pages")
+    refute payload.key?("featured_folder")
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}", params: { include: "pages" }, headers: authorization_headers
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert_equal([first_page.id, second_page.id], payload.fetch("pages").map { |page| page.fetch("id") })
+    refute payload.key?("featured_folder")
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}", params: { include: "featured_folder" }, headers: authorization_headers
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert_equal first_folder.id, payload.fetch("featured_folder").fetch("id")
+    refute payload.key?("pages")
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}", params: { include: "pages,featured_folder" }, headers: authorization_headers
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert_equal([first_page.id, second_page.id], payload.fetch("pages").map { |page| page.fetch("id") })
+    assert_equal first_folder.id, payload.fetch("featured_folder").fetch("id")
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders", headers: authorization_headers
+
+    assert_response :success
+    assert_equal([first_folder.id, second_folder.id], JSON.parse(response.body).fetch("records").map { |folder| folder.fetch("id") })
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/pages", headers: authorization_headers
+
+    assert_response :success
+    assert_equal([first_page.id, second_page.id], JSON.parse(response.body).fetch("records").map { |page| page.fetch("id") })
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}", params: { include: "unknown" }, headers: authorization_headers
+
+    assert_response :unprocessable_entity
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/featured_folder", headers: authorization_headers
+
+    assert_response :unprocessable_entity
+    assert_includes JSON.parse(response.body).fetch("error"), "featured_folder is not a direct child collection"
+  end
+
   test "expands a request-driven named children relationship in the flat payload" do
     RecordingStudioApi.register_recordable_type_api(
       "Workspace",
@@ -215,14 +301,14 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     )
 
     get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}",
-      params: { include: "folders" },
+        params: { include: "folders" },
         headers: authorization_headers
 
     assert_response :success
     payload = JSON.parse(response.body)
     folders = payload.fetch("folders")
 
-    assert_equal [folder_recording.id], folders.map { |child| child.fetch("id") }
+    assert_equal([folder_recording.id], folders.map { |child| child.fetch("id") })
     refute payload.key?("relationships")
     refute payload.key?("data")
   end
@@ -249,7 +335,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     )
     second_workspace = RecordingStudio::Recording.create!(recordable: Workspace.create!(name: "Second"), parent_recording: @root_recording)
     first_folder = RecordingStudio::Recording.create!(recordable: Folder.create!(name: "First"), parent_recording: @root_recording)
-    second_root_folder = RecordingStudio::Recording.create!(recordable: Folder.create!(name: "Second folder"), parent_recording: @root_recording)
+    RecordingStudio::Recording.create!(recordable: Folder.create!(name: "Second folder"), parent_recording: @root_recording)
     second_folder = RecordingStudio::Recording.create!(recordable: Folder.create!(name: "Third"), parent_recording: second_workspace)
 
     get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}", headers: authorization_headers
@@ -259,7 +345,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_flat_record(payload, @root_recording, type: "Workspace")
     assert payload.key?("name")
     assert_equal "active", payload.fetch("status")
-    assert_equal [first_folder.id], payload.fetch("folders").map { |folder| folder.fetch("id") }
+    assert_equal([first_folder.id], payload.fetch("folders").map { |folder| folder.fetch("id") })
     assert_equal({ "limit" => 1, "has_more" => true }, payload.fetch("_meta").fetch("folders"))
     payload.fetch("folders").each do |folder|
       assert_equal "Folder", folder.fetch("type")
@@ -288,8 +374,8 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     root_payload = records.find { |record| record.fetch("id") == @root_recording.id }
     second_payload = records.find { |record| record.fetch("id") == second_workspace.id }
     assert_equal({ "limit" => 1, "has_more" => true }, root_payload.fetch("_meta").fetch("folders"))
-    assert_equal [first_folder.id], root_payload.fetch("folders").map { |folder| folder.fetch("id") }
-    assert_equal [second_folder.id], second_payload.fetch("folders").map { |folder| folder.fetch("id") }
+    assert_equal([first_folder.id], root_payload.fetch("folders").map { |folder| folder.fetch("id") })
+    assert_equal([second_folder.id], second_payload.fetch("folders").map { |folder| folder.fetch("id") })
     refute second_payload.fetch("_meta", {}).key?("folders")
 
     get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders/#{first_folder.id}", headers: authorization_headers
@@ -348,7 +434,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
           many: false,
           resolver: ->(workspace) { { label: workspace.name } },
           serializer: ->(value, **) { value },
-          output_keys: %i[label],
+          output_keys: %i[label]
         }
       }
     )
@@ -374,7 +460,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
           include: true,
           resolver: ->(workspace) { { label: workspace.name.upcase } },
           serializer: ->(value, **) { value },
-          output_keys: %i[label],
+          output_keys: %i[label]
         }
       }
     )
@@ -472,7 +558,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders?limit=1", headers: authorization_headers
 
     assert_response :success
-    assert_equal [child.id], JSON.parse(response.body).fetch("records").map { |record| record.fetch("id") }
+    assert_equal([child.id], JSON.parse(response.body).fetch("records").map { |record| record.fetch("id") })
   ensure
     RecordingStudioApi::RelationshipContext.define_method(:relationship_value, original) if original
   end
@@ -511,8 +597,8 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
       "Workspace",
       relationships: {
         endpoint_folders: { source: :children, child_type: "Folder", many: true,
-                   serializer: ->(recordable, **) { { name: recordable.name } }, output_keys: %i[name], limit: 20,
-                   endpoints: %i[index] }
+                            serializer: ->(recordable, **) { { name: recordable.name } }, output_keys: %i[name], limit: 20,
+                            endpoints: %i[index] }
       }
     )
 
@@ -528,8 +614,8 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
       "Workspace",
       relationships: {
         operation_folders: { source: :children, child_type: "Folder", many: true,
-                   serializer: ->(recordable, **) { { name: recordable.name } }, output_keys: %i[name], limit: 20,
-                   endpoints: %i[index show update destroy] }
+                             serializer: ->(recordable, **) { { name: recordable.name } }, output_keys: %i[name], limit: 20,
+                             endpoints: %i[index show update destroy] }
       }
     )
 
@@ -586,7 +672,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
 
     get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders", headers: authorization_headers
     assert_response :success
-    assert_equal [direct_child.id], JSON.parse(response.body).fetch("records").map { |record| record.fetch("id") }
+    assert_equal([direct_child.id], JSON.parse(response.body).fetch("records").map { |record| record.fetch("id") })
 
     [other_parent.id, descendant.id, wrong_type.id].each do |child_id|
       get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders/#{child_id}", headers: authorization_headers
@@ -636,7 +722,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     get "/recording_studio_api/apis/public/v1/workspaces/#{@root_recording.id}/folders", headers: authorization_headers
 
     assert_response :success
-    assert_equal [child.id], JSON.parse(response.body).fetch("records").map { |record| record.fetch("id") }
+    assert_equal([child.id], JSON.parse(response.body).fetch("records").map { |record| record.fetch("id") })
   end
 
   test "lists available API resources when no resource param is provided" do

@@ -19,9 +19,9 @@ module RecordingStudioApi
     def load_children
       child_entries.group_by { |_parent, _name, definition| child_key(definition) }.each_value do |entries|
         definition = entries.first.last
-         rows = bounded_children(entries.map { |parent, _name, _definition| parent.id }.uniq, definition)
-           .group_by(&:parent_recording_id)
-           .transform_values { |children| children.sort_by { |child| child[:relationship_row_number].to_i } }
+        rows = bounded_children(entries.map { |parent, _name, _definition| parent.id }.uniq, definition)
+               .group_by(&:parent_recording_id)
+               .transform_values { |children| children.sort_by { |child| child[:relationship_row_number].to_i } }
         entries.each do |parent, name, entry_definition|
           children = rows.fetch(parent.id, [])
           @context.authorize_relationship!(parent, name, entry_definition)
@@ -39,9 +39,7 @@ module RecordingStudioApi
       custom_entries.group_by { |_parent, name, definition| [name.to_s, definition, definition.resolver] }.each_value do |entries|
         definition = entries.first.last
         resolver = definition.resolver
-        unless resolver.respond_to?(:call_many)
-          raise ConfigurationError, "Custom relationship #{entries.first[1]} requires resolver.call_many(contexts) for index expansion"
-        end
+        raise ConfigurationError, "Custom relationship #{entries.first[1]} requires resolver.call_many(contexts) for index expansion" unless resolver.respond_to?(:call_many)
 
         contexts = entries.map { |parent, name, entry_definition| @context.resolver_context(parent, entry_definition, name: name) }
         values = resolver.call_many(contexts)
@@ -61,14 +59,14 @@ module RecordingStudioApi
       order_sql = order_sql(definition, quoted_table)
       limit = definition.limit
       source = @context.scoped_recordings
-        .where(parent_recording_id: parent_ids, recordable_type: definition.child_type)
-        .reorder(Arel.sql(order_sql))
-        .select("#{quoted_table}.*, ROW_NUMBER() OVER (PARTITION BY #{quoted_table}.parent_recording_id ORDER BY #{order_sql}) AS relationship_row_number")
+                       .where(parent_recording_id: parent_ids, recordable_type: definition.child_type)
+                       .reorder(Arel.sql(order_sql))
+                       .select("#{quoted_table}.*, ROW_NUMBER() OVER (PARTITION BY #{quoted_table}.parent_recording_id ORDER BY #{order_sql}) AS relationship_row_number")
       @context.scoped_recordings.klass
-        .from("(#{source.to_sql}) #{quoted_table}")
-        .where("relationship_row_number <= ?", limit + 1)
-        .preload(:recordable)
-        .to_a
+              .from("(#{source.to_sql}) #{quoted_table}")
+              .where("relationship_row_number <= ?", limit + 1)
+              .preload(:recordable)
+              .to_a
     end
 
     def order_sql(definition, quoted_table)
@@ -84,15 +82,13 @@ module RecordingStudioApi
       end.join(", ")
     end
 
-    def validate_many_result!(values, entries, definition)
-      unless values.is_a?(Hash)
-        raise ConfigurationError, "Custom relationship #{entries.first[1]} call_many must return a hash keyed by primary recording id"
-      end
+    def validate_many_result!(values, entries, _definition)
+      raise ConfigurationError, "Custom relationship #{entries.first[1]} call_many must return a hash keyed by primary recording id" unless values.is_a?(Hash)
 
       ids = entries.map { |parent, _name, _definition| parent.id }
-      unless (values.keys - ids).empty? && values.values.all? { |value| value.nil? || @context.recording?(value) || @context.collection?(value) }
-        raise ConfigurationError, "Custom relationship #{entries.first[1]} call_many returned an invalid key or value"
-      end
+      return if (values.keys - ids).empty? && values.values.all? { |value| value.nil? || @context.recording?(value) || @context.collection?(value) }
+
+      raise ConfigurationError, "Custom relationship #{entries.first[1]} call_many returned an invalid key or value"
     end
 
     def child_entries

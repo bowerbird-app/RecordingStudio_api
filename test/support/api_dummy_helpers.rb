@@ -49,7 +49,7 @@ module ApiDummyHelpers
       api: :operations,
       operations: %i[index show],
       serializer: ->(recordable, **) { { name: recordable.name } },
-      output_keys: %i[name],
+      output_keys: %i[name]
     )
   end
 

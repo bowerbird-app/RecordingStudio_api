@@ -7,8 +7,10 @@ module RecordingStudioApi
                 :selected_include_names, :target_recording
 
     def self.build(recording:, context:, api_version:, api_key:, registration:, field: nil, relationship: nil)
-      return context.with(recording: recording, recordable: recording.recordable, registration: registration,
-              field: field, relationship: relationship, target_recording: nil) if context.is_a?(self)
+      if context.is_a?(self)
+        return context.with(recording: recording, recordable: recording.recordable, registration: registration,
+                            field: field, relationship: relationship, target_recording: nil)
+      end
 
       new(
         recording: recording,
@@ -27,8 +29,8 @@ module RecordingStudioApi
     end
 
     def initialize(recording:, recordable:, access_grant:, scoped_recordings:, api_version:, api_key:, params:,
-             registration:, selected_include_names: nil, relationship_context: nil, field: nil, relationship: nil,
-             target_recording: nil)
+                   registration:, selected_include_names: nil, relationship_context: nil, field: nil, relationship: nil,
+                   target_recording: nil)
       @recording = recording
       @recordable = recordable
       @access_grant = access_grant
@@ -47,7 +49,7 @@ module RecordingStudioApi
     end
 
     def with(recording: @recording, recordable: @recordable, registration: @registration, field: @field, relationship: @relationship,
-         target_recording: @target_recording)
+             target_recording: @target_recording)
       self.class.new(
         recording: recording, recordable: recordable, access_grant: access_grant,
         scoped_recordings: scoped_recordings, api_version: api_version, api_key: api_key, params: params,
@@ -57,23 +59,21 @@ module RecordingStudioApi
     end
 
     def include?(name, definition = nil)
-      return @relationship_context.include?(name, definition) if @relationship_context&.respond_to?(:include?)
+      return @relationship_context.include?(name, definition) if @relationship_context.respond_to?(:include?)
 
       selected_include_names.include?(name.to_s)
     end
 
     def relationship_value(recording, name, definition)
-      return @relationship_context.relationship_value(recording, name, definition) if @relationship_context&.respond_to?(:relationship_value)
+      @relationship_context.relationship_value(recording, name, definition) if @relationship_context.respond_to?(:relationship_value)
     end
 
     def relationship_metadata(recording, name)
-      return @relationship_context.relationship_metadata(recording, name) if @relationship_context&.respond_to?(:relationship_metadata)
+      @relationship_context.relationship_metadata(recording, name) if @relationship_context.respond_to?(:relationship_metadata)
     end
 
-    private
-
     def self.context_value(context, name)
-      context.public_send(name) if context&.respond_to?(name)
+      context.public_send(name) if context.respond_to?(name)
     end
   end
 end

@@ -246,9 +246,9 @@ module RecordingStudioApi
                 source: :custom,
                 many: false,
                 include: true,
-                resolver: ->(_workspace) { nil },
+                resolver: ->(_workspace) {},
                 serializer: ->(*) {},
-                output_keys: %i[name],
+                output_keys: %i[name]
               }
             }
           ) do
@@ -336,7 +336,7 @@ module RecordingStudioApi
         relationships = {
           folders: { source: :children, child_type: "Folder", many: true, serializer: ->(*) {},
                      output_keys: %i[name], limit: 20, endpoints: %i[index create] },
-          owner: { source: :custom, many: false, include: true, resolver: ->(*) { nil },
+          owner: { source: :custom, many: false, include: true, resolver: ->(*) {},
                    serializer: ->(*) {}, output_keys: %i[name] }
         }
 

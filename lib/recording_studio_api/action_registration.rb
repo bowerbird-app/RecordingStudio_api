@@ -12,7 +12,6 @@ module RecordingStudioApi
 
     attr_reader :name, :capability, :version, :version_notes, :deprecation, :http_verb, :handler, :serializer, :scope, :openapi, :input_contract, :required_role
 
-    # rubocop:disable Metrics/ParameterLists
     def initialize(name:, capability:, http_verb:, handler:, version: nil, version_notes: nil, deprecation: nil, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil)
       @name = name.to_s
       @capability = capability&.to_sym
@@ -27,7 +26,6 @@ module RecordingStudioApi
       @input_contract = normalize_input_contract(input_contract)
       @required_role = normalize_required_role(required_role)
     end
-    # rubocop:enable Metrics/ParameterLists
 
     # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
     def validate!

@@ -38,9 +38,9 @@ class RelationshipContextSecurityTest < ActiveSupport::TestCase
     folder = RecordingStudio::Recording.create!(recordable: Folder.create!(name: "Direct"), parent_recording: @primary)
     RecordingStudio::Recording.create!(recordable: Folder.create!(name: "Descendant"), parent_recording: folder)
     registration = registration(relationships: {
-      "folders" => relationship(source: :children, child_type: "Folder", many: true),
-      "custom" => relationship(resolver: ->(_context) { called = true })
-    })
+                                  "folders" => relationship(source: :children, child_type: "Folder", many: true),
+                                  "custom" => relationship(resolver: ->(_context) { called = true })
+                                })
     with_registration(registration) do
       assert_raises(RecordingStudioApi::InvalidActionInputError) { context_for("unknown") }
       refute called
@@ -54,10 +54,13 @@ class RelationshipContextSecurityTest < ActiveSupport::TestCase
     hidden = RecordingStudio::Recording.create!(recordable: Folder.create!(name: "Hidden"), parent_recording: @primary)
     received = nil
     registration = registration(relationships: {
-      "many" => relationship(many: true, resolver: ->(context) { received = context; [visible, hidden] }),
-      "invalid" => relationship(resolver: ->(_context) { Folder.first }),
-      "denied" => relationship(authorize: ->(_context) { false })
-    })
+                                  "many" => relationship(many: true, resolver: lambda { |context|
+                                    received = context
+                                    [visible, hidden]
+                                  }),
+                                  "invalid" => relationship(resolver: ->(_context) { Folder.first }),
+                                  "denied" => relationship(authorize: ->(_context) { false })
+                                })
     with_registration(registration) do
       context = context_for("many,invalid,denied", scope: [@primary, visible], params: { "filter" => "recent" })
       assert_equal [visible], context.relationship_value(@primary, "many", registration.relationships.fetch("many"))
@@ -154,7 +157,7 @@ class RelationshipContextSecurityTest < ActiveSupport::TestCase
 
   def relationship(source: :custom, child_type: nil, many: false, include: :request, resolver: nil, authorize: nil)
     options = { source: source, many: many, include: include, serializer: ->(_value) { { "name" => "value" } }, output_keys: ["name"], authorize: authorize }
-    source == :children ? options[:child_type] = child_type : options[:resolver] = resolver || ->(_context) { nil }
+    source == :children ? options[:child_type] = child_type : options[:resolver] = resolver || ->(_context) {}
     options[:limit] = 10 if many
     options
   end
@@ -163,7 +166,7 @@ class RelationshipContextSecurityTest < ActiveSupport::TestCase
     RecordingStudioApi::RelationshipContext.for(recordings: [@primary], include_values: include_values, scoped_recordings: RecordingStudio::Recording.where(id: scope.map(&:id)), api_key: :public, api_version: "v1", access_grant: access_grant, params: params, batch: batch)
   end
 
-  def with_registration(registration)
-    RecordingStudioApi.stub(:recordable_registration_for, ->(*, **) { registration }) { yield }
+  def with_registration(registration, &)
+    RecordingStudioApi.stub(:recordable_registration_for, ->(*, **) { registration }, &)
   end
 end

@@ -111,7 +111,6 @@ module RecordingStudioApi
       Integration.oauth_error_status(error)
     end
 
-    # rubocop:disable Metrics/ParameterLists
     def register_capability_action(name, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil, api: :public)
       configuration.api(api).action_registry.register(
         name,
@@ -128,7 +127,6 @@ module RecordingStudioApi
         required_role: required_role
       )
     end
-    # rubocop:enable Metrics/ParameterLists
 
     def register_recordable_type_api(recordable_type, serializer: nil, output_keys: nil, fields: nil, openapi: nil,
                                      sortable_attributes: nil, writable_attributes: nil, immutable_fields: nil,

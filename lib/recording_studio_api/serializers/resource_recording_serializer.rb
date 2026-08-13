@@ -4,7 +4,7 @@ module RecordingStudioApi
   module Serializers
     class ResourceRecordingSerializer
       BASE_KEYS = %w[id type parent_id root_id created_at updated_at].freeze
-      RESERVED_KEYS = (BASE_KEYS + ["_meta", "actions"]).freeze
+      RESERVED_KEYS = (BASE_KEYS + %w[_meta actions]).freeze
 
       class << self
         def call(recording, version: nil, api: :public, context: nil, expand_relationships: true)
@@ -24,7 +24,7 @@ module RecordingStudioApi
         private
 
         def serialized_attributes(registration, context)
-          serializer = registration.serializer if registration&.respond_to?(:serializer)
+          serializer = registration.serializer if registration.respond_to?(:serializer)
           return {} unless serializer.respond_to?(:call)
 
           value = call_with_context(serializer, context.recordable, context)
@@ -100,8 +100,10 @@ module RecordingStudioApi
           fields = registration ? registration.fields.keys.map(&:to_s) : []
           invalid = values.keys & (RESERVED_KEYS + fields + relationships)
           raise ConfigurationError, "Serializer emitted reserved keys: #{invalid.join(', ')}" if invalid.any?
+
           undeclared = values.keys - declared
           raise ConfigurationError, "Serializer emitted undeclared keys: #{undeclared.join(', ')}" if undeclared.any?
+
           collisions = values.keys & payload.keys.map(&:to_s)
           raise ConfigurationError, "Serializer collided with response keys: #{collisions.join(', ')}" if collisions.any?
 
@@ -114,6 +116,7 @@ module RecordingStudioApi
           relationship_names = registration.relationships.keys.map(&:to_s)
           invalid = values.keys & (RESERVED_KEYS + Array(registration.output_keys).map(&:to_s) + relationship_names)
           raise ConfigurationError, "Fields emitted reserved keys: #{invalid.join(', ')}" if invalid.any?
+
           collisions = values.keys & payload.keys.map(&:to_s)
           raise ConfigurationError, "Fields collided with response keys: #{collisions.join(', ')}" if collisions.any?
 
@@ -123,8 +126,10 @@ module RecordingStudioApi
         def merge_relationship_serializer_output!(payload, values, definition)
           invalid = values.keys & RESERVED_KEYS
           raise ConfigurationError, "Relationship serializer emitted reserved keys: #{invalid.join(', ')}" if invalid.any?
+
           undeclared = values.keys - definition.output_keys
           raise ConfigurationError, "Relationship serializer emitted undeclared keys: #{undeclared.join(', ')}" if undeclared.any?
+
           collisions = values.keys & payload.keys.map(&:to_s)
           raise ConfigurationError, "Relationship serializer collided with response keys: #{collisions.join(', ')}" if collisions.any?
 
@@ -141,7 +146,7 @@ module RecordingStudioApi
         def call_with_context(callable, value, context)
           parameters = callable.respond_to?(:parameters) ? callable.parameters : callable.method(:call).parameters
           accepts_context = parameters.any? do |kind, name|
-            [:key, :keyreq, :keyrest].include?(kind) && (name == :context || kind == :keyrest)
+            %i[key keyreq keyrest].include?(kind) && (name == :context || kind == :keyrest)
           end
           accepts_context ? callable.call(value, context: context) : callable.call(value)
         end
@@ -170,7 +175,7 @@ module RecordingStudioApi
         end
 
         def stringify_keys(value)
-          value.each_with_object({}) { |(key, entry), output| output[key.to_s] = entry }
+          value.transform_keys(&:to_s)
         end
       end
     end

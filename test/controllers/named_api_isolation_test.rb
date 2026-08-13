@@ -101,14 +101,14 @@ class NamedApiIsolationTest < ActionDispatch::IntegrationTest
 
     get "#{operations_root_path}/workspaces/#{@root_recording.id}/folders", headers: bearer_headers(@operations_token)
     assert_response :success
-    assert_equal [folder_recording.id], JSON.parse(response.body).fetch("records").map { |record| record.fetch("id") }
+    assert_equal([folder_recording.id], JSON.parse(response.body).fetch("records").map { |record| record.fetch("id") })
 
     get "#{operations_root_path}/workspaces/#{@root_recording.id}/public_folders", headers: bearer_headers(@operations_token)
     assert_response :unprocessable_entity
 
     get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/public_folders", headers: bearer_headers(@public_token)
     assert_response :success
-    assert_equal [folder_recording.id], JSON.parse(response.body).fetch("records").map { |record| record.fetch("id") }
+    assert_equal([folder_recording.id], JSON.parse(response.body).fetch("records").map { |record| record.fetch("id") })
 
     get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders", headers: bearer_headers(@public_token)
     assert_response :unprocessable_entity

@@ -37,9 +37,9 @@ module RecordingStudioApi
 
     class RelationshipDefinition
       attr_reader :source, :child_type, :many, :include, :resolver, :serializer, :output_keys,
-                  :limit, :order, :endpoints, :authorize, :openapi
+                  :limit, :order, :endpoints, :authorize, :description, :openapi
 
-      def initialize(source:, child_type:, many:, include:, resolver:, serializer:, output_keys:, limit:, order:, endpoints:, authorize:, openapi:)
+      def initialize(source:, child_type:, many:, include:, resolver:, serializer:, output_keys:, limit:, order:, endpoints:, authorize:, description:, openapi:)
         @source = source
         @child_type = child_type
         @many = many
@@ -51,6 +51,7 @@ module RecordingStudioApi
         @order = order
         @endpoints = endpoints
         @authorize = authorize
+        @description = description
         @openapi = openapi
         freeze
       end
@@ -64,7 +65,7 @@ module RecordingStudioApi
         {
           source: source, child_type: child_type, many: many, include: include, resolver: resolver,
           serializer: serializer, output_keys: output_keys, limit: limit, order: order,
-          endpoints: endpoints, authorize: authorize, openapi: openapi
+          endpoints: endpoints, authorize: authorize, description: description, openapi: openapi
         }.freeze
       end
 
@@ -119,10 +120,12 @@ module RecordingStudioApi
       if invalid_immutable_fields.any?
         raise ConfigurationError, "Immutable fields must be writable attributes for #{recordable_type}: #{invalid_immutable_fields.join(', ')}"
       end
+
       invalid_immutable_relationships = immutable_relationships - relationships.keys
       if invalid_immutable_relationships.any?
         raise ConfigurationError, "Immutable relationships are not registered for #{recordable_type}: #{invalid_immutable_relationships.join(', ')}"
       end
+
       invalid_operations = operations - DEFAULT_OPERATIONS
       raise ConfigurationError, "Unsupported API operations for #{recordable_type}: #{invalid_operations.join(', ')}" if invalid_operations.any?
 
@@ -130,6 +133,7 @@ module RecordingStudioApi
       if invalid_actions.any?
         raise ConfigurationError, "Capability actions are invalid for #{recordable_type}: #{invalid_actions.join(', ')}"
       end
+
       true
     end
 
@@ -181,6 +185,7 @@ module RecordingStudioApi
         include_policy = normalize_include(normalized.fetch(:include, false), "Field #{field_name}")
         authorize = normalized[:authorize]
         raise ConfigurationError, "Field #{field_name} authorize must respond to call for #{recordable_type}" if authorize && !authorize.respond_to?(:call)
+
         fields[field_name] = FieldDefinition.new(resolver: resolver, include: include_policy, authorize: authorize, openapi: normalize_openapi(normalized[:openapi]))
       end.freeze
     end
@@ -198,11 +203,12 @@ module RecordingStudioApi
         raise ConfigurationError, "Relationship #{relationship_name} must be a hash for #{recordable_type}" unless options.is_a?(Hash)
 
         normalized = symbolize_keys(options)
-        reject_unknown_options!(normalized, %i[source child_type many include resolver serializer output_keys limit order endpoints authorize openapi], "Relationship #{relationship_name}")
+        reject_unknown_options!(normalized, %i[source child_type many include resolver serializer output_keys limit order endpoints authorize description openapi], "Relationship #{relationship_name}")
         source = normalized[:source]&.to_s&.to_sym
         unless RELATIONSHIP_SOURCES.include?(source)
           raise ConfigurationError, "Relationship #{relationship_name} source must be one of: #{RELATIONSHIP_SOURCES.join(', ')} for #{recordable_type}"
         end
+
         many = normalized[:many]
         raise ConfigurationError, "Relationship #{relationship_name} many must be boolean for #{recordable_type}" unless [true, false].include?(many)
 
@@ -211,8 +217,10 @@ module RecordingStudioApi
         unless serializer.respond_to?(:call)
           raise ConfigurationError, "Relationship #{relationship_name} serializer must respond to call for #{recordable_type}"
         end
+
         output_keys = normalize_names(normalized[:output_keys], "Relationship #{relationship_name} output keys")
         raise ConfigurationError, "Relationship #{relationship_name} output_keys are required for #{recordable_type}" if output_keys.empty?
+
         validate_reserved_names!(output_keys, "Relationship #{relationship_name} output keys")
         limit = normalize_limit(relationship_name, many, normalized.key?(:limit), normalized[:limit])
         order = normalize_order(relationship_name, many, normalized.key?(:order), normalized[:order])
@@ -220,11 +228,12 @@ module RecordingStudioApi
         include_policy = normalize_include(normalized.fetch(:include, false), "Relationship #{relationship_name}")
         authorize = normalized[:authorize]
         raise ConfigurationError, "Relationship #{relationship_name} authorize must respond to call for #{recordable_type}" if authorize && !authorize.respond_to?(:call)
+        description = normalize_description(normalized[:description], "Relationship #{relationship_name}")
 
         relationships[relationship_name] = RelationshipDefinition.new(
           source: source, child_type: child_type, many: many, include: include_policy, resolver: resolver,
           serializer: serializer, output_keys: output_keys, limit: limit, order: order, endpoints: endpoints,
-          authorize: authorize, openapi: normalize_openapi(normalized[:openapi])
+          authorize: authorize, description: description, openapi: normalize_openapi(normalized[:openapi])
         )
       end.freeze
     end
@@ -233,14 +242,17 @@ module RecordingStudioApi
       if source == :children
         raise ConfigurationError, "Relationship #{name} requires child_type for #{recordable_type}" if options[:child_type].blank?
         raise ConfigurationError, "Relationship #{name} cannot specify resolver for children source" if options.key?(:resolver)
+
         child_type = options[:child_type].to_s
         unless child_type.match?(/\A[A-Z][a-zA-Z0-9_:]*\z/)
           raise ConfigurationError, "Relationship #{name} child_type is invalid for #{recordable_type}"
         end
+
         [child_type.freeze, nil]
       else
         raise ConfigurationError, "Relationship #{name} requires resolver for custom source" unless options[:resolver].respond_to?(:call)
         raise ConfigurationError, "Relationship #{name} cannot specify child_type for custom source" if options.key?(:child_type)
+
         [nil, options[:resolver]]
       end
     end
@@ -253,6 +265,7 @@ module RecordingStudioApi
       unless value.is_a?(Integer) && value.positive?
         raise ConfigurationError, "Relationship #{name} limit must be a positive integer for #{recordable_type}"
       end
+
       value
     end
 
@@ -268,10 +281,12 @@ module RecordingStudioApi
         unless DIRECT_CHILD_ORDER_ATTRIBUTES.include?(attribute_name)
           raise ConfigurationError, "Relationship #{name} order attribute is not supported for #{recordable_type}: #{attribute_name}"
         end
+
         normalized_direction = direction.to_s.to_sym
         unless %i[asc desc].include?(normalized_direction)
           raise ConfigurationError, "Relationship #{name} order direction must be asc or desc for #{recordable_type}"
         end
+
         order[attribute_name] = normalized_direction
       end.freeze
     end
@@ -282,19 +297,30 @@ module RecordingStudioApi
         raise ConfigurationError, "Relationship #{name} endpoints require a many children relationship for #{recordable_type}"
       end
       return endpoints.freeze if endpoints.empty?
+
       invalid = endpoints - ENDPOINTS
       raise ConfigurationError, "Relationship #{name} endpoints are invalid for #{recordable_type}: #{invalid.join(', ')}" if invalid.any?
+
       endpoints.freeze
     end
 
     def normalize_include(value, label)
       return value if INCLUDE_POLICIES.include?(value)
+
       raise ConfigurationError, "#{label} include must be true, :request, or false for #{recordable_type}"
+    end
+
+    def normalize_description(value, label)
+      return nil if value.nil?
+      raise ConfigurationError, "#{label} description must be a string for #{recordable_type}" unless value.is_a?(String)
+
+      value.squish.presence
     end
 
     def normalize_openapi(value)
       return {}.freeze if value.nil?
       raise ConfigurationError, "OpenAPI metadata must be a hash for #{recordable_type}" unless value.is_a?(Hash)
+
       deep_freeze(symbolize_keys(value))
     end
 
@@ -305,6 +331,7 @@ module RecordingStudioApi
     def normalize_name(value, label)
       name = value.to_s
       raise ConfigurationError, "#{label} is invalid for #{recordable_type}: #{name}" unless name.match?(FIELD_NAME_PATTERN)
+
       name
     end
 
@@ -334,7 +361,10 @@ module RecordingStudioApi
 
     def deep_freeze(value)
       case value
-      when Hash then value.each { |key, child| deep_freeze(key); deep_freeze(child) }.freeze
+      when Hash then value.each do |key, child|
+        deep_freeze(key)
+        deep_freeze(child)
+      end.freeze
       when Array then value.each { |child| deep_freeze(child) }.freeze
       else value.freeze
       end

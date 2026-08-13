@@ -20,7 +20,7 @@ class RelationshipBatchLoaderTest < ActiveSupport::TestCase
   end
 
   test "constructs through for and exposes relationship value and metadata" do
-    definition = relationship_definition(source: :custom, resolver: ->(_context) { nil })
+    definition = relationship_definition(source: :custom, resolver: ->(_context) {})
 
     with_registration("owner" => definition) do
       context = build_context(include_values: "owner")
@@ -69,7 +69,7 @@ class RelationshipBatchLoaderTest < ActiveSupport::TestCase
       assert_equal({ limit: 2, has_more: true }, primary_metadata)
       assert_empty prepared_reads
       assert_nil context.relationship_metadata(secondary, "folders")
-      assert context.relationship_value(@primary, "folders").all? { |recording| recording.association(:recordable).loaded? }
+      assert(context.relationship_value(@primary, "folders").all? { |recording| recording.association(:recordable).loaded? })
       refute_includes context.relationship_value(@primary, "folders"), wrong_type
       refute_includes context.relationship_value(@primary, "folders"), hidden
     end
@@ -180,9 +180,9 @@ class RelationshipBatchLoaderTest < ActiveSupport::TestCase
     registration(relationships: { relationship: options }).relationships.fetch("relationship")
   end
 
-  def with_registration(relationships)
+  def with_registration(relationships, &)
     registration = registration(relationships: relationships)
-    RecordingStudioApi.stub(:recordable_registration_for, ->(*, **) { registration }) { yield }
+    RecordingStudioApi.stub(:recordable_registration_for, ->(*, **) { registration }, &)
   end
 
   def registration(relationships:)

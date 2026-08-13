@@ -55,6 +55,44 @@ RecordingStudioApi.register_recordable_type_api(
   serializer: ->(recordable, **) { { name: recordable.name } },
   output_keys: %i[name],
   writable_attributes: %i[name],
+  relationships: {
+    folders: {
+      source: :children,
+      child_type: "Folder",
+      many: true,
+      include: true,
+      serializer: ->(folder, **) { { name: folder.name } },
+      output_keys: %i[name],
+      description: "The folders directly inside this workspace.",
+      limit: 20,
+      endpoints: %i[index show]
+    },
+    pages: {
+      source: :children,
+      child_type: "Page",
+      many: true,
+      include: :request,
+      serializer: ->(page, **) { { title: page.title } },
+      output_keys: %i[title],
+      description: "The pages directly inside this workspace.",
+      limit: 20,
+      endpoints: %i[index show]
+    },
+    featured_folder: {
+      source: :custom,
+      many: false,
+      include: :request,
+      resolver: ->(context) do
+        context.scoped_recordings.where(
+          parent_recording_id: context.recording.id,
+          recordable_type: "Folder"
+        ).order(:created_at, :id).first
+      end,
+      serializer: ->(folder, **) { { name: folder.name } },
+      output_keys: %i[name],
+      description: "The first Folder directly inside this workspace."
+    }
+  },
   openapi: {
     details_schema: {
       type: "object",
@@ -127,6 +165,13 @@ RecordingStudioApi.register_recordable_type_api(
       }
     }
   }
+)
+
+RecordingStudioApi.register_recordable_type_api(
+  "Page",
+  operations: %i[index show],
+  serializer: ->(recordable, **) { { title: recordable.title } },
+  output_keys: %i[title]
 )
 
 RecordingStudioApi.register_recordable_type_api(

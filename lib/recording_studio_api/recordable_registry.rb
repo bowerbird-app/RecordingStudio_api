@@ -56,9 +56,9 @@ module RecordingStudioApi
         relationships: merge_definitions("relationship", existing.relationships, incoming.relationships),
         immutable_relationships: existing.immutable_relationships | incoming.immutable_relationships,
         operations: merge_explicit_set("operations", existing.operations, incoming.operations,
-                     existing.operations_supplied?, incoming.operations_supplied?),
+                                       existing.operations_supplied?, incoming.operations_supplied?),
         capability_actions: merge_explicit_set("capability actions", existing.capability_actions, incoming.capability_actions,
-                  existing.capability_actions_supplied?, incoming.capability_actions_supplied?),
+                                               existing.capability_actions_supplied?, incoming.capability_actions_supplied?),
         operations_supplied: existing.operations_supplied? || incoming.operations_supplied?,
         capability_actions_supplied: existing.capability_actions_supplied? || incoming.capability_actions_supplied?
       )
@@ -66,9 +66,8 @@ module RecordingStudioApi
 
     def merge_definitions(kind, existing, incoming)
       existing.merge(incoming) do |name, established, replacement|
-        unless established == replacement
-          raise ConfigurationError, "#{kind.capitalize} #{name} cannot be redefined incompatibly"
-        end
+        raise ConfigurationError, "#{kind.capitalize} #{name} cannot be redefined incompatibly" unless established == replacement
+
         established
       end
     end

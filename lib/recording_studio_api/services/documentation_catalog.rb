@@ -124,13 +124,21 @@ module RecordingStudioApi
             description: "List #{docs_resource_name}",
             capability: nil,
             scope: nil,
-            openapi: merge_hashes(
+            openapi: resource_openapi(
               {
                 tags: [openapi_tag],
                 parameters: pagination_parameters(recordable_type) + include_parameters_for(recordable_type),
-                responses: resource_list_responses(resource_name, recordable_type, docs_resource_name)
+                responses: resource_list_responses(
+                  resource_name,
+                  recordable_type,
+                  docs_resource_name,
+                  relationship_examples: relationship_response_examples(recordable_type, collection: true)
+                )
               },
-              openapi_overrides.fetch(:index, {})
+              openapi_overrides.fetch(:index, {}),
+              recordable_type,
+              resource_name: resource_name,
+              collection: true
             )
           },
           {
@@ -158,13 +166,19 @@ module RecordingStudioApi
             description: "Get #{docs_resource_name}",
             capability: nil,
             scope: nil,
-            openapi: merge_hashes(
+            openapi: resource_openapi(
               {
                 tags: [openapi_tag],
                 parameters: [id_parameter] + include_parameters_for(recordable_type),
-                responses: resource_item_responses(recordable_type)
+                responses: resource_item_responses(
+                  recordable_type,
+                  relationship_examples: relationship_response_examples(recordable_type)
+                )
               },
-              openapi_overrides.fetch(:show, {})
+              openapi_overrides.fetch(:show, {}),
+              recordable_type,
+              resource_name: resource_name,
+              collection: false
             )
           },
           {
@@ -218,7 +232,7 @@ module RecordingStudioApi
         end
       end
 
-      def relationship_endpoints(resource_name, recordable_type, name, relationship, registration)
+      def relationship_endpoints(resource_name, recordable_type, name, relationship, _registration)
         return [] unless nested_relationship?(relationship)
 
         path = "#{api_root_path}/#{resource_name}/:id/#{name}"
@@ -352,6 +366,18 @@ module RecordingStudioApi
             override_value
           end
         end
+      end
+
+      def resource_openapi(default_openapi, override_openapi, recordable_type, resource_name:, collection:)
+        openapi = merge_hashes(default_openapi, override_openapi)
+        relationship_description = relationship_documentation_for(
+          recordable_type,
+          resource_name: resource_name,
+          collection: collection
+        )
+        return openapi if relationship_description.blank?
+
+        openapi.merge(description: [openapi[:description], relationship_description].compact.join("\n\n"))
       end
 
       def api_root_path
@@ -499,7 +525,7 @@ module RecordingStudioApi
         "Delete #{docs_resource_name_for(resource_name, recordable_type)} permanently"
       end
 
-      def resource_list_responses(resource_name, recordable_type, docs_resource_name, item_schema: nil)
+      def resource_list_responses(resource_name, recordable_type, docs_resource_name, item_schema: nil, relationship_examples: {})
         resource_type = resource_name.to_s.singularize
 
         {
@@ -540,7 +566,8 @@ module RecordingStudioApi
                     }
                   },
                   required: %w[resource type records meta]
-                }
+                },
+                examples: relationship_examples
               }
             }
           }
@@ -597,14 +624,15 @@ module RecordingStudioApi
         ]
       end
 
-      def resource_item_responses(recordable_type)
+      def resource_item_responses(recordable_type, relationship_examples: {})
 
         {
           "200" => {
             description: "Single record payload.",
             content: {
               "application/json" => {
-                schema: recording_schema(recordable_type)
+                schema: recording_schema(recordable_type),
+                examples: relationship_examples
               }
             }
           },
@@ -903,7 +931,133 @@ module RecordingStudioApi
         }
       end
 
-      def relationship_request_body(relationship, operation:)
+      def relationship_documentation_for(recordable_type, resource_name:, collection:)
+        registration = recordable_registration_for(recordable_type)
+        return unless registration
+
+        included = registration.relationships.select { |_name, relationship| relationship.include == true }
+        requested = registration.relationships.select { |_name, relationship| relationship.include == :request }
+        return if included.empty? && requested.empty?
+
+        included.map do |name, relationship|
+          "#{response_subject(collection)} includes #{relationship_field_description(name, relationship)}."
+        end.concat(
+          requested.map do |name, relationship|
+            "Add `include=#{name}` to also receive #{relationship_field_description(name, relationship)}."
+          end
+        ).concat(
+          registration.relationships.filter_map do |name, relationship|
+            relationship_route_description(name, relationship, resource_name)
+          end
+        ).join(" ")
+      end
+
+      def response_subject(collection)
+        collection ? "Each item in `records`" : "The response"
+      end
+
+      def relationship_field_description(name, relationship)
+        field = "`#{name}`"
+        type = relationship.child_type.presence || "related"
+        value = if relationship.many
+                  "#{field}, an array of #{type} records"
+                else
+                  "#{field}, one #{type} record or `null`"
+                end
+        attributes = relationship.output_keys.map { |key| "`#{key}`" }.to_sentence
+        value += " with #{attributes}" if attributes.present?
+        value += " (up to #{relationship.limit})" if relationship.many && relationship.limit
+        value += ". #{relationship.description}" if relationship.description.present?
+        value
+      end
+
+      def relationship_route_description(name, relationship, resource_name)
+        if relationship.source == :custom
+          return "`#{name}` is available only in this response; there is no separate endpoint for it." if relationship.include
+
+          return
+        end
+        return unless relationship.many && relationship.endpoints.any?
+
+        "To browse #{name} separately, use `GET #{api_root_path}/#{resource_name}/{id}/#{name}`."
+      end
+
+      def relationship_response_examples(recordable_type, collection: false)
+        registration = recordable_registration_for(recordable_type)
+        return {} unless registration
+
+        included = registration.relationships.select { |_name, relationship| relationship.include == true }
+        requested = registration.relationships.select { |_name, relationship| relationship.include == :request }
+        return {} if included.empty? && requested.empty?
+
+        examples = {
+          default_relationships: {
+            summary: "#{example_subject(recordable_type, collection)} with included fields",
+            description: "Shows the fields returned without an include query parameter.",
+            value: relationship_example_response(recordable_type, included, collection: collection)
+          }
+        }
+        return examples if requested.empty?
+
+        examples[:requested_relationships] = {
+          summary: "#{example_subject(recordable_type, collection)} with requested details",
+          description: "Shows the additional fields returned by `include=#{requested.keys.join(',')}`.",
+          value: relationship_example_response(recordable_type, included.merge(requested), collection: collection)
+        }
+        examples
+      end
+
+      def example_subject(recordable_type, collection)
+        label = recordable_type.to_s.demodulize.humanize
+        collection ? "#{label} list" : label
+      end
+
+      def relationship_example_response(recordable_type, relationships, collection:)
+        record = relationship_example_record(recordable_type, relationships)
+        return record unless collection
+
+        resource_name = RecordingStudioApi.resource_name_for(recordable_type)
+        {
+          resource: resource_name,
+          type: resource_name.to_s.singularize,
+          records: [record],
+          meta: {
+            limit: 50,
+            sort: "created_at",
+            order: "asc",
+            has_more: false,
+            next_pagination_token: nil
+          }
+        }
+      end
+
+      def relationship_example_record(recordable_type, relationships)
+        record = {
+          id: "00000000-0000-4000-8000-000000000001",
+          type: recordable_type.to_s,
+          root_id: "00000000-0000-4000-8000-000000000001",
+          parent_id: nil,
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z"
+        }
+        relationships.each { |name, relationship| record[name.to_s] = relationship_example_value(relationship) }
+        record
+      end
+
+      def relationship_example_value(relationship)
+        child = {
+          id: "00000000-0000-4000-8000-000000000002",
+          type: relationship.child_type.presence || "Custom relationship",
+          root_id: "00000000-0000-4000-8000-000000000001",
+          parent_id: "00000000-0000-4000-8000-000000000001",
+          created_at: "2026-01-01T00:00:00Z",
+          updated_at: "2026-01-01T00:00:00Z"
+        }
+        relationship.output_keys.each { |key| child[key.to_s] = "Example #{key.to_s.humanize.downcase}" }
+        relationship.many ? [child] : child
+      end
+
+      def relationship_request_body(_relationship, operation:)
         properties = {
           attributes: { type: "object" }
         }

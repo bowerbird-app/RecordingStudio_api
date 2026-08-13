@@ -4,7 +4,7 @@ require "test_helper"
 
 class RecordableRegistrationTest < Minitest::Test
   Serializer = ->(*) { {} }
-  Resolver = ->(*) { nil }
+  Resolver = ->(*) {}
 
   def test_normalizes_the_public_registration_contract
     registration = RecordingStudioApi::RecordableRegistration.new(
@@ -16,7 +16,8 @@ class RecordableRegistrationTest < Minitest::Test
         images: {
           source: :children, child_type: "RecordingStudioAttachable::Attachment", many: true,
           include: true, serializer: Serializer, output_keys: %i[name content_type], limit: 20,
-          order: { created_at: :asc }, endpoints: %i[index show], authorize: Resolver, openapi: { type: "array" }
+          order: { created_at: :asc }, endpoints: %i[index show], authorize: Resolver,
+          description: "Images attached to this page.", openapi: { type: "array" }
         }
       }
     )
@@ -32,6 +33,7 @@ class RecordableRegistrationTest < Minitest::Test
     assert_equal %w[name content_type], relationship.output_keys
     assert_equal({ "created_at" => :asc }, relationship.order)
     assert_equal %i[index show], relationship.endpoints
+    assert_equal "Images attached to this page.", relationship.description
   end
 
   def test_field_defaults_to_not_included_and_definitions_are_immutable
@@ -119,16 +121,17 @@ class RecordableRegistrationTest < Minitest::Test
 
   def test_rejects_invalid_many_limit_order_endpoints_and_legacy_options
     base = { source: :children, child_type: "Image", many: true, serializer: Serializer, output_keys: %i[name], limit: 1 }
-    assert_configuration_error("limit") { relationship(**base.merge(limit: 0)) }
-    assert_configuration_error("order direction") { relationship(**base.merge(order: { created_at: :random })) }
+    assert_configuration_error("limit") { relationship(**base, limit: 0) }
+    assert_configuration_error("order direction") { relationship(**base, order: { created_at: :random }) }
     assert_configuration_error("limit") { relationship(source: :children, child_type: "Image", many: false, serializer: Serializer, output_keys: %i[name], limit: 1) }
     assert_configuration_error("endpoints require") { relationship(source: :custom, many: true, resolver: Resolver, serializer: Serializer, output_keys: %i[name], limit: 1, endpoints: [:index]) }
-    assert_configuration_error("endpoints are invalid") { relationship(**base.merge(endpoints: [:export])) }
-    assert_configuration_error("authorize") { relationship(**base.merge(authorize: :admin)) }
-    assert_configuration_error("options are invalid") { relationship(**base.merge(types: ["Image"])) }
-    assert_configuration_error("options are invalid") { relationship(**base.merge(unknown: true)) }
-    assert_configuration_error("order attribute is not supported") { relationship(**base.merge(order: { title: :asc })) }
-    assert_configuration_error("order attribute is not supported") { relationship(**base.merge(order: { password_digest: :asc })) }
+    assert_configuration_error("endpoints are invalid") { relationship(**base, endpoints: [:export]) }
+    assert_configuration_error("authorize") { relationship(**base, authorize: :admin) }
+    assert_configuration_error("description") { relationship(**base, description: :images) }
+    assert_configuration_error("options are invalid") { relationship(**base, types: ["Image"]) }
+    assert_configuration_error("options are invalid") { relationship(**base, unknown: true) }
+    assert_configuration_error("order attribute is not supported") { relationship(**base, order: { title: :asc }) }
+    assert_configuration_error("order attribute is not supported") { relationship(**base, order: { password_digest: :asc }) }
     assert_configuration_error("order is only valid") do
       relationship(source: :children, child_type: "Image", many: false, serializer: Serializer, output_keys: %i[name], order: {})
     end
@@ -216,8 +219,8 @@ class RecordableRegistrationTest < Minitest::Test
     RecordingStudioApi::RecordableRegistration.new(recordable_type: "Page", relationships: { images: options })
   end
 
-  def assert_configuration_error(fragment, &block)
-    error = assert_raises(RecordingStudioApi::ConfigurationError, &block)
+  def assert_configuration_error(fragment, &)
+    error = assert_raises(RecordingStudioApi::ConfigurationError, &)
     assert_includes error.message, fragment
   end
 end

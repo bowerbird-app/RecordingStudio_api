@@ -1,4 +1,5 @@
 # frozen_string_literal: true
+
 # app/controllers/recording_studio_api/api/v1/relationship_resources_controller.rb
 
 module RecordingStudioApi
@@ -147,9 +148,7 @@ module RecordingStudioApi
             raise RecordingStudioApi::UnsupportedActionError,
                   "#{relationship_name} is not a direct child collection"
           end
-          unless relationship.endpoints.include?(operation)
-            raise RecordingStudioApi::UnsupportedActionError, "#{operation} is not enabled for #{relationship_name}"
-          end
+          raise RecordingStudioApi::UnsupportedActionError, "#{operation} is not enabled for #{relationship_name}" unless relationship.endpoints.include?(operation)
 
           assert_operation_enabled!(relationship.child_type, operation)
           relationship_context.authorize_relationship!(parent_recording, relationship_name, relationship)
@@ -181,7 +180,7 @@ module RecordingStudioApi
           raise RecordingStudioApi::UnsupportedActionError, "#{operation} is not enabled for #{recordable_type}"
         end
 
-        def relationship_operation_context(recording: nil, recordable_type:)
+        def relationship_operation_context(recordable_type:, recording: nil)
           RecordingStudioApi::ResourceOperationContext.new(
             recording: recording,
             recordable_type: recordable_type,

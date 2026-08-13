@@ -44,6 +44,19 @@ Then open the app and sign in with:
 - `/docs/install`, `/docs/config`, `/docs/api_routes`, `/docs/scalar`, `/docs/auth`, `/docs/add_capability`, `/docs/methods`, `/docs/api_hierarchy`, `/docs/recordable_types`, `/docs/recordings_tree`, `/docs/gem_views` - sidebar pages that capture the completed architecture handoff
 - `/up` - Rails health check
 
+## Relationship Expansion Demo
+
+The seeded `Studio Workspace` has direct Folder and Page children. After obtaining a bearer token, use its recording ID to compare these API responses:
+
+- `GET /recording_studio_api/api/v1/workspaces/:id` includes `folders` automatically
+- `GET /recording_studio_api/api/v1/workspaces/:id?include=pages` adds the request-selected `pages`
+- `GET /recording_studio_api/api/v1/workspaces/:id?include=featured_folder` adds the request-selected custom `featured_folder`
+- `GET /recording_studio_api/api/v1/workspaces/:id?include=pages,featured_folder` adds both request-selected relationships
+- `GET /recording_studio_api/api/v1/workspaces/:id/folders` lists the direct Folder children
+- `GET /recording_studio_api/api/v1/workspaces/:id/pages` lists the direct Page children
+
+The custom `featured_folder` relationship is embed-only; it intentionally has no nested relationship route.
+
 ## Why This App Exists
 
 Use this app to verify the renamed engine integration, the admin-root flow, and the API-key OAuth2 client credentials flow in a host app. If a layout, route, asset source, token exchange, access-grant dispatch, root switch, or Recording Studio initializer change breaks here, the RecordingStudio API scaffold needs adjustment before deeper feature work.
