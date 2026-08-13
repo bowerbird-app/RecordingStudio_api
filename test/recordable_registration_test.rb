@@ -87,4 +87,24 @@ class RecordableRegistrationTest < Minitest::Test
     assert_equal true, relationship.fetch(:read)
     assert_equal false, relationship.fetch(:write)
   end
+
+  def test_relationships_are_read_only_by_default
+    relationship = RecordingStudioApi::RecordableRegistration.new(
+      recordable_type: "Workspace",
+      relationships: { folders: { source: :children } }
+    ).relationships.fetch("folders")
+
+    assert_equal false, relationship.fetch(:write)
+  end
+
+  def test_relationship_names_cannot_override_canonical_response_keys
+    error = assert_raises(RecordingStudioApi::ConfigurationError) do
+      RecordingStudioApi::RecordableRegistration.new(
+        recordable_type: "Workspace",
+        relationships: { id: { source: :children } }
+      )
+    end
+
+    assert_includes error.message, "Relationship name is reserved"
+  end
 end

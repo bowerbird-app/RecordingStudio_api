@@ -6,6 +6,7 @@ module RecordingStudioApi
     RELATIONSHIP_SOURCES = %i[children custom].freeze
     RELATIONSHIP_INCLUDE_POLICIES = [true, :request].freeze
     FIELD_NAME_PATTERN = /\A[a-zA-Z_][a-zA-Z0-9_]*\z/
+    RESERVED_RESPONSE_KEYS = %w[id type actions root_id parent_id created_at updated_at].freeze
 
     attr_reader :recordable_type, :output_keys, :fields, :openapi, :sortable_attributes,
                 :writable_attributes, :immutable_fields, :relationships, :immutable_relationships,
@@ -161,6 +162,9 @@ module RecordingStudioApi
         unless relationship_name.match?(FIELD_NAME_PATTERN)
           raise ConfigurationError, "Relationship name is invalid for #{recordable_type}: #{relationship_name}"
         end
+        if RESERVED_RESPONSE_KEYS.include?(relationship_name)
+          raise ConfigurationError, "Relationship name is reserved for #{recordable_type}: #{relationship_name}"
+        end
 
         normalized_options = options
         unless normalized_options.is_a?(Hash)
@@ -225,7 +229,7 @@ module RecordingStudioApi
           types: types,
           include: include_policy,
           read: normalized_options.fetch(:read, true) == true,
-          write: normalized_options.fetch(:write, true) == true,
+          write: normalized_options.fetch(:write, false) == true,
           resolver: resolver,
           method: method_name.to_sym,
           serializer: normalized_options[:serializer],

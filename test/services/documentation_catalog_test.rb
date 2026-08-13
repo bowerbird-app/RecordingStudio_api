@@ -233,6 +233,51 @@ module RecordingStudioApi
             assert_equal "string", properties.fetch(:name).fetch(:type)
           end
         end
+
+        def test_custom_relationship_schema_supports_singular_or_collection_values
+          with_recordable_registration(
+            "Workspace",
+            relationships: {
+              owner: {
+                source: :custom,
+                include: true,
+                resolver: ->(_workspace) { nil },
+                output_keys: %i[name],
+                fields: { name: :name }
+              }
+            }
+          ) do
+            catalog = with_catalog_stubs(
+              recordable_types: ["Workspace"],
+              actions_by_type: { "Workspace" => [] },
+              preserve_recordable_registrations: true
+            ) { DocumentationCatalog.call }
+
+            schema = catalog.fetch(:resources).first.fetch(:endpoints)
+              .find { |endpoint| endpoint.fetch(:verb) == "GET" && endpoint.fetch(:path).end_with?("/workspaces/:id") }
+              .fetch(:openapi).fetch(:responses).fetch("200").fetch(:content).fetch("application/json").fetch(:schema)
+            assert schema.fetch(:properties).fetch(:owner).key?(:oneOf)
+          end
+        end
+
+        def test_relationship_show_endpoint_is_omitted_when_no_child_type_supports_show
+          with_recordable_registration(
+            "Workspace",
+            relationships: { folders: { source: :children, types: ["Folder"] } }
+          ) do
+            with_recordable_registration("Folder", operations: %i[index]) do
+              catalog = with_catalog_stubs(
+                recordable_types: %w[Workspace Folder],
+                actions_by_type: { "Workspace" => [], "Folder" => [] },
+                preserve_recordable_registrations: true
+              ) { DocumentationCatalog.call }
+
+              paths = catalog.fetch(:resources).find { |section| section.fetch(:resource) == "workspaces" }
+                .fetch(:endpoints).map { |endpoint| endpoint.fetch(:path) }
+              refute_includes paths, "/recording_studio_api/api/v1/workspaces/:id/folders/:relationship_id"
+            end
+          end
+        end
       end
 
       def test_action_request_body_uses_input_contract_schema
@@ -474,7 +519,7 @@ module RecordingStudioApi
       end
 
       def with_recordable_registration(recordable_type, output_keys: nil, fields: nil, openapi: {}, relationships: nil,
-                                       immutable_relationships: nil)
+                                       immutable_relationships: nil, operations: nil)
         registry = RecordingStudioApi.configuration.recordable_registry
         existing = registry[recordable_type]
 
@@ -484,7 +529,8 @@ module RecordingStudioApi
           fields: fields,
           openapi: openapi,
           relationships: relationships,
-          immutable_relationships: immutable_relationships
+          immutable_relationships: immutable_relationships,
+          operations: operations
         )
         yield
       ensure

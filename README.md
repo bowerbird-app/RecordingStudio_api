@@ -364,6 +364,7 @@ generic named endpoints:
 
 ```text
 GET    /api/v1/projects/:id/tasks
+GET    /api/v1/projects/:id/tasks/:relationship_id
 POST   /api/v1/projects/:id/tasks                    # { type: "tasks", attributes: { ... } }
 PATCH  /api/v1/projects/:id/tasks/:relationship_id
 DELETE /api/v1/projects/:id/tasks/:relationship_id
@@ -593,6 +594,7 @@ end
 - `PATCH /recording_studio_api/api/<version>/:resource/:id` — update a recording when the resource permits `:update`
 - `DELETE /recording_studio_api/api/<version>/:resource/:id` — destroy a recording when the resource permits `:destroy`
 - `GET /recording_studio_api/api/<version>/:resource/:id/:relationship` — list a registered named relationship
+- `GET /recording_studio_api/api/<version>/:resource/:id/:relationship/:relationship_id` — show a direct child from a registered `children` relationship
 - `POST /recording_studio_api/api/<version>/:resource/:id/:relationship` and `PATCH|DELETE /.../:relationship/:relationship_id` — mutate a writable `children` relationship
 - `POST|PATCH|PUT|DELETE /recording_studio_api/api/<version>/:resource/:id/actions/:action_name` — execute the newest compatible contribution contract for that public API version
 - `POST|PATCH|PUT|DELETE /recording_studio_api/api/<version>/:resource/:id/:action_name` — compatibility alias for existing clients

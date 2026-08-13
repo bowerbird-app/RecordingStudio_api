@@ -96,7 +96,7 @@ module RecordingStudioApi
         definitions.each do |name, definition|
           types = definition.fetch(:types)
           @children_by_parent_and_relationship[[parent_id, name]] = rows.fetch(parent_id, []).select do |child|
-            types.empty? || types.include?(child.recordable_type)
+            relationship_types(definition).include?(child.recordable_type)
           end
         end
       end
@@ -138,13 +138,18 @@ module RecordingStudioApi
       else
         recording?(value) ? [value] : []
       end
+    end
 
-      def normalize_collection(value)
-        return value if value.is_a?(Array) || value.is_a?(Hash) || value.is_a?(String)
-        return value.to_a if value.respond_to?(:to_a) && !recording?(value)
+    def normalize_collection(value)
+      return value if value.is_a?(Array) || value.is_a?(Hash) || value.is_a?(String)
+      return value.to_a if value.respond_to?(:to_a) && !recording?(value)
 
-        value
-      end
+      value
+    end
+
+    def relationship_types(definition)
+      types = definition.fetch(:types)
+      types.presence || RecordingStudioApi.api_recordable_types(api: @api)
     end
 
     def filter_scoped_recordings(value, allowed_ids)

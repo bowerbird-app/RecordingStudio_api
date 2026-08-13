@@ -322,6 +322,21 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_equal "Renamed nested folder", RecordingStudio::Recording.find(child_id).recordable.name
   end
 
+  test "does not expose writes for child relationships without an explicit write opt-in" do
+    RecordingStudioApi.register_recordable_type_api(
+      "Workspace",
+      relationships: { folders: { source: :children, types: ["Folder"] } }
+    )
+
+    post "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders", params: {
+      type: "folders",
+      attributes: { name: "Blocked folder" }
+    }, headers: authorization_headers
+
+    assert_response :unprocessable_entity
+    assert_includes JSON.parse(response.body).fetch("error"), "folders is immutable"
+  end
+
   test "does not expose writes for immutable named relationships" do
     RecordingStudioApi.register_recordable_type_api(
       "Workspace",

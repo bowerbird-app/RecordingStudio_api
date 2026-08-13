@@ -236,7 +236,7 @@ module RecordingStudioApi
               responses: relationship_collection_responses(relationship)
             }
           }
-          if relationship.fetch(:source) == :children
+          if relationship.fetch(:source) == :children && relationship_types(relationship, operation: :show).any?
             endpoints << {
               verb: "GET",
               path: "#{path}/:relationship_id",
@@ -745,6 +745,8 @@ module RecordingStudioApi
         return schema if schema.is_a?(Hash)
 
         items = relationship_recording_schema(relationship)
+        return { oneOf: [relationship_endpoint_item_schema(relationship), { type: "array", items: items }] } if relationship.fetch(:source) == :custom
+
         {
           type: "array",
           items: items
