@@ -192,6 +192,7 @@ module RecordingStudioApi
             root_recording: current_root_recording,
             api_version: current_api_version,
             params: params.to_unsafe_h,
+            request_params: request.request_parameters,
             scoped_recordings: scoped_recordings,
             parent_recording: parent_recording
           )

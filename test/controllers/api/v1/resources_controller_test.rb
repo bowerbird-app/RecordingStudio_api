@@ -753,6 +753,73 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_not_includes payload.keys, "unknown_attribute"
   end
 
+  test "accepts flat writes, preserves legacy envelopes, and rejects ambiguous write bodies" do
+    RecordingStudioApi.register_recordable_type_api(
+      "Workspace",
+      relationships: {
+        folders: { source: :children, child_type: "Folder", many: true,
+                   serializer: ->(recordable, **) { { name: recordable.name } }, output_keys: %i[name], limit: 20,
+                   endpoints: %i[create update] }
+      }
+    )
+
+    post "/recording_studio_api/api/v1/folders", params: {
+      name: "Flat top-level folder",
+      parent_id: @root_recording.id
+    }, headers: authorization_headers
+
+    assert_response :created
+    top_level_folder_id = JSON.parse(response.body).fetch("id")
+    assert_equal "Flat top-level folder", RecordingStudio::Recording.find(top_level_folder_id).recordable.name
+
+    post "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders", params: {
+      name: "Flat nested folder"
+    }, headers: authorization_headers
+
+    assert_response :created
+    nested_folder_id = JSON.parse(response.body).fetch("id")
+
+    patch "/recording_studio_api/api/v1/folders/#{top_level_folder_id}", params: {
+      name: "Flat renamed folder",
+      created_at: 1.year.ago.iso8601
+    }, headers: authorization_headers
+
+    assert_response :success
+    top_level_folder = RecordingStudio::Recording.find(top_level_folder_id).recordable
+    assert_equal "Flat renamed folder", top_level_folder.name
+    assert_not_equal 1.year.ago.iso8601, top_level_folder.created_at.iso8601
+
+    post "/recording_studio_api/api/v1/workspaces", params: {
+      attributes: { name: "Legacy workspace" }
+    }, headers: authorization_headers
+
+    assert_response :created
+    legacy_workspace_id = JSON.parse(response.body).fetch("id")
+
+    patch "/recording_studio_api/api/v1/folders/#{nested_folder_id}", params: {
+      attributes: { name: "Legacy renamed folder" }
+    }, headers: authorization_headers
+
+    assert_response :success
+    assert_equal "Legacy renamed folder", RecordingStudio::Recording.find(nested_folder_id).recordable.name
+
+    post "/recording_studio_api/api/v1/folders", params: {
+      name: "Mixed folder",
+      parent_id: @root_recording.id,
+      attributes: { name: "Legacy mixed folder" }
+    }, headers: authorization_headers
+
+    assert_response :unprocessable_entity
+    assert_equal "Use either flat writable fields or attributes, not both", JSON.parse(response.body).fetch("error")
+
+    patch "/recording_studio_api/api/v1/workspaces/#{legacy_workspace_id}", params: {
+      parent_id: @root_recording.id
+    }, headers: authorization_headers
+
+    assert_response :unprocessable_entity
+    assert_equal "parent_id is not permitted for updates; use the move action instead", JSON.parse(response.body).fetch("error")
+  end
+
   test "rejects resource operations excluded by a recordable allowlist" do
     RecordingStudioApi.register_recordable_type_api("Workspace", operations: %i[index])
 

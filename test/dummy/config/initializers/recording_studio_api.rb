@@ -188,6 +188,37 @@ RecordingStudioApi.register_recordable_type_api(
       },
       required: ["name"]
     },
+    create: {
+      request_body: {
+        content: {
+          "application/json" => {
+            examples: {
+              default: {
+                value: {
+                  name: "Marketing",
+                  parent_id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    update: {
+      request_body: {
+        content: {
+          "application/json" => {
+            examples: {
+              default: {
+                value: {
+                  name: "Renamed folder"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     index: {
       summary: "List folders",
       description: "List folders",

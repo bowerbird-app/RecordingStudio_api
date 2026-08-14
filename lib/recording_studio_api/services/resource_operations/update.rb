@@ -5,6 +5,7 @@ module RecordingStudioApi
     module ResourceOperations
       class Update < Base
         def call
+          reject_parent_id_input!
           authorize_access!(recording, role: :edit)
 
           attributes = resource_attributes.slice(*mutable_attribute_keys)
@@ -17,6 +18,16 @@ module RecordingStudioApi
                               end
 
           { json: serialize_recording(revised_recording, context: relationship_context_for([revised_recording])) }
+        end
+
+        private
+
+        def reject_parent_id_input!
+          return if context.parent_recording
+          return unless request_payload.key?(:parent_id) || request_payload.key?("parent_id")
+
+          raise RecordingStudioApi::InvalidActionInputError,
+                "parent_id is not permitted for updates; use the move action instead"
         end
       end
     end

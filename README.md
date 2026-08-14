@@ -367,6 +367,13 @@ sit beside those keys. There are no `data`, `attributes`, or `relationships` wra
 use `records` plus `meta`; a record's `_meta` reports `limit` and `has_more` for emitted collection
 relationships.
 
+Write bodies use the same flat field layout. Send registered writable fields at the request body
+root, with `parent_id` only for top-level creates that select a parent Recording Studio record.
+Nested creates take their parent from the URL, and updates do not accept `parent_id`; use the
+registered move action to change a record's parent. During migration, legacy
+`{ attributes: { ... } }` bodies remain accepted, but a request cannot combine that envelope with
+flat writable fields.
+
 The engine fetches requested `children` relationships in one scoped query per response,
 preventing serializer-driven N+1 queries. A custom resolver is application code and may issue
 queries; preload its associations where needed and use `context.scoped_recordings` when resolving
@@ -377,8 +384,8 @@ generic named endpoints:
 ```text
 GET    /api/v1/projects/:parent_id/tasks
 GET    /api/v1/projects/:parent_id/tasks/:relationship_id
-POST   /api/v1/projects/:parent_id/tasks              # { attributes: { ... } }
-PATCH  /api/v1/projects/:parent_id/tasks/:relationship_id # { attributes: { ... } }
+POST   /api/v1/projects/:parent_id/tasks              # { "name": "Planning" }
+PATCH  /api/v1/projects/:parent_id/tasks/:relationship_id # { "name": "Planning" }
 DELETE /api/v1/projects/:parent_id/tasks/:relationship_id
 ```
 

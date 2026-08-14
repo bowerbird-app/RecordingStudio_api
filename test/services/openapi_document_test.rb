@@ -426,9 +426,11 @@ module RecordingStudioApi
           assert_equal "Workspace with included fields", response_examples.fetch("default_relationships").fetch("summary")
           assert_equal "Workspace with requested details", response_examples.fetch("requested_relationships").fetch("summary")
           assert_equal "host-controlled-example", response_examples.fetch("host_example").fetch("value").fetch("id")
-          assert_equal ["Folder"], response_examples.fetch("default_relationships").fetch("value").fetch("folders").map { |folder| folder.fetch("type") }
+          folder_types = response_examples.fetch("default_relationships").fetch("value").fetch("folders").map { |folder| folder.fetch("type") }
+          assert_equal ["Folder"], folder_types
           refute response_examples.fetch("default_relationships").fetch("value").key?("pages")
-          assert_equal ["Page"], response_examples.fetch("requested_relationships").fetch("value").fetch("pages").map { |page| page.fetch("type") }
+          page_types = response_examples.fetch("requested_relationships").fetch("value").fetch("pages").map { |page| page.fetch("type") }
+          assert_equal ["Page"], page_types
           assert_equal "Custom relationship", response_examples.fetch("requested_relationships").fetch("value").fetch("featured_folder").fetch("type")
         end
       end

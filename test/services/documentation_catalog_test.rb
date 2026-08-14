@@ -357,14 +357,19 @@ module RecordingStudioApi
         end
       end
 
-      def test_nested_create_request_body_contains_attributes_only
+      def test_nested_create_request_body_contains_flat_writable_properties
         relationships = {
           folders: { source: :children, child_type: "Folder", many: true, serializer: ->(*) {},
                      output_keys: %i[name], limit: 20, endpoints: %i[create] }
         }
 
         with_recordable_registration("Workspace", relationships: relationships) do
-          with_recordable_registration("Folder", operations: %i[create]) do
+          with_recordable_registration(
+            "Folder",
+            operations: %i[create],
+            writable_attributes: %i[name],
+            openapi: { details_schema: { properties: { name: { type: "string" } } } }
+          ) do
             catalog = with_catalog_stubs(
               recordable_types: %w[Workspace Folder],
               actions_by_type: { "Workspace" => [], "Folder" => [] },
@@ -374,8 +379,10 @@ module RecordingStudioApi
               .fetch(:endpoints).find { |entry| entry.fetch(:verb) == "POST" && entry.fetch(:path).end_with?("/folders") }
             schema = endpoint.fetch(:openapi).fetch(:request_body).fetch(:content).fetch("application/json").fetch(:schema)
 
-            assert_equal ["attributes"], schema.fetch(:required)
-            assert_equal [:attributes], schema.fetch(:properties).keys
+            assert_equal [:name], schema.fetch(:properties).keys
+            assert_equal false, schema.fetch(:additionalProperties)
+            refute schema.fetch(:properties).key?(:attributes)
+            refute schema.key?(:required)
           end
         end
       end
@@ -477,7 +484,7 @@ module RecordingStudioApi
         assert_equal "mount paths must be safe absolute paths", error.message
       end
 
-      def test_resource_write_request_body_uses_closed_attributes_schema_when_unregistered
+      def test_resource_write_request_body_uses_closed_flat_schema_when_unregistered
         catalog = with_catalog_stubs(
           recordable_types: ["Workspace"],
           root_recordable_types: ["Workspace"],
@@ -492,10 +499,10 @@ module RecordingStudioApi
         create_endpoint = section.fetch(:endpoints).find { |entry| entry.fetch(:verb) == "POST" && entry.fetch(:action) == "resources#create" }
         schema = create_endpoint.fetch(:openapi).fetch(:request_body).fetch(:content).fetch("application/json").fetch(:schema)
 
-        assert_equal "object", schema.fetch(:properties).fetch(:attributes).fetch(:type)
-        assert_equal({}, schema.fetch(:properties).fetch(:attributes).fetch(:properties))
-        assert_equal false, schema.fetch(:properties).fetch(:attributes).fetch(:additionalProperties)
-        assert_equal %w[attributes], schema.fetch(:required)
+        assert_equal [:parent_id], schema.fetch(:properties).keys
+        assert_equal false, schema.fetch(:additionalProperties)
+        assert_equal [], schema.fetch(:required)
+        refute schema.fetch(:properties).key?(:attributes)
         assert_equal true, schema.fetch(:properties).fetch(:parent_id).fetch(:nullable)
       end
 
@@ -514,8 +521,33 @@ module RecordingStudioApi
         create_endpoint = section.fetch(:endpoints).find { |entry| entry.fetch(:verb) == "POST" && entry.fetch(:action) == "resources#create" }
         schema = create_endpoint.fetch(:openapi).fetch(:request_body).fetch(:content).fetch("application/json").fetch(:schema)
 
-        assert_equal %w[attributes parent_id], schema.fetch(:required)
+        assert_equal ["parent_id"], schema.fetch(:required)
+        refute schema.fetch(:properties).key?(:attributes)
         refute schema.fetch(:properties).fetch(:parent_id).key?(:nullable)
+      end
+
+      def test_resource_update_request_body_documents_flat_writable_fields_without_parent_id
+        with_recordable_registration(
+          "Workspace",
+          writable_attributes: %i[name],
+          openapi: { details_schema: { properties: { name: { type: "string" } } } }
+        ) do
+          catalog = with_catalog_stubs(
+            recordable_types: ["Workspace"],
+            root_recordable_types: ["Workspace"],
+            actions_by_type: { "Workspace" => [] },
+            preserve_recordable_registrations: true
+          ) { DocumentationCatalog.call }
+
+          section = catalog.fetch(:resources).find { |resource| resource.fetch(:resource) == "workspaces" }
+          update_endpoint = section.fetch(:endpoints).find { |entry| entry.fetch(:verb) == "PATCH" }
+          schema = update_endpoint.fetch(:openapi).fetch(:request_body).fetch(:content).fetch("application/json").fetch(:schema)
+
+          assert_equal [:name], schema.fetch(:properties).keys
+          refute schema.fetch(:properties).key?(:attributes)
+          refute schema.fetch(:properties).key?(:parent_id)
+          assert_equal false, schema.fetch(:additionalProperties)
+        end
       end
 
       def test_catalog_selects_action_contract_by_api_version_profile
@@ -596,8 +628,17 @@ module RecordingStudioApi
         declarations_singleton.send(:define_method, :root_allowed?, original_root_allowed)
       end
 
-      def with_recordable_registration(recordable_type, serializer: nil, output_keys: nil, fields: nil, openapi: {}, relationships: nil,
-                                       immutable_relationships: nil, operations: nil)
+      def with_recordable_registration(
+        recordable_type,
+        serializer: nil,
+        output_keys: nil,
+        fields: nil,
+        openapi: {},
+        relationships: nil,
+        immutable_relationships: nil,
+        operations: nil,
+        writable_attributes: nil
+      )
         registry = RecordingStudioApi.configuration.recordable_registry
         existing = registry[recordable_type]
 
@@ -609,7 +650,8 @@ module RecordingStudioApi
           openapi: openapi,
           relationships: relationships,
           immutable_relationships: immutable_relationships,
-          operations: operations
+          operations: operations,
+          writable_attributes: writable_attributes
         )
         yield
       ensure

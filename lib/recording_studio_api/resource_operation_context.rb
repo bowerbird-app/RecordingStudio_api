@@ -12,6 +12,7 @@ module RecordingStudioApi
     :root_recording,
     :api_version,
     :params,
+    :request_params,
     :scoped_recordings,
     :parent_recording
   ) do

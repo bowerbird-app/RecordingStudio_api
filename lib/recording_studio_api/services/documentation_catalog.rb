@@ -683,13 +683,18 @@ module RecordingStudioApi
       end
 
       def resource_write_request_body(recordable_type, operation:)
-        parent_id_schema = { type: "string" }
-        required_fields = ["attributes"]
+        attributes_schema = attributes_schema_for(recordable_type, mutable: operation == :update)
+        properties = attributes_schema.fetch(:properties).deep_dup
+        required_fields = []
 
-        if root_recordable_type?(recordable_type)
-          parent_id_schema[:nullable] = true
-        else
-          required_fields << "parent_id"
+        if operation == :create
+          parent_id_schema = { type: "string" }
+          if root_recordable_type?(recordable_type)
+            parent_id_schema[:nullable] = true
+          else
+            required_fields << "parent_id"
+          end
+          properties[:parent_id] = parent_id_schema
         end
 
         {
@@ -698,10 +703,8 @@ module RecordingStudioApi
             "application/json" => {
               schema: {
                 type: "object",
-                properties: {
-                  attributes: attributes_schema_for(recordable_type, mutable: operation == :update),
-                  parent_id: parent_id_schema
-                },
+                properties: properties,
+                additionalProperties: false,
                 required: required_fields
               }
             }
@@ -1057,10 +1060,8 @@ module RecordingStudioApi
         relationship.many ? [child] : child
       end
 
-      def relationship_request_body(_relationship, operation:)
-        properties = {
-          attributes: { type: "object" }
-        }
+      def relationship_request_body(relationship, operation:)
+        attributes_schema = attributes_schema_for(relationship.child_type, mutable: operation == :update)
 
         {
           required: true,
@@ -1068,8 +1069,8 @@ module RecordingStudioApi
             "application/json" => {
               schema: {
                 type: "object",
-                properties: properties,
-                required: ["attributes"]
+                properties: attributes_schema.fetch(:properties).deep_dup,
+                additionalProperties: false
               }
             }
           }

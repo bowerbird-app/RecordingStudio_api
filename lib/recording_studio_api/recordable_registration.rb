@@ -228,6 +228,7 @@ module RecordingStudioApi
         include_policy = normalize_include(normalized.fetch(:include, false), "Relationship #{relationship_name}")
         authorize = normalized[:authorize]
         raise ConfigurationError, "Relationship #{relationship_name} authorize must respond to call for #{recordable_type}" if authorize && !authorize.respond_to?(:call)
+
         description = normalize_description(normalized[:description], "Relationship #{relationship_name}")
 
         relationships[relationship_name] = RelationshipDefinition.new(
