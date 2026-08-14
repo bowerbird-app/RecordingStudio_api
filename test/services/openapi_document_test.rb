@@ -637,17 +637,15 @@ module RecordingStudioApi
 
       def with_recordable_registration(recordable_type, openapi:, serializer: nil, output_keys: nil, fields: nil, relationships: nil, operations: nil)
         registry = RecordingStudioApi.configuration.recordable_registry
-        existing = registry[recordable_type]
+        registrations = registry.instance_variable_get(:@registrations)
+        key = recordable_type.to_s
+        existing = registrations.delete(key)
 
         registry.register(recordable_type, serializer: serializer, output_keys: output_keys, fields: fields, relationships: relationships, openapi: openapi, operations: operations)
         yield
       ensure
-        registrations = registry.instance_variable_get(:@registrations)
-        if existing
-          registrations[recordable_type] = existing
-        else
-          registrations.delete(recordable_type)
-        end
+        registrations.delete(key)
+        registrations[key] = existing if existing
       end
     end
   end
