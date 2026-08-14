@@ -21,12 +21,13 @@ module RecordingStudioApi
 
           payload = pagination.value
           recordings = payload.fetch(:rows)
+          relationship_context = relationship_context_for(recordings, batch: true)
 
           {
             json: {
               resource: resource_name,
               type: recordable_type.demodulize,
-              data: recordings.map { |entry| serialize_recording(entry) },
+              records: recordings.map { |entry| serialize_recording(entry, context: relationship_context) },
               meta: payload.fetch(:meta)
             }
           }

@@ -71,14 +71,38 @@ module RecordingStudioApi
           access_grant.scope_recording || root_recording
         end
 
-        def serialize_recording(target_recording)
-          RecordingStudioApi::Serializers::ResourceRecordingSerializer.call(target_recording, version: api_version, api: api_key)
+        def serialize_recording(target_recording, context: nil)
+          RecordingStudioApi::Serializers::ResourceRecordingSerializer.call(
+            target_recording,
+            version: api_version,
+            api: api_key,
+            context: context
+          )
+        end
+
+        def relationship_context_for(recordings, batch: false)
+          RecordingStudioApi::RelationshipContext.for(
+            recordings: recordings,
+            include_values: params[:include],
+            scoped_recordings: scoped_recordings,
+            api_key: api_key,
+            api_version: api_version,
+            access_grant: access_grant,
+            params: params,
+            batch: batch
+          )
         end
 
         def resource_attributes
-          payload = params.respond_to?(:to_unsafe_h) ? params.to_unsafe_h : {}
+          payload = request_payload
           attributes = payload["attributes"]
           attributes = payload[:attributes] if attributes.nil?
+
+          if attributes.present? && flat_writable_attribute_keys(payload).any?
+            raise RecordingStudioApi::InvalidActionInputError,
+                  "Use either flat writable fields or attributes, not both"
+          end
+
           attributes = payload if attributes.nil?
 
           normalized = attributes.respond_to?(:to_h) ? attributes.to_h : {}
@@ -86,13 +110,30 @@ module RecordingStudioApi
           symbolized.slice(*allowed_attribute_keys)
         end
 
+        def flat_writable_attribute_keys(payload)
+          payload.keys.map(&:to_s) & allowed_attribute_keys.map(&:to_s)
+        end
+
+        def request_payload
+          request_params = context.request_params || params
+          request_params.respond_to?(:to_unsafe_h) ? request_params.to_unsafe_h : request_params.to_h
+        end
+
         def allowed_attribute_keys
           registration = RecordingStudioApi.recordable_registration_for(recordable_type, api: api_key)
           Array(registration&.writable_attributes).map(&:to_sym)
         end
 
+        def mutable_attribute_keys
+          registration = RecordingStudioApi.recordable_registration_for(recordable_type, api: api_key)
+          allowed_attribute_keys - Array(registration&.immutable_fields).map(&:to_sym)
+        end
+
         def parent_recording_for_create
-          if params[:parent_id].blank?
+          return context.parent_recording if context.parent_recording
+
+          parent_id = request_payload["parent_id"] || request_payload[:parent_id]
+          if parent_id.blank?
             return access_scope_recording if root_recordable_type?
 
             raise RecordingStudioApi::InvalidActionInputError.new(
@@ -108,7 +149,7 @@ module RecordingStudioApi
             )
           end
 
-          parent_recording = scoped_recordings.find_by(id: params[:parent_id])
+          parent_recording = scoped_recordings.find_by(id: parent_id)
           raise RecordingStudioApi::NotFoundError, "Parent resource was not found in this API scope" if parent_recording.nil?
 
           parent_recording

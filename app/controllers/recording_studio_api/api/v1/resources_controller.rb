@@ -52,8 +52,13 @@ module RecordingStudioApi
           recordable_type
         end
 
-        def serialize_recording(recording)
-          RecordingStudioApi::Serializers::ResourceRecordingSerializer.call(recording, version: current_api_version, api: current_api_key)
+        def serialize_recording(recording, context: nil)
+          RecordingStudioApi::Serializers::ResourceRecordingSerializer.call(
+            recording,
+            version: current_api_version,
+            api: current_api_key,
+            context: context
+          )
         end
 
         def destroy_resource!(recording)
@@ -153,7 +158,9 @@ module RecordingStudioApi
             root_recording: current_root_recording,
             api_version: current_api_version,
             params: params,
-            scoped_recordings: scoped_recordings
+            request_params: request.request_parameters,
+            scoped_recordings: scoped_recordings,
+            parent_recording: nil
           )
         end
 

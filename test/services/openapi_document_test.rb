@@ -262,7 +262,7 @@ module RecordingStudioApi
           .fetch("application/json")
           .fetch("schema")
 
-        assert_equal %w[resource type data meta], list_schema.fetch("required")
+        assert_equal %w[resource type records meta], list_schema.fetch("required")
         assert_equal %w[limit sort order has_more next_pagination_token],
                      list_schema.fetch("properties").fetch("meta").fetch("required")
       end
@@ -302,17 +302,15 @@ module RecordingStudioApi
           .fetch("application/json")
           .fetch("schema")
           .fetch("properties")
-          .fetch("data")
-          .fetch("properties")
           .fetch("parent_id")
 
         assert_equal true, parent_schema.fetch("nullable")
         refute_nil parent_schema.fetch("example")
       end
 
-      def test_resource_response_schema_actions_defaults_to_empty_array_example
+      def test_resource_response_schema_has_flat_canonical_keys_without_actions
         document = with_recordable_types(["Workspace"]) { OpenapiDocument.call }
-        actions_schema = document
+        schema = document
           .fetch(:paths)
           .fetch("/recording_studio_api/api/v1/workspaces/{id}")
           .fetch("get")
@@ -321,17 +319,186 @@ module RecordingStudioApi
           .fetch("content")
           .fetch("application/json")
           .fetch("schema")
-          .fetch("properties")
-          .fetch("data")
-          .fetch("properties")
-          .fetch("actions")
 
-        assert_equal [], actions_schema.fetch("example")
+        assert_equal %w[id type root_id parent_id created_at updated_at], schema.fetch("properties").keys.map(&:to_s) & %w[id type root_id parent_id created_at updated_at]
+        refute schema.fetch("properties").key?("actions")
+      end
+
+      def test_flat_schema_documents_serializer_fields_relationships_and_meta
+        relationships = {
+          folders: {
+            source: :children, child_type: "Folder", many: true, include: true,
+            serializer: ->(*) { { label: "Folder" } }, output_keys: %i[label], limit: 20,
+            endpoints: %i[index]
+          },
+          owner: {
+            source: :custom, many: false, include: true, resolver: ->(*) {},
+            serializer: ->(*) { { name: "Owner" } }, output_keys: %i[name]
+          }
+        }
+        fields = { title: { resolver: ->(*) { "Title" }, include: true, openapi: { type: :string } } }
+
+        with_recordable_registration("Page", serializer: ->(*) { { slug: "page" } }, output_keys: %i[slug], fields: fields, relationships: relationships, openapi: {}) do
+          document = with_recordable_types(%w[Page Folder]) { OpenapiDocument.call }
+          properties = document.dig(:paths, "/recording_studio_api/api/v1/pages/{id}", "get", :responses, "200", "content", "application/json", "schema", "properties")
+
+          assert_equal "string", properties.fetch("slug").fetch("type")
+          assert_equal "string", properties.fetch("title").fetch("type")
+          assert_equal "array", properties.fetch("folders").fetch("type")
+          assert_equal true, properties.fetch("owner").fetch("nullable")
+          assert_equal %w[limit has_more], properties.fetch("_meta").fetch("properties").fetch("folders").fetch("required")
+        end
+      end
+
+      def test_include_parameter_only_documents_request_enabled_registered_names
+        fields = { summary: { resolver: ->(*) { "Summary" }, include: :request } }
+        relationships = {
+          comments: {
+            source: :children, child_type: "Comment", many: true, include: :request,
+            serializer: ->(*) { { body: "Body" } }, output_keys: %i[body], limit: 20
+          },
+          author: {
+            source: :custom, many: false, include: true, resolver: ->(*) {},
+            serializer: ->(*) { { name: "Author" } }, output_keys: %i[name]
+          }
+        }
+
+        with_recordable_registration("Page", fields: fields, relationships: relationships, openapi: {}) do
+          document = with_recordable_types(["Page"]) { OpenapiDocument.call }
+          parameters = document.dig(:paths, "/recording_studio_api/api/v1/pages", "get", :parameters)
+          include_parameter = parameters.find { |parameter| parameter.fetch("name") == "include" }
+
+          assert_equal "summary,comments", include_parameter.fetch("schema").fetch("example")
+          refute include_parameter.fetch("schema").key?("enum")
+          assert_includes include_parameter.fetch("description"), "summary, comments"
+          refute_includes include_parameter.fetch("description"), "true"
+        end
+      end
+
+      def test_relationship_get_documentation_generates_descriptions_and_examples
+        relationships = {
+          folders: {
+            source: :children, child_type: "Folder", many: true, include: true,
+            serializer: ->(*) { { name: "Folder" } }, output_keys: %i[name], limit: 20,
+            endpoints: %i[index show], description: "The folders directly inside this workspace."
+          },
+          pages: {
+            source: :children, child_type: "Page", many: true, include: :request,
+            serializer: ->(*) { { title: "Page" } }, output_keys: %i[title], limit: 20,
+            endpoints: %i[index show], description: "The pages directly inside this workspace."
+          },
+          featured_folder: {
+            source: :custom, many: false, include: :request, resolver: ->(*) {},
+            serializer: ->(*) { { name: "Folder" } }, output_keys: %i[name],
+            description: "The first Folder directly inside this workspace."
+          }
+        }
+
+        with_recordable_registration(
+          "Workspace",
+          relationships: relationships,
+          openapi: {
+            show: {
+              responses: {
+                "200" => {
+                  content: {
+                    "application/json" => {
+                      examples: {
+                        host_example: { value: { id: "host-controlled-example" } }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ) do
+          document = with_recordable_types(%w[Workspace Folder Page]) { OpenapiDocument.call }
+          operation = document.fetch(:paths).fetch("/recording_studio_api/api/v1/workspaces/{id}").fetch("get")
+          response_examples = operation.fetch(:responses).fetch("200").fetch("content").fetch("application/json").fetch("examples")
+
+          assert_includes operation.fetch(:description), "The response includes `folders`, an array of Folder records with `name` (up to 20). The folders directly inside this workspace."
+          assert_includes operation.fetch(:description), "Add `include=pages` to also receive `pages`, an array of Page records with `title` (up to 20). The pages directly inside this workspace."
+          assert_includes operation.fetch(:description), "Add `include=featured_folder` to also receive `featured_folder`, one related record or `null` with `name`. The first Folder directly inside this workspace."
+          assert_includes operation.fetch(:description), "To browse folders separately, use `GET /recording_studio_api/api/v1/workspaces/{id}/folders`."
+          assert_includes operation.fetch(:description), "`featured_folder` is available only in this response; there is no separate endpoint for it."
+          assert response_examples.key?("default_relationships")
+          assert_equal "Workspace with included fields", response_examples.fetch("default_relationships").fetch("summary")
+          assert_equal "Workspace with requested details", response_examples.fetch("requested_relationships").fetch("summary")
+          assert_equal "host-controlled-example", response_examples.fetch("host_example").fetch("value").fetch("id")
+          folder_types = response_examples.fetch("default_relationships").fetch("value").fetch("folders").map { |folder| folder.fetch("type") }
+          assert_equal ["Folder"], folder_types
+          refute response_examples.fetch("default_relationships").fetch("value").key?("pages")
+          page_types = response_examples.fetch("requested_relationships").fetch("value").fetch("pages").map { |page| page.fetch("type") }
+          assert_equal ["Page"], page_types
+          assert_equal "Custom relationship", response_examples.fetch("requested_relationships").fetch("value").fetch("featured_folder").fetch("type")
+        end
+      end
+
+      def test_nested_index_uses_the_standard_paginated_collection_contract
+        relationships = {
+          folders: {
+            source: :children, child_type: "Folder", many: true, serializer: ->(*) { { name: "Folder" } },
+            output_keys: %i[name], limit: 20, endpoints: %i[index]
+          }
+        }
+
+        with_recordable_registration("Workspace", relationships: relationships, openapi: {}) do
+          with_recordable_registration("Folder", openapi: {}) do
+            document = with_recordable_types(%w[Workspace Folder]) { OpenapiDocument.call }
+            normal_schema = document.dig(:paths, "/recording_studio_api/api/v1/folders", "get", :responses, "200", "content", "application/json", "schema")
+            nested_schema = document.dig(:paths, "/recording_studio_api/api/v1/workspaces/{id}/folders", "get", :responses, "200", "content", "application/json", "schema")
+
+            assert_equal normal_schema.fetch("required"), nested_schema.fetch("required")
+            assert_equal normal_schema.fetch("properties").keys.sort, nested_schema.fetch("properties").keys.sort
+            refute nested_schema.fetch("properties").key?("relationship")
+            assert_equal "string", nested_schema.fetch("properties").fetch("records").fetch("items").fetch("properties").fetch("name").fetch("type")
+          end
+        end
+      end
+
+      def test_named_api_nested_paths_are_isolated_and_respect_child_operations
+        original_configuration = RecordingStudioApi.configuration
+        configuration = RecordingStudioApi::Configuration.new
+        RecordingStudioApi.instance_variable_set(:@configuration, configuration)
+        configuration.recordable_registry.register(
+          "Workspace",
+          relationships: {
+            public_folders: { source: :children, child_type: "Folder", many: true, serializer: ->(*) {},
+                              output_keys: %i[name], limit: 20, endpoints: %i[index] }
+          }
+        )
+        operations = configuration.api(:operations)
+        operations.recordable_registry.register(
+          "Workspace",
+          relationships: {
+            folders: { source: :children, child_type: "Folder", many: true, serializer: ->(*) {},
+                       output_keys: %i[name], limit: 20, endpoints: %i[index create] }
+          }
+        )
+        operations.recordable_registry.register("Folder", operations: %i[index])
+
+        document = OpenapiDocument.call(api: :operations)
+        paths = document.fetch(:paths).keys
+
+        assert_includes paths, "/recording_studio_api/apis/operations/v1/workspaces/{id}/folders"
+        refute(paths.any? { |path| path.include?("public_folders") })
+        refute document.fetch(:paths).fetch("/recording_studio_api/apis/operations/v1/workspaces/{id}/folders").key?("post")
+      ensure
+        RecordingStudioApi.instance_variable_set(:@configuration, original_configuration)
+      end
+
+      def test_generated_document_is_json_structurally_valid
+        document = with_recordable_types(["Workspace"]) { OpenapiDocument.call }
+
+        assert_equal "3.0.3", JSON.parse(JSON.generate(document)).fetch("openapi")
       end
 
       def test_registered_enum_attribute_is_documented_as_named_enum
         with_recordable_registration(
           "Page",
+          serializer: ->(*) { { role: "view" } },
+          output_keys: %i[role],
           openapi: {
             details_schema: {
               type: "object",
@@ -355,10 +522,6 @@ module RecordingStudioApi
             .fetch("content")
             .fetch("application/json")
             .fetch("schema")
-            .fetch("properties")
-            .fetch("data")
-            .fetch("properties")
-            .fetch("attributes")
             .fetch("properties")
             .fetch("role")
 
@@ -386,14 +549,14 @@ module RecordingStudioApi
         assert_nil meta_schema.fetch("example").fetch("next_pagination_token")
       end
 
-      def test_unregistered_page_schema_uses_closed_attributes_schema
+      def test_unregistered_page_schema_has_no_attributes_wrapper
         with_stubbed_recordable_class("Page", [
                                       column_stub("id", :uuid, false),
                                       column_stub("title", :string, true),
                                       column_stub("created_at", :datetime, false)
                                     ]) do
           document = with_recordable_types(["Page"]) { OpenapiDocument.call }
-          attributes_schema = document
+          properties = document
             .fetch(:paths)
             .fetch("/recording_studio_api/api/v1/pages/{id}")
             .fetch("get")
@@ -403,13 +566,10 @@ module RecordingStudioApi
             .fetch("application/json")
             .fetch("schema")
             .fetch("properties")
-            .fetch("data")
-            .fetch("properties")
-            .fetch("attributes")
 
-          assert_equal "object", attributes_schema.fetch("type")
-          assert_equal({}, attributes_schema.fetch("properties"))
-          assert_equal false, attributes_schema.fetch("additionalProperties")
+          refute properties.key?("attributes")
+          assert_equal "string", properties.fetch("created_at").fetch("type")
+          assert_equal "string", properties.fetch("updated_at").fetch("type")
         end
       end
 
@@ -475,19 +635,17 @@ module RecordingStudioApi
         Object.const_set(class_name, existing_class) if existing_class
       end
 
-      def with_recordable_registration(recordable_type, openapi:, operations: nil)
+      def with_recordable_registration(recordable_type, openapi:, serializer: nil, output_keys: nil, fields: nil, relationships: nil, operations: nil)
         registry = RecordingStudioApi.configuration.recordable_registry
-        existing = registry[recordable_type]
+        registrations = registry.instance_variable_get(:@registrations)
+        key = recordable_type.to_s
+        existing = registrations.delete(key)
 
-        registry.register(recordable_type, openapi: openapi, operations: operations)
+        registry.register(recordable_type, serializer: serializer, output_keys: output_keys, fields: fields, relationships: relationships, openapi: openapi, operations: operations)
         yield
       ensure
-        registrations = registry.instance_variable_get(:@registrations)
-        if existing
-          registrations[recordable_type] = existing
-        else
-          registrations.delete(recordable_type)
-        end
+        registrations.delete(key)
+        registrations[key] = existing if existing
       end
     end
   end

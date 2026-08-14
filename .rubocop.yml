@@ -40,6 +40,7 @@ Metrics/AbcSize:
     - 'test/**/*'
     - 'lib/generators/**/*'
     - 'lib/recording_studio_api/admin/api_section_factory.rb'
+    - 'lib/recording_studio_api/recordable_registration.rb'
 
 # Allow empty blocks in tests (common for stubs/mocks)
 Lint/EmptyBlock:

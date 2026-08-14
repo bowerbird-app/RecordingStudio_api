@@ -83,17 +83,15 @@ module RecordingStudioApi
 
         assert_equal ["Folder"], move_endpoint.fetch(:openapi).fetch(:tags)
         assert_equal "Move", move_endpoint.fetch(:summary)
-        action_data_schema = move_endpoint
+        action_response_schema = move_endpoint
           .fetch(:openapi)
           .fetch(:responses)
           .fetch("200")
           .fetch(:content)
           .fetch("application/json")
           .fetch(:schema)
-          .fetch(:properties)
-          .fetch(:data)
-        assert_equal "object", action_data_schema.fetch(:type)
-        assert action_data_schema.fetch(:properties).key?(:id)
+        assert_equal "object", action_response_schema.fetch(:type)
+        assert action_response_schema.fetch(:properties).key?(:id)
       end
 
       def test_default_resource_tags_are_human_readable_for_access
@@ -138,7 +136,7 @@ module RecordingStudioApi
           .fetch("application/json")
           .fetch(:schema)
           .fetch(:properties)
-          .fetch(:data)
+          .fetch(:records)
           .fetch(:items)
 
         assert_equal "object", item_schema.fetch(:type)
@@ -179,6 +177,114 @@ module RecordingStudioApi
           end
 
           assert_equal "Get page details", show_endpoint.fetch(:openapi).fetch(:summary)
+        end
+      end
+
+      def test_named_relationship_adds_generic_relationship_endpoints_to_documentation
+        with_recordable_registration(
+          "Workspace",
+          relationships: {
+            folders: { source: :children, child_type: "Folder", many: true, serializer: ->(*) {},
+                       output_keys: %i[name], limit: 20, endpoints: %i[index show create] }
+          }
+        ) do
+          catalog = with_catalog_stubs(
+            recordable_types: ["Workspace"],
+            actions_by_type: { "Workspace" => [] },
+            preserve_recordable_registrations: true
+          ) { DocumentationCatalog.call }
+
+          endpoints = catalog.fetch(:resources).first.fetch(:endpoints)
+          assert_includes endpoints.map { |endpoint| [endpoint.fetch(:verb), endpoint.fetch(:path)] },
+                          ["GET", "/recording_studio_api/api/v1/workspaces/:id/folders"]
+          assert_includes endpoints.map { |endpoint| [endpoint.fetch(:verb), endpoint.fetch(:path)] },
+                          ["GET", "/recording_studio_api/api/v1/workspaces/:id/folders/:relationship_id"]
+          assert_includes endpoints.map { |endpoint| [endpoint.fetch(:verb), endpoint.fetch(:path)] },
+                          ["POST", "/recording_studio_api/api/v1/workspaces/:id/folders"]
+        end
+      end
+
+      def test_named_relationship_responses_describe_declared_child_types
+        with_recordable_registration(
+          "Workspace",
+          relationships: {
+            folders: { source: :children, child_type: "Folder", many: true, serializer: ->(*) {},
+                       output_keys: %i[name], limit: 20, endpoints: %i[index show create] }
+          }
+        ) do
+          with_recordable_registration(
+            "Folder",
+            openapi: {
+              details_schema: {
+                properties: {
+                  name: { type: "string" }
+                }
+              }
+            }
+          ) do
+            catalog = with_catalog_stubs(
+              recordable_types: %w[Workspace Folder],
+              actions_by_type: { "Workspace" => [], "Folder" => [] },
+              preserve_recordable_registrations: true
+            ) { DocumentationCatalog.call }
+
+            endpoint = catalog.fetch(:resources).find { |section| section.fetch(:resource) == "workspaces" }
+              .fetch(:endpoints).find { |entry| entry.fetch(:verb) == "POST" && entry.fetch(:path).end_with?("/folders") }
+            properties = endpoint.fetch(:openapi).fetch(:responses).fetch("201")
+              .fetch(:content).fetch("application/json").fetch(:schema)
+              .fetch(:properties)
+
+            assert_equal "string", properties.fetch(:name).fetch(:type)
+          end
+        end
+
+        def test_custom_relationship_schema_supports_singular_or_collection_values
+          with_recordable_registration(
+            "Workspace",
+            relationships: {
+              owner: {
+                source: :custom,
+                many: false,
+                include: true,
+                resolver: ->(_workspace) {},
+                serializer: ->(*) {},
+                output_keys: %i[name]
+              }
+            }
+          ) do
+            catalog = with_catalog_stubs(
+              recordable_types: ["Workspace"],
+              actions_by_type: { "Workspace" => [] },
+              preserve_recordable_registrations: true
+            ) { DocumentationCatalog.call }
+
+            schema = catalog.fetch(:resources).first.fetch(:endpoints)
+              .find { |endpoint| endpoint.fetch(:verb) == "GET" && endpoint.fetch(:path).end_with?("/workspaces/:id") }
+              .fetch(:openapi).fetch(:responses).fetch("200").fetch(:content).fetch("application/json").fetch(:schema)
+            assert schema.fetch(:properties).fetch(:owner).key?(:oneOf)
+          end
+        end
+
+        def test_relationship_show_endpoint_is_omitted_when_no_child_type_supports_show
+          with_recordable_registration(
+            "Workspace",
+            relationships: {
+              folders: { source: :children, child_type: "Folder", many: true, serializer: ->(*) {},
+                         output_keys: %i[name], limit: 20, endpoints: %i[index show] }
+            }
+          ) do
+            with_recordable_registration("Folder", operations: %i[index]) do
+              catalog = with_catalog_stubs(
+                recordable_types: %w[Workspace Folder],
+                actions_by_type: { "Workspace" => [], "Folder" => [] },
+                preserve_recordable_registrations: true
+              ) { DocumentationCatalog.call }
+
+              paths = catalog.fetch(:resources).find { |section| section.fetch(:resource) == "workspaces" }
+                .fetch(:endpoints).map { |endpoint| endpoint.fetch(:path) }
+              refute_includes paths, "/recording_studio_api/api/v1/workspaces/:id/folders/:relationship_id"
+            end
+          end
         end
       end
 
@@ -224,6 +330,83 @@ module RecordingStudioApi
         assert_equal "number", schema.fetch(:properties).fetch("score").fetch(:type)
         assert_equal "array", schema.fetch(:properties).fetch("tags").fetch(:type)
         assert_equal %w[draft final], schema.fetch(:properties).fetch("mode").fetch(:enum)
+      end
+
+      def test_nested_endpoints_require_many_children_endpoints_and_child_operations
+        relationships = {
+          folders: { source: :children, child_type: "Folder", many: true, serializer: ->(*) {},
+                     output_keys: %i[name], limit: 20, endpoints: %i[index create] },
+          owner: { source: :custom, many: false, include: true, resolver: ->(*) {},
+                   serializer: ->(*) {}, output_keys: %i[name] }
+        }
+
+        with_recordable_registration("Workspace", relationships: relationships) do
+          with_recordable_registration("Folder", operations: %i[index]) do
+            catalog = with_catalog_stubs(
+              recordable_types: %w[Workspace Folder],
+              actions_by_type: { "Workspace" => [], "Folder" => [] },
+              preserve_recordable_registrations: true
+            ) { DocumentationCatalog.call }
+
+            paths = catalog.fetch(:resources).find { |section| section.fetch(:resource) == "workspaces" }
+              .fetch(:endpoints).map { |endpoint| [endpoint.fetch(:verb), endpoint.fetch(:path)] }
+            assert_includes paths, ["GET", "/recording_studio_api/api/v1/workspaces/:id/folders"]
+            refute_includes paths, ["POST", "/recording_studio_api/api/v1/workspaces/:id/folders"]
+            refute(paths.any? { |_verb, path| path.include?("/owner") })
+          end
+        end
+      end
+
+      def test_nested_create_request_body_contains_flat_writable_properties
+        relationships = {
+          folders: { source: :children, child_type: "Folder", many: true, serializer: ->(*) {},
+                     output_keys: %i[name], limit: 20, endpoints: %i[create] }
+        }
+
+        with_recordable_registration("Workspace", relationships: relationships) do
+          with_recordable_registration(
+            "Folder",
+            operations: %i[create],
+            writable_attributes: %i[name],
+            openapi: { details_schema: { properties: { name: { type: "string" } } } }
+          ) do
+            catalog = with_catalog_stubs(
+              recordable_types: %w[Workspace Folder],
+              actions_by_type: { "Workspace" => [], "Folder" => [] },
+              preserve_recordable_registrations: true
+            ) { DocumentationCatalog.call }
+            endpoint = catalog.fetch(:resources).find { |section| section.fetch(:resource) == "workspaces" }
+              .fetch(:endpoints).find { |entry| entry.fetch(:verb) == "POST" && entry.fetch(:path).end_with?("/folders") }
+            schema = endpoint.fetch(:openapi).fetch(:request_body).fetch(:content).fetch("application/json").fetch(:schema)
+
+            assert_equal [:name], schema.fetch(:properties).keys
+            assert_equal false, schema.fetch(:additionalProperties)
+            refute schema.fetch(:properties).key?(:attributes)
+            refute schema.key?(:required)
+          end
+        end
+      end
+
+      def test_nested_show_endpoint_is_documented_without_index
+        relationships = {
+          folders: { source: :children, child_type: "Folder", many: true, serializer: ->(*) {},
+                     output_keys: %i[name], limit: 20, endpoints: %i[show] }
+        }
+
+        with_recordable_registration("Workspace", relationships: relationships) do
+          with_recordable_registration("Folder", operations: %i[show]) do
+            catalog = with_catalog_stubs(
+              recordable_types: %w[Workspace Folder],
+              actions_by_type: { "Workspace" => [], "Folder" => [] },
+              preserve_recordable_registrations: true
+            ) { DocumentationCatalog.call }
+            paths = catalog.fetch(:resources).find { |section| section.fetch(:resource) == "workspaces" }
+              .fetch(:endpoints).map { |endpoint| [endpoint.fetch(:verb), endpoint.fetch(:path)] }
+
+            assert_includes paths, ["GET", "/recording_studio_api/api/v1/workspaces/:id/folders/:relationship_id"]
+            refute_includes paths, ["GET", "/recording_studio_api/api/v1/workspaces/:id/folders"]
+          end
+        end
       end
 
       def test_catalog_uses_configured_default_api_version_in_paths
@@ -301,7 +484,7 @@ module RecordingStudioApi
         assert_equal "mount paths must be safe absolute paths", error.message
       end
 
-      def test_resource_write_request_body_uses_closed_attributes_schema_when_unregistered
+      def test_resource_write_request_body_uses_closed_flat_schema_when_unregistered
         catalog = with_catalog_stubs(
           recordable_types: ["Workspace"],
           root_recordable_types: ["Workspace"],
@@ -316,10 +499,10 @@ module RecordingStudioApi
         create_endpoint = section.fetch(:endpoints).find { |entry| entry.fetch(:verb) == "POST" && entry.fetch(:action) == "resources#create" }
         schema = create_endpoint.fetch(:openapi).fetch(:request_body).fetch(:content).fetch("application/json").fetch(:schema)
 
-        assert_equal "object", schema.fetch(:properties).fetch(:attributes).fetch(:type)
-        assert_equal({}, schema.fetch(:properties).fetch(:attributes).fetch(:properties))
-        assert_equal false, schema.fetch(:properties).fetch(:attributes).fetch(:additionalProperties)
-        assert_equal %w[attributes], schema.fetch(:required)
+        assert_equal [:parent_id], schema.fetch(:properties).keys
+        assert_equal false, schema.fetch(:additionalProperties)
+        assert_equal [], schema.fetch(:required)
+        refute schema.fetch(:properties).key?(:attributes)
         assert_equal true, schema.fetch(:properties).fetch(:parent_id).fetch(:nullable)
       end
 
@@ -338,8 +521,33 @@ module RecordingStudioApi
         create_endpoint = section.fetch(:endpoints).find { |entry| entry.fetch(:verb) == "POST" && entry.fetch(:action) == "resources#create" }
         schema = create_endpoint.fetch(:openapi).fetch(:request_body).fetch(:content).fetch("application/json").fetch(:schema)
 
-        assert_equal %w[attributes parent_id], schema.fetch(:required)
+        assert_equal ["parent_id"], schema.fetch(:required)
+        refute schema.fetch(:properties).key?(:attributes)
         refute schema.fetch(:properties).fetch(:parent_id).key?(:nullable)
+      end
+
+      def test_resource_update_request_body_documents_flat_writable_fields_without_parent_id
+        with_recordable_registration(
+          "Workspace",
+          writable_attributes: %i[name],
+          openapi: { details_schema: { properties: { name: { type: "string" } } } }
+        ) do
+          catalog = with_catalog_stubs(
+            recordable_types: ["Workspace"],
+            root_recordable_types: ["Workspace"],
+            actions_by_type: { "Workspace" => [] },
+            preserve_recordable_registrations: true
+          ) { DocumentationCatalog.call }
+
+          section = catalog.fetch(:resources).find { |resource| resource.fetch(:resource) == "workspaces" }
+          update_endpoint = section.fetch(:endpoints).find { |entry| entry.fetch(:verb) == "PATCH" }
+          schema = update_endpoint.fetch(:openapi).fetch(:request_body).fetch(:content).fetch("application/json").fetch(:schema)
+
+          assert_equal [:name], schema.fetch(:properties).keys
+          refute schema.fetch(:properties).key?(:attributes)
+          refute schema.fetch(:properties).key?(:parent_id)
+          assert_equal false, schema.fetch(:additionalProperties)
+        end
       end
 
       def test_catalog_selects_action_contract_by_api_version_profile
@@ -420,18 +628,35 @@ module RecordingStudioApi
         declarations_singleton.send(:define_method, :root_allowed?, original_root_allowed)
       end
 
-      def with_recordable_registration(recordable_type, serializer: nil, openapi:)
+      def with_recordable_registration(
+        recordable_type,
+        serializer: nil,
+        output_keys: nil,
+        fields: nil,
+        openapi: {},
+        relationships: nil,
+        immutable_relationships: nil,
+        operations: nil,
+        writable_attributes: nil
+      )
         registry = RecordingStudioApi.configuration.recordable_registry
         existing = registry[recordable_type]
 
-        registry.register(recordable_type, serializer: serializer, openapi: openapi)
+        registry.register(
+          recordable_type,
+          serializer: serializer,
+          output_keys: output_keys,
+          fields: fields,
+          openapi: openapi,
+          relationships: relationships,
+          immutable_relationships: immutable_relationships,
+          operations: operations,
+          writable_attributes: writable_attributes
+        )
         yield
       ensure
-        if existing
-          registry.register(recordable_type, serializer: existing.serializer, openapi: existing.openapi)
-        else
-          registry.instance_variable_get(:@registrations).delete(recordable_type)
-        end
+        registrations = registry.instance_variable_get(:@registrations)
+        existing ? registrations[recordable_type] = existing : registrations.delete(recordable_type)
       end
     end
   end

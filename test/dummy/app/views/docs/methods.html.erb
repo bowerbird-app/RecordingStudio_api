@@ -15,7 +15,11 @@
 		language: :ruby,
 		code: <<~'CODE'
 			RecordingStudioApi.configure { |config| config.access_token_ttl = 1.hour }
-			RecordingStudioApi.register_recordable_type_api("Page", serializer: PageSerializer)
+			RecordingStudioApi.register_recordable_type_api(
+			  "Page",
+			  output_keys: %i[title],
+			  fields: { title: :title }
+			)
 			RecordingStudioApi.register_capability_action(
 			  :publish,
 			  capability: :publishable,

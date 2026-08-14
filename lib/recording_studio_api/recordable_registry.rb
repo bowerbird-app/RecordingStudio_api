@@ -9,20 +9,18 @@ module RecordingStudioApi
       @registrations = {}
     end
 
-    def register(recordable_type, serializer: nil, openapi: nil, sortable_attributes: nil, writable_attributes: nil, operations: nil, capability_actions: nil)
-      registration = RecordableRegistration.new(
-        recordable_type: recordable_type,
-        serializer: serializer,
-        openapi: openapi,
-        sortable_attributes: sortable_attributes,
-        writable_attributes: writable_attributes,
-        operations: operations,
+    def register(recordable_type, serializer: nil, output_keys: nil, fields: nil, openapi: nil,
+                 sortable_attributes: nil, writable_attributes: nil, immutable_fields: nil,
+                 relationships: nil, immutable_relationships: nil, operations: nil, capability_actions: nil)
+      incoming = RecordableRegistration.new(
+        recordable_type: recordable_type, serializer: serializer, output_keys: output_keys, fields: fields,
+        openapi: openapi, sortable_attributes: sortable_attributes, writable_attributes: writable_attributes,
+        immutable_fields: immutable_fields, relationships: relationships,
+        immutable_relationships: immutable_relationships, operations: operations,
         capability_actions: capability_actions
       )
-      registration.validate!
-
-      key = registration.recordable_type
-      @registrations[key] = merge_registrations(@registrations[key], registration)
+      key = incoming.recordable_type
+      @registrations[key] = merge_registrations(@registrations[key], incoming)
     end
 
     def fetch(recordable_type)
@@ -44,62 +42,56 @@ module RecordingStudioApi
     private
 
     def merge_registrations(existing, incoming)
-      return incoming if existing.nil?
+      return incoming unless existing
 
-      merged = RecordableRegistration.new(
+      RecordableRegistration.new(
         recordable_type: incoming.recordable_type,
-        serializer: compose_serializers(existing.serializer, incoming.serializer),
+        serializer: merge_value("serializer", existing.serializer, incoming.serializer),
+        output_keys: existing.output_keys | incoming.output_keys,
+        fields: merge_definitions("field", existing.fields, incoming.fields),
         openapi: deep_merge_hashes(existing.openapi, incoming.openapi),
         sortable_attributes: existing.sortable_attributes | incoming.sortable_attributes,
-        writable_attributes: (existing.writable_attributes | incoming.writable_attributes).sort,
-        operations: existing.operations & incoming.operations,
-        capability_actions: (existing.capability_actions | incoming.capability_actions).sort
+        writable_attributes: existing.writable_attributes | incoming.writable_attributes,
+        immutable_fields: existing.immutable_fields | incoming.immutable_fields,
+        relationships: merge_definitions("relationship", existing.relationships, incoming.relationships),
+        immutable_relationships: existing.immutable_relationships | incoming.immutable_relationships,
+        operations: merge_explicit_set("operations", existing.operations, incoming.operations,
+                                       existing.operations_supplied?, incoming.operations_supplied?),
+        capability_actions: merge_explicit_set("capability actions", existing.capability_actions, incoming.capability_actions,
+                                               existing.capability_actions_supplied?, incoming.capability_actions_supplied?),
+        operations_supplied: existing.operations_supplied? || incoming.operations_supplied?,
+        capability_actions_supplied: existing.capability_actions_supplied? || incoming.capability_actions_supplied?
       )
-      merged.validate!
-      merged
     end
 
-    def compose_serializers(base_serializer, overlay_serializer)
-      return overlay_serializer if base_serializer.nil?
-      return base_serializer if overlay_serializer.nil?
+    def merge_definitions(kind, existing, incoming)
+      existing.merge(incoming) do |name, established, replacement|
+        raise ConfigurationError, "#{kind.capitalize} #{name} cannot be redefined incompatibly" unless established == replacement
 
-      lambda do |recordable|
-        base_payload = normalize_hash(base_serializer.call(recordable))
-        overlay_payload = normalize_hash(overlay_serializer.call(recordable))
-        deep_merge_hashes(base_payload, overlay_payload)
+        established
       end
     end
 
-    def normalize_hash(value)
-      return {} unless value.respond_to?(:to_h)
+    def merge_value(name, established, replacement)
+      return replacement unless established
+      return established unless replacement
+      return established if established == replacement
 
-      symbolize_keys(value.to_h)
+      raise ConfigurationError, "#{name.capitalize} cannot be redefined incompatibly"
     end
 
-    def symbolize_keys(value)
-      case value
-      when Hash
-        value.each_with_object({}) do |(key, child_value), output|
-          normalized_key = key.respond_to?(:to_sym) ? key.to_sym : key
-          output[normalized_key] = symbolize_keys(child_value)
-        end
-      when Array
-        value.map { |child_value| symbolize_keys(child_value) }
-      else
-        value
-      end
+    def merge_explicit_set(name, established, replacement, established_supplied, replacement_supplied)
+      return replacement if replacement_supplied && !established_supplied
+      return established if established_supplied && !replacement_supplied
+      return established unless established_supplied || replacement_supplied
+      return established if established == replacement
+
+      raise ConfigurationError, "#{name.capitalize} cannot be redefined incompatibly"
     end
 
     def deep_merge_hashes(base, overlay)
-      base_hash = normalize_hash(base)
-      overlay_hash = normalize_hash(overlay)
-
-      base_hash.merge(overlay_hash) do |_key, base_value, overlay_value|
-        if base_value.is_a?(Hash) && overlay_value.is_a?(Hash)
-          deep_merge_hashes(base_value, overlay_value)
-        else
-          overlay_value
-        end
+      base.merge(overlay) do |_key, base_value, overlay_value|
+        base_value.is_a?(Hash) && overlay_value.is_a?(Hash) ? deep_merge_hashes(base_value, overlay_value) : overlay_value
       end
     end
   end

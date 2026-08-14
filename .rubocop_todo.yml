@@ -121,6 +121,7 @@ Metrics/AbcSize:
   Max: 57
   Exclude:
     - 'lib/recording_studio_api/admin/api_section_factory.rb'
+    - 'lib/recording_studio_api/recordable_registration.rb'
 
 # Offense count: 19
 # Configuration parameters: CountComments, CountAsOne, AllowedMethods, AllowedPatterns.
@@ -155,7 +156,13 @@ Metrics/ModuleLength:
 # Offense count: 5
 # Configuration parameters: CountKeywordArgs, MaxOptionalParameters.
 Metrics/ParameterLists:
-  Max: 8
+  Max: 13
+  Exclude:
+    - 'lib/recording_studio_api.rb'
+    - 'lib/recording_studio_api/recordable_registration.rb'
+    - 'lib/recording_studio_api/recordable_registry.rb'
+    - 'lib/recording_studio_api/relationship_context.rb'
+    - 'lib/recording_studio_api/serializer_context.rb'
 
 # Offense count: 15
 # Configuration parameters: AllowedMethods, AllowedPatterns.
@@ -169,6 +176,24 @@ Naming/RescuedExceptionsVariableName:
   Exclude:
     - 'app/controllers/recording_studio_api/concerns/rate_limiting.rb'
     - 'app/controllers/recording_studio_api/concerns/request_logging.rb'
+
+Lint/UnusedMethodArgument:
+  Exclude:
+    - 'lib/recording_studio_api/relationship_context.rb'
+    - 'lib/recording_studio_api/serializers/recording_serializer.rb'
+    - 'lib/recording_studio_api/services/documentation_catalog.rb'
+
+Lint/UselessConstantScoping:
+  Exclude:
+    - 'test/relationship_batch_loader_test.rb'
+
+Naming/AccessorMethodName:
+  Exclude:
+    - 'test/relationship_batch_loader_test.rb'
+
+Naming/PredicateMethod:
+  Exclude:
+    - 'lib/recording_studio_api/recordable_registration.rb'
 
 # Offense count: 6
 # This cop supports safe autocorrection (--autocorrect).

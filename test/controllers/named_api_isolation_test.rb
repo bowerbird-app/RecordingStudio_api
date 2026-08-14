@@ -9,19 +9,39 @@ class NamedApiIsolationTest < ActionDispatch::IntegrationTest
     reset_recording_studio_api_configuration!
     reset_recording_studio_capabilities!
     RecordingStudioApi.configuration.api(:operations) { |api| api.default_access = :read_only }
+    RecordingStudioApi.configuration.recordable_registry.instance_variable_get(:@registrations).delete("Workspace")
     RecordingStudioApi.register_recordable_type_api(
       "Workspace",
-      serializer: ->(_workspace) { { audience: "public" } }
+      serializer: ->(_workspace, **) { { audience: "public" } },
+      output_keys: %i[audience],
+      relationships: {
+        public_folders: { source: :children, child_type: "Folder", many: true,
+                          serializer: ->(recordable, **) { { name: recordable.name } }, output_keys: %i[name], limit: 20,
+                          endpoints: %i[index] }
+      }
     )
     RecordingStudioApi.register_recordable_type_api(
       "Workspace",
       api: :operations,
-      serializer: ->(_workspace) { { audience: "operations" } }
+      serializer: ->(_workspace, **) { { audience: "operations" } },
+      output_keys: %i[audience],
+      relationships: {
+        folders: { source: :children, child_type: "Folder", many: true,
+                   serializer: ->(recordable, **) { { name: recordable.name } }, output_keys: %i[name], limit: 20,
+                   endpoints: %i[index show] }
+      }
     )
     RecordingStudioApi.register_default_resource_actions!
+    RecordingStudioApi.register_recordable_type_api(
+      "Folder",
+      api: :operations,
+      serializer: ->(recordable, **) { { name: recordable.name } },
+      output_keys: %i[name],
+      operations: %i[index show]
+    )
 
     user = create_user
-    _root_recording, @access_recording = create_access_recording_for(user: user)
+    @root_recording, @access_recording = create_access_recording_for(user: user)
     @public_token = issue_oauth_access_token_for(access_recording: @access_recording)
     @operations_token = issue_operations_token
   end
@@ -38,16 +58,16 @@ class NamedApiIsolationTest < ActionDispatch::IntegrationTest
 
     get operations_root_path, headers: bearer_headers(@operations_token)
     assert_response :success
-    assert_equal [{ "name" => "workspaces", "type" => "workspace" }], JSON.parse(response.body).fetch("resources")
+    assert_equal %w[folders workspaces], JSON.parse(response.body).fetch("resources").map { |resource| resource.fetch("name") }.sort
   end
 
   test "named api uses its own serializer and read only operation defaults" do
     get "#{operations_root_path}/workspaces", headers: bearer_headers(@operations_token)
 
     assert_response :success
-    data = JSON.parse(response.body).fetch("data")
-    assert_not_empty data
-    assert_equal({ "audience" => "operations" }, data.first.fetch("attributes"))
+    records = JSON.parse(response.body).fetch("records")
+    assert_not_empty records
+    assert_equal "operations", records.first.fetch("audience")
 
     post "#{operations_root_path}/workspaces",
          params: { attributes: { name: "Blocked write" } },
@@ -55,6 +75,43 @@ class NamedApiIsolationTest < ActionDispatch::IntegrationTest
 
     assert_response :unprocessable_content
     assert_equal 0, Workspace.where(name: "Blocked write").count
+  end
+
+  test "named api shows a direct configured child relationship record" do
+    folder_recording = RecordingStudio::Recording.create!(
+      recordable: Folder.create!(name: "Operations child"),
+      parent_recording: @root_recording
+    )
+
+    get "#{operations_root_path}/workspaces/#{@root_recording.id}/folders/#{folder_recording.id}",
+        headers: bearer_headers(@operations_token)
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert_equal folder_recording.id, payload.fetch("id")
+    assert_equal "Folder", payload.fetch("type")
+    refute payload.key?("data")
+  end
+
+  test "named api nested routes use only the named relationship registry" do
+    folder_recording = RecordingStudio::Recording.create!(
+      recordable: Folder.create!(name: "Operations child"),
+      parent_recording: @root_recording
+    )
+
+    get "#{operations_root_path}/workspaces/#{@root_recording.id}/folders", headers: bearer_headers(@operations_token)
+    assert_response :success
+    assert_equal([folder_recording.id], JSON.parse(response.body).fetch("records").map { |record| record.fetch("id") })
+
+    get "#{operations_root_path}/workspaces/#{@root_recording.id}/public_folders", headers: bearer_headers(@operations_token)
+    assert_response :unprocessable_entity
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/public_folders", headers: bearer_headers(@public_token)
+    assert_response :success
+    assert_equal([folder_recording.id], JSON.parse(response.body).fetch("records").map { |record| record.fetch("id") })
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders", headers: bearer_headers(@public_token)
+    assert_response :unprocessable_entity
   end
 
   private

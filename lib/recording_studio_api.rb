@@ -19,6 +19,9 @@ require "recording_studio_api/token"
 require "recording_studio_api/oauth_access_token"
 require "recording_studio_api/oauth_error_mapper"
 require "recording_studio_api/openapi_helpers"
+require "recording_studio_api/relationship_batch_loader"
+require "recording_studio_api/relationship_context"
+require "recording_studio_api/serializer_context"
 require "recording_studio_api/serializers/recording_serializer"
 require "recording_studio_api/serializers/resource_recording_serializer"
 require "recording_studio_api/services/base_service"
@@ -108,7 +111,6 @@ module RecordingStudioApi
       Integration.oauth_error_status(error)
     end
 
-    # rubocop:disable Metrics/ParameterLists
     def register_capability_action(name, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil, api: :public)
       configuration.api(api).action_registry.register(
         name,
@@ -125,18 +127,25 @@ module RecordingStudioApi
         required_role: required_role
       )
     end
-    # rubocop:enable Metrics/ParameterLists
 
-    def register_recordable_type_api(recordable_type, serializer: nil, openapi: nil, sortable_attributes: nil, writable_attributes: nil, operations: nil, capability_actions: nil, api: :public)
+    def register_recordable_type_api(recordable_type, serializer: nil, output_keys: nil, fields: nil, openapi: nil,
+                                     sortable_attributes: nil, writable_attributes: nil, immutable_fields: nil,
+                                     relationships: nil, immutable_relationships: nil, operations: nil,
+                                     capability_actions: nil, api: :public)
       definition = configuration.api(api)
       resolved_operations = operations
       resolved_operations = %i[index show] if resolved_operations.nil? && definition.respond_to?(:default_access) && definition.default_access == :read_only
       definition.recordable_registry.register(
         recordable_type,
         serializer: serializer,
+        output_keys: output_keys,
+        fields: fields,
         openapi: openapi,
         sortable_attributes: sortable_attributes,
         writable_attributes: writable_attributes,
+        immutable_fields: immutable_fields,
+        relationships: relationships,
+        immutable_relationships: immutable_relationships,
         operations: resolved_operations,
         capability_actions: capability_actions
       )

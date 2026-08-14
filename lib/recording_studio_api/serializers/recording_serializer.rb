@@ -14,22 +14,18 @@ module RecordingStudioApi
 
         def serialize_recording(recording, version: nil, api: :public)
           {
-            id: recording.id,
-            type: resource_type_for(recording.recordable_type),
-            actions: action_names_for(recording.recordable_type, version: version, api: api),
-            root_id: recording.root_recording_id,
-            parent_id: recording.parent_recording_id
+            id: recording.id.to_s,
+            type: recording.recordable_type.to_s,
+            parent_id: recording.parent_recording_id&.to_s,
+            root_id: recording.root_recording_id&.to_s,
+            created_at: iso8601(recording, :created_at),
+            updated_at: iso8601(recording, :updated_at)
           }
         end
 
-        def resource_type_for(recordable_type)
-          recordable_type.to_s.demodulize.underscore
-        end
-
-        def action_names_for(recordable_type, version: nil, api: :public)
-          return [] unless RecordingStudioApi.respond_to?(:capability_actions_for)
-
-          RecordingStudioApi.capability_actions_for(recordable_type, version: version, api: api).map(&:name)
+        def iso8601(recording, name)
+          value = recording.public_send(name) if recording.respond_to?(name)
+          value&.iso8601
         end
       end
     end

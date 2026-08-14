@@ -6,11 +6,11 @@ require "openssl"
 require "securerandom"
 
 def ensure_recording_for(recordable:, parent_recording:)
-  RecordingStudio::Recording.unscoped.find_or_create_by!(
-    recordable: recordable,
-    root_recording_id: parent_recording.root_recording_id,
-    parent_recording_id: parent_recording.id
-  )
+  recording = RecordingStudio::Recording.unscoped.find_or_initialize_by(recordable: recordable)
+  recording.root_recording_id = parent_recording.root_recording_id
+  recording.parent_recording_id = parent_recording.id
+  recording.save! if recording.new_record? || recording.changed?
+  recording
 end
 
 def ensure_access_recording_for(recording:, actor:, role:, manager_actor: actor)
@@ -347,8 +347,8 @@ admin_api = RecordingStudioApi::AdminApi.find_or_create_by!(key: "api") do |reco
 end
 
 workspace = Workspace.find_or_create_by!(name: "Studio Workspace")
-folder = Folder.find_or_create_by!(name: "Product Docs")
-page = Page.find_or_create_by!(title: "Getting Started")
+folders = ["Product Docs", "Release Notes"].map { |name| Folder.find_or_create_by!(name: name) }
+pages = ["Getting Started", "Production Checklist"].map { |title| Page.find_or_create_by!(title: title) }
 
 admin_root_recording = RecordingStudio::Recording.unscoped.find_or_create_by!(
   recordable: admin_root,
@@ -366,8 +366,10 @@ root_recording = RecordingStudio::Recording.unscoped.find_or_create_by!(
   parent_recording_id: nil
 )
 
-folder_recording = ensure_recording_for(recordable: folder, parent_recording: root_recording)
-page_recording = ensure_recording_for(recordable: page, parent_recording: folder_recording)
+folder_recordings = folders.map { |folder| ensure_recording_for(recordable: folder, parent_recording: root_recording) }
+page_recordings = pages.map { |page| ensure_recording_for(recordable: page, parent_recording: root_recording) }
+folder_recording = folder_recordings.first
+page_recording = page_recordings.first
 
 Current.actor = admin_user
 ensure_access_recording_for(
@@ -466,7 +468,7 @@ seeded_api_clients.concat(service_name_variant_clients)
 
 puts "Seeded users: admin@admin.com (password: Password)"
 puts "Seeded admin root: #{admin_root.name}"
-puts "Seeded workspace tree: #{workspace.name} -> #{folder.name} -> #{page.title}"
+puts "Seeded workspace children: #{workspace.name} -> folders: #{folders.map(&:name).join(', ')}; pages: #{pages.map(&:title).join(', ')}"
 puts "Seeded admin root access recording: #{admin_root_recording.id}"
 puts "Seeded admin access recording: #{admin_access_recording.id}"
 

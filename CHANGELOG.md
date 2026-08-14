@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-14
+
+### Changed
+- **Breaking (pre-production):** API responses now use the flat recording contract. Former
+  `attributes` values are top-level, relationship values have no `relationships` or `data` wrapper,
+  and `actions` is removed. Upgrade consumer snapshots, fixtures, and tests; no runtime legacy
+  response compatibility is provided.
+- Replaced recordable serializers and the child-only relationship DSL with explicit `output_keys`,
+  `fields`, and named `children`/`custom` relationship sources
+- Flattened API record responses and generated OpenAPI schemas; timestamps are now canonical
+  response keys and collection entries are exposed as `records`
+- Added generic named relationship endpoints and request-driven relationship expansion
+
+See [UPGRADING.md](UPGRADING.md) for the required registration, client-response, request-body, and
+relationship migration steps.
+
 ## [0.2.0] - 2026-08-03
 
 ### Added
@@ -37,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/bowerbird-app/RecordingStudio_api/releases/tag/v0.1.0

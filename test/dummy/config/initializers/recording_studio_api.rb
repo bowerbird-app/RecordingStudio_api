@@ -46,13 +46,53 @@ RecordingStudioApi.register_recordable_type_api(
   "AdminRoot",
   api: :operations,
   operations: %i[index show],
-  serializer: ->(recordable) { { name: recordable.name } }
+  serializer: ->(recordable, **) { { name: recordable.name } },
+  output_keys: %i[name],
 )
 
 RecordingStudioApi.register_recordable_type_api(
   "Workspace",
-  serializer: ->(recordable) { { name: recordable.name } },
+  serializer: ->(recordable, **) { { name: recordable.name } },
+  output_keys: %i[name],
   writable_attributes: %i[name],
+  relationships: {
+    folders: {
+      source: :children,
+      child_type: "Folder",
+      many: true,
+      include: true,
+      serializer: ->(folder, **) { { name: folder.name } },
+      output_keys: %i[name],
+      description: "The folders directly inside this workspace.",
+      limit: 20,
+      endpoints: %i[index show]
+    },
+    pages: {
+      source: :children,
+      child_type: "Page",
+      many: true,
+      include: :request,
+      serializer: ->(page, **) { { title: page.title } },
+      output_keys: %i[title],
+      description: "The pages directly inside this workspace.",
+      limit: 20,
+      endpoints: %i[index show]
+    },
+    featured_folder: {
+      source: :custom,
+      many: false,
+      include: :request,
+      resolver: ->(context) do
+        context.scoped_recordings.where(
+          parent_recording_id: context.recording.id,
+          recordable_type: "Folder"
+        ).order(:created_at, :id).first
+      end,
+      serializer: ->(folder, **) { { name: folder.name } },
+      output_keys: %i[name],
+      description: "The first Folder directly inside this workspace."
+    }
+  },
   openapi: {
     details_schema: {
       type: "object",
@@ -73,16 +113,15 @@ RecordingStudioApi.register_recordable_type_api(
                   value: {
                     resource: "workspaces",
                     type: "workspace",
-                    data: [
+                    records: [
                       {
                         id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f",
                         type: "workspace",
-                        actions: [],
                         root_id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f",
                         parent_id: nil,
-                        attributes: {
-                          name: "Editorial"
-                        }
+                        created_at: "2026-01-01T00:00:00Z",
+                        updated_at: "2026-01-01T00:00:00Z",
+                        name: "Editorial"
                       }
                     ],
                     meta: {
@@ -110,16 +149,13 @@ RecordingStudioApi.register_recordable_type_api(
               examples: {
                 default: {
                   value: {
-                    data: {
-                      id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f",
-                      type: "workspace",
-                      actions: [],
-                      root_id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f",
-                      parent_id: nil,
-                      attributes: {
-                        name: "Editorial"
-                      }
-                    }
+                    id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f",
+                    type: "workspace",
+                    root_id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f",
+                    parent_id: nil,
+                    created_at: "2026-01-01T00:00:00Z",
+                    updated_at: "2026-01-01T00:00:00Z",
+                    name: "Editorial"
                   }
                 }
               }
@@ -132,8 +168,16 @@ RecordingStudioApi.register_recordable_type_api(
 )
 
 RecordingStudioApi.register_recordable_type_api(
+  "Page",
+  operations: %i[index show],
+  serializer: ->(recordable, **) { { title: recordable.title } },
+  output_keys: %i[title]
+)
+
+RecordingStudioApi.register_recordable_type_api(
   "Folder",
-  serializer: ->(recordable) { { name: recordable.name } },
+  serializer: ->(recordable, **) { { name: recordable.name } },
+  output_keys: %i[name],
   writable_attributes: %i[name],
   capability_actions: %i[move],
   openapi: {
@@ -143,6 +187,37 @@ RecordingStudioApi.register_recordable_type_api(
         name: { type: "string", description: "Folder attributes." }
       },
       required: ["name"]
+    },
+    create: {
+      request_body: {
+        content: {
+          "application/json" => {
+            examples: {
+              default: {
+                value: {
+                  name: "Marketing",
+                  parent_id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    update: {
+      request_body: {
+        content: {
+          "application/json" => {
+            examples: {
+              default: {
+                value: {
+                  name: "Renamed folder"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     index: {
       summary: "List folders",
@@ -156,16 +231,15 @@ RecordingStudioApi.register_recordable_type_api(
                   value: {
                     resource: "folders",
                     type: "folder",
-                    data: [
+                    records: [
                       {
                         id: "74c7a8bd-9787-45dc-8479-40347f8c0422",
                         type: "folder",
-                        actions: ["move"],
                         root_id: "8f8ee9f8-5448-4438-b65f-7578f69009f1",
                         parent_id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f",
-                        attributes: {
-                          name: "Marketing"
-                        }
+                        created_at: "2026-01-01T00:00:00Z",
+                        updated_at: "2026-01-01T00:00:00Z",
+                        name: "Marketing"
                       }
                     ],
                     meta: {
@@ -193,16 +267,13 @@ RecordingStudioApi.register_recordable_type_api(
               examples: {
                 default: {
                   value: {
-                    data: {
-                      id: "74c7a8bd-9787-45dc-8479-40347f8c0422",
-                      type: "folder",
-                      actions: ["move"],
-                      root_id: "8f8ee9f8-5448-4438-b65f-7578f69009f1",
-                      parent_id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f",
-                      attributes: {
-                        name: "Marketing"
-                      }
-                    }
+                    id: "74c7a8bd-9787-45dc-8479-40347f8c0422",
+                    type: "folder",
+                    root_id: "8f8ee9f8-5448-4438-b65f-7578f69009f1",
+                    parent_id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f",
+                    created_at: "2026-01-01T00:00:00Z",
+                    updated_at: "2026-01-01T00:00:00Z",
+                    name: "Marketing"
                   }
                 }
               }
@@ -213,4 +284,3 @@ RecordingStudioApi.register_recordable_type_api(
     }
   }
 )
-
