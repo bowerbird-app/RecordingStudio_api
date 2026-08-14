@@ -4,6 +4,8 @@
 
 `RecordingStudioApi` is a mountable Rails engine that provides authenticated, capability-backed JSON APIs for Recording Studio addons.
 
+For the breaking flat API contract introduced in `0.3.0`, see [UPGRADING.md](UPGRADING.md).
+
 ## Current Scope
 
 - OAuth2 `client_credentials` authentication backed by `RecordingStudioApi::ApiClient`, `ApiCredential`, and issued access tokens
@@ -394,7 +396,8 @@ Recording Studio parent declarations.
 
 ## Flat Response Upgrade
 
-This pre-production release is a breaking API contract change with no runtime legacy compatibility.
+This pre-production release is a breaking API response contract change with no runtime legacy
+response compatibility.
 
 - Former `attributes` values are top-level: replace `response.attributes.title` with `response.title`.
 - There is no `relationships` object or relationship `data` wrapper: replace `response.relationships.comments.data` with `response.comments`.
