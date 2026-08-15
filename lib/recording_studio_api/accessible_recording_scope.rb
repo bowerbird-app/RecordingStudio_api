@@ -9,8 +9,11 @@ module RecordingStudioApi
     end
 
     def relation
-      recordings_table = RecordingStudio::Recording.table_name
-      RecordingStudio::Recording.unscoped.where("#{recordings_table}.id IN (#{accessible_recording_ids_sql})")
+      RecordingStudio::Recording.unscoped.where(id: recording_ids)
+    end
+
+    def recording_ids
+      @recording_ids ||= connection.select_values(accessible_recording_ids_sql)
     end
 
     private

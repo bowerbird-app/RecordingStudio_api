@@ -69,7 +69,7 @@ module RecordingStudioApi
         if RequestLogging.writer.respond_to?(:call)
           RequestLogging.writer.call(payload)
         else
-          RecordingStudioApi::ApiRequestLog.create!(payload)
+          RecordingStudioApi::ApiRequestLogDelivery.deliver(payload)
         end
       rescue StandardError => error
         Rails.logger.warn("[RecordingStudioApi] api request log write failed: #{error.class}: #{error.message}")

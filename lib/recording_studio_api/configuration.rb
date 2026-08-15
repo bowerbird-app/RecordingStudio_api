@@ -61,6 +61,8 @@ module RecordingStudioApi
                   :rate_limit_api_write_period_seconds,
                   :api_request_logging_enabled,
                   :api_request_logging_payload_mode,
+                  :api_request_logging_delivery,
+                  :api_request_logging_batch_size,
                   :api_request_log_allowed_param_keys,
                   :api_request_log_retention_days,
                   :api_daily_metric_retention_days
@@ -129,6 +131,8 @@ module RecordingStudioApi
       @rate_limit_api_write_period_seconds = 60
       @api_request_logging_enabled = false
       @api_request_logging_payload_mode = "metadata_only"
+      @api_request_logging_delivery = "sync"
+      @api_request_logging_batch_size = 25
       @api_request_log_allowed_param_keys = []
       @api_request_log_retention_days = 30
       @api_daily_metric_retention_days = nil
@@ -190,6 +194,8 @@ module RecordingStudioApi
         rate_limit_api_write_period_seconds: rate_limit_api_write_period_seconds,
         api_request_logging_enabled: api_request_logging_enabled,
         api_request_logging_payload_mode: api_request_logging_payload_mode,
+        api_request_logging_delivery: api_request_logging_delivery,
+        api_request_logging_batch_size: api_request_logging_batch_size,
         api_request_log_allowed_param_keys: api_request_log_allowed_param_keys,
         api_request_log_retention_days: api_request_log_retention_days,
         api_daily_metric_retention_days: api_daily_metric_retention_days,
@@ -411,6 +417,14 @@ module RecordingStudioApi
       validate_enabled_rate_limits!
       validate_positive_days!(:api_request_log_retention_days, api_request_log_retention_days)
       validate_positive_days!(:api_daily_metric_retention_days, api_daily_metric_retention_days) if api_daily_metric_retention_days.present?
+      validate_api_request_logging_delivery!
+    end
+
+    def validate_api_request_logging_delivery!
+      allowed = %w[sync async batched]
+      return if allowed.include?(api_request_logging_delivery.to_s)
+
+      raise ConfigurationError, "api_request_logging_delivery must be one of: #{allowed.join(', ')}"
     end
 
     def validate_enabled_rate_limits!

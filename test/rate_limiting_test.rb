@@ -18,12 +18,13 @@ class RateLimitingTest < ActiveSupport::TestCase
   end
 
   class FakeRequest
-    attr_reader :path, :remote_ip
+    attr_reader :path, :remote_ip, :headers
 
-    def initialize(path:, method:, remote_ip: "127.0.0.1")
+    def initialize(path:, method:, remote_ip: "127.0.0.1", headers: {})
       @path = path
       @method = method.to_s.upcase
       @remote_ip = remote_ip
+      @headers = headers
     end
 
     def get?
@@ -41,19 +42,26 @@ class RateLimitingTest < ActiveSupport::TestCase
       @expire_calls = []
       @ttl_calls = []
       @eval_calls = []
+      @counts = Hash.new(0)
+      @effective_ttl = {}
     end
 
     def incr(key)
       incr_calls << key
-      @incr_values.shift || @incr_values.last || 1
+      next_value = @incr_values.shift
+      @counts[key] = next_value.nil? ? (@counts[key] + 1) : next_value
+      @counts[key]
     end
 
     def expire(key, period)
       expire_calls << [key, period]
+      @effective_ttl[key] = @ttl >= 0 ? @ttl : period
     end
 
     def ttl(key)
       ttl_calls << key
+      return @effective_ttl.fetch(key) if @effective_ttl.key?(key)
+
       @ttl
     end
 
@@ -61,8 +69,12 @@ class RateLimitingTest < ActiveSupport::TestCase
       eval_calls << { keys: keys, argv: argv }
       key = keys.fetch(0)
       count = incr(key)
-      expire(key, argv.fetch(0))
-      [count, ttl(key)]
+      current_ttl = ttl(key)
+      if count == 1 || current_ttl.to_i.negative?
+        expire(key, argv.fetch(0))
+        current_ttl = ttl(key)
+      end
+      [count, current_ttl]
     end
   end
 
@@ -86,9 +98,9 @@ class RateLimitingTest < ActiveSupport::TestCase
 
     attr_reader :params, :request, :response, :rendered_payload, :current_api_credential, :current_api_client
 
-    def initialize(path:, method:, params: {}, remote_ip: "127.0.0.1", current_api_credential: nil, current_api_client: nil)
+    def initialize(path:, method:, params: {}, remote_ip: "127.0.0.1", current_api_credential: nil, current_api_client: nil, headers: {})
       @params = ActiveSupport::HashWithIndifferentAccess.new(params)
-      @request = FakeRequest.new(path: path, method: method, remote_ip: remote_ip)
+      @request = FakeRequest.new(path: path, method: method, remote_ip: remote_ip, headers: headers)
       @response = FakeResponse.new
       @current_api_credential = current_api_credential
       @current_api_client = current_api_client
@@ -140,7 +152,7 @@ class RateLimitingTest < ActiveSupport::TestCase
     expected_key = "custom_ns:api_read:credential:cred-1:#{current_window}"
     assert_equal [expected_key], redis.incr_calls
     assert_equal [[expected_key, 30]], redis.expire_calls
-    assert_equal [expected_key], redis.ttl_calls
+    assert_equal 2, redis.ttl_calls.length
     assert_equal 1, redis.eval_calls.length
   end
 
@@ -198,7 +210,8 @@ class RateLimitingTest < ActiveSupport::TestCase
     current_window = (Time.current.to_i / 20).to_i
     expected_key = "recording_studio_api:api_pre_auth:ip:203.0.113.9:#{current_window}"
     assert_equal [expected_key], redis.incr_calls
-    assert_equal [[expected_key, 20]], redis.expire_calls
+    # Counter already past the first hit with a live TTL, so EXPIRE is not rewritten.
+    assert_equal [], redis.expire_calls
   end
 
   test "computed api write decision uses current api client identifier" do
@@ -394,5 +407,73 @@ class RateLimitingTest < ActiveSupport::TestCase
     end
 
     assert_nil load_error_client
+  end
+
+  test "expires redis keys only on the first increment in a window" do
+    RecordingStudioApi.configuration.rate_limit_api_enabled = true
+    RecordingStudioApi.configuration.rate_limit_api_read_requests = 5
+    RecordingStudioApi.configuration.rate_limit_api_read_period_seconds = 30
+
+    harness = Harness.new(path: "/recording_studio_api/api/v1/pages", method: :get)
+    redis = FakeRedis.new(incr_values: [1, 2, 3], ttl: -2)
+
+    harness.stub(:rate_limit_redis_client, redis) do
+      3.times { harness.send(:resolved_rate_limit_decision) }
+    end
+
+    assert_equal 3, redis.incr_calls.length
+    assert_equal 1, redis.expire_calls.length
+  end
+
+  test "resets memoized redis client after a redis error" do
+    RecordingStudioApi.configuration.rate_limit_api_enabled = true
+    RecordingStudioApi.configuration.rate_limit_fail_closed = true
+    RecordingStudioApi.configuration.rate_limit_fail_closed_buckets = %w[api_read]
+    RecordingStudioApi.configuration.rate_limit_api_read_requests = 2
+    RecordingStudioApi.configuration.rate_limit_api_read_period_seconds = 30
+
+    harness = Harness.new(path: "/recording_studio_api/api/v1/pages", method: :get)
+    broken = Object.new
+    def broken.eval(*)
+      raise "offline"
+    end
+
+    RecordingStudioApi::Concerns::RateLimiting.instance_variable_set(:@redis_client, broken)
+    decision = harness.send(:resolved_rate_limit_decision)
+
+    assert_equal true, decision.fetch(:limited)
+    assert_nil RecordingStudioApi::Concerns::RateLimiting.instance_variable_get(:@redis_client)
+  end
+
+  test "skips pre-auth rate limit for bearer requests when authenticated api limits are enabled" do
+    RecordingStudioApi.configuration.rate_limit_api_pre_auth_enabled = true
+    RecordingStudioApi.configuration.rate_limit_api_enabled = true
+
+    harness = Harness.new(
+      path: "/recording_studio_api/api/v1/pages",
+      method: :get,
+      headers: { "Authorization" => "Bearer rsapi_at_token" }
+    )
+
+    assert harness.send(:skip_api_pre_auth_rate_limit_for_bearer?)
+
+    called = false
+    harness.stub(:enforce_rate_limit!, -> { called = true }) do
+      harness.send(:enforce_api_pre_auth_rate_limit!)
+    end
+    refute called
+  end
+
+  test "keeps pre-auth rate limit for bearer requests when authenticated api limits are disabled" do
+    RecordingStudioApi.configuration.rate_limit_api_pre_auth_enabled = true
+    RecordingStudioApi.configuration.rate_limit_api_enabled = false
+
+    harness = Harness.new(
+      path: "/recording_studio_api/api/v1/pages",
+      method: :get,
+      headers: { "Authorization" => "Bearer rsapi_at_token" }
+    )
+
+    refute harness.send(:skip_api_pre_auth_rate_limit_for_bearer?)
   end
 end

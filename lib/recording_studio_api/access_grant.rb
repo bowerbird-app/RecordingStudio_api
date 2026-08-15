@@ -7,7 +7,9 @@ module RecordingStudioApi
       @credential = credential
       @access_recording = access_recording
       @root_recording = root_recording
+      @accessible_scopes = {}
       @accessible_recordings = {}
+      @accessible_recording_ids = {}
     end
 
     attr_reader :api_client, :credential, :access_recording, :root_recording
@@ -31,17 +33,19 @@ module RecordingStudioApi
     end
 
     def accessible_recordings(include_trashed: false)
-      @accessible_recordings[include_trashed] ||= RecordingStudioApi::AccessibleRecordingScope.new(
-        scope_recording: scope_recording,
-        access_recording: access_recording,
-        include_trashed: include_trashed
-      ).relation
+      @accessible_recordings[include_trashed] ||= RecordingStudio::Recording.unscoped.where(
+        id: accessible_recording_ids(include_trashed: include_trashed)
+      )
+    end
+
+    def accessible_recording_ids(include_trashed: false)
+      @accessible_recording_ids[include_trashed] ||= accessible_scope(include_trashed: include_trashed).recording_ids
     end
 
     def authorized?(recording:, role:, include_trashed: false)
       return false unless recording.present?
       return false unless role_satisfies?(role)
-      return false unless accessible_recordings(include_trashed: include_trashed).exists?(id: recording.id)
+      return false unless accessible_recording_ids(include_trashed: include_trashed).include?(recording.id)
 
       recording_for_access_check = recording_for_accessible_check(recording, include_trashed: include_trashed)
       return false if actor.nil? || recording_for_access_check.nil?
@@ -60,6 +64,14 @@ module RecordingStudioApi
     end
 
     private
+
+    def accessible_scope(include_trashed:)
+      @accessible_scopes[include_trashed] ||= RecordingStudioApi::AccessibleRecordingScope.new(
+        scope_recording: scope_recording,
+        access_recording: access_recording,
+        include_trashed: include_trashed
+      )
+    end
 
     def role_satisfies?(required_role)
       return false if required_role.blank?

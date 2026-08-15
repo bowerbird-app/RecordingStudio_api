@@ -59,6 +59,10 @@ RecordingStudioApi.configure do |config|
   # Only top-level keys in this allowlist are retained; Rails filter_parameters still applies.
   # config.api_request_log_allowed_param_keys = %w[grant_type resource sort order limit]
   # config.api_request_logging_payload_mode = "metadata_only"
+  # Deliver logs via ActiveJob ("async") or a process-local batch flushed to
+  # ActiveJob ("batched") when a queue backend is configured.
+  # config.api_request_logging_delivery = "sync"
+  # config.api_request_logging_batch_size = 25
   # Raw request details are retained for 30 days; daily aggregates are retained indefinitely.
   # config.api_request_log_retention_days = 30
   # config.api_daily_metric_retention_days = nil

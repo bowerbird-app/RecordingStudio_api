@@ -24,7 +24,13 @@ module RecordingStudioApi
 
         class << self
           def call(api: :public)
-            new(api: api).call
+            api_name = RecordingStudioApi::Admin::ApiContext.resolve(api).name
+            cache = (Thread.current[:recording_studio_api_admin_credentials_query] ||= {})
+            cache[api_name] ||= new(api: api).call
+          end
+
+          def clear_cache!
+            Thread.current[:recording_studio_api_admin_credentials_query] = nil
           end
         end
 

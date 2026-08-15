@@ -27,6 +27,8 @@ module ApiDummyHelpers
     configuration.api_management_authorization_required = false
     RecordingStudioApi.instance_variable_set(:@configuration, configuration)
     RecordingStudioApi::Concerns::RateLimiting.reset_redis_client!
+    RecordingStudioApi::Admin::Queries::AdminApiCredentialsQuery.clear_cache!
+    RecordingStudioApi::ApiRequestLogBatch.clear!
     RecordingStudioApi.register_default_capability_actions!
     RecordingStudioApi.register_default_resource_actions!
     register_dummy_capability_actions!

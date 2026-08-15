@@ -5,12 +5,15 @@ module RecordingStudioApi
     module RateLimiting
       extend ActiveSupport::Concern
 
-      # Atomically increment and refresh TTL so a crash between INCR and EXPIRE
-      # cannot leave an immortal counter key.
+      # Atomically increment and set TTL only on first hit in the window so we
+      # avoid rewriting expiry on every request. Re-apply EXPIRE if TTL is missing.
       RATE_LIMIT_INCR_EXPIRE_SCRIPT = <<~LUA
         local count = redis.call("INCR", KEYS[1])
-        redis.call("EXPIRE", KEYS[1], ARGV[1])
         local ttl = redis.call("TTL", KEYS[1])
+        if count == 1 or ttl < 0 then
+          redis.call("EXPIRE", KEYS[1], ARGV[1])
+          ttl = redis.call("TTL", KEYS[1])
+        end
         return { count, ttl }
       LUA
 
@@ -53,6 +56,7 @@ module RecordingStudioApi
 
       def enforce_api_pre_auth_rate_limit!
         return unless api_pre_auth_rate_limit_enabled_for_request?
+        return if skip_api_pre_auth_rate_limit_for_bearer?
 
         with_rate_limit_bucket("api_pre_auth") do
           enforce_rate_limit!
@@ -95,6 +99,7 @@ module RecordingStudioApi
         fail_closed_rate_limit_decision
       rescue StandardError => error
         Rails.logger.warn("[RecordingStudioApi] rate limiter unavailable: #{error.class}: #{error.message}")
+        RateLimiting.reset_redis_client!
         fail_closed_rate_limit_decision
       end
 
@@ -129,8 +134,12 @@ module RecordingStudioApi
         end
 
         count = redis.incr(key)
-        redis.expire(key, period)
-        [count, redis.ttl(key)]
+        ttl = redis.ttl(key)
+        if count == 1 || ttl.to_i < 0
+          redis.expire(key, period)
+          ttl = redis.ttl(key)
+        end
+        [count, ttl.to_i]
       end
 
       def normalize_decision(decision)
@@ -172,6 +181,19 @@ module RecordingStudioApi
       end
 
       def api_pre_auth_rate_limit_enabled_for_request? = rate_limit_api.rate_limit_api_pre_auth_enabled && api_rate_limited_path?
+
+      # Skip the IP pre-auth bucket when a Bearer token is present and authenticated API
+      # rate limits are enabled. Invalid Bearer traffic still hits pre-auth when API RL is off.
+      def skip_api_pre_auth_rate_limit_for_bearer?
+        return false unless rate_limit_api.rate_limit_api_enabled
+
+        bearer_authorization_header_present?
+      end
+
+      def bearer_authorization_header_present?
+        authorization = request.headers["Authorization"].to_s
+        authorization.match?(/\ABearer\s+\S+/i)
+      end
 
       def rate_limit_enabled_for_request?
         if rate_limit_bucket_override == "api_pre_auth"
