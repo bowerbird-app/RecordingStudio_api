@@ -21,6 +21,20 @@ sudo -u postgres /usr/lib/postgresql/16/bin/pg_ctl -D /var/lib/postgresql/16/mai
 `pg_isready -h 127.0.0.1 -U postgres` should then succeed. Redis is optional (rate limiting is off
 outside `production`), so you normally don't need it.
 
+### Tailwind CSS / dummy app gems must use `vendor/bundle`
+
+The dummy app's Tailwind entry (`test/dummy/app/assets/tailwind/application.css`) scans engine
+component sources via `@source` globs under `test/dummy/vendor/bundle/**` and `/usr/local/bundle/**`
+(matching GitHub Codespaces). If the dummy app gems are installed only in the rbenv global path,
+Tailwind will miss classes such as `lg:grid-cols-3` from FlatPack's grid component and admin pages
+will look unstyled (widgets stack one-per-row instead of a 3-column grid).
+
+The startup update script installs dummy-app gems into `vendor/bundle`. After gem or view changes,
+rebuild CSS: `cd test/dummy && bundle exec rails tailwindcss:build` (or rely on `bin/dev`'s watcher).
+
+Quick sanity check: `grep -c 'lg\\\\:grid-cols-3' test/dummy/app/assets/builds/tailwind.css` should
+be **> 0**.
+
 ### Run the app
 
 ```bash
