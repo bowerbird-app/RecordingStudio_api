@@ -45,9 +45,7 @@ module RecordingStudioApi
     def render_oauth_error(error)
       payload = RecordingStudioApi::OauthErrorMapper.payload_for(error)
       status = RecordingStudioApi::OauthErrorMapper.status_for(payload)
-      if payload[:error].to_s == "invalid_client"
-        response.set_header("WWW-Authenticate", OAUTH_WWW_AUTHENTICATE)
-      end
+      response.set_header("WWW-Authenticate", OAUTH_WWW_AUTHENTICATE) if payload[:error].to_s == "invalid_client"
       render json: payload, status: status
     end
 
