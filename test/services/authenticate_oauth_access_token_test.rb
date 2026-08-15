@@ -43,6 +43,39 @@ class AuthenticateOauthAccessTokenTest < ActiveSupport::TestCase
     assert_equal @root_recording.id, result.value.root_recording.id
   end
 
+  test "amortizes last_used_at updates within one minute" do
+    first = RecordingStudioApi::Services::AuthenticateOauthAccessToken.call(
+      authorization_header: "Bearer #{@access_token}"
+    )
+    assert first.success?, first.error
+
+    access_token = RecordingStudioApi::ApiAccessToken.find_by!(
+      token_digest: RecordingStudioApi::OauthAccessToken.digest(@access_token)
+    )
+    first_credential_used_at = @credential.reload.last_used_at
+    first_token_used_at = access_token.reload.last_used_at
+    assert_not_nil first_credential_used_at
+    assert_not_nil first_token_used_at
+
+    travel 30.seconds do
+      second = RecordingStudioApi::Services::AuthenticateOauthAccessToken.call(
+        authorization_header: "Bearer #{@access_token}"
+      )
+      assert second.success?, second.error
+      assert_equal first_credential_used_at.to_i, @credential.reload.last_used_at.to_i
+      assert_equal first_token_used_at.to_i, access_token.reload.last_used_at.to_i
+    end
+
+    travel 2.minutes do
+      third = RecordingStudioApi::Services::AuthenticateOauthAccessToken.call(
+        authorization_header: "Bearer #{@access_token}"
+      )
+      assert third.success?, third.error
+      assert @credential.reload.last_used_at > first_credential_used_at
+      assert access_token.reload.last_used_at > first_token_used_at
+    end
+  end
+
   test "rejects a bearer token belonging to another api" do
     RecordingStudioApi.configuration.api(:operations)
 
@@ -80,6 +113,11 @@ class AuthenticateOauthAccessTokenTest < ActiveSupport::TestCase
   end
 
   test "rejects access tokens after the parent credential expires" do
+    access_token = RecordingStudioApi::ApiAccessToken.find_by!(
+      token_digest: RecordingStudioApi::OauthAccessToken.digest(@access_token)
+    )
+    assert_nil access_token.revoked_at
+
     @credential.update_columns(expires_at: 1.second.ago, updated_at: Time.current)
 
     result = RecordingStudioApi::Services::AuthenticateOauthAccessToken.call(
@@ -88,6 +126,8 @@ class AuthenticateOauthAccessTokenTest < ActiveSupport::TestCase
 
     assert result.failure?
     assert_equal "Bearer access token is inactive", result.error
+    assert_not_nil access_token.reload.revoked_at
+    assert_nil @credential.reload.revoked_at
   end
 
   test "rejects access tokens after the parent credential is revoked" do

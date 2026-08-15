@@ -37,8 +37,10 @@ module RecordingStudioApi
         credential = ApiCredential.find_by(token_public_id: parsed.fetch(:public_id))
         return [nil, nil] if credential.nil?
 
-        provided_digest = Token.digest(parsed.fetch(:token))
-        return [nil, nil] unless secure_compare(credential.token_digest, provided_digest)
+        provided_token = parsed.fetch(:token)
+        return [nil, nil] unless Token.digest_matches?(credential.token_digest, provided_token)
+
+        TokenDigest.rehash_if_legacy!(credential, provided_token)
 
         [credential, nil]
       end

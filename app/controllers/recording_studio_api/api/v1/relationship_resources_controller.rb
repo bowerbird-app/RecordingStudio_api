@@ -18,7 +18,8 @@ module RecordingStudioApi
             pagination_token: params[:pagination_token],
             sort: params[:sort],
             order: params[:order],
-            api: current_api_key
+            api: current_api_key,
+            scope_key: "client:#{current_api_client.id}"
           )
           raise RecordingStudioApi::InvalidPaginationTokenError, pagination.error if pagination.failure?
 
@@ -194,7 +195,8 @@ module RecordingStudioApi
             params: params.to_unsafe_h,
             request_params: request.request_parameters,
             scoped_recordings: scoped_recordings,
-            parent_recording: parent_recording
+            parent_recording: parent_recording,
+            idempotency_key: request.headers["Idempotency-Key"].presence
           )
         end
       end

@@ -23,6 +23,8 @@ module RecordingStudioApi
                   :access_management_view_role,
                   :access_management_edit_role,
                   :api_management_authorization_required,
+                  :token_digest_pepper,
+                  :token_digest_legacy_verify,
                   :capability_action_role_resolver,
                   :admin_dashboard_path_resolver,
                   :admin_settings_path_resolver,
@@ -59,6 +61,8 @@ module RecordingStudioApi
                   :rate_limit_api_write_period_seconds,
                   :api_request_logging_enabled,
                   :api_request_logging_payload_mode,
+                  :api_request_logging_delivery,
+                  :api_request_logging_batch_size,
                   :api_request_log_allowed_param_keys,
                   :api_request_log_retention_days,
                   :api_daily_metric_retention_days
@@ -72,7 +76,11 @@ module RecordingStudioApi
       @token_authenticators = []
       @access_management_view_role = :view
       @access_management_edit_role = :admin
-      @api_management_authorization_required = false
+      @api_management_authorization_required = true
+      @token_digest_pepper = ENV["RECORDING_STUDIO_API_TOKEN_DIGEST_PEPPER"].presence
+      # Legacy unsalted SHA256 verify is off by default. Enable temporarily while
+      # rotating/rehashing credentials written before peppered digests.
+      @token_digest_legacy_verify = false
       @capability_action_roles = {}
       @capability_action_role_resolver = nil
       @admin_dashboard_path_resolver = lambda do |controller:, **|
@@ -106,11 +114,12 @@ module RecordingStudioApi
       @layout_name = "recording_studio/default_layout"
       @pagination_default_limit = 50
       @pagination_max_limit = 100
-      @rate_limit_oauth_enabled = false
-      @rate_limit_api_enabled = false
-      @rate_limit_api_pre_auth_enabled = false
-      @rate_limit_fail_closed = false
-      @rate_limit_fail_closed_buckets = %w[oauth api_pre_auth]
+      @rate_limit_oauth_enabled = true
+      # Authenticated API rate limits are on by default; hosts may disable explicitly.
+      @rate_limit_api_enabled = true
+      @rate_limit_api_pre_auth_enabled = true
+      @rate_limit_fail_closed = true
+      @rate_limit_fail_closed_buckets = %w[oauth api_pre_auth api]
       @rate_limit_redis_url = ENV["RECORDING_STUDIO_API_RATE_LIMIT_REDIS_URL"].presence
       @rate_limit_redis_namespace = "recording_studio_api"
       @rate_limit_oauth_requests = 10
@@ -125,6 +134,8 @@ module RecordingStudioApi
       @rate_limit_api_write_period_seconds = 60
       @api_request_logging_enabled = false
       @api_request_logging_payload_mode = "metadata_only"
+      @api_request_logging_delivery = "sync"
+      @api_request_logging_batch_size = 25
       @api_request_log_allowed_param_keys = []
       @api_request_log_retention_days = 30
       @api_daily_metric_retention_days = nil
@@ -142,6 +153,8 @@ module RecordingStudioApi
         credential_ttl: credential_ttl,
         access_token_ttl: access_token_ttl,
         api_management_authorization_required: api_management_authorization_required,
+        token_digest_pepper_present: token_digest_pepper.present?,
+        token_digest_legacy_verify: token_digest_legacy_verify,
         token_authenticators_count: token_authenticators.count,
         capability_action_roles: capability_action_roles,
         capability_action_role_resolver: capability_action_role_resolver.respond_to?(:call),
@@ -184,6 +197,8 @@ module RecordingStudioApi
         rate_limit_api_write_period_seconds: rate_limit_api_write_period_seconds,
         api_request_logging_enabled: api_request_logging_enabled,
         api_request_logging_payload_mode: api_request_logging_payload_mode,
+        api_request_logging_delivery: api_request_logging_delivery,
+        api_request_logging_batch_size: api_request_logging_batch_size,
         api_request_log_allowed_param_keys: api_request_log_allowed_param_keys,
         api_request_log_retention_days: api_request_log_retention_days,
         api_daily_metric_retention_days: api_daily_metric_retention_days,
@@ -400,11 +415,32 @@ module RecordingStudioApi
     end
 
     def validate_security_configuration!
+      validate_token_digest_pepper!
       validate_positive_duration!(:access_token_ttl, access_token_ttl)
       validate_non_negative_duration!(:credential_ttl, credential_ttl) if credential_ttl.present?
       validate_enabled_rate_limits!
       validate_positive_days!(:api_request_log_retention_days, api_request_log_retention_days)
       validate_positive_days!(:api_daily_metric_retention_days, api_daily_metric_retention_days) if api_daily_metric_retention_days.present?
+      validate_api_request_logging_delivery!
+    end
+
+    def validate_token_digest_pepper!
+      return if token_digest_pepper.present?
+      # Unit tests load Rails without an application; TokenDigest.pepper still
+      # enforces a pepper/secret_key_base when digests are actually computed.
+      return unless defined?(Rails) && Rails.application
+      return if Rails.application.secret_key_base.present?
+
+      raise ConfigurationError,
+            "token_digest_pepper is required (set RECORDING_STUDIO_API_TOKEN_DIGEST_PEPPER " \
+            "or config.token_digest_pepper, or ensure Rails.application.secret_key_base is present)"
+    end
+
+    def validate_api_request_logging_delivery!
+      allowed = %w[sync async batched]
+      return if allowed.include?(api_request_logging_delivery.to_s)
+
+      raise ConfigurationError, "api_request_logging_delivery must be one of: #{allowed.join(', ')}"
     end
 
     def validate_enabled_rate_limits!

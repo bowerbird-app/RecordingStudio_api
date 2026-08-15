@@ -46,12 +46,60 @@ module RecordingStudioApi
 
         def raw_rows
           return [] unless ApiRequestLog.table_available?
+          return [] if raw_start_date > end_date
 
-          scope = ApiRequestLog.where(api_key: api_key, occurred_at: raw_start_date.beginning_of_day..end_date.end_of_day)
-          scope = scope.where(status_code: (status_class.to_i * 100)..((status_class.to_i * 100) + 99)) if status_class
-          scope = scope.where(rate_limited: true) if rate_limited == true
-          scope.pluck(:occurred_at, :route_name, :request_method, :status_code, :rate_limited, :duration_ms)
-               .map { |values| row_from_log(*values) }
+          connection = ApiRequestLog.connection
+          binds = [
+            api_key,
+            raw_start_date.beginning_of_day,
+            end_date.end_of_day
+          ]
+          sql = <<~SQL.squish
+            SELECT
+              DATE(occurred_at) AS metric_date,
+              COALESCE(NULLIF(route_name, ''), 'unknown') AS route_name,
+              request_method,
+              (status_code / 100) AS status_class,
+              COUNT(*) AS request_count,
+              SUM(CASE WHEN rate_limited OR status_code = 429 THEN 1 ELSE 0 END) AS rate_limited_count,
+              SUM(CASE WHEN status_code BETWEEN 400 AND 499 THEN 1 ELSE 0 END) AS client_error_count,
+              SUM(CASE WHEN status_code BETWEEN 500 AND 599 THEN 1 ELSE 0 END) AS server_error_count,
+              COUNT(duration_ms) AS duration_count,
+              COALESCE(SUM(duration_ms), 0) AS duration_sum_ms,
+              COALESCE(MAX(duration_ms), 0) AS duration_max_ms
+            FROM #{ApiRequestLog.table_name}
+            WHERE api_key = ?
+              AND occurred_at BETWEEN ? AND ?
+          SQL
+
+          if status_class
+            sql = "#{sql} AND status_code BETWEEN ? AND ?"
+            binds << (status_class.to_i * 100)
+            binds << ((status_class.to_i * 100) + 99)
+          end
+
+          sql = "#{sql} AND (rate_limited = TRUE OR status_code = 429)" if rate_limited == true
+
+          sql = <<~SQL.squish
+            #{sql}
+            GROUP BY 1, 2, 3, 4
+          SQL
+
+          connection.select_all(ApiRequestLog.sanitize_sql_array([sql, *binds])).map do |values|
+            Row.new(
+              metric_date: values.fetch("metric_date").to_date,
+              route_name: values.fetch("route_name"),
+              request_method: values.fetch("request_method"),
+              status_class: values.fetch("status_class").to_i,
+              request_count: values.fetch("request_count").to_i,
+              rate_limited_count: values.fetch("rate_limited_count").to_i,
+              client_error_count: values.fetch("client_error_count").to_i,
+              server_error_count: values.fetch("server_error_count").to_i,
+              duration_count: values.fetch("duration_count").to_i,
+              duration_sum_ms: values.fetch("duration_sum_ms").to_i,
+              duration_max_ms: values.fetch("duration_max_ms").to_i
+            )
+          end
         end
 
         def aggregate_end_date
@@ -63,7 +111,7 @@ module RecordingStudioApi
         end
 
         def raw_cutoff_date
-          retention_days = RecordingStudioApi.configuration.api_request_log_retention_days
+          retention_days = RecordingStudioApi::ApiRuntimePolicy.for(:public).api_request_log_retention_days
           return Date.new(0) if retention_days.nil?
 
           (Time.current - retention_days.to_i.days).to_date
@@ -71,23 +119,6 @@ module RecordingStudioApi
 
         def row_from_metric(metric)
           Row.new(**metric.attributes.symbolize_keys.slice(*Row.members))
-        end
-
-        def row_from_log(occurred_at, route_name, request_method, status_code, rate_limited, duration_ms)
-          status = status_code.to_i
-          Row.new(
-            metric_date: occurred_at.to_date,
-            route_name: route_name.presence || "unknown",
-            request_method: request_method,
-            status_class: status / 100,
-            request_count: 1,
-            rate_limited_count: rate_limited || status == 429 ? 1 : 0,
-            client_error_count: (400..499).cover?(status) ? 1 : 0,
-            server_error_count: (500..599).cover?(status) ? 1 : 0,
-            duration_count: duration_ms.present? ? 1 : 0,
-            duration_sum_ms: duration_ms.to_i,
-            duration_max_ms: duration_ms.to_i
-          )
         end
 
         def merge(rows)

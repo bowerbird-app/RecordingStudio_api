@@ -62,6 +62,9 @@ class InstallGeneratorTest < Minitest::Test
 
       css = File.read(css_path)
       assert_tailwind_sources_present(css)
+      assert_includes css, '@import "./gem_sources.css"'
+      assert_includes css, '@source inline("grid grid-cols-1'
+      assert File.exist?(File.join(dir, "lib/tasks/flat_pack_tailwind_assets.rake"))
     end
   end
 
@@ -72,8 +75,10 @@ class InstallGeneratorTest < Minitest::Test
         @import "tailwindcss";
         @source "../../vendor/bundle/**/recording_studio_api/app/views/**/*.erb";
         @source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/recording_studio_api-*/app/views/**/*.erb";
-        @source "../../vendor/bundle/**/flatpack/app/components/**/*.{rb,erb}";
+        @source "../../vendor/bundle/**/flatpack*/app/components/**/*.{rb,erb}";
+        @source "../../vendor/bundle/**/flat_pack*/app/components/**/*.{rb,erb}";
         @source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/flatpack-*/app/components/**/*.{rb,erb}";
+        @source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/flat_pack-*/app/components/**/*.{rb,erb}";
       CSS
 
       generator = build_generator(dir)
@@ -415,8 +420,10 @@ class InstallGeneratorTest < Minitest::Test
     [
       '@source "../../vendor/bundle/**/recording_studio_api/app/views/**/*.erb";',
       '@source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/recording_studio_api-*/app/views/**/*.erb";',
-      '@source "../../vendor/bundle/**/flatpack/app/components/**/*.{rb,erb}";',
-      '@source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/flatpack-*/app/components/**/*.{rb,erb}";'
+      '@source "../../vendor/bundle/**/flatpack*/app/components/**/*.{rb,erb}";',
+      '@source "../../vendor/bundle/**/flat_pack*/app/components/**/*.{rb,erb}";',
+      '@source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/flatpack-*/app/components/**/*.{rb,erb}";',
+      '@source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/flat_pack-*/app/components/**/*.{rb,erb}";'
     ]
   end
 end

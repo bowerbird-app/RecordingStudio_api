@@ -58,11 +58,12 @@ class ConfigurationTest < Minitest::Test
     assert_nil configuration.documentation_access
     assert_nil configuration.documentation_layout_name
     assert_equal "recording_studio/default_layout", configuration.layout_name
-    assert_equal false, configuration.rate_limit_oauth_enabled
-    assert_equal false, configuration.rate_limit_api_enabled
-    assert_equal false, configuration.rate_limit_api_pre_auth_enabled
-    assert_equal false, configuration.rate_limit_fail_closed
-    assert_equal %w[oauth api_pre_auth], configuration.rate_limit_fail_closed_buckets
+    assert_equal true, configuration.rate_limit_oauth_enabled
+    assert_equal true, configuration.rate_limit_api_enabled
+    assert_equal true, configuration.rate_limit_api_pre_auth_enabled
+    assert_equal true, configuration.rate_limit_fail_closed
+    assert_equal %w[oauth api_pre_auth api], configuration.rate_limit_fail_closed_buckets
+    assert_equal false, configuration.token_digest_legacy_verify
     assert_equal "recording_studio_api", configuration.rate_limit_redis_namespace
     assert_equal 10, configuration.rate_limit_oauth_requests
     assert_equal 60, configuration.rate_limit_oauth_period_seconds
@@ -138,7 +139,7 @@ class ConfigurationTest < Minitest::Test
     assert_equal 20.minutes, @configuration.access_token_ttl
     assert_equal 75, @configuration.rate_limit_api_read_requests
     assert_equal %w[query], @configuration.api_request_log_allowed_param_keys
-    refute @configuration.api_management_authorization_required
+    assert @configuration.api_management_authorization_required
   end
 
   def test_api_names_are_normalized_and_invalid_names_are_rejected

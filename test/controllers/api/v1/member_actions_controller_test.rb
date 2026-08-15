@@ -56,7 +56,7 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
         headers: authorization_headers
 
     assert_response :unprocessable_entity
-    assert_equal "move is not enabled for Page", JSON.parse(response.body).fetch("error")
+    assert_equal "move is not enabled for Page", JSON.parse(response.body).dig("error", "message")
   end
 
   test "dispatches a registered capability action with OAuth2 bearer authentication" do
@@ -195,7 +195,7 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
          headers: { "Authorization" => "Bearer #{restricted_oauth_token}" }
 
     assert_response :not_found
-    assert_equal "Resource was not found in this API scope", JSON.parse(response.body).fetch("error")
+    assert_equal "Resource was not found in this API scope", JSON.parse(response.body).dig("error", "message")
   end
 
   test "rejects requests without a bearer token" do
@@ -214,7 +214,7 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
          headers: { "Authorization" => "Bearer #{view_token}" }
 
     assert_response :forbidden
-    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).fetch("error")
+    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
   end
 
   test "allows the host to lower a custom action role requirement" do

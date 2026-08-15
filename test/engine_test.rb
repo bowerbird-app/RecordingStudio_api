@@ -99,7 +99,9 @@ class EngineTest < Minitest::Test
     find_initializer("recording_studio_api.load_config").block.call(app)
 
     assert_equal 5, RecordingStudioApi.configuration.timeout
-    assert_equal false, RecordingStudioApi.configuration.rate_limit_api_enabled
+    assert_equal true, RecordingStudioApi.configuration.rate_limit_api_enabled
+    assert_equal false, RecordingStudioApi.configuration.token_digest_legacy_verify
+    assert_equal %w[oauth api_pre_auth api], RecordingStudioApi.configuration.rate_limit_fail_closed_buckets
   end
 
   def test_load_config_ignores_non_enumerable_yaml_and_merge_errors

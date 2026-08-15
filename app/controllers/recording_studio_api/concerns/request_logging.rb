@@ -40,7 +40,7 @@ module RecordingStudioApi
       end
 
       def write_request_log(started_at, monotonic_start, raised_error)
-        return unless current_api.api_request_logging_enabled
+        return unless current_runtime_policy.api_request_logging_enabled
 
         duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - monotonic_start) * 1000).round
         payload = {
@@ -69,7 +69,7 @@ module RecordingStudioApi
         if RequestLogging.writer.respond_to?(:call)
           RequestLogging.writer.call(payload)
         else
-          RecordingStudioApi::ApiRequestLog.create!(payload)
+          RecordingStudioApi::ApiRequestLogDelivery.deliver(payload)
         end
       rescue StandardError => error
         Rails.logger.warn("[RecordingStudioApi] api request log write failed: #{error.class}: #{error.message}")
@@ -78,7 +78,7 @@ module RecordingStudioApi
       def safe_id_for(method_name)
         return unless respond_to?(method_name, true)
 
-        value = public_send(method_name)
+        value = send(method_name)
         value&.id
       rescue StandardError
         nil
@@ -92,7 +92,7 @@ module RecordingStudioApi
       end
 
       def log_request_params?
-        PARAM_PAYLOAD_MODES.include?(current_api.api_request_logging_payload_mode.to_s)
+        PARAM_PAYLOAD_MODES.include?(current_runtime_policy.api_request_logging_payload_mode.to_s)
       end
 
       def request_parameter_filter
@@ -105,7 +105,7 @@ module RecordingStudioApi
       end
 
       def allowed_request_params(params)
-        allowed_keys = Array(current_api.api_request_log_allowed_param_keys).map(&:to_s)
+        allowed_keys = Array(current_runtime_policy.api_request_log_allowed_param_keys).map(&:to_s)
         params.slice(*allowed_keys)
       end
     end

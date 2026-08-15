@@ -23,6 +23,11 @@ module RecordingStudioApi
       raise RecordingStudioApi::AuthorizationError, "API credential management requires higher access"
     end
 
+    # Match AdminApiCredentialsQuery: scope by named API. AdminController already
+    # requires AdminRoot, so filtering by current_root_recording would 404 all
+    # workspace-rooted credentials shown on the admin credentials screen.
+    # Intentional: AdminRoot operators manage credentials across the named API,
+    # not only under the currently selected workspace root.
     def load_credential
       @credential = RecordingStudioApi::ApiCredential
                     .joins(:api_client)

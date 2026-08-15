@@ -2,14 +2,16 @@
 
 module RecordingStudioApi
   class AdminSettingsController < AdminController
-    before_action :authorize_api_access_update!, only: :update_api_access
+    before_action :authorize_api_access_update!, only: %i[update_api_access update_runtime_policy]
 
     def show
       configuration = RecordingStudioApi.configuration
-
+      @policy = RecordingStudioApi::ApiRuntimePolicy.for(@current_admin_api.name)
       @api_setting = RecordingStudioApi::ApiSetting.for_api(@current_admin_api.name)
       @api_access_enabled = @api_setting.api_access_enabled
       @api_label = @current_admin_api.name.humanize
+      @overrides = @api_setting.runtime_overrides_hash
+      @global_overrides = RecordingStudioApi::ApiSetting.for_api(:public).runtime_overrides_hash
 
       @settings_rows = [
         setting_row("Configured APIs", format_list(configuration.api_names)),
@@ -21,12 +23,12 @@ module RecordingStudioApi
           ]
         end,
         setting_row("Request timeout", format_seconds(configuration.timeout)),
-        setting_row("Credential TTL", format_seconds(@current_admin_api.credential_ttl)),
-        setting_row("Access token TTL", format_seconds(@current_admin_api.access_token_ttl)),
-        setting_row("API request logging enabled", format_boolean(@current_admin_api.api_request_logging_enabled)),
-        setting_row("API request logging payload mode", format_presence(@current_admin_api.api_request_logging_payload_mode)),
-        setting_row("API request log retention", format_days(configuration.api_request_log_retention_days)),
-        setting_row("API daily metric retention", format_days(configuration.api_daily_metric_retention_days))
+        setting_row("Credential TTL (effective)", format_seconds(@policy.credential_ttl)),
+        setting_row("Access token TTL (effective)", format_seconds(@policy.access_token_ttl)),
+        setting_row("API request logging enabled (effective)", format_boolean(@policy.api_request_logging_enabled)),
+        setting_row("API request logging payload mode", format_presence(@policy.api_request_logging_payload_mode)),
+        setting_row("API request log retention (effective)", format_days(@policy.api_request_log_retention_days)),
+        setting_row("API daily metric retention (effective)", format_days(@policy.api_daily_metric_retention_days))
       ]
     end
 
@@ -34,11 +36,18 @@ module RecordingStudioApi
       api_setting = RecordingStudioApi::ApiSetting.for_api(@current_admin_api.name)
       api_setting.update!(api_access_enabled: api_access_params.fetch(:enabled, "0"))
 
-      redirect_to RecordingStudioApi.admin_settings_path(
-        controller: self,
-        **RecordingStudioApi::Admin::ApiContext.query_params(@current_admin_api.name),
-        **page_nav_close_param
-      ), notice: api_access_notice(api_setting)
+      redirect_to settings_redirect_path, notice: api_access_notice(api_setting)
+    end
+
+    def update_runtime_policy
+      api_setting = RecordingStudioApi::ApiSetting.for_api(@current_admin_api.name)
+      attrs = runtime_policy_params
+      attrs = attrs.merge(global_retention_params) if @current_admin_api.name == "public"
+      api_setting.apply_runtime_overrides!(attrs)
+
+      redirect_to settings_redirect_path, notice: "Runtime policy overrides saved."
+    rescue ArgumentError, TypeError, ActiveRecord::RecordInvalid => e
+      redirect_to settings_redirect_path, alert: "Could not save runtime policy: #{e.message}"
     end
 
     private
@@ -55,6 +64,29 @@ module RecordingStudioApi
 
     def api_access_params
       params.fetch(:api_access, {}).permit(:enabled)
+    end
+
+    def runtime_policy_params
+      params.fetch(:runtime_policy, {}).permit(
+        :api_request_logging_enabled,
+        :credential_ttl_seconds,
+        :access_token_ttl_seconds
+      ).to_h
+    end
+
+    def global_retention_params
+      params.fetch(:runtime_policy, {}).permit(
+        :api_request_log_retention_days,
+        :api_daily_metric_retention_days
+      ).to_h
+    end
+
+    def settings_redirect_path
+      RecordingStudioApi.admin_settings_path(
+        controller: self,
+        **RecordingStudioApi::Admin::ApiContext.query_params(@current_admin_api.name),
+        **page_nav_close_param
+      )
     end
 
     def api_access_notice(api_setting)

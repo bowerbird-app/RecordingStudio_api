@@ -34,62 +34,95 @@ module RecordingStudioApi
         ApiRequestLog.table_available? && ApiDailyMetric.table_available? && ApiDailyLatencyHistogramBucket.table_available?
       end
 
-      def log_rows
-        @log_rows ||= ApiRequestLog.where(occurred_at: metric_date.beginning_of_day..metric_date.end_of_day)
-                                   .pluck(:api_key, :route_name, :controller_name, :action_name, :request_method, :status_code, :rate_limited, :duration_ms)
-      end
-
       def delete_existing_metrics!
         ApiDailyMetric.where(metric_date: metric_date).delete_all
         ApiDailyLatencyHistogramBucket.where(metric_date: metric_date).delete_all
       end
 
       def persist_daily_metrics!
-        grouped_rows.each do |(api_key, route_name, request_method, status_class), rows|
-          durations = rows.map { |row| row[7] }.compact
+        connection = ApiRequestLog.connection
+        sql = <<~SQL.squish
+          SELECT
+            COALESCE(NULLIF(api_key, ''), 'public') AS api_key,
+            COALESCE(NULLIF(route_name, ''), 'unknown') AS route_name,
+            MIN(controller_name) AS controller_name,
+            MIN(action_name) AS action_name,
+            request_method,
+            (status_code / 100) AS status_class,
+            COUNT(*) AS request_count,
+            SUM(CASE WHEN rate_limited OR status_code = 429 THEN 1 ELSE 0 END) AS rate_limited_count,
+            SUM(CASE WHEN status_code BETWEEN 400 AND 499 THEN 1 ELSE 0 END) AS client_error_count,
+            SUM(CASE WHEN status_code BETWEEN 500 AND 599 THEN 1 ELSE 0 END) AS server_error_count,
+            COUNT(duration_ms) AS duration_count,
+            COALESCE(SUM(duration_ms), 0) AS duration_sum_ms,
+            COALESCE(MAX(duration_ms), 0) AS duration_max_ms
+          FROM #{ApiRequestLog.table_name}
+          WHERE occurred_at BETWEEN ? AND ?
+          GROUP BY 1, 2, 5, 6
+        SQL
+
+        connection.select_all(
+          ApiRequestLog.sanitize_sql_array([sql, metric_date.beginning_of_day, metric_date.end_of_day])
+        ).each do |row|
           ApiDailyMetric.create!(
-            api_key: api_key,
+            api_key: row.fetch("api_key"),
             metric_date: metric_date,
-            route_name: route_name,
-            controller_name: rows.first[2],
-            action_name: rows.first[3],
-            request_method: request_method,
-            status_class: status_class,
-            request_count: rows.size,
-            rate_limited_count: rows.count { |row| row[6] || row[5].to_i == 429 },
-            client_error_count: rows.count { |row| (400..499).cover?(row[5].to_i) },
-            server_error_count: rows.count { |row| (500..599).cover?(row[5].to_i) },
-            duration_count: durations.size,
-            duration_sum_ms: durations.sum,
-            duration_max_ms: durations.max.to_i
+            route_name: row.fetch("route_name"),
+            controller_name: row["controller_name"],
+            action_name: row["action_name"],
+            request_method: row.fetch("request_method"),
+            status_class: row.fetch("status_class").to_i,
+            request_count: row.fetch("request_count").to_i,
+            rate_limited_count: row.fetch("rate_limited_count").to_i,
+            client_error_count: row.fetch("client_error_count").to_i,
+            server_error_count: row.fetch("server_error_count").to_i,
+            duration_count: row.fetch("duration_count").to_i,
+            duration_sum_ms: row.fetch("duration_sum_ms").to_i,
+            duration_max_ms: row.fetch("duration_max_ms").to_i
           )
         end
       end
 
       def persist_histogram_buckets!
-        grouped_rows.each do |(api_key, route_name, request_method, status_class), rows|
-          rows.map { |row| row[7] }.compact.group_by { |duration| latency_bucket_for(duration) }.each do |upper_bound_ms, durations|
-            ApiDailyLatencyHistogramBucket.create!(
-              api_key: api_key,
-              metric_date: metric_date,
-              route_name: route_name,
-              request_method: request_method,
-              status_class: status_class,
-              upper_bound_ms: upper_bound_ms,
-              request_count: durations.size
-            )
+        connection = ApiRequestLog.connection
+        bucket_case = LATENCY_BUCKETS_MS.map.with_index do |upper_bound, index|
+          lower = index.zero? ? 0 : LATENCY_BUCKETS_MS[index - 1] + 1
+          if index == LATENCY_BUCKETS_MS.length - 1
+            "WHEN duration_ms >= #{lower} THEN #{upper_bound}"
+          else
+            "WHEN duration_ms BETWEEN #{lower} AND #{upper_bound} THEN #{upper_bound}"
           end
-        end
-      end
+        end.join(" ")
 
-      def grouped_rows
-        @grouped_rows ||= log_rows.group_by do |api_key, route_name, _controller_name, _action_name, request_method, status_code, *_|
-          [api_key.presence || "public", route_name.presence || "unknown", request_method, status_code.to_i / 100]
-        end
-      end
+        sql = <<~SQL.squish
+          SELECT
+            COALESCE(NULLIF(api_key, ''), 'public') AS api_key,
+            COALESCE(NULLIF(route_name, ''), 'unknown') AS route_name,
+            request_method,
+            (status_code / 100) AS status_class,
+            CASE #{bucket_case} END AS upper_bound_ms,
+            COUNT(*) AS request_count
+          FROM #{ApiRequestLog.table_name}
+          WHERE occurred_at BETWEEN ? AND ?
+            AND duration_ms IS NOT NULL
+          GROUP BY 1, 2, 3, 4, 5
+        SQL
 
-      def latency_bucket_for(duration)
-        LATENCY_BUCKETS_MS.find { |upper_bound| duration <= upper_bound } || LATENCY_BUCKETS_MS.last
+        connection.select_all(
+          ApiRequestLog.sanitize_sql_array([sql, metric_date.beginning_of_day, metric_date.end_of_day])
+        ).each do |row|
+          next if row["upper_bound_ms"].nil?
+
+          ApiDailyLatencyHistogramBucket.create!(
+            api_key: row.fetch("api_key"),
+            metric_date: metric_date,
+            route_name: row.fetch("route_name"),
+            request_method: row.fetch("request_method"),
+            status_class: row.fetch("status_class").to_i,
+            upper_bound_ms: row.fetch("upper_bound_ms").to_i,
+            request_count: row.fetch("request_count").to_i
+          )
+        end
       end
     end
   end

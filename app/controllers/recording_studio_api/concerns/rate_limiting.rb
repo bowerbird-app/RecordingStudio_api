@@ -5,8 +5,46 @@ module RecordingStudioApi
     module RateLimiting
       extend ActiveSupport::Concern
 
+      # Atomically increment and set TTL only on first hit in the window so we
+      # avoid rewriting expiry on every request. Re-apply EXPIRE if TTL is missing.
+      RATE_LIMIT_INCR_EXPIRE_SCRIPT = <<~LUA
+        local count = redis.call("INCR", KEYS[1])
+        local ttl = redis.call("TTL", KEYS[1])
+        if count == 1 or ttl < 0 then
+          redis.call("EXPIRE", KEYS[1], ARGV[1])
+          ttl = redis.call("TTL", KEYS[1])
+        end
+        return { count, ttl }
+      LUA
+
       class << self
         attr_accessor :decider
+
+        def redis_client
+          @redis_client_mutex ||= Mutex.new
+          @redis_client_mutex.synchronize do
+            return @redis_client if defined?(@redis_client) && !@redis_client.nil?
+
+            require "redis"
+            url = RecordingStudioApi.configuration.rate_limit_redis_url.to_s.strip
+            options = {
+              connect_timeout: 1,
+              read_timeout: 1,
+              write_timeout: 1
+            }
+            options[:url] = url if url.present?
+            @redis_client = Redis.new(**options)
+          end
+        rescue LoadError
+          nil
+        end
+
+        def reset_redis_client!
+          @redis_client_mutex ||= Mutex.new
+          @redis_client_mutex.synchronize do
+            @redis_client = nil
+          end
+        end
       end
 
       included do
@@ -18,6 +56,7 @@ module RecordingStudioApi
 
       def enforce_api_pre_auth_rate_limit!
         return unless api_pre_auth_rate_limit_enabled_for_request?
+        return if skip_api_pre_auth_rate_limit_for_bearer?
 
         with_rate_limit_bucket("api_pre_auth") do
           enforce_rate_limit!
@@ -39,8 +78,18 @@ module RecordingStudioApi
         response.set_header("X-RateLimit-Remaining", decision[:remaining].to_i.to_s)
 
         @rate_limited_request = true
-        render json: { error: "rate_limit_exceeded", error_description: "Too many requests" }, status: :too_many_requests
+        render json: rate_limit_exceeded_payload, status: :too_many_requests
         true
+      end
+
+      def rate_limit_exceeded_payload
+        if oauth_rate_limited_path?
+          { error: "rate_limit_exceeded", error_description: "Too many requests" }
+        elsif respond_to?(:api_error_payload, true)
+          api_error_payload(code: "rate_limit_exceeded", message: "Too many requests")
+        else
+          { error: { code: "rate_limit_exceeded", message: "Too many requests" } }
+        end
       end
 
       def resolved_rate_limit_decision
@@ -60,6 +109,7 @@ module RecordingStudioApi
         fail_closed_rate_limit_decision
       rescue StandardError => error
         Rails.logger.warn("[RecordingStudioApi] rate limiter unavailable: #{error.class}: #{error.message}")
+        RateLimiting.reset_redis_client!
         fail_closed_rate_limit_decision
       end
 
@@ -76,11 +126,8 @@ module RecordingStudioApi
         current_window = (Time.current.to_i / period).to_i
         key = "#{rate_limit_scoped_namespace}:#{rate_limit_bucket}:#{rate_limit_identifier}:#{current_window}"
 
-        count = redis.incr(key)
-        redis.expire(key, period) if count == 1
-
+        count, retry_after = increment_rate_limit_counter(redis, key, period)
         remaining = [limit - count, 0].max
-        retry_after = redis.ttl(key)
 
         {
           limited: count > limit,
@@ -88,6 +135,21 @@ module RecordingStudioApi
           remaining: remaining,
           retry_after: retry_after.positive? ? retry_after : period
         }
+      end
+
+      def increment_rate_limit_counter(redis, key, period)
+        if redis.respond_to?(:eval)
+          result = redis.eval(RATE_LIMIT_INCR_EXPIRE_SCRIPT, keys: [key], argv: [period.to_i])
+          return [result[0].to_i, result[1].to_i]
+        end
+
+        count = redis.incr(key)
+        ttl = redis.ttl(key)
+        if count == 1 || ttl.to_i < 0
+          redis.expire(key, period)
+          ttl = redis.ttl(key)
+        end
+        [count, ttl.to_i]
       end
 
       def normalize_decision(decision)
@@ -129,6 +191,19 @@ module RecordingStudioApi
       end
 
       def api_pre_auth_rate_limit_enabled_for_request? = rate_limit_api.rate_limit_api_pre_auth_enabled && api_rate_limited_path?
+
+      # Skip the IP pre-auth bucket when a Bearer token is present and authenticated API
+      # rate limits are enabled. Invalid Bearer traffic still hits pre-auth when API RL is off.
+      def skip_api_pre_auth_rate_limit_for_bearer?
+        return false unless rate_limit_api.rate_limit_api_enabled
+
+        bearer_authorization_header_present?
+      end
+
+      def bearer_authorization_header_present?
+        authorization = request.headers["Authorization"].to_s
+        authorization.match?(/\ABearer\s+\S+/i)
+      end
 
       def rate_limit_enabled_for_request?
         if rate_limit_bucket_override == "api_pre_auth"
@@ -203,9 +278,9 @@ module RecordingStudioApi
       end
 
       def rate_limit_api
-        return current_api if respond_to?(:current_api, true)
+        return current_runtime_policy if respond_to?(:current_runtime_policy, true)
 
-        RecordingStudioApi.configuration
+        RecordingStudioApi::ApiRuntimePolicy.for(:public)
       end
 
       def rate_limit_scoped_namespace
@@ -218,7 +293,7 @@ module RecordingStudioApi
       def rate_limit_bucket_override = @rate_limit_bucket_override
 
       def oauth_rate_limited_path?
-        request.path.end_with?("/oauth/token")
+        request.path.end_with?("/oauth/token", "/oauth/revoke")
       end
 
       def api_rate_limited_path?
@@ -235,12 +310,7 @@ module RecordingStudioApi
       end
 
       def rate_limit_redis_client
-        require "redis"
-
-        url = RecordingStudioApi.configuration.rate_limit_redis_url.to_s.strip
-        @rate_limit_redis_client ||= url.present? ? Redis.new(url: url) : Redis.new
-      rescue LoadError
-        nil
+        RateLimiting.redis_client
       end
     end
   end

@@ -43,7 +43,8 @@ module RecordingStudioApi
       @openapi_title = nil
       @openapi_description = nil
       @authentication = :oauth
-      @default_access = :read_write
+      # Named APIs default to read-only; hosts must opt into write operations.
+      @default_access = :read_only
       @documentation_enabled = false
       @documentation_access = nil
       @documentation_layout_name = nil

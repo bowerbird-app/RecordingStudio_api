@@ -4,6 +4,7 @@ module RecordingStudioApi
   module Services
     class IssueOauthAccessToken < BaseService
       SUPPORTED_GRANT_TYPE = "client_credentials"
+      DUMMY_CLIENT_SECRET = "recording-studio-api.oauth.dummy-client-secret"
 
       def initialize(grant_type:, client_id:, client_secret:, api: :public)
         @grant_type = grant_type
@@ -17,6 +18,7 @@ module RecordingStudioApi
       attr_reader :grant_type, :client_id, :client_secret, :api_key
 
       def perform
+        return oauth_failure("invalid_request", "grant_type is required") if grant_type.blank?
         return oauth_failure("unsupported_grant_type", "grant_type must be client_credentials") unless grant_type == SUPPORTED_GRANT_TYPE
         return oauth_failure("invalid_request", "client_id is required") if client_id.blank?
         return oauth_failure("invalid_request", "client_secret is required") if client_secret.blank?
@@ -24,11 +26,7 @@ module RecordingStudioApi
         credential = ApiCredential.joins(:api_client)
                                   .merge(ApiClient.where(api_key: api_key))
                                   .find_by(token_public_id: client_id)
-        return oauth_failure("invalid_client", "client authentication failed") if credential.nil?
-        return oauth_failure("invalid_client", "client authentication failed") unless credential.active_for_authentication?
-
-        provided_digest = Token.digest(client_secret)
-        return oauth_failure("invalid_client", "client authentication failed") unless secure_compare(credential.token_digest, provided_digest)
+        return oauth_failure("invalid_client", "client authentication failed") unless authenticate_client?(credential)
 
         token_data = OauthAccessToken.generate
         expires_at = resolved_expiry
@@ -71,15 +69,27 @@ module RecordingStudioApi
         failure({ error: code, error_description: description })
       end
 
-      def secure_compare(left, right)
-        return false if left.blank? || right.blank?
-        return false unless left.bytesize == right.bytesize
+      def authenticate_client?(credential)
+        expected_digest = credential&.token_digest.presence || dummy_client_secret_digest
+        secret_matches = Token.digest_matches?(expected_digest, client_secret)
+        TokenDigest.rehash_if_legacy!(credential, client_secret) if secret_matches && credential.present?
 
-        ActiveSupport::SecurityUtils.secure_compare(left, right)
+        return false if credential.blank? || !secret_matches
+
+        unless credential.active_for_authentication?
+          credential.revoke_tokens_on_expiry!
+          return false
+        end
+
+        true
+      end
+
+      def dummy_client_secret_digest
+        Token.digest(DUMMY_CLIENT_SECRET)
       end
 
       def resolved_expiry
-        ttl = RecordingStudioApi.configuration.fetch_api(api_key).access_token_ttl
+        ttl = RecordingStudioApi::ApiRuntimePolicy.for(api_key).access_token_ttl
         Time.current + (ttl.presence || 1.hour)
       end
 

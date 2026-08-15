@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-15
+
+### Added
+- Optional `Idempotency-Key` header on resource creates (Redis-backed, scoped per API client)
+- Collection index `filter[...]` exact-match filters and `q` substring search over sortable/writable attributes
+- Install generator ships `lib/tasks/flat_pack_tailwind_assets.rake` plus `gem_sources.css` / Grid utility safelist guidance for host Tailwind builds
+
+### Changed
+- **Breaking (pre-production):** `token_digest_legacy_verify` defaults to `false`; enable temporarily while rehashing pre-pepper digests
+- **Breaking (pre-production):** `token_digest_pepper` no longer falls back to a hardcoded string; set `RECORDING_STUDIO_API_TOKEN_DIGEST_PEPPER`, `config.token_digest_pepper`, or rely on `Rails.application.secret_key_base`
+- **Breaking (pre-production):** authenticated API rate limiting defaults to enabled; `rate_limit_fail_closed_buckets` includes `api`
+- Named API `default_access` defaults to `:read_only` (opt into writes via registration/`read_write`)
+- Credential rotation locks the API client and active credential rows and treats uniqueness races as retryable failures
+- Accessible recording authorization uses SQL `EXISTS` / subquery membership instead of materializing full id arrays for every check
+- OpenAPI documents hard-delete semantics, collection filters/search, and `Idempotency-Key`
+- Admin credential revoke remains intentionally AdminRoot / named-API scoped (not limited to the selected workspace root)
+
+### Removed
+- Placeholder `RecordingStudioApi::Services::ExampleService` and its tests
+
+### Fixed
+- Dummy/host Tailwind scanning for FlatPack Grid (`md:grid-cols-*`, `lg:grid-cols-*`) and icon sizing utilities when gems live outside vendor Docker paths
+
+See [UPGRADING.md](UPGRADING.md) for digest, rate-limit, delete, and client migration steps.
+
 ## [0.3.0] - 2026-08-14
 
 ### Changed
@@ -53,7 +78,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/bowerbird-app/RecordingStudio_api/releases/tag/v0.1.0

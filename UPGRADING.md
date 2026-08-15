@@ -1,3 +1,57 @@
+# Upgrading RecordingStudioApi
+
+## Upgrading to 0.4.0
+
+`0.4.0` is a pre-production breaking release focused on safer defaults and operational hardening.
+Update the host dependency to `recording_studio_api`, `~> 0.4.0`, then apply the steps below.
+
+If you are still on a pre-`0.3.0` flat-contract API, complete [Upgrading to 0.3.0](#upgrading-to-030)
+first.
+
+No database migration is required for `0.4.0`.
+
+### 1. Token digests
+
+1. Ensure `Rails.application.secret_key_base` is set, or set
+   `RECORDING_STUDIO_API_TOKEN_DIGEST_PEPPER` / `config.token_digest_pepper`. There is no hardcoded
+   digest pepper fallback.
+2. `token_digest_legacy_verify` now defaults to `false`. If you still have unsalted SHA256 digests
+   in the database, temporarily set `config.token_digest_legacy_verify = true`, rotate or allow
+   rehash-on-login, then turn it back off.
+
+### 2. Rate limits and named API defaults
+
+1. Authenticated API rate limiting is on by default (`rate_limit_api_enabled = true`). Disable
+   explicitly in non-production hosts if needed.
+2. Fail-closed buckets default to `%w[oauth api_pre_auth api]`. Ensure Redis is reachable in
+   production or tune `rate_limit_fail_closed_buckets`.
+3. Named APIs default to `default_access: :read_only`. Register write operations explicitly or set
+   `api.default_access = :read_write`.
+
+### 3. Deletes, admin revoke, and mobile OAuth migrations
+
+1. Resource `DELETE` hard-deletes the recording/recordable. Recording Studio no longer exposes a
+   shared trash workflow through this gem; do not expect soft-delete/`trashed_at` behavior from
+   destroy endpoints.
+2. Admin credential revoke under AdminRoot is intentionally named-API scoped (not limited to the
+   currently selected workspace root). Workspace operators continue to revoke via API client screens
+   that are tenancy-scoped.
+3. Historical mobile OAuth create/drop migrations in the dummy app remain as historical artifacts.
+   Do not rewrite old migrations; hosts that never ran them can ignore
+   `remove_mobile_oauth_from_recording_studio_api`.
+
+### 4. Client features
+
+1. Send `Idempotency-Key` on creates when retries are possible. Responses are cached in Redis for 24
+   hours per API + client + key when Redis is available.
+2. Collection indexes accept `filter[attribute]=value` (exact) and `q` (ILIKE across filterable
+   attributes). OpenAPI documents the allowed filter attributes per resource.
+3. After regenerating install artifacts, run
+   `bin/rails flat_pack:prepare_tailwind_assets tailwindcss:build` so FlatPack Grid utilities scan
+   correctly. Gitignore `tmp/tailwind_scan/` and `app/assets/tailwind/gem_sources.css`.
+
+---
+
 # Upgrading to 0.3.0
 
 `0.3.0` is a pre-production breaking release. Upgrade API clients, recordable registrations, and
@@ -5,9 +59,9 @@ OpenAPI snapshots together; do not expect the previous response structure to rem
 
 ## 1. Update the gem and regenerate API artifacts
 
-Update the host application's dependency to `recording_studio_api`, `~> 0.3.0`. Restart the
-application after updating registrations, then regenerate or re-export any OpenAPI documents,
-generated clients, fixtures, and contract snapshots.
+Update the host application's dependency to `recording_studio_api`, `~> 0.3.0` (or `~> 0.4.0` if
+continuing through the current release). Restart the application after updating registrations, then
+regenerate or re-export any OpenAPI documents, generated clients, fixtures, and contract snapshots.
 
 No database migration is required for this release.
 
@@ -100,6 +154,22 @@ Use `parent_id` only for a top-level create that chooses a parent Recording Stud
 creates obtain the parent from the route, and updates cannot change `parent_id`; use a registered
 move action to change a record's parent.
 
-`0.3.0` temporarily accepts the former `{ "attributes": { ... } }` request envelope, but clients
-must migrate to flat bodies and must not send an envelope and flat writable fields in the same
-request. The legacy response shape is not available.
+`0.3.0` rejects the former `{ "attributes": { ... } }` request envelope. Send writable fields at
+the request body root. The legacy response shape is not available.
+
+## 6. Update API error handling
+
+Resource API errors now use a nested object:
+
+```json
+{
+  "error": {
+    "code": "not_found",
+    "message": "Resource was not found in this API scope"
+  }
+}
+```
+
+Read `error.code` and `error.message`. Validation failures use `code: "validation_failed"` and may
+include `error.details`. OAuth token/revoke endpoints keep the OAuth wire format
+`{ "error": "...", "error_description": "..." }`.

@@ -40,9 +40,12 @@ module RecordingStudioApi
           description: "Discover the resource collections available through this API."
         }
         assert document.fetch(:paths).key?("/recording_studio_api/oauth/token")
+        assert document.fetch(:paths).key?("/recording_studio_api/oauth/revoke")
         assert document.fetch(:paths).key?("/recording_studio_api/api/v1")
         assert document.fetch(:components).fetch(:schemas).key?(:OAuthTokenResponse)
+        assert document.fetch(:components).fetch(:schemas).key?(:OAuthError)
         assert document.fetch(:components).fetch(:responses).key?(:Unauthorized)
+        assert document.fetch(:components).fetch(:securitySchemes).key?(:oauthHttpBasic)
       end
 
       def test_call_uses_configured_openapi_title_when_present
@@ -88,8 +91,17 @@ module RecordingStudioApi
         assert_equal [], token_operation.fetch(:security)
         assert_equal "Exchange OAuth client credentials", token_operation.fetch(:summary)
         assert token_operation.key?(:requestBody)
+        assert_equal %w[grant_type],
+                     token_operation.dig(:requestBody, :content, "application/x-www-form-urlencoded", :schema, :required)
         assert token_operation.fetch(:responses).key?("200")
+        assert token_operation.fetch(:responses).key?("400")
         assert token_operation.fetch(:responses).key?("401")
+        assert token_operation.fetch(:responses).key?("429")
+
+        revoke_operation = document.fetch(:paths).fetch("/recording_studio_api/oauth/revoke").fetch("post")
+        assert_equal [], revoke_operation.fetch(:security)
+        assert_equal "Revoke an OAuth access token", revoke_operation.fetch(:summary)
+        assert revoke_operation.fetch(:responses).key?("200")
       end
 
       def test_resource_operations_include_security_and_path_parameters
@@ -161,7 +173,10 @@ module RecordingStudioApi
           document = with_recordable_types(["Page"]) { OpenapiDocument.call }
           delete_operation = document.fetch(:paths).fetch("/recording_studio_api/api/v1/pages/{id}").fetch("delete")
 
-          assert_equal "Delete Page permanently", delete_operation.fetch(:description)
+          assert_equal(
+            "Permanently delete Page. Recording Studio API hard-deletes the recording and recordable; it does not soft-delete or move to trash.",
+            delete_operation.fetch(:description)
+          )
         end
       end
 
@@ -211,8 +226,11 @@ module RecordingStudioApi
 
         token_operation = document.fetch(:paths).fetch("/platform/recording-api/oauth/token").fetch("post")
         assert_equal [], token_operation.fetch(:security)
-        assert token_operation.fetch(:responses).key?("422")
+        assert token_operation.fetch(:responses).key?("400")
+        assert token_operation.fetch(:responses).key?("401")
+        assert token_operation.fetch(:responses).key?("429")
         assert_not token_operation.fetch(:responses).key?("403")
+        assert_not token_operation.fetch(:responses).key?("422")
         assert_equal "/platform/recording-api/oauth/token",
                      document.fetch(:components).fetch(:securitySchemes).fetch(:oauthClientCredentials)
                        .fetch(:flows).fetch(:clientCredentials).fetch(:tokenUrl)

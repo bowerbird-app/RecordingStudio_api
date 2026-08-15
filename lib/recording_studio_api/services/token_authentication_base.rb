@@ -21,7 +21,12 @@ module RecordingStudioApi
         return failure(AuthenticationError.new(invalid_token_error_message)) if credential.nil?
         return failure(AuthenticationError.new(invalid_token_error_message)) unless credential.api_client&.api_key == api_key
         return failure(AuthenticationError.new(inactive_token_error_message)) unless token_record_active?(token_record)
-        return failure(AuthenticationError.new(inactive_token_error_message)) unless credential.active_for_authentication?
+
+        unless credential.active_for_authentication?
+          credential.revoke_tokens_on_expiry!
+          return failure(AuthenticationError.new(inactive_token_error_message))
+        end
+
         return failure(AuthenticationError.new(inactive_token_error_message)) unless access_recording_active?(credential)
 
         root_recording = resolve_root_recording(credential)
@@ -77,7 +82,16 @@ module RecordingStudioApi
       end
 
       def update_last_used!(credential, _token_record)
-        credential.update_column(:last_used_at, Time.current)
+        touch_last_used_at!(credential)
+      end
+
+      def touch_last_used_at!(record)
+        return if record.nil?
+
+        last_used_at = record.last_used_at if record.respond_to?(:last_used_at)
+        return if last_used_at.present? && last_used_at > 1.minute.ago
+
+        record.update_column(:last_used_at, Time.current)
       end
 
       def service_args

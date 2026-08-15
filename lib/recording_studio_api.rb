@@ -14,10 +14,15 @@ require "recording_studio_api/action_context"
 require "recording_studio_api/resource_operation_context"
 require "recording_studio_api/accessible_recording_scope"
 require "recording_studio_api/access_policy"
+require "recording_studio_api/api_runtime_policy"
 require "recording_studio_api/recordable_registry"
+require "recording_studio_api/api_request_log_batch"
+require "recording_studio_api/api_request_log_delivery"
+require "recording_studio_api/token_digest"
 require "recording_studio_api/token"
 require "recording_studio_api/oauth_access_token"
 require "recording_studio_api/oauth_error_mapper"
+require "recording_studio_api/idempotency_store"
 require "recording_studio_api/openapi_helpers"
 require "recording_studio_api/relationship_batch_loader"
 require "recording_studio_api/relationship_context"
@@ -28,12 +33,12 @@ require "recording_studio_api/services/base_service"
 require "recording_studio_api/services/token_authentication_base"
 require "recording_studio_api/access_management_policy"
 require "recording_studio_api/api_client_management_policy"
-require "recording_studio_api/services/example_service"
 require "recording_studio_api/services/provision_api_client"
 require "recording_studio_api/services/provision_access_request"
 require "recording_studio_api/services/rotate_api_credential"
 require "recording_studio_api/services/authenticate_bearer_token"
 require "recording_studio_api/services/issue_oauth_access_token"
+require "recording_studio_api/services/revoke_oauth_access_token"
 require "recording_studio_api/services/authenticate_oauth_access_token"
 require "recording_studio_api/services/issue_test_credential"
 require "recording_studio_api/services/revoke_test_credential"
@@ -43,6 +48,8 @@ require "recording_studio_api/services/openapi_document"
 require "recording_studio_api/services/paginate_resource_collection"
 require "recording_studio_api/services/aggregate_api_request_log_metrics"
 require "recording_studio_api/services/prune_api_request_logs"
+require "recording_studio_api/services/prune_api_daily_metrics"
+require "recording_studio_api/services/maintain_api_metrics"
 require "recording_studio_api/services/resource_operations/base"
 require "recording_studio_api/services/resource_operations/index"
 require "recording_studio_api/services/resource_operations/show"
@@ -354,6 +361,14 @@ module RecordingStudioApi
         required_role: :edit,
         handler: RecordingStudioApi::Services::MoveRecording,
         serializer: RecordingStudioApi::Serializers::ResourceRecordingSerializer,
+        input_contract: {
+          reject_unknown: true,
+          fields: {
+            parent_id: { type: :string, required: false, allow_blank: false },
+            destination_id: { type: :string, required: false, allow_blank: false },
+            new_parent_id: { type: :string, required: false, allow_blank: false }
+          }
+        },
         api: api
       )
     end

@@ -38,13 +38,29 @@ module RecordingStudioApi
             path: oauth_token_path,
             action: "oauth#token",
             summary: "Exchange OAuth client credentials",
-            description: "Exchange client credentials for an OAuth2 access token.",
+            description: "Exchange client credentials for an OAuth2 access token. Supply client_id and client_secret in the form body or via HTTP Basic authentication. Query-string credentials are rejected.",
             capability: nil,
             scope: nil,
             openapi: {
               tags: ["Authentication"],
+              security: [],
               request_body: oauth_token_request_body,
               responses: oauth_token_responses
+            }
+          },
+          {
+            verb: "POST",
+            path: oauth_revoke_path,
+            action: "oauth#revoke",
+            summary: "Revoke an OAuth access token",
+            description: "Revoke a previously issued OAuth2 access token (RFC 7009). Authenticate with client credentials in the form body or via HTTP Basic. Unknown tokens still return 200 once the client authenticates.",
+            capability: nil,
+            scope: nil,
+            openapi: {
+              tags: ["Authentication"],
+              security: [],
+              request_body: oauth_revoke_request_body,
+              responses: oauth_revoke_responses
             }
           }
         ]
@@ -109,7 +125,7 @@ module RecordingStudioApi
           .sort_by { |section| section.fetch(:resource) }
       end
 
-      def default_resource_endpoints(resource_name, recordable_type)
+      def default_resource_endpoints(resource_name, recordable_type) # rubocop:disable Metrics/MethodLength
         openapi_tag = openapi_tag_for(resource_name, recordable_type)
         docs_resource_name = docs_resource_name_for(resource_name, recordable_type)
         registration = recordable_registration_for(recordable_type)
@@ -127,7 +143,7 @@ module RecordingStudioApi
             openapi: resource_openapi(
               {
                 tags: [openapi_tag],
-                parameters: pagination_parameters(recordable_type) + include_parameters_for(recordable_type),
+                parameters: pagination_parameters(recordable_type) + collection_filter_parameters(recordable_type) + include_parameters_for(recordable_type),
                 responses: resource_list_responses(
                   resource_name,
                   recordable_type,
@@ -152,6 +168,7 @@ module RecordingStudioApi
             openapi: merge_hashes(
               {
                 tags: [openapi_tag],
+                parameters: [idempotency_key_parameter],
                 request_body: resource_write_request_body(recordable_type, operation: :create),
                 responses: resource_create_responses(recordable_type)
               },
@@ -221,7 +238,7 @@ module RecordingStudioApi
         endpoints.select do |endpoint|
           registration.nil? || registration.supports_operation?(endpoint.fetch(:action).split("#").last)
         end
-      end
+      end # rubocop:enable Metrics/MethodLength
 
       def relationship_resource_endpoints(resource_name, recordable_type)
         registration = recordable_registration_for(recordable_type)
@@ -280,7 +297,7 @@ module RecordingStudioApi
             scope: :resource,
             openapi: {
               tags: [openapi_tag_for(resource_name, recordable_type)],
-              parameters: [id_parameter],
+              parameters: [id_parameter, idempotency_key_parameter],
               request_body: relationship_request_body(relationship, operation: :create),
               responses: relationship_create_responses(relationship)
             }
@@ -393,6 +410,12 @@ module RecordingStudioApi
         return mounted_path("/oauth/token") if @api_key == "public"
 
         mounted_path("/apis/#{@api_key}/oauth/token")
+      end
+
+      def oauth_revoke_path
+        return mounted_path("/oauth/revoke") if @api_key == "public"
+
+        mounted_path("/apis/#{@api_key}/oauth/revoke")
       end
 
       def api_recordable_types
@@ -522,7 +545,8 @@ module RecordingStudioApi
       end
 
       def destroy_description_for(resource_name, recordable_type)
-        "Delete #{docs_resource_name_for(resource_name, recordable_type)} permanently"
+        "Permanently delete #{docs_resource_name_for(resource_name, recordable_type)}. " \
+          "Recording Studio API hard-deletes the recording and recordable; it does not soft-delete or move to trash."
       end
 
       def resource_list_responses(resource_name, recordable_type, docs_resource_name, item_schema: nil, relationship_examples: {})
@@ -622,6 +646,54 @@ module RecordingStudioApi
             }
           }
         ]
+      end
+
+      def collection_filter_parameters(recordable_type)
+        filterable = filterable_attributes_for(recordable_type)
+        parameters = [
+          {
+            name: "q",
+            in: "query",
+            required: false,
+            description: "Case-insensitive substring search across filterable attributes for this resource.",
+            schema: {
+              type: "string"
+            }
+          }
+        ]
+        return parameters if filterable.empty?
+
+        parameters + filterable.map do |attribute|
+          {
+            name: "filter[#{attribute}]",
+            in: "query",
+            required: false,
+            description: "Exact match filter on #{attribute}.",
+            schema: {
+              type: "string"
+            }
+          }
+        end
+      end
+
+      def filterable_attributes_for(recordable_type)
+        registration = recordable_registration_for(recordable_type)
+        return [] if registration.nil?
+
+        (registration.sortable_attributes | registration.writable_attributes).map(&:to_s)
+      end
+
+      def idempotency_key_parameter
+        {
+          name: "Idempotency-Key",
+          in: "header",
+          required: false,
+          description: "Optional client-supplied key. When Redis is available, identical create requests from the same API client reuse the first successful response for 24 hours.",
+          schema: {
+            type: "string",
+            maxLength: 255
+          }
+        }
       end
 
       def resource_item_responses(recordable_type, relationship_examples: {})
@@ -868,10 +940,42 @@ module RecordingStudioApi
                 type: "object",
                 properties: {
                   grant_type: { type: "string", enum: ["client_credentials"] },
-                  client_id: { type: "string" },
-                  client_secret: { type: "string" }
+                  client_id: {
+                    type: "string",
+                    description: "OAuth client id. Optional when supplied via HTTP Basic username."
+                  },
+                  client_secret: {
+                    type: "string",
+                    description: "OAuth client secret. Optional when supplied via HTTP Basic password."
+                  }
                 },
-                required: %w[grant_type client_id client_secret]
+                required: %w[grant_type]
+              }
+            }
+          }
+        }
+      end
+
+      def oauth_revoke_request_body
+        {
+          required: true,
+          content: {
+            "application/x-www-form-urlencoded" => {
+              schema: {
+                type: "object",
+                properties: {
+                  token: { type: "string", description: "Access token to revoke." },
+                  token_type_hint: { type: "string", enum: ["access_token"] },
+                  client_id: {
+                    type: "string",
+                    description: "OAuth client id. Optional when supplied via HTTP Basic username."
+                  },
+                  client_secret: {
+                    type: "string",
+                    description: "OAuth client secret. Optional when supplied via HTTP Basic password."
+                  }
+                },
+                required: %w[token]
               }
             }
           }
@@ -888,11 +992,73 @@ module RecordingStudioApi
               }
             }
           },
-          "401" => {
-            "$ref" => "#/components/responses/Unauthorized"
+          "400" => {
+            description: "Invalid OAuth token request.",
+            content: {
+              "application/json" => {
+                schema: { "$ref" => "#/components/schemas/OAuthError" }
+              }
+            }
           },
-          "422" => {
-            "$ref" => "#/components/responses/UnprocessableEntity"
+          "401" => {
+            description: "Client authentication failed.",
+            headers: {
+              "WWW-Authenticate" => {
+                schema: { type: "string" },
+                description: 'Basic realm="RecordingStudioApi"'
+              }
+            },
+            content: {
+              "application/json" => {
+                schema: { "$ref" => "#/components/schemas/OAuthError" }
+              }
+            }
+          },
+          "429" => {
+            description: "OAuth rate limit exceeded.",
+            content: {
+              "application/json" => {
+                schema: { "$ref" => "#/components/schemas/OAuthError" }
+              }
+            }
+          }
+        }
+      end
+
+      def oauth_revoke_responses
+        {
+          "200" => {
+            description: "Token revoked, or the token was unknown to this client."
+          },
+          "400" => {
+            description: "Invalid OAuth revoke request.",
+            content: {
+              "application/json" => {
+                schema: { "$ref" => "#/components/schemas/OAuthError" }
+              }
+            }
+          },
+          "401" => {
+            description: "Client authentication failed.",
+            headers: {
+              "WWW-Authenticate" => {
+                schema: { type: "string" },
+                description: 'Basic realm="RecordingStudioApi"'
+              }
+            },
+            content: {
+              "application/json" => {
+                schema: { "$ref" => "#/components/schemas/OAuthError" }
+              }
+            }
+          },
+          "429" => {
+            description: "OAuth rate limit exceeded.",
+            content: {
+              "application/json" => {
+                schema: { "$ref" => "#/components/schemas/OAuthError" }
+              }
+            }
           }
         }
       end

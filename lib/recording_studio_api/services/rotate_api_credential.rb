@@ -23,21 +23,22 @@ module RecordingStudioApi
         payload = nil
 
         ApiCredential.transaction do
-          previous_credential = latest_credential
+          locked_client = ApiClient.lock.find(api_client.id)
+          previous_credential = locked_client.credentials.lock.order(created_at: :desc, id: :desc).first
           raise RecordingStudioApi::Error, "API credential is missing" if previous_credential.nil?
 
           previous_credential.revoke! if previous_credential.revoked_at.nil?
 
           credential = ApiCredential.create!(
-            api_client: api_client,
-            access_recording: api_client.access_recording,
+            api_client: locked_client,
+            access_recording: locked_client.access_recording,
             token_public_id: token.fetch(:public_id),
             token_digest: token.fetch(:digest),
             token_prefix: token.fetch(:prefix),
             expires_at: resolved_expiry(previous_credential)
           )
 
-          api_client_recording = api_client.recording
+          api_client_recording = locked_client.recording
           raise RecordingStudioApi::Error, "API client recording is missing" if api_client_recording.nil?
 
           RecordingStudio.record!(
@@ -45,11 +46,11 @@ module RecordingStudioApi
             recordable: credential,
             root_recording: api_client_recording.root_recording,
             parent_recording: api_client_recording,
-            actor: api_client
+            actor: locked_client
           )
 
           payload = {
-            api_client: api_client,
+            api_client: locked_client,
             credential: credential,
             previous_credential: previous_credential,
             token: token.fetch(:token)
@@ -57,12 +58,10 @@ module RecordingStudioApi
         end
 
         success(payload)
+      rescue ActiveRecord::RecordNotUnique
+        failure("API credential rotation conflict; retry the request")
       rescue ActiveRecord::ActiveRecordError, RecordingStudioApi::Error => e
         failure(e)
-      end
-
-      def latest_credential
-        @latest_credential ||= api_client.credentials.max_by { |credential| [credential.created_at.to_i, credential.id.to_i] }
       end
 
       def resolved_expiry(previous_credential)

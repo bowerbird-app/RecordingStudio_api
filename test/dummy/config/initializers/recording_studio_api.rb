@@ -13,6 +13,9 @@ RecordingStudioApi.configure do |config|
   config.rate_limit_api_enabled = true
   config.rate_limit_redis_url = ENV.fetch("RECORDING_STUDIO_API_RATE_LIMIT_REDIS_URL", "redis://127.0.0.1:6379/0")
   config.api_request_logging_enabled = true
+  # Dummy seeds provision public API clients via access-point grants without AdminApi ACL.
+  # Host apps should keep the gem default (true) unless they intentionally want open public management.
+  config.api_management_authorization_required = false
 
   config.api :operations do |api|
     api.openapi_title = "Recording Studio Operations API"

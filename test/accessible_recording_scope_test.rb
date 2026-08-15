@@ -75,6 +75,24 @@ class AccessibleRecordingScopeTest < ActiveSupport::TestCase
     assert_includes ids, page_recording.id
   end
 
+  test "memoizes recording ids for repeated authorization checks" do
+    root_recording, access_recording = create_access_recording_for(user: @user, role: :edit)
+    page_recording = create_page_recording(root_recording: root_recording)
+    grant = RecordingStudioApi::AccessGrant.new(
+      api_client: nil,
+      credential: nil,
+      access_recording: access_recording,
+      root_recording: root_recording
+    )
+
+    first_ids = grant.accessible_recording_ids
+    second_ids = grant.accessible_recording_ids
+
+    assert_same first_ids, second_ids
+    assert_includes first_ids, page_recording.id
+    assert grant.accessible_recordings.exists?(id: page_recording.id)
+  end
+
   test "returns empty relation when scope is nil" do
     root_recording, access_recording = create_access_recording_for(user: @user, role: :admin)
 
@@ -96,5 +114,21 @@ class AccessibleRecordingScopeTest < ActiveSupport::TestCase
     ).relation
 
     assert_empty relation.to_a
+  end
+
+  test "include? checks membership without materializing the full id list" do
+    root_recording, access_recording = create_access_recording_for(user: @user, role: :edit)
+    page_recording = create_page_recording(root_recording: root_recording)
+    other_root, = create_access_recording_for(user: @user, role: :edit, workspace_name: "Other Workspace")
+    other_page = create_page_recording(root_recording: other_root)
+
+    scope = RecordingStudioApi::AccessibleRecordingScope.new(
+      scope_recording: root_recording,
+      access_recording: access_recording
+    )
+
+    assert scope.include?(page_recording.id)
+    refute scope.include?(other_page.id)
+    refute scope.include?(nil)
   end
 end

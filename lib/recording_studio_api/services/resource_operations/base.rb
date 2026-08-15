@@ -95,23 +95,23 @@ module RecordingStudioApi
 
         def resource_attributes
           payload = request_payload
-          attributes = payload["attributes"]
-          attributes = payload[:attributes] if attributes.nil?
-
-          if attributes.present? && flat_writable_attribute_keys(payload).any?
-            raise RecordingStudioApi::InvalidActionInputError,
-                  "Use either flat writable fields or attributes, not both"
+          if payload.key?("attributes") || payload.key?(:attributes)
+            raise RecordingStudioApi::InvalidActionInputError.new(
+              "The attributes envelope is no longer supported; send writable fields at the request body root",
+              details: [
+                {
+                  attribute: :attributes,
+                  message: "is not supported",
+                  full_message: "Attributes is not supported",
+                  type: :unsupported
+                }
+              ]
+            )
           end
 
-          attributes = payload if attributes.nil?
-
-          normalized = attributes.respond_to?(:to_h) ? attributes.to_h : {}
+          normalized = payload.respond_to?(:to_h) ? payload.to_h : {}
           symbolized = normalized.respond_to?(:deep_symbolize_keys) ? normalized.deep_symbolize_keys : {}
           symbolized.slice(*allowed_attribute_keys)
-        end
-
-        def flat_writable_attribute_keys(payload)
-          payload.keys.map(&:to_s) & allowed_attribute_keys.map(&:to_s)
         end
 
         def request_payload

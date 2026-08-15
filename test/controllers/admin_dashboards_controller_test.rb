@@ -381,8 +381,9 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, 'data-recording-studio-default-layout="true"'
     assert_includes response.body, "Public API settings"
-    assert_includes response.body, "Manage public API access and review its runtime configuration."
-    assert_includes response.body, "Runtime configuration"
+    assert_includes response.body, "Manage public API access and runtime operational overrides."
+    assert_includes response.body, "Runtime overrides"
+    assert_includes response.body, "Effective configuration"
     assert_includes response.body, "Configured APIs"
     assert_includes response.body, "Public API versions"
     assert_includes response.body, "Operations API versions"
@@ -414,12 +415,51 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
     assert_equal false, RecordingStudioApi::ApiSetting.find_by!(key: "api").api_access_enabled
   end
 
+  test "allows an API administrator to set runtime policy overrides" do
+    patch recording_studio_api.admin_api_runtime_policy_settings_path, params: {
+      runtime_policy: {
+        api_request_logging_enabled: "true",
+        credential_ttl_seconds: "7200",
+        access_token_ttl_seconds: "900",
+        api_request_log_retention_days: "14",
+        api_daily_metric_retention_days: "90"
+      }
+    }
+
+    assert_redirected_to admin_api_settings_path(close_url: admin_api_path)
+    setting = RecordingStudioApi::ApiSetting.find_by!(key: "api")
+    assert_equal true, setting.runtime_overrides_hash.fetch("api_request_logging_enabled")
+    assert_equal 7200, setting.runtime_overrides_hash.fetch("credential_ttl_seconds")
+    assert_equal 14, setting.runtime_overrides_hash.fetch("api_request_log_retention_days")
+
+    policy = RecordingStudioApi::ApiRuntimePolicy.for(:public)
+    assert policy.api_request_logging_enabled
+    assert_equal 7200, policy.credential_ttl.to_i
+    assert_equal 14, policy.api_request_log_retention_days
+  end
+
+  test "allows an API administrator to set rate limit overrides" do
+    patch recording_studio_api.admin_api_rate_limiting_settings_path, params: {
+      rate_limit: {
+        rate_limit_api_enabled: "true",
+        rate_limit_api_read_requests: "50",
+        rate_limit_api_read_period_seconds: "30"
+      }
+    }
+
+    assert_redirected_to admin_api_rate_limiting_path(close_url: admin_api_path)
+    policy = RecordingStudioApi::ApiRuntimePolicy.for(:public)
+    assert policy.rate_limit_api_enabled
+    assert_equal 50, policy.rate_limit_api_read_requests
+    assert_equal 30, policy.rate_limit_api_read_period_seconds
+  end
+
   test "renders the admin api rate limiting page from the configured host route" do
     get admin_api_rate_limiting_path
 
     assert_response :success
     assert_includes response.body, "Rate limiting"
-    assert_includes response.body, "Read-only view of the current rate-limiting configuration."
+    assert_includes response.body, "Override rate-limit enables and thresholds at runtime"
     assert_includes response.body, "Rate limit OAuth enabled"
     assert_includes response.body, "Rate limit API pre-auth enabled"
     assert_includes response.body, "Rate limit API enabled"

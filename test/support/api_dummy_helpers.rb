@@ -5,7 +5,7 @@ require_relative "../test_helper"
 require_relative "../dummy/config/environment"
 require "rails/test_help"
 
-module ApiDummyHelpers
+module ApiDummyHelpers # rubocop:disable Metrics/ModuleLength
   TEST_PASSWORD = "ApiAuthPassword!2026"
 
   def with_access_creation_context(&)
@@ -17,7 +17,17 @@ module ApiDummyHelpers
   end
 
   def reset_recording_studio_api_configuration!
-    RecordingStudioApi.instance_variable_set(:@configuration, RecordingStudioApi::Configuration.new)
+    configuration = RecordingStudioApi::Configuration.new
+    # Deterministic tests: disable unauthenticated rate limits and open public management auth.
+    configuration.rate_limit_oauth_enabled = false
+    configuration.rate_limit_api_pre_auth_enabled = false
+    configuration.rate_limit_api_enabled = false
+    configuration.rate_limit_fail_closed = false
+    configuration.api_management_authorization_required = false
+    RecordingStudioApi.instance_variable_set(:@configuration, configuration)
+    RecordingStudioApi::Concerns::RateLimiting.reset_redis_client!
+    RecordingStudioApi::Admin::Queries::AdminApiCredentialsQuery.clear_cache!
+    RecordingStudioApi::ApiRequestLogBatch.clear!
     RecordingStudioApi.register_default_capability_actions!
     RecordingStudioApi.register_default_resource_actions!
     register_dummy_capability_actions!

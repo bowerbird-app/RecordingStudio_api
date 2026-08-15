@@ -4,7 +4,8 @@
 
 `RecordingStudioApi` is a mountable Rails engine that provides authenticated, capability-backed JSON APIs for Recording Studio addons.
 
-For the breaking flat API contract introduced in `0.3.0`, see [UPGRADING.md](UPGRADING.md).
+For breaking changes in `0.4.0` (safer defaults and hardening) and the flat API contract from
+`0.3.0`, see [UPGRADING.md](UPGRADING.md).
 
 ## Current Scope
 
@@ -191,8 +192,11 @@ Public routes remain `/recording_studio_api/api/<version>`. Named APIs use
 `/recording_studio_api/apis/<api-name>/oauth/token`.
 
 API clients are bound to exactly one API. Provision and authenticate named clients with `api:`;
-a public token is rejected on every named API and vice versa. The existing site-wide API switch
-remains a global kill switch, while `ApiSetting.for_api` supports additional per-API switches.
+a public token is rejected on every named API and vice versa. The existing site-wide API switch remains a global kill switch, while `ApiSetting.for_api`
+supports additional per-API switches. Admins can also set runtime overrides for request logging,
+credential/access-token TTLs, retention, and rate-limit enables/thresholds from the Admin API
+settings and rate-limiting pages. Blank override fields fall back to initializer defaults; Redis
+URL/namespace and digest peppers stay deploy-time only.
 
 Named APIs inherit credential and token TTLs, rate-limit windows, and request-payload logging policy
 from the public configuration when declared. Each definition can then override those values without
@@ -223,6 +227,36 @@ definitions and remain independently authorized, configured, and filtered. Keepi
 of `--user-apis` makes it available only from the site administration root. Every recordable used as
 an API credential access point must enable Recording Studio's `api_access_point` capability; the gem
 then intersects that capability with the selected API's registered recordables.
+
+### Request logging and metrics retention
+
+When `api_request_logging_enabled` is on, each API request can write a row to the API logging
+database. Admin charts prefer rolled-up daily metrics, so hosts should run maintenance nightly:
+
+1. Aggregate the last few complete days into `api_daily_metrics` (and latency histogram buckets).
+2. Delete raw `api_request_logs` older than `api_request_log_retention_days` (default 30).
+3. Optionally delete daily metrics older than `api_daily_metric_retention_days` (default `nil` =
+   keep forever).
+
+```sh
+# Synchronous maintain (cron / Kamal / systemd timer)
+bin/rails recording_studio_api:api_metrics:maintain
+
+# Or enqueue for an ActiveJob backend (Solid Queue, Sidekiq, etc.)
+bin/rails recording_studio_api:api_metrics:enqueue_maintain
+```
+
+Solid Queue recurring example:
+
+```ruby
+# config/recurring.yml
+maintain_api_metrics:
+  class: RecordingStudioApi::MaintainApiMetricsJob
+  queue: recording_studio_api_metrics
+  schedule: every day at 2am
+```
+
+Without a schedule, retention config is inert and raw request logs keep growing.
 
 ### Core registries
 
@@ -372,9 +406,8 @@ relationships.
 Write bodies use the same flat field layout. Send registered writable fields at the request body
 root, with `parent_id` only for top-level creates that select a parent Recording Studio record.
 Nested creates take their parent from the URL, and updates do not accept `parent_id`; use the
-registered move action to change a record's parent. During migration, legacy
-`{ attributes: { ... } }` bodies remain accepted, but a request cannot combine that envelope with
-flat writable fields.
+registered move action to change a record's parent. The legacy `{ attributes: { ... } }` envelope
+is rejected.
 
 The engine fetches requested `children` relationships in one scoped query per response,
 preventing serializer-driven N+1 queries. A custom resolver is application code and may issue

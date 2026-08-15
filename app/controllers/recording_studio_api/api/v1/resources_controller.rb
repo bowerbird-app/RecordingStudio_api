@@ -160,7 +160,8 @@ module RecordingStudioApi
             params: params,
             request_params: request.request_parameters,
             scoped_recordings: scoped_recordings,
-            parent_recording: nil
+            parent_recording: nil,
+            idempotency_key: request.headers["Idempotency-Key"].presence
           )
         end
 

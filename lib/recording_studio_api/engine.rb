@@ -145,6 +145,17 @@ module RecordingStudioApi
       RecordingStudioApi::Hooks.run(:after_initialize, self)
     end
 
+    initializer "recording_studio_api.flush_request_log_batches" do
+      next unless defined?(ActiveSupport::Executor)
+
+      ActiveSupport::Executor.to_complete do
+        RecordingStudioApi::ApiRequestLogBatch.flush!
+        RecordingStudioApi::Admin::Queries::AdminApiCredentialsQuery.clear_cache!
+      rescue StandardError => e
+        Rails.logger.warn("[RecordingStudioApi] request completion cleanup failed: #{e.class}: #{e.message}")
+      end
+    end
+
     # Apply model extensions when models are loaded
     initializer "recording_studio_api.apply_model_extensions" do
       config.to_prepare do
