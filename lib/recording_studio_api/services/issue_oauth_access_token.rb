@@ -4,6 +4,11 @@ module RecordingStudioApi
   module Services
     class IssueOauthAccessToken < BaseService
       SUPPORTED_GRANT_TYPE = "client_credentials"
+      # Fixed digest used when no credential exists so authentication always
+      # performs a constant-time compare of equal-length SHA256 hex digests.
+      DUMMY_CLIENT_SECRET_DIGEST = Token.digest(
+        "recording-studio-api.oauth.dummy-client-secret"
+      ).freeze
 
       def initialize(grant_type:, client_id:, client_secret:, api: :public)
         @grant_type = grant_type
@@ -17,6 +22,7 @@ module RecordingStudioApi
       attr_reader :grant_type, :client_id, :client_secret, :api_key
 
       def perform
+        return oauth_failure("invalid_request", "grant_type is required") if grant_type.blank?
         return oauth_failure("unsupported_grant_type", "grant_type must be client_credentials") unless grant_type == SUPPORTED_GRANT_TYPE
         return oauth_failure("invalid_request", "client_id is required") if client_id.blank?
         return oauth_failure("invalid_request", "client_secret is required") if client_secret.blank?
@@ -24,11 +30,7 @@ module RecordingStudioApi
         credential = ApiCredential.joins(:api_client)
                                   .merge(ApiClient.where(api_key: api_key))
                                   .find_by(token_public_id: client_id)
-        return oauth_failure("invalid_client", "client authentication failed") if credential.nil?
-        return oauth_failure("invalid_client", "client authentication failed") unless credential.active_for_authentication?
-
-        provided_digest = Token.digest(client_secret)
-        return oauth_failure("invalid_client", "client authentication failed") unless secure_compare(credential.token_digest, provided_digest)
+        return oauth_failure("invalid_client", "client authentication failed") unless authenticate_client?(credential)
 
         token_data = OauthAccessToken.generate
         expires_at = resolved_expiry
@@ -69,6 +71,14 @@ module RecordingStudioApi
 
       def oauth_failure(code, description)
         failure({ error: code, error_description: description })
+      end
+
+      def authenticate_client?(credential)
+        provided_digest = Token.digest(client_secret)
+        expected_digest = credential&.token_digest.presence || DUMMY_CLIENT_SECRET_DIGEST
+        secret_matches = secure_compare(expected_digest, provided_digest)
+
+        credential.present? && credential.active_for_authentication? && secret_matches
       end
 
       def secure_compare(left, right)

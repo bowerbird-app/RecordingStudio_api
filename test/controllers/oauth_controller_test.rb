@@ -195,6 +195,34 @@ class OauthControllerTest < ActionDispatch::IntegrationTest
     assert_match(/\Arsapi_at_/, body.fetch("access_token"))
   end
 
+  test "ignores client credentials supplied only in the query string" do
+    query = {
+      grant_type: "client_credentials",
+      client_id: @payload.fetch(:credential).oauth_client_id,
+      client_secret: @payload.fetch(:token)
+    }.to_query
+
+    post "/recording_studio_api/oauth/token?#{query}"
+
+    assert_response :bad_request
+    body = JSON.parse(response.body)
+    assert_equal "invalid_request", body.fetch("error")
+    assert_equal "grant_type is required", body.fetch("error_description")
+  end
+
+  test "does not accept client_secret from the query string when body omits it" do
+    post "/recording_studio_api/oauth/token?client_secret=#{CGI.escape(@payload.fetch(:token))}",
+         params: {
+           grant_type: "client_credentials",
+           client_id: @payload.fetch(:credential).oauth_client_id
+         }
+
+    assert_response :bad_request
+    body = JSON.parse(response.body)
+    assert_equal "invalid_request", body.fetch("error")
+    assert_equal "client_secret is required", body.fetch("error_description")
+  end
+
   test "returns oauth error for invalid client credentials" do
     post "/recording_studio_api/oauth/token", params: {
       grant_type: "client_credentials",
@@ -203,12 +231,27 @@ class OauthControllerTest < ActionDispatch::IntegrationTest
     }
 
     assert_response :unauthorized
+    assert_equal 'Basic realm="RecordingStudioApi"', response.headers["WWW-Authenticate"]
     assert_includes response.headers["Cache-Control"], "no-store"
     assert_includes response.headers["Cache-Control"], "private"
     assert_equal "no-cache", response.headers["Pragma"]
     assert_equal "0", response.headers["Expires"]
     body = JSON.parse(response.body)
     assert_equal "invalid_client", body.fetch("error")
+  end
+
+  test "returns WWW-Authenticate for unknown client_id" do
+    post "/recording_studio_api/oauth/token", params: {
+      grant_type: "client_credentials",
+      client_id: "missing-client-id",
+      client_secret: "not-a-real-secret"
+    }
+
+    assert_response :unauthorized
+    assert_equal 'Basic realm="RecordingStudioApi"', response.headers["WWW-Authenticate"]
+    body = JSON.parse(response.body)
+    assert_equal "invalid_client", body.fetch("error")
+    assert_equal "client authentication failed", body.fetch("error_description")
   end
 
   test "falls back to client credentials flow for unsupported grant type" do
@@ -219,6 +262,7 @@ class OauthControllerTest < ActionDispatch::IntegrationTest
     }
 
     assert_response :bad_request
+    assert_nil response.headers["WWW-Authenticate"]
     body = JSON.parse(response.body)
     assert_equal "unsupported_grant_type", body.fetch("error")
   end
