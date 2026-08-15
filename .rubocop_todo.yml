@@ -68,7 +68,9 @@ Layout/IndentationConsistency:
 # SupportedStyles: aligned, indented, indented_relative_to_receiver
 Layout/MultilineMethodCallIndentation:
   Exclude:
-    - 'app/controllers/recording_studio_api/access_requests_controller.rb'
+    - 'app/controllers/recording_studio_api/access_requests/detail_loading.rb'
+    - 'app/controllers/recording_studio_api/access_requests/form_state.rb'
+    - 'app/controllers/recording_studio_api/access_requests/list_loading.rb'
     - 'app/controllers/recording_studio_api/api/v1/resources_controller.rb'
     - 'app/controllers/recording_studio_api/api_access_tokens_controller.rb'
     - 'lib/recording_studio_api/services/documentation_catalog.rb'
@@ -151,6 +153,7 @@ Metrics/MethodLength:
 Metrics/ModuleLength:
   Max: 180
   Exclude:
+    - 'app/controllers/recording_studio_api/access_requests/list_loading.rb'
     - 'app/controllers/recording_studio_api/concerns/rate_limiting.rb'
 
 # Offense count: 5
@@ -249,7 +252,8 @@ Style/IfInsideElse:
 # This cop supports safe autocorrection (--autocorrect).
 Style/IfUnlessModifier:
   Exclude:
-    - 'app/controllers/recording_studio_api/access_requests_controller.rb'
+    - 'app/controllers/recording_studio_api/access_requests/list_loading.rb'
+    - 'app/controllers/recording_studio_api/access_requests/policy_helpers.rb'
     - 'app/controllers/recording_studio_api/concerns/rate_limiting.rb'
     - 'lib/recording_studio_api.rb'
     - 'lib/recording_studio_api/action_input_contract.rb'
@@ -339,7 +343,7 @@ Style/SelectByRegexp:
 # Configuration parameters: AllowModifier.
 Style/SoleNestedConditional:
   Exclude:
-    - 'app/controllers/recording_studio_api/access_requests_controller.rb'
+    - 'app/controllers/recording_studio_api/access_requests/list_loading.rb'
 
 # Offense count: 1
 # This cop supports safe autocorrection (--autocorrect).
@@ -355,7 +359,7 @@ Style/StringLiterals:
 # SupportedStyles: single_quotes, double_quotes
 Style/StringLiteralsInInterpolation:
   Exclude:
-    - 'app/controllers/recording_studio_api/access_requests_controller.rb'
+    - 'app/controllers/recording_studio_api/access_requests/policy_helpers.rb'
     - 'app/controllers/recording_studio_api/api_access_tokens_controller.rb'
     - 'test/controllers/access_requests_controller_test.rb'
 
@@ -373,7 +377,8 @@ Style/SymbolArray:
 # AllowedMethods: define_method
 Style/SymbolProc:
   Exclude:
-    - 'app/controllers/recording_studio_api/access_requests_controller.rb'
+    - 'app/controllers/recording_studio_api/access_requests/form_state.rb'
+    - 'app/controllers/recording_studio_api/access_requests/list_loading.rb'
     - 'lib/recording_studio_api/access_management_policy.rb'
     - 'lib/recording_studio_api/services/provision_api_client.rb'
     - 'test/controllers/api/v1/member_actions_controller_test.rb'
