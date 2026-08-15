@@ -11,7 +11,7 @@
 
   <%= render FlatPack::PageTitle::Component.new(
     title: "#{@api_label} API settings",
-    subtitle: "Manage #{@api_label.downcase} API access and review its runtime configuration.",
+    subtitle: "Manage #{@api_label.downcase} API access and runtime operational overrides.",
     variant: :h1
   ) %>
 
@@ -26,12 +26,78 @@
       label: "Enable #{@api_label} API access",
       help_text: @current_admin_api.name == "public" ? "Global emergency switch for all API access" : "Turn this API surface on and off"
     ) %>
-    <%= render FlatPack::Button::Component.new(text: "Save", style: :primary, size: :md, type: :submit) %>
+    <%= render FlatPack::Button::Component.new(text: "Save access", style: :primary, size: :md, type: :submit) %>
   <% end %>
 
   <%= render FlatPack::SectionTitle::Component.new(
-    title: "Runtime configuration",
-    subtitle: "Configuration set in recording_studio_api.rb and loaded at runtime"
+    title: "Runtime overrides",
+    subtitle: "Blank fields keep the initializer default. Overrides apply immediately without redeploy."
+  ) %>
+
+  <%= form_with url: recording_studio_api.admin_api_runtime_policy_settings_path(
+    **RecordingStudioApi::Admin::ApiContext.query_params(@current_admin_api.name),
+    **page_nav_close_param
+  ), method: :patch, class: "flex flex-col gap-4" do %>
+    <%= render FlatPack::Select::Component.new(
+      name: "runtime_policy[api_request_logging_enabled]",
+      options: [
+        ["Use config default (#{@policy.definition.api_request_logging_enabled ? 'enabled' : 'disabled'})", ""],
+        ["Enabled", "true"],
+        ["Disabled", "false"]
+      ],
+      value: @overrides.key?("api_request_logging_enabled") ? @overrides.fetch("api_request_logging_enabled").to_s : "",
+      label: "API request logging",
+      help_text: "Effective: #{@policy.api_request_logging_enabled ? 'enabled' : 'disabled'}",
+      class: "w-full max-w-xl"
+    ) %>
+
+    <%= render FlatPack::TextInput::Component.new(
+      name: "runtime_policy[credential_ttl_seconds]",
+      value: @overrides["credential_ttl_seconds"],
+      label: "Credential TTL (seconds)",
+      help_text: "Effective: #{@policy.credential_ttl.to_i} seconds. Leave blank for config default.",
+      class: "w-full max-w-xl"
+    ) %>
+
+    <%= render FlatPack::TextInput::Component.new(
+      name: "runtime_policy[access_token_ttl_seconds]",
+      value: @overrides["access_token_ttl_seconds"],
+      label: "Access token TTL (seconds)",
+      help_text: "Effective: #{@policy.access_token_ttl.to_i} seconds. Leave blank for config default.",
+      class: "w-full max-w-xl"
+    ) %>
+
+    <% if @current_admin_api.name == "public" %>
+      <%= render FlatPack::TextInput::Component.new(
+        name: "runtime_policy[api_request_log_retention_days]",
+        value: @global_overrides["api_request_log_retention_days"],
+        label: "API request log retention (days)",
+        help_text: "Effective: #{@policy.api_request_log_retention_days.nil? ? 'indefinite' : "#{@policy.api_request_log_retention_days} days"}. Shared across APIs.",
+        class: "w-full max-w-xl"
+      ) %>
+
+      <%= render FlatPack::Select::Component.new(
+        name: "runtime_policy[api_daily_metric_retention_days]",
+        options: [
+          ["Use config default", ""],
+          ["Indefinite", "indefinite"],
+          ["30 days", "30"],
+          ["90 days", "90"],
+          ["365 days", "365"]
+        ],
+        value: @global_overrides.fetch("api_daily_metric_retention_days", "").to_s,
+        label: "API daily metric retention",
+        help_text: "Effective: #{@policy.api_daily_metric_retention_days.nil? ? 'indefinite' : "#{@policy.api_daily_metric_retention_days} days"}",
+        class: "w-full max-w-xl"
+      ) %>
+    <% end %>
+
+    <%= render FlatPack::Button::Component.new(text: "Save overrides", style: :primary, size: :md, type: :submit) %>
+  <% end %>
+
+  <%= render FlatPack::SectionTitle::Component.new(
+    title: "Effective configuration",
+    subtitle: "Initializer defaults plus any runtime overrides currently in effect"
   ) %>
 
   <%= render FlatPack::Table::Component.new(data: @settings_rows) do |table| %>

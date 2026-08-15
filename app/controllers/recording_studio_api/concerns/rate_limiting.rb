@@ -278,9 +278,9 @@ module RecordingStudioApi
       end
 
       def rate_limit_api
-        return current_api if respond_to?(:current_api, true)
+        return current_runtime_policy if respond_to?(:current_runtime_policy, true)
 
-        RecordingStudioApi.configuration
+        RecordingStudioApi::ApiRuntimePolicy.for(:public)
       end
 
       def rate_limit_scoped_namespace

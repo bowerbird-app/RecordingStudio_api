@@ -8,8 +8,104 @@
 
   <%= render FlatPack::PageTitle::Component.new(
     title: "#{@api_label} API rate limiting",
-    subtitle: "Read-only view of the current rate-limiting configuration.",
+    subtitle: "Override rate-limit enables and thresholds at runtime. Blank fields keep the initializer default.",
     variant: :h1
+  ) %>
+
+  <%= form_with url: recording_studio_api.admin_api_rate_limiting_settings_path(
+    **RecordingStudioApi::Admin::ApiContext.query_params(@current_admin_api.name),
+    **page_nav_close_param
+  ), method: :patch, class: "flex flex-col gap-4" do %>
+    <%= render FlatPack::Select::Component.new(
+      name: "rate_limit[rate_limit_oauth_enabled]",
+      options: [
+        ["Use config default (#{@policy.definition.rate_limit_oauth_enabled ? 'enabled' : 'disabled'})", ""],
+        ["Enabled", "true"],
+        ["Disabled", "false"]
+      ],
+      value: @overrides.key?("rate_limit_oauth_enabled") ? @overrides.fetch("rate_limit_oauth_enabled").to_s : "",
+      label: "OAuth rate limiting",
+      class: "w-full max-w-xl"
+    ) %>
+    <%= render FlatPack::TextInput::Component.new(
+      name: "rate_limit[rate_limit_oauth_requests]",
+      value: @overrides["rate_limit_oauth_requests"],
+      label: "OAuth requests per window",
+      class: "w-full max-w-xl"
+    ) %>
+    <%= render FlatPack::TextInput::Component.new(
+      name: "rate_limit[rate_limit_oauth_period_seconds]",
+      value: @overrides["rate_limit_oauth_period_seconds"],
+      label: "OAuth window (seconds)",
+      class: "w-full max-w-xl"
+    ) %>
+
+    <%= render FlatPack::Select::Component.new(
+      name: "rate_limit[rate_limit_api_pre_auth_enabled]",
+      options: [
+        ["Use config default (#{@policy.definition.rate_limit_api_pre_auth_enabled ? 'enabled' : 'disabled'})", ""],
+        ["Enabled", "true"],
+        ["Disabled", "false"]
+      ],
+      value: @overrides.key?("rate_limit_api_pre_auth_enabled") ? @overrides.fetch("rate_limit_api_pre_auth_enabled").to_s : "",
+      label: "API pre-auth rate limiting",
+      class: "w-full max-w-xl"
+    ) %>
+    <%= render FlatPack::TextInput::Component.new(
+      name: "rate_limit[rate_limit_api_pre_auth_requests]",
+      value: @overrides["rate_limit_api_pre_auth_requests"],
+      label: "API pre-auth requests per window",
+      class: "w-full max-w-xl"
+    ) %>
+    <%= render FlatPack::TextInput::Component.new(
+      name: "rate_limit[rate_limit_api_pre_auth_period_seconds]",
+      value: @overrides["rate_limit_api_pre_auth_period_seconds"],
+      label: "API pre-auth window (seconds)",
+      class: "w-full max-w-xl"
+    ) %>
+
+    <%= render FlatPack::Select::Component.new(
+      name: "rate_limit[rate_limit_api_enabled]",
+      options: [
+        ["Use config default (#{@policy.definition.rate_limit_api_enabled ? 'enabled' : 'disabled'})", ""],
+        ["Enabled", "true"],
+        ["Disabled", "false"]
+      ],
+      value: @overrides.key?("rate_limit_api_enabled") ? @overrides.fetch("rate_limit_api_enabled").to_s : "",
+      label: "Authenticated API rate limiting",
+      class: "w-full max-w-xl"
+    ) %>
+    <%= render FlatPack::TextInput::Component.new(
+      name: "rate_limit[rate_limit_api_read_requests]",
+      value: @overrides["rate_limit_api_read_requests"],
+      label: "API read requests per window",
+      class: "w-full max-w-xl"
+    ) %>
+    <%= render FlatPack::TextInput::Component.new(
+      name: "rate_limit[rate_limit_api_read_period_seconds]",
+      value: @overrides["rate_limit_api_read_period_seconds"],
+      label: "API read window (seconds)",
+      class: "w-full max-w-xl"
+    ) %>
+    <%= render FlatPack::TextInput::Component.new(
+      name: "rate_limit[rate_limit_api_write_requests]",
+      value: @overrides["rate_limit_api_write_requests"],
+      label: "API write requests per window",
+      class: "w-full max-w-xl"
+    ) %>
+    <%= render FlatPack::TextInput::Component.new(
+      name: "rate_limit[rate_limit_api_write_period_seconds]",
+      value: @overrides["rate_limit_api_write_period_seconds"],
+      label: "API write window (seconds)",
+      class: "w-full max-w-xl"
+    ) %>
+
+    <%= render FlatPack::Button::Component.new(text: "Save rate limits", style: :primary, size: :md, type: :submit) %>
+  <% end %>
+
+  <%= render FlatPack::SectionTitle::Component.new(
+    title: "Effective configuration",
+    subtitle: "Redis connectivity remains deploy-time only"
   ) %>
 
   <%= render FlatPack::Table::Component.new(data: @rate_limit_rows) do |table| %>

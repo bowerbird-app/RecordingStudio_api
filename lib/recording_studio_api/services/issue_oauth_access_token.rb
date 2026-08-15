@@ -89,7 +89,7 @@ module RecordingStudioApi
       end
 
       def resolved_expiry
-        ttl = RecordingStudioApi.configuration.fetch_api(api_key).access_token_ttl
+        ttl = RecordingStudioApi::ApiRuntimePolicy.for(api_key).access_token_ttl
         Time.current + (ttl.presence || 1.hour)
       end
 

@@ -17,6 +17,10 @@ module RecordingStudioApi
         raise RecordingStudioApi::NotFoundError, "Unknown API"
       end
 
+      def current_runtime_policy
+        @current_runtime_policy ||= RecordingStudioApi::ApiRuntimePolicy.for(current_api_key)
+      end
+
       def current_api_version
         @current_api_version ||= begin
           requested_version = request.path_parameters[:api_version].presence

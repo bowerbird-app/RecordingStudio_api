@@ -16,7 +16,7 @@ module RecordingStudioApi
         private
 
         def default_before
-          retention_days = RecordingStudioApi.configuration.api_daily_metric_retention_days
+          retention_days = RecordingStudioApi::ApiRuntimePolicy.for(:public).api_daily_metric_retention_days
           return if retention_days.nil?
 
           Date.current - retention_days.to_i.days

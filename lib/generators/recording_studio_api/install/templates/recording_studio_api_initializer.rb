@@ -64,7 +64,8 @@ RecordingStudioApi.configure do |config|
   # config.api_request_logging_delivery = "sync"
   # config.api_request_logging_batch_size = 25
   # Raw request details are retained for 30 days; daily aggregates are retained
-  # indefinitely unless api_daily_metric_retention_days is set.
+  # indefinitely unless api_daily_metric_retention_days is set. Admins can override
+  # logging, TTLs, retention, and rate limits at runtime from Admin API settings.
   # config.api_request_log_retention_days = 30
   # config.api_daily_metric_retention_days = nil
   #

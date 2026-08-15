@@ -19,7 +19,9 @@ RecordingStudioApi::Engine.routes.draw do
   get "/admin_api", to: "admin_dashboards#show", as: :admin_dashboard
   get "/admin_api/settings", to: "admin_settings#show", as: :admin_settings
   patch "/admin_api/settings/api_access", to: "admin_settings#update_api_access", as: :admin_api_access_settings
+  patch "/admin_api/settings/runtime_policy", to: "admin_settings#update_runtime_policy", as: :admin_api_runtime_policy_settings
   get "/admin_api/rate_limiting", to: "admin_rate_limitings#show", as: :admin_rate_limiting
+  patch "/admin_api/rate_limiting", to: "admin_rate_limitings#update", as: :admin_api_rate_limiting_settings
   get "/admin_api/requests", to: "admin_requests#index", as: :admin_requests
   get "/admin_api/errors", to: "admin_errors#index", as: :admin_errors
   get "/admin_api/logs", to: "admin_logs#index", as: :admin_logs

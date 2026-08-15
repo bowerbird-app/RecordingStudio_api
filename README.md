@@ -191,8 +191,11 @@ Public routes remain `/recording_studio_api/api/<version>`. Named APIs use
 `/recording_studio_api/apis/<api-name>/oauth/token`.
 
 API clients are bound to exactly one API. Provision and authenticate named clients with `api:`;
-a public token is rejected on every named API and vice versa. The existing site-wide API switch
-remains a global kill switch, while `ApiSetting.for_api` supports additional per-API switches.
+a public token is rejected on every named API and vice versa. The existing site-wide API switch remains a global kill switch, while `ApiSetting.for_api`
+supports additional per-API switches. Admins can also set runtime overrides for request logging,
+credential/access-token TTLs, retention, and rate-limit enables/thresholds from the Admin API
+settings and rate-limiting pages. Blank override fields fall back to initializer defaults; Redis
+URL/namespace and digest peppers stay deploy-time only.
 
 Named APIs inherit credential and token TTLs, rate-limit windows, and request-payload logging policy
 from the public configuration when declared. Each definition can then override those values without
