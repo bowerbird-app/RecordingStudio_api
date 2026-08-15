@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "fileutils"
 
 namespace :flat_pack do
@@ -21,14 +23,14 @@ namespace :flat_pack do
     end
 
     application_css = source_dir.join("application.css").read
-      .gsub('"flat_pack/variables.css"', '"./variables.css"')
-      .gsub('"flat_pack/rich_text.css"', '"./rich_text.css"')
-      .gsub('"flat_pack/content_editor.css"', '"./content_editor.css"')
+                        .gsub('"flat_pack/variables.css"', '"./variables.css"')
+                        .gsub('"flat_pack/rich_text.css"', '"./rich_text.css"')
+                        .gsub('"flat_pack/content_editor.css"', '"./content_editor.css"')
 
     target_dir.join("application.css").write(application_css)
   end
 
-  # Copy (not symlink) gem trees into a path inside the dummy app. Tailwind does not
+  # Copy (not symlink) gem trees into a path inside the host app. Tailwind does not
   # follow symlinks for @source, and absolute Engine roots vary by Bundler layout.
   def mirror_gem_tailwind_sources
     mirror_root = Rails.root.join("tmp/tailwind_scan")

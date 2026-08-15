@@ -125,7 +125,7 @@ module RecordingStudioApi
           .sort_by { |section| section.fetch(:resource) }
       end
 
-      def default_resource_endpoints(resource_name, recordable_type)
+      def default_resource_endpoints(resource_name, recordable_type) # rubocop:disable Metrics/MethodLength
         openapi_tag = openapi_tag_for(resource_name, recordable_type)
         docs_resource_name = docs_resource_name_for(resource_name, recordable_type)
         registration = recordable_registration_for(recordable_type)
@@ -238,7 +238,7 @@ module RecordingStudioApi
         endpoints.select do |endpoint|
           registration.nil? || registration.supports_operation?(endpoint.fetch(:action).split("#").last)
         end
-      end
+      end # rubocop:enable Metrics/MethodLength
 
       def relationship_resource_endpoints(resource_name, recordable_type)
         registration = recordable_registration_for(recordable_type)

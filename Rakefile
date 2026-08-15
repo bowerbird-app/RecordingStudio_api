@@ -6,7 +6,11 @@ require "rake/testtask"
 DUMMY_TEST_FILE = File.expand_path("test/controllers/docs_controller_test.rb", __dir__)
 DUMMY_GEMFILE = File.expand_path("test/dummy/Gemfile", __dir__)
 DUMMY_APP_ROOT = File.expand_path("test/dummy", __dir__)
-ROOT_TEST_EXCLUSIONS = %w[test/controllers/docs_controller_test.rb test/rename_verification_test.rb].freeze
+ROOT_TEST_EXCLUSIONS = %w[
+  test/controllers/docs_controller_test.rb
+  test/rename_verification_test.rb
+  test/dummy/**/*
+].freeze
 
 def run_command!(env, *command)
   return if system(env, *command)

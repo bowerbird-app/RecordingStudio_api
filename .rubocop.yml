@@ -8,6 +8,7 @@ AllCops:
     - 'test/dummy/**/*'
     - 'vendor/**/*'
     - 'bin/**/*'
+    - 'lib/generators/**/templates/**/*'
 
 Style/Documentation:
   Enabled: false
@@ -29,6 +30,7 @@ Metrics/BlockLength:
   Exclude:
     - 'test/**/*'
     - 'config/routes.rb'
+    - 'lib/generators/**/*'
 
 Metrics/MethodLength:
   Exclude:

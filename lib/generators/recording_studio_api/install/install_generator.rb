@@ -68,7 +68,7 @@ module RecordingStudioApi
 
       def ensure_gem_sources_import(tailwind_css_path)
         content = File.read(tailwind_css_path)
-        return if content.include?('gem_sources.css')
+        return if content.include?("gem_sources.css")
 
         inject_into_file tailwind_css_path, after: "@import \"tailwindcss\";\n" do
           <<~CSS

@@ -17,13 +17,13 @@ module RecordingStudioApi
         return nil if raw.blank?
 
         JSON.parse(raw)
-      rescue JSON::ParserError => error
-        Rails.logger.warn("[RecordingStudioApi] idempotency fetch failed: #{error.class}: #{error.message}")
+      rescue JSON::ParserError => e
+        Rails.logger.warn("[RecordingStudioApi] idempotency fetch failed: #{e.class}: #{e.message}")
         nil
-      rescue StandardError => error
-        raise unless redis_error?(error)
+      rescue StandardError => e
+        raise unless redis_error?(e)
 
-        Rails.logger.warn("[RecordingStudioApi] idempotency fetch failed: #{error.class}: #{error.message}")
+        Rails.logger.warn("[RecordingStudioApi] idempotency fetch failed: #{e.class}: #{e.message}")
         nil
       end
 
@@ -35,10 +35,10 @@ module RecordingStudioApi
           JSON.generate("json" => payload, "status" => status),
           ex: ttl.to_i
         )
-      rescue StandardError => error
-        raise unless redis_error?(error)
+      rescue StandardError => e
+        raise unless redis_error?(e)
 
-        Rails.logger.warn("[RecordingStudioApi] idempotency write failed: #{error.class}: #{error.message}")
+        Rails.logger.warn("[RecordingStudioApi] idempotency write failed: #{e.class}: #{e.message}")
         nil
       end
 

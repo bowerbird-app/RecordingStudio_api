@@ -229,7 +229,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     filtered = JSON.parse(response.body)
-    assert_equal ["Alpha Notes"], filtered.fetch("records").map { |row| row.fetch("name") }
+    assert_equal(["Alpha Notes"], filtered.fetch("records").map { |row| row.fetch("name") })
     assert_equal({ "name" => "Alpha Notes" }, filtered.fetch("meta").fetch("filter"))
 
     get "/recording_studio_api/api/v1/folders",
@@ -238,7 +238,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     searched = JSON.parse(response.body)
-    assert_equal ["Beta Archive"], searched.fetch("records").map { |row| row.fetch("name") }
+    assert_equal(["Beta Archive"], searched.fetch("records").map { |row| row.fetch("name") })
     assert_equal "Archive", searched.fetch("meta").fetch("q")
   end
 
