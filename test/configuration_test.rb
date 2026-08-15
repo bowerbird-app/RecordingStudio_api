@@ -59,10 +59,11 @@ class ConfigurationTest < Minitest::Test
     assert_nil configuration.documentation_layout_name
     assert_equal "recording_studio/default_layout", configuration.layout_name
     assert_equal true, configuration.rate_limit_oauth_enabled
-    assert_equal false, configuration.rate_limit_api_enabled
+    assert_equal true, configuration.rate_limit_api_enabled
     assert_equal true, configuration.rate_limit_api_pre_auth_enabled
     assert_equal true, configuration.rate_limit_fail_closed
-    assert_equal %w[oauth api_pre_auth], configuration.rate_limit_fail_closed_buckets
+    assert_equal %w[oauth api_pre_auth api], configuration.rate_limit_fail_closed_buckets
+    assert_equal false, configuration.token_digest_legacy_verify
     assert_equal "recording_studio_api", configuration.rate_limit_redis_namespace
     assert_equal 10, configuration.rate_limit_oauth_requests
     assert_equal 60, configuration.rate_limit_oauth_period_seconds

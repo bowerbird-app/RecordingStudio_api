@@ -143,7 +143,7 @@ module RecordingStudioApi
             openapi: resource_openapi(
               {
                 tags: [openapi_tag],
-                parameters: pagination_parameters(recordable_type) + include_parameters_for(recordable_type),
+                parameters: pagination_parameters(recordable_type) + collection_filter_parameters(recordable_type) + include_parameters_for(recordable_type),
                 responses: resource_list_responses(
                   resource_name,
                   recordable_type,
@@ -168,6 +168,7 @@ module RecordingStudioApi
             openapi: merge_hashes(
               {
                 tags: [openapi_tag],
+                parameters: [idempotency_key_parameter],
                 request_body: resource_write_request_body(recordable_type, operation: :create),
                 responses: resource_create_responses(recordable_type)
               },
@@ -296,7 +297,7 @@ module RecordingStudioApi
             scope: :resource,
             openapi: {
               tags: [openapi_tag_for(resource_name, recordable_type)],
-              parameters: [id_parameter],
+              parameters: [id_parameter, idempotency_key_parameter],
               request_body: relationship_request_body(relationship, operation: :create),
               responses: relationship_create_responses(relationship)
             }
@@ -544,7 +545,8 @@ module RecordingStudioApi
       end
 
       def destroy_description_for(resource_name, recordable_type)
-        "Delete #{docs_resource_name_for(resource_name, recordable_type)} permanently"
+        "Permanently delete #{docs_resource_name_for(resource_name, recordable_type)}. " \
+          "Recording Studio API hard-deletes the recording and recordable; it does not soft-delete or move to trash."
       end
 
       def resource_list_responses(resource_name, recordable_type, docs_resource_name, item_schema: nil, relationship_examples: {})
@@ -644,6 +646,54 @@ module RecordingStudioApi
             }
           }
         ]
+      end
+
+      def collection_filter_parameters(recordable_type)
+        filterable = filterable_attributes_for(recordable_type)
+        parameters = [
+          {
+            name: "q",
+            in: "query",
+            required: false,
+            description: "Case-insensitive substring search across filterable attributes for this resource.",
+            schema: {
+              type: "string"
+            }
+          }
+        ]
+        return parameters if filterable.empty?
+
+        parameters + filterable.map do |attribute|
+          {
+            name: "filter[#{attribute}]",
+            in: "query",
+            required: false,
+            description: "Exact match filter on #{attribute}.",
+            schema: {
+              type: "string"
+            }
+          }
+        end
+      end
+
+      def filterable_attributes_for(recordable_type)
+        registration = recordable_registration_for(recordable_type)
+        return [] if registration.nil?
+
+        (registration.sortable_attributes | registration.writable_attributes).map(&:to_s)
+      end
+
+      def idempotency_key_parameter
+        {
+          name: "Idempotency-Key",
+          in: "header",
+          required: false,
+          description: "Optional client-supplied key. When Redis is available, identical create requests from the same API client reuse the first successful response for 24 hours.",
+          schema: {
+            type: "string",
+            maxLength: 255
+          }
+        }
       end
 
       def resource_item_responses(recordable_type, relationship_examples: {})

@@ -67,4 +67,12 @@ class RotateApiCredentialTest < ActiveSupport::TestCase
     assert result.failure?
     assert_equal "Actor is not authorized to manage this API client", result.error
   end
+
+  test "locks the api client row while rotating" do
+    source = File.read(RecordingStudioApi::Engine.root.join("lib/recording_studio_api/services/rotate_api_credential.rb"))
+
+    assert_includes source, "ApiClient.lock.find"
+    assert_includes source, "credentials.lock"
+    assert_includes source, "ActiveRecord::RecordNotUnique"
+  end
 end

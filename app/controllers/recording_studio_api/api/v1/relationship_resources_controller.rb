@@ -195,7 +195,8 @@ module RecordingStudioApi
             params: params.to_unsafe_h,
             request_params: request.request_parameters,
             scoped_recordings: scoped_recordings,
-            parent_recording: parent_recording
+            parent_recording: parent_recording,
+            idempotency_key: request.headers["Idempotency-Key"].presence
           )
         end
       end

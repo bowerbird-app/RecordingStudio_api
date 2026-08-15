@@ -119,3 +119,46 @@ Resource API errors now use a nested object:
 Read `error.code` and `error.message`. Validation failures use `code: "validation_failed"` and may
 include `error.details`. OAuth token/revoke endpoints keep the OAuth wire format
 `{ "error": "...", "error_description": "..." }`.
+## Unreleased hardening notes (post-0.3.0)
+
+Apply these when pulling the current mainline hardening work on top of `0.3.0`.
+
+### Token digests
+
+1. Ensure `Rails.application.secret_key_base` is set, or set
+   `RECORDING_STUDIO_API_TOKEN_DIGEST_PEPPER` / `config.token_digest_pepper`. There is no hardcoded
+   digest pepper fallback.
+2. `token_digest_legacy_verify` now defaults to `false`. If you still have unsalted SHA256 digests
+   in the database, temporarily set `config.token_digest_legacy_verify = true`, rotate or allow
+   rehash-on-login, then turn it back off.
+
+### Rate limits and named API defaults
+
+1. Authenticated API rate limiting is on by default (`rate_limit_api_enabled = true`). Disable
+   explicitly in non-production hosts if needed.
+2. Fail-closed buckets default to `%w[oauth api_pre_auth api]`. Ensure Redis is reachable in
+   production or tune `rate_limit_fail_closed_buckets`.
+3. Named APIs default to `default_access: :read_only`. Register write operations explicitly or set
+   `api.default_access = :read_write`.
+
+### Deletes, admin revoke, and mobile OAuth migrations
+
+1. Resource `DELETE` hard-deletes the recording/recordable. Recording Studio no longer exposes a
+   shared trash workflow through this gem; do not expect soft-delete/`trashed_at` behavior from
+   destroy endpoints.
+2. Admin credential revoke under AdminRoot is intentionally named-API scoped (not limited to the
+   currently selected workspace root). Workspace operators continue to revoke via API client screens
+   that are tenancy-scoped.
+3. Historical mobile OAuth create/drop migrations in the dummy app remain as historical artifacts.
+   Do not rewrite old migrations; hosts that never ran them can ignore
+   `remove_mobile_oauth_from_recording_studio_api`.
+
+### Client features
+
+1. Send `Idempotency-Key` on creates when retries are possible. Responses are cached in Redis for 24
+   hours per API + client + key when Redis is available.
+2. Collection indexes accept `filter[attribute]=value` (exact) and `q` (ILIKE across filterable
+   attributes). OpenAPI documents the allowed filter attributes per resource.
+3. After regenerating install artifacts, run
+   `bin/rails flat_pack:prepare_tailwind_assets tailwindcss:build` so FlatPack Grid utilities scan
+   correctly. Gitignore `tmp/tailwind_scan/` and `app/assets/tailwind/gem_sources.css`.

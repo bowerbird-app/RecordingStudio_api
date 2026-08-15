@@ -26,8 +26,8 @@ RecordingStudioApi.configure do |config|
   config.access_token_ttl = 1.hour
 
   # Credential and access-token digests are HMAC-SHA256(pepper, token). Defaults to
-  # Rails secret_key_base; override for dedicated rotation. Keep legacy SHA256 verify
-  # enabled until existing credentials/tokens are rotated or rehashed.
+  # Rails secret_key_base when token_digest_pepper is unset. Legacy unsalted SHA256
+  # verify is off by default; enable only while rotating/rehashing older digests.
   # config.token_digest_pepper = ENV.fetch("RECORDING_STUDIO_API_TOKEN_DIGEST_PEPPER", nil)
   # config.token_digest_legacy_verify = true
 
@@ -35,8 +35,8 @@ RecordingStudioApi.configure do |config|
   # Disable only for intentionally open access-point delegation on an API.
   # config.api_management_authorization_required = true
 
-  # Unauthenticated OAuth and API pre-auth buckets are rate-limited by default and
-  # fail closed when Redis is unavailable. Authenticated API buckets remain opt-in.
+  # OAuth, API pre-auth, and authenticated API buckets are rate-limited by default
+  # and fail closed when Redis is unavailable for those buckets.
   config.rate_limit_redis_url = ENV.fetch("RECORDING_STUDIO_API_RATE_LIMIT_REDIS_URL", nil)
   config.rate_limit_redis_namespace = "recording_studio_api"
   # config.rate_limit_oauth_enabled = true
@@ -45,13 +45,13 @@ RecordingStudioApi.configure do |config|
   # config.rate_limit_api_pre_auth_enabled = true
   config.rate_limit_api_pre_auth_requests = 120
   config.rate_limit_api_pre_auth_period_seconds = 60
-  config.rate_limit_api_enabled = Rails.env.production?
+  # config.rate_limit_api_enabled = true
   config.rate_limit_api_read_requests = 300
   config.rate_limit_api_read_period_seconds = 60
   config.rate_limit_api_write_requests = 60
   config.rate_limit_api_write_period_seconds = 60
   # config.rate_limit_fail_closed = true
-  config.rate_limit_fail_closed_buckets = %w[oauth api_pre_auth]
+  config.rate_limit_fail_closed_buckets = %w[oauth api_pre_auth api]
 
   # Optional: log API requests to the API request log database
   # config.api_request_logging_enabled = true

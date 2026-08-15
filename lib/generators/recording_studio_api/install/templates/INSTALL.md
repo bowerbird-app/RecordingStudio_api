@@ -11,7 +11,13 @@ Next steps:
   - call `RecordingStudio.enable_capability(:accessible, on: "YourRecordable")` for recordables that can own direct access grants
 5. Install the engine migrations with `bin/rails generate recording_studio_api:migrations`.
 6. Apply the migrations with `bin/rails db:migrate`.
-7. Run `bin/rails tailwindcss:build` if you use Tailwind CSS.
+7. Run `bin/rails flat_pack:prepare_tailwind_assets tailwindcss:build` if you use Tailwind CSS.
+   The install generator copies `lib/tasks/flat_pack_tailwind_assets.rake`, which mirrors gem
+   Engine trees into `tmp/tailwind_scan` (Tailwind does not follow symlinks) and writes
+   `app/assets/tailwind/gem_sources.css` with absolute `@source` fallbacks plus a FlatPack Grid
+   utility safelist. Add `tmp/tailwind_scan/` and `app/assets/tailwind/gem_sources.css` to
+   `.gitignore`.
+
 8. Provision OAuth2 client credentials from an existing `RecordingStudio::Access` recording, then exchange them for an access token:
 
    ```ruby

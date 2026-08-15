@@ -23,6 +23,7 @@ class TokenDigestTest < ActiveSupport::TestCase
   end
 
   test "accepts legacy sha256 digests while legacy verify is enabled" do
+    RecordingStudioApi.configuration.token_digest_legacy_verify = true
     secret = "rsapi_abcd1234.legacy-secret-value"
     legacy_digest = RecordingStudioApi::TokenDigest.legacy_digest(secret)
 
@@ -39,6 +40,7 @@ class TokenDigestTest < ActiveSupport::TestCase
   end
 
   test "rehashes legacy credential digests after a successful match" do
+    RecordingStudioApi.configuration.token_digest_legacy_verify = true
     user = create_user
     _root, access_recording = create_access_recording_for(user: user)
     payload = RecordingStudioApi::Services::ProvisionApiClient.call(
@@ -58,5 +60,17 @@ class TokenDigestTest < ActiveSupport::TestCase
 
     assert result.success?, result.error
     assert_equal RecordingStudioApi::Token.digest(secret), credential.reload.token_digest
+  end
+
+  test "raises when no digest pepper or secret_key_base is available" do
+    RecordingStudioApi.configuration.token_digest_pepper = nil
+    fake_app = Struct.new(:secret_key_base).new(nil)
+
+    Rails.stub(:application, fake_app) do
+      error = assert_raises(RecordingStudioApi::ConfigurationError) do
+        RecordingStudioApi::TokenDigest.pepper
+      end
+      assert_match(/token_digest_pepper is required/, error.message)
+    end
   end
 end

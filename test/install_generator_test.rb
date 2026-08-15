@@ -62,6 +62,9 @@ class InstallGeneratorTest < Minitest::Test
 
       css = File.read(css_path)
       assert_tailwind_sources_present(css)
+      assert_includes css, '@import "./gem_sources.css"'
+      assert_includes css, '@source inline("grid grid-cols-1'
+      assert File.exist?(File.join(dir, "lib/tasks/flat_pack_tailwind_assets.rake"))
     end
   end
 

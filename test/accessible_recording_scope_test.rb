@@ -115,4 +115,20 @@ class AccessibleRecordingScopeTest < ActiveSupport::TestCase
 
     assert_empty relation.to_a
   end
+
+  test "include? checks membership without materializing the full id list" do
+    root_recording, access_recording = create_access_recording_for(user: @user, role: :edit)
+    page_recording = create_page_recording(root_recording: root_recording)
+    other_root, = create_access_recording_for(user: @user, role: :edit, workspace_name: "Other Workspace")
+    other_page = create_page_recording(root_recording: other_root)
+
+    scope = RecordingStudioApi::AccessibleRecordingScope.new(
+      scope_recording: root_recording,
+      access_recording: access_recording
+    )
+
+    assert scope.include?(page_recording.id)
+    refute scope.include?(other_page.id)
+    refute scope.include?(nil)
+  end
 end

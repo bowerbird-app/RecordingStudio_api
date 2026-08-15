@@ -8,12 +8,23 @@ module RecordingStudioApi
       @include_trashed = include_trashed
     end
 
+    # Prefer a SQL subquery so collection scans do not materialize every
+    # descendant id into Ruby before filtering.
     def relation
-      RecordingStudio::Recording.unscoped.where(id: recording_ids)
+      RecordingStudio::Recording.unscoped.where("id IN (#{accessible_recording_ids_sql})")
     end
 
     def recording_ids
       @recording_ids ||= connection.select_values(accessible_recording_ids_sql)
+    end
+
+    def include?(recording_id)
+      return false if recording_id.blank?
+
+      value = connection.select_value(
+        "SELECT EXISTS(SELECT 1 FROM (#{accessible_recording_ids_sql}) AS accessible_ids WHERE id = #{connection.quote(recording_id)})"
+      )
+      ActiveRecord::Type::Boolean.new.cast(value)
     end
 
     private

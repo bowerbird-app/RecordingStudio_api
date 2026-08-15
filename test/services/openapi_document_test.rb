@@ -173,7 +173,10 @@ module RecordingStudioApi
           document = with_recordable_types(["Page"]) { OpenapiDocument.call }
           delete_operation = document.fetch(:paths).fetch("/recording_studio_api/api/v1/pages/{id}").fetch("delete")
 
-          assert_equal "Delete Page permanently", delete_operation.fetch(:description)
+          assert_equal(
+            "Permanently delete Page. Recording Studio API hard-deletes the recording and recordable; it does not soft-delete or move to trash.",
+            delete_operation.fetch(:description)
+          )
         end
       end
 

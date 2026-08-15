@@ -45,7 +45,7 @@ module RecordingStudioApi
     def authorized?(recording:, role:, include_trashed: false)
       return false unless recording.present?
       return false unless role_satisfies?(role)
-      return false unless accessible_recording_ids(include_trashed: include_trashed).include?(recording.id)
+      return false unless accessible_scope(include_trashed: include_trashed).include?(recording.id)
 
       recording_for_access_check = recording_for_accessible_check(recording, include_trashed: include_trashed)
       return false if actor.nil? || recording_for_access_check.nil?

@@ -66,9 +66,13 @@ module RecordingStudioApi
     def pepper
       configured = RecordingStudioApi.configuration.token_digest_pepper
       return configured.to_s if configured.present?
-      return Rails.application.secret_key_base.to_s if defined?(Rails) && Rails.application&.secret_key_base.present?
+      if defined?(Rails) && Rails.application&.secret_key_base.present?
+        return Rails.application.secret_key_base.to_s
+      end
 
-      "recording-studio-api.token-digest.fallback-pepper"
+      raise RecordingStudioApi::ConfigurationError,
+            "token_digest_pepper is required (set RECORDING_STUDIO_API_TOKEN_DIGEST_PEPPER " \
+            "or config.token_digest_pepper, or ensure Rails.application.secret_key_base is present)"
     end
   end
 end

@@ -213,6 +213,35 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_equal "sort must be one of: created_at, name", JSON.parse(response.body).dig("error", "message")
   end
 
+  test "filters and searches collection indexes by writable attributes" do
+    RecordingStudio::Recording.create!(
+      recordable: Folder.create!(name: "Alpha Notes"),
+      parent_recording: @root_recording
+    )
+    RecordingStudio::Recording.create!(
+      recordable: Folder.create!(name: "Beta Archive"),
+      parent_recording: @root_recording
+    )
+
+    get "/recording_studio_api/api/v1/folders",
+        params: { filter: { name: "Alpha Notes" } },
+        headers: authorization_headers
+
+    assert_response :success
+    filtered = JSON.parse(response.body)
+    assert_equal ["Alpha Notes"], filtered.fetch("records").map { |row| row.fetch("name") }
+    assert_equal({ "name" => "Alpha Notes" }, filtered.fetch("meta").fetch("filter"))
+
+    get "/recording_studio_api/api/v1/folders",
+        params: { q: "Archive" },
+        headers: authorization_headers
+
+    assert_response :success
+    searched = JSON.parse(response.body)
+    assert_equal ["Beta Archive"], searched.fetch("records").map { |row| row.fetch("name") }
+    assert_equal "Archive", searched.fetch("meta").fetch("q")
+  end
+
   test "serializes default payload for page resources" do
     page_recording = create_page_recording(root_recording: @root_recording, page_title: "Docs Landing")
 
