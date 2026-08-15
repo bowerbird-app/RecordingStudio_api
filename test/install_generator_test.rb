@@ -72,8 +72,10 @@ class InstallGeneratorTest < Minitest::Test
         @import "tailwindcss";
         @source "../../vendor/bundle/**/recording_studio_api/app/views/**/*.erb";
         @source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/recording_studio_api-*/app/views/**/*.erb";
-        @source "../../vendor/bundle/**/flatpack/app/components/**/*.{rb,erb}";
+        @source "../../vendor/bundle/**/flatpack*/app/components/**/*.{rb,erb}";
+        @source "../../vendor/bundle/**/flat_pack*/app/components/**/*.{rb,erb}";
         @source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/flatpack-*/app/components/**/*.{rb,erb}";
+        @source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/flat_pack-*/app/components/**/*.{rb,erb}";
       CSS
 
       generator = build_generator(dir)
@@ -415,8 +417,10 @@ class InstallGeneratorTest < Minitest::Test
     [
       '@source "../../vendor/bundle/**/recording_studio_api/app/views/**/*.erb";',
       '@source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/recording_studio_api-*/app/views/**/*.erb";',
-      '@source "../../vendor/bundle/**/flatpack/app/components/**/*.{rb,erb}";',
-      '@source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/flatpack-*/app/components/**/*.{rb,erb}";'
+      '@source "../../vendor/bundle/**/flatpack*/app/components/**/*.{rb,erb}";',
+      '@source "../../vendor/bundle/**/flat_pack*/app/components/**/*.{rb,erb}";',
+      '@source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/flatpack-*/app/components/**/*.{rb,erb}";',
+      '@source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/flat_pack-*/app/components/**/*.{rb,erb}";'
     ]
   end
 end

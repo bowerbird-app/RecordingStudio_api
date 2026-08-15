@@ -77,11 +77,14 @@ module RecordingStudioApi
       end
 
       def formatted_tailwind_source_block(missing_lines)
+        engine_lines = missing_lines.select { |line| line.include?("recording_studio_api") }
+        flat_pack_lines = missing_lines - engine_lines
+
         [
           "\n/* Include RecordingStudioApi engine views for Tailwind CSS */",
-          missing_lines.first(2),
+          engine_lines,
           "\n/* Include FlatPack component sources for Tailwind CSS */",
-          missing_lines.drop(2)
+          flat_pack_lines
         ].flatten.reject(&:empty?).join("\n")
       end
 
@@ -98,9 +101,28 @@ module RecordingStudioApi
           '@source "../../vendor/bundle/**/recording_studio_api/app/views/**/*.erb";',
           '@source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/' \
           'recording_studio_api-*/app/views/**/*.erb";',
-          '@source "../../vendor/bundle/**/flatpack/app/components/**/*.{rb,erb}";',
-          '@source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/flatpack-*/app/components/**/*.{rb,erb}";'
+          # GitHub gem checkout directory is flatpack-*; gem name is flat_pack.
+          '@source "../../vendor/bundle/**/flatpack*/app/components/**/*.{rb,erb}";',
+          '@source "../../vendor/bundle/**/flat_pack*/app/components/**/*.{rb,erb}";',
+          '@source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/' \
+          'flatpack-*/app/components/**/*.{rb,erb}";',
+          '@source "../../../../../../usr/local/bundle/ruby/**/bundler/gems/' \
+          'flat_pack-*/app/components/**/*.{rb,erb}";',
+          *resolved_flat_pack_source_lines
         ]
+      end
+
+      def resolved_flat_pack_source_lines
+        return [] unless defined?(FlatPack::Engine)
+
+        components = FlatPack::Engine.root.join("app/components")
+        return [] unless components.exist?
+
+        tailwind_css_path = Rails.root.join("app/assets/tailwind/application.css")
+        relative = components.relative_path_from(tailwind_css_path.dirname)
+        [%(@source "#{relative}";)]
+      rescue StandardError
+        []
       end
     end
   end
