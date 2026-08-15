@@ -23,20 +23,14 @@ module RecordingStudioApi
       raise RecordingStudioApi::AuthorizationError, "API credential management requires higher access"
     end
 
+    # Match AdminApiCredentialsQuery: scope by named API. AdminController already
+    # requires AdminRoot, so filtering by current_root_recording would 404 all
+    # workspace-rooted credentials shown on the admin credentials screen.
     def load_credential
-      scope = RecordingStudioApi::ApiCredential
-              .joins(:api_client)
-              .where(api_client: { api_key: @current_admin_api.name })
-
-      root_recording = current_root_recording
-      if root_recording.present?
-        recordings = RecordingStudio::Recording.arel_table
-        scope = scope.joins(api_client: :access_recording).where(
-          recordings[:root_recording_id].eq(root_recording.id).or(recordings[:id].eq(root_recording.id))
-        )
-      end
-
-      @credential = scope.find(params[:id])
+      @credential = RecordingStudioApi::ApiCredential
+                    .joins(:api_client)
+                    .where(api_client: { api_key: @current_admin_api.name })
+                    .find(params[:id])
     end
   end
 end
