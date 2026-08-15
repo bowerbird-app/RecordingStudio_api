@@ -5,7 +5,7 @@ require_relative "../test_helper"
 require_relative "../dummy/config/environment"
 require "rails/test_help"
 
-module ApiDummyHelpers
+module ApiDummyHelpers # rubocop:disable Metrics/ModuleLength
   TEST_PASSWORD = "ApiAuthPassword!2026"
 
   def with_access_creation_context(&)
