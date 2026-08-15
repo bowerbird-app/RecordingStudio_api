@@ -194,25 +194,7 @@ module RecordingStudioApi
             }
           },
           schemas: {
-            Error: {
-              type: "object",
-              properties: {
-                error: { type: "string" },
-                details: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      attribute: { type: "string" },
-                      message: { type: "string" },
-                      full_message: { type: "string" },
-                      type: { type: "string" }
-                    }
-                  }
-                }
-              },
-              required: ["error"]
-            },
+            Error: error_schema,
             OAuthError: {
               type: "object",
               properties: {
@@ -273,6 +255,35 @@ module RecordingStudioApi
               }
             }
           }
+        }
+      end
+
+      def error_schema
+        {
+          type: "object",
+          properties: {
+            error: {
+              type: "object",
+              properties: {
+                code: { type: "string" },
+                message: { type: "string" },
+                details: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      attribute: { type: "string" },
+                      message: { type: "string" },
+                      full_message: { type: "string" },
+                      type: { type: "string" }
+                    }
+                  }
+                }
+              },
+              required: %w[code message]
+            }
+          },
+          required: ["error"]
         }
       end
 

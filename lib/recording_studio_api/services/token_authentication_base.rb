@@ -21,7 +21,12 @@ module RecordingStudioApi
         return failure(AuthenticationError.new(invalid_token_error_message)) if credential.nil?
         return failure(AuthenticationError.new(invalid_token_error_message)) unless credential.api_client&.api_key == api_key
         return failure(AuthenticationError.new(inactive_token_error_message)) unless token_record_active?(token_record)
-        return failure(AuthenticationError.new(inactive_token_error_message)) unless credential.active_for_authentication?
+
+        unless credential.active_for_authentication?
+          credential.revoke_tokens_on_expiry!
+          return failure(AuthenticationError.new(inactive_token_error_message))
+        end
+
         return failure(AuthenticationError.new(inactive_token_error_message)) unless access_recording_active?(credential)
 
         root_recording = resolve_root_recording(credential)

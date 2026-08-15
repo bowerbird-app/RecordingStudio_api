@@ -70,7 +70,7 @@ class NamedApiIsolationTest < ActionDispatch::IntegrationTest
     assert_equal "operations", records.first.fetch("audience")
 
     post "#{operations_root_path}/workspaces",
-         params: { attributes: { name: "Blocked write" } },
+         params: { name: "Blocked write" },
          headers: bearer_headers(@operations_token)
 
     assert_response :unprocessable_content

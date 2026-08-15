@@ -109,6 +109,16 @@ class IssueOauthAccessTokenTest < ActiveSupport::TestCase
   end
 
   test "does not issue an access token for an expired credential" do
+    issued = RecordingStudioApi::Services::IssueOauthAccessToken.call(
+      grant_type: "client_credentials",
+      client_id: @payload.fetch(:credential).oauth_client_id,
+      client_secret: @payload.fetch(:token)
+    )
+    assert issued.success?, issued.error
+    access_token = RecordingStudioApi::ApiAccessToken.find_by!(
+      token_digest: RecordingStudioApi::OauthAccessToken.digest(issued.value.fetch(:access_token))
+    )
+
     @payload.fetch(:credential).update_columns(expires_at: 1.second.ago, updated_at: Time.current)
 
     result = RecordingStudioApi::Services::IssueOauthAccessToken.call(
@@ -119,6 +129,8 @@ class IssueOauthAccessTokenTest < ActiveSupport::TestCase
 
     assert result.failure?
     assert_equal "invalid_client", result.error.fetch(:error)
+    assert_not_nil access_token.reload.revoked_at
+    assert_nil @payload.fetch(:credential).reload.revoked_at
   end
 
   test "does not issue an access token for a revoked credential" do

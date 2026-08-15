@@ -49,7 +49,8 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :service_unavailable
     assert_not rate_limit_checked
-    assert_equal "api_access_disabled", JSON.parse(response.body).fetch("error")
+    assert_equal "api_access_disabled", JSON.parse(response.body).dig("error", "code")
+    assert_equal "API access is temporarily disabled", JSON.parse(response.body).dig("error", "message")
   end
 
   test "throttles api v1 read requests when api throttling is enabled" do
@@ -83,9 +84,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     end
 
     post "/recording_studio_api/api/v1/workspaces", params: {
-      attributes: {
-        name: "Throttled Workspace"
-      }
+      name: "Throttled Workspace"
     }, headers: authorization_headers
 
     assert_response :too_many_requests
@@ -136,7 +135,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     get "/recording_studio_api/api/v1/pages", params: { pagination_token: "not-a-valid-token" }, headers: authorization_headers
 
     assert_response :unprocessable_entity
-    assert_equal "Invalid pagination token", JSON.parse(response.body).fetch("error")
+    assert_equal "Invalid pagination token", JSON.parse(response.body).dig("error", "message")
   end
 
   test "rejects pagination tokens issued for another api client" do
@@ -158,7 +157,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
         headers: { "Authorization" => "Bearer #{other_token}" }
 
     assert_response :unprocessable_entity
-    assert_equal "Pagination token does not match authenticated client", JSON.parse(response.body).fetch("error")
+    assert_equal "Pagination token does not match authenticated client", JSON.parse(response.body).dig("error", "message")
   end
 
   test "returns WWW-Authenticate Bearer challenge on unauthorized api requests" do
@@ -183,7 +182,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     get "/recording_studio_api/api/v1/pages", params: { limit: 2, pagination_token: tampered_token }, headers: authorization_headers
 
     assert_response :unprocessable_entity
-    assert_equal "Invalid pagination token", JSON.parse(response.body).fetch("error")
+    assert_equal "Invalid pagination token", JSON.parse(response.body).dig("error", "message")
   end
 
   test "sorts workspace collection using configured recordable sortable attributes" do
@@ -211,7 +210,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     get "/recording_studio_api/api/v1/workspaces", params: { sort: "title" }, headers: authorization_headers
 
     assert_response :unprocessable_entity
-    assert_equal "sort must be one of: created_at, name", JSON.parse(response.body).fetch("error")
+    assert_equal "sort must be one of: created_at, name", JSON.parse(response.body).dig("error", "message")
   end
 
   test "serializes default payload for page resources" do
@@ -312,7 +311,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/featured_folder", headers: authorization_headers
 
     assert_response :unprocessable_entity
-    assert_includes JSON.parse(response.body).fetch("error"), "featured_folder is not a direct child collection"
+    assert_includes JSON.parse(response.body).dig("error", "message"), "featured_folder is not a direct child collection"
   end
 
   test "expands a request-driven named children relationship in the flat payload" do
@@ -414,7 +413,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
 
     patch "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders/#{first_folder.id}", params: {
       parent_id: second_workspace.id,
-      attributes: { name: "Move attempt" }
+      name: "Move attempt"
     }, headers: authorization_headers
 
     assert_response :unprocessable_entity
@@ -476,7 +475,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
         headers: authorization_headers
 
     assert_response :unprocessable_entity
-    assert_includes JSON.parse(response.body).fetch("error"), "summary is not a direct child collection"
+    assert_includes JSON.parse(response.body).dig("error", "message"), "summary is not a direct child collection"
   end
 
   test "rejects custom relationships from nested routing" do
@@ -498,7 +497,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
         headers: authorization_headers
 
     assert_response :unprocessable_entity
-    assert_includes JSON.parse(response.body).fetch("error"), "summary is not a direct child collection"
+    assert_includes JSON.parse(response.body).dig("error", "message"), "summary is not a direct child collection"
   end
 
   test "creates and updates declared children through a named relationship endpoint" do
@@ -512,14 +511,14 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     )
 
     post "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders", params: {
-      attributes: { name: "Nested folder" }
+      name: "Nested folder"
     }, headers: authorization_headers
 
     assert_response :created
     child_id = JSON.parse(response.body).fetch("id")
 
     patch "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders/#{child_id}", params: {
-      attributes: { name: "Renamed nested folder" }
+      name: "Renamed nested folder"
     }, headers: authorization_headers
 
     assert_response :success
@@ -538,11 +537,11 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
 
     post "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders", params: {
       type: "folders",
-      attributes: { name: "Blocked folder" }
+      name: "Blocked folder"
     }, headers: authorization_headers
 
     assert_response :unprocessable_entity
-    assert_includes JSON.parse(response.body).fetch("error"), "create is not enabled for folders"
+    assert_includes JSON.parse(response.body).dig("error", "message"), "create is not enabled for folders"
   end
 
   test "does not expose writes when the child registration disables create" do
@@ -560,11 +559,11 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     )
 
     post "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders", params: {
-      attributes: { name: "Blocked folder" }
+      name: "Blocked folder"
     }, headers: authorization_headers
 
     assert_response :unprocessable_entity
-    assert_includes JSON.parse(response.body).fetch("error"), "create is not enabled for Folder"
+    assert_includes JSON.parse(response.body).dig("error", "message"), "create is not enabled for Folder"
   end
 
   test "does not resolve the direct child relationship before paginating nested index" do
@@ -615,7 +614,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
       [:patch, "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders/#{denied.id}"],
       [:delete, "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders/#{denied.id}"]
     ].each do |method, path|
-      public_send(method, path, params: method == :patch ? { attributes: { name: "Hidden move" } } : {}, headers: authorization_headers)
+      public_send(method, path, params: method == :patch ? { name: "Hidden move" } : {}, headers: authorization_headers)
       assert_response :not_found
     end
   end
@@ -633,7 +632,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
 
     get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/endpoint_folders/#{child.id}", headers: authorization_headers
     assert_response :unprocessable_entity
-    patch "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/endpoint_folders/#{child.id}", params: { attributes: { name: "Blocked" } }, headers: authorization_headers
+    patch "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/endpoint_folders/#{child.id}", params: { name: "Blocked" }, headers: authorization_headers
     assert_response :unprocessable_entity
     delete "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/endpoint_folders/#{child.id}", headers: authorization_headers
     assert_response :unprocessable_entity
@@ -648,7 +647,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
       }
     )
 
-    patch "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/operation_folders/#{child.id}", params: { attributes: { name: "Blocked" } }, headers: authorization_headers
+    patch "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/operation_folders/#{child.id}", params: { name: "Blocked" }, headers: authorization_headers
     assert_response :unprocessable_entity
     delete "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/operation_folders/#{child.id}", headers: authorization_headers
     assert_response :unprocessable_entity
@@ -709,17 +708,17 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     end
 
     post "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders", params: {
-      type: "folders", attributes: { name: "Blocked type" }
+      type: "folders", name: "Blocked type"
     }, headers: authorization_headers
     assert_response :unprocessable_entity
 
     post "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders", params: {
-      parent_id: other_parent.id, attributes: { name: "Blocked parent" }
+      parent_id: other_parent.id, name: "Blocked parent"
     }, headers: authorization_headers
     assert_response :unprocessable_entity
 
     post "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders", params: {
-      attributes: { name: "Created child" }
+      name: "Created child"
     }, headers: authorization_headers
     assert_response :created
     created = RecordingStudio::Recording.find(JSON.parse(response.body).fetch("id"))
@@ -727,7 +726,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_equal "Folder", created.recordable_type
 
     patch "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders/#{direct_child.id}", params: {
-      parent_id: other_parent.id, attributes: { name: "Move attempt" }
+      parent_id: other_parent.id, name: "Move attempt"
     }, headers: authorization_headers
     assert_response :unprocessable_entity
     assert_equal @root_recording, direct_child.reload.parent_recording
@@ -768,10 +767,8 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
 
   test "creates a scoped workspace resource and filters unknown attributes" do
     post "/recording_studio_api/api/v1/workspaces", params: {
-      attributes: {
-        name: "Created Workspace",
+      name: "Created Workspace",
         unknown_attribute: "ignored"
-      }
     }, headers: authorization_headers
 
     assert_response :created
@@ -782,7 +779,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_not_includes payload.keys, "unknown_attribute"
   end
 
-  test "accepts flat writes, preserves legacy envelopes, and rejects ambiguous write bodies" do
+  test "accepts flat writes and rejects the legacy attributes envelope" do
     RecordingStudioApi.register_recordable_type_api(
       "Workspace",
       relationships: {
@@ -819,34 +816,36 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_not_equal 1.year.ago.iso8601, top_level_folder.created_at.iso8601
 
     post "/recording_studio_api/api/v1/workspaces", params: {
-      attributes: { name: "Legacy workspace" }
+      name: "Legacy workspace"
     }, headers: authorization_headers
 
     assert_response :created
     legacy_workspace_id = JSON.parse(response.body).fetch("id")
 
     patch "/recording_studio_api/api/v1/folders/#{nested_folder_id}", params: {
-      attributes: { name: "Legacy renamed folder" }
+      name: "Legacy renamed folder"
     }, headers: authorization_headers
 
     assert_response :success
     assert_equal "Legacy renamed folder", RecordingStudio::Recording.find(nested_folder_id).recordable.name
 
     post "/recording_studio_api/api/v1/folders", params: {
-      name: "Mixed folder",
-      parent_id: @root_recording.id,
-      attributes: { name: "Legacy mixed folder" }
+      attributes: { name: "Legacy envelope folder" },
+      parent_id: @root_recording.id
     }, headers: authorization_headers
 
     assert_response :unprocessable_entity
-    assert_equal "Use either flat writable fields or attributes, not both", JSON.parse(response.body).fetch("error")
+    assert_equal "The attributes envelope is no longer supported; send writable fields at the request body root",
+                 JSON.parse(response.body).dig("error", "message")
+    assert_equal "invalid_input", JSON.parse(response.body).dig("error", "code")
 
     patch "/recording_studio_api/api/v1/workspaces/#{legacy_workspace_id}", params: {
       parent_id: @root_recording.id
     }, headers: authorization_headers
 
     assert_response :unprocessable_entity
-    assert_equal "parent_id is not permitted for updates; use the move action instead", JSON.parse(response.body).fetch("error")
+    assert_equal "parent_id is not permitted for updates; use the move action instead",
+                 JSON.parse(response.body).dig("error", "message")
   end
 
   test "rejects resource operations excluded by a recordable allowlist" do
@@ -857,11 +856,11 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
 
     post "/recording_studio_api/api/v1/workspaces", params: {
-      attributes: { name: "Excluded workspace" }
+      name: "Excluded workspace"
     }, headers: authorization_headers
 
     assert_response :unprocessable_entity
-    assert_equal "create is not enabled for Workspace", JSON.parse(response.body).fetch("error")
+    assert_equal "create is not enabled for Workspace", JSON.parse(response.body).dig("error", "message")
   end
 
   test "does not make response-only OpenAPI properties writable" do
@@ -882,10 +881,8 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     requested_created_at = 1.year.ago.iso8601
 
     patch "/recording_studio_api/api/v1/workspaces/#{workspace_recording.id}", params: {
-      attributes: {
-        name: "Updated",
-        created_at: requested_created_at
-      }
+      name: "Updated",
+      created_at: requested_created_at
     }, headers: authorization_headers
 
     assert_response :success
@@ -903,14 +900,14 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     original_name = @root_recording.recordable.name
 
     patch "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}", params: {
-      attributes: { name: "Attempted rename" }
+      name: "Attempted rename"
     }, headers: authorization_headers
 
     assert_response :success
     assert_equal original_name, @root_recording.recordable.reload.name
 
     post "/recording_studio_api/api/v1/workspaces", params: {
-      attributes: { name: "Write-once workspace" }
+      name: "Write-once workspace"
     }, headers: authorization_headers
 
     assert_response :created
@@ -920,15 +917,13 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
   test "returns validation errors when creating a page without a title" do
     post "/recording_studio_api/api/v1/pages", params: {
       parent_id: @root_recording.id,
-      attributes: {
-        additionalProperty: "anything"
-      }
+      additionalProperty: "anything"
     }, headers: authorization_headers
 
     assert_response :unprocessable_entity
 
     payload = JSON.parse(response.body)
-    assert_equal "Title can't be blank", payload.fetch("error")
+    assert_equal "Title can't be blank", payload.dig("error", "message")
     assert_equal [
       {
         "attribute" => "title",
@@ -936,20 +931,18 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
         "full_message" => "Title can't be blank",
         "type" => "blank"
       }
-    ], payload.fetch("details")
+    ], payload.dig("error", "details")
   end
 
   test "requires parent_id when creating a non-root page resource" do
     post "/recording_studio_api/api/v1/pages", params: {
-      attributes: {
-        title: "Orphan page"
-      }
+      title: "Orphan page"
     }, headers: authorization_headers
 
     assert_response :unprocessable_entity
 
     payload = JSON.parse(response.body)
-    assert_equal "parent_id is required for Page", payload.fetch("error")
+    assert_equal "parent_id is required for Page", payload.dig("error", "message")
     assert_equal [
       {
         "attribute" => "parent_id",
@@ -957,7 +950,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
         "full_message" => "Parent is required",
         "type" => "blank"
       }
-    ], payload.fetch("details")
+    ], payload.dig("error", "details")
   end
 
   test "rejects create when parent type is not allowed and rolls back recordable creation" do
@@ -966,15 +959,13 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
 
     post "/recording_studio_api/api/v1/folders", params: {
       parent_id: page_recording.id,
-      attributes: {
-        name: "Invalid Child Folder"
-      }
+      name: "Invalid Child Folder"
     }, headers: authorization_headers
 
     assert_response :unprocessable_entity
 
     payload = JSON.parse(response.body)
-    assert_equal "Folder cannot be recorded under Page", payload.fetch("error")
+    assert_equal "Folder cannot be recorded under Page", payload.dig("error", "message")
     assert_equal folders_before, Folder.count
     assert_equal [
       {
@@ -983,7 +974,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
         "full_message" => "Folder cannot be recorded under Page",
         "type" => "invalid"
       }
-    ], payload.fetch("details")
+    ], payload.dig("error", "details")
   end
 
   test "ignores update attributes for unregistered page resources" do
@@ -991,9 +982,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     original_title = page_recording.recordable.title
 
     patch "/recording_studio_api/api/v1/pages/#{page_recording.id}", params: {
-      attributes: {
-        title: ""
-      }
+      title: ""
     }, headers: authorization_headers
 
     assert_response :success
@@ -1007,13 +996,11 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
 
     post "/recording_studio_api/api/v1/workspaces", params: {
       parent_id: other_root_recording.id,
-      attributes: {
-        name: "Blocked Workspace"
-      }
+      name: "Blocked Workspace"
     }, headers: authorization_headers
 
     assert_response :not_found
-    assert_equal "Parent resource was not found in this API scope", JSON.parse(response.body).fetch("error")
+    assert_equal "Parent resource was not found in this API scope", JSON.parse(response.body).dig("error", "message")
   end
 
   test "rejects show when recording type does not match requested resource" do
@@ -1025,14 +1012,14 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     get "/recording_studio_api/api/v1/pages/#{folder_recording.id}", headers: authorization_headers
 
     assert_response :not_found
-    assert_includes JSON.parse(response.body).fetch("error"), "Resource type does not match"
+    assert_includes JSON.parse(response.body).dig("error", "message"), "Resource type does not match"
   end
 
   test "rejects unknown API resource" do
     get "/recording_studio_api/api/v1/unknown_resources", headers: authorization_headers
 
     assert_response :not_found
-    assert_equal "Unknown API resource unknown_resources", JSON.parse(response.body).fetch("error")
+    assert_equal "Unknown API resource unknown_resources", JSON.parse(response.body).dig("error", "message")
   end
 
   test "rejects a resource outside the authenticated root scope" do
@@ -1042,7 +1029,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     get "/recording_studio_api/api/v1/pages/#{hidden_page.id}", headers: authorization_headers
 
     assert_response :not_found
-    assert_equal "Resource was not found in this API scope", JSON.parse(response.body).fetch("error")
+    assert_equal "Resource was not found in this API scope", JSON.parse(response.body).dig("error", "message")
   end
 
   test "deletes a resource by hard deleting its recording" do
@@ -1070,13 +1057,11 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     view_token = issue_oauth_access_token_for(access_recording: view_access_recording, name: "View-only token")
 
     post "/recording_studio_api/api/v1/workspaces", params: {
-      attributes: {
-        name: "Blocked Workspace"
-      }
+      name: "Blocked Workspace"
     }, headers: { "Authorization" => "Bearer #{view_token}" }
 
     assert_response :forbidden
-    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).fetch("error")
+    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
   end
 
   test "view token cannot inherit another access recording owned by the same actor" do
@@ -1089,13 +1074,11 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     view_token = issue_oauth_access_token_for(access_recording: view_access_recording, name: "View token with sibling admin")
 
     post "/recording_studio_api/api/v1/workspaces", params: {
-      attributes: {
-        name: "Blocked Workspace"
-      }
+      name: "Blocked Workspace"
     }, headers: { "Authorization" => "Bearer #{view_token}" }
 
     assert_response :forbidden
-    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).fetch("error")
+    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
   end
 
   test "forbids update for clients with view-only access" do
@@ -1107,13 +1090,11 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     view_token = issue_oauth_access_token_for(access_recording: view_access_recording, name: "View-only token")
 
     patch "/recording_studio_api/api/v1/pages/#{page_recording.id}", params: {
-      attributes: {
-        title: "Blocked Update"
-      }
+      title: "Blocked Update"
     }, headers: { "Authorization" => "Bearer #{view_token}" }
 
     assert_response :forbidden
-    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).fetch("error")
+    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
   end
 
   test "forbids destroy for clients with view-only access" do
@@ -1127,7 +1108,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     delete "/recording_studio_api/api/v1/pages/#{page_recording.id}", headers: { "Authorization" => "Bearer #{view_token}" }
 
     assert_response :forbidden
-    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).fetch("error")
+    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
   end
 
   test "rejects delete for resources outside the authenticated root scope" do
@@ -1137,7 +1118,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     delete "/recording_studio_api/api/v1/pages/#{hidden_page.id}", headers: authorization_headers
 
     assert_response :not_found
-    assert_equal "Resource was not found in this API scope", JSON.parse(response.body).fetch("error")
+    assert_equal "Resource was not found in this API scope", JSON.parse(response.body).dig("error", "message")
   end
 
   private

@@ -43,7 +43,14 @@ module RecordingStudioApi
         secret_matches = Token.digest_matches?(expected_digest, client_secret)
         TokenDigest.rehash_if_legacy!(credential, client_secret) if secret_matches && credential.present?
 
-        credential.present? && credential.active_for_authentication? && secret_matches
+        return false if credential.blank? || !secret_matches
+
+        unless credential.active_for_authentication?
+          credential.revoke_tokens_on_expiry!
+          return false
+        end
+
+        true
       end
 
       def revoke_matching_access_token!(credential)

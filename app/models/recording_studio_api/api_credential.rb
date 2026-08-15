@@ -61,18 +61,35 @@ module RecordingStudioApi
 
     def active_for_authentication?
       revoked_at.nil? &&
-        (expires_at.nil? || expires_at.future?) &&
+        !expired? &&
         effective_access_recording.present? &&
         effective_access_recording.trashed_at.nil? &&
         api_client.recording.present? &&
         api_client.recording.trashed_at.nil?
     end
 
+    def expired?
+      expires_at.present? && !expires_at.future?
+    end
+
     def revoke!(time: Time.current)
       transaction do
         update_columns(revoked_at: time, updated_at: time)
-        access_tokens.where(revoked_at: nil).update_all(revoked_at: time, updated_at: time)
+        revoke_outstanding_access_tokens!(time: time)
       end
+    end
+
+    # Leaves the credential in an expired (not revoked) state for admin status, but
+    # marks outstanding access tokens revoked so they cannot appear active.
+    def revoke_outstanding_access_tokens!(time: Time.current)
+      access_tokens.where(revoked_at: nil).update_all(revoked_at: time, updated_at: time)
+    end
+
+    def revoke_tokens_on_expiry!(time: Time.current)
+      return unless expired?
+      return if revoked_at.present?
+
+      revoke_outstanding_access_tokens!(time: time)
     end
 
     # Credentials remain mutable during transition while recordables become authoritative.

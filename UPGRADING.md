@@ -100,6 +100,22 @@ Use `parent_id` only for a top-level create that chooses a parent Recording Stud
 creates obtain the parent from the route, and updates cannot change `parent_id`; use a registered
 move action to change a record's parent.
 
-`0.3.0` temporarily accepts the former `{ "attributes": { ... } }` request envelope, but clients
-must migrate to flat bodies and must not send an envelope and flat writable fields in the same
-request. The legacy response shape is not available.
+`0.3.0` rejects the former `{ "attributes": { ... } }` request envelope. Send writable fields at
+the request body root. The legacy response shape is not available.
+
+## 6. Update API error handling
+
+Resource API errors now use a nested object:
+
+```json
+{
+  "error": {
+    "code": "not_found",
+    "message": "Resource was not found in this API scope"
+  }
+}
+```
+
+Read `error.code` and `error.message`. Validation failures use `code: "validation_failed"` and may
+include `error.details`. OAuth token/revoke endpoints keep the OAuth wire format
+`{ "error": "...", "error_description": "..." }`.

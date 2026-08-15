@@ -78,8 +78,18 @@ module RecordingStudioApi
         response.set_header("X-RateLimit-Remaining", decision[:remaining].to_i.to_s)
 
         @rate_limited_request = true
-        render json: { error: "rate_limit_exceeded", error_description: "Too many requests" }, status: :too_many_requests
+        render json: rate_limit_exceeded_payload, status: :too_many_requests
         true
+      end
+
+      def rate_limit_exceeded_payload
+        if oauth_rate_limited_path?
+          { error: "rate_limit_exceeded", error_description: "Too many requests" }
+        elsif respond_to?(:api_error_payload, true)
+          api_error_payload(code: "rate_limit_exceeded", message: "Too many requests")
+        else
+          { error: { code: "rate_limit_exceeded", message: "Too many requests" } }
+        end
       end
 
       def resolved_rate_limit_decision

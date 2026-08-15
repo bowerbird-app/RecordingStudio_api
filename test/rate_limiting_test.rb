@@ -373,7 +373,7 @@ class RateLimitingTest < ActiveSupport::TestCase
     assert_equal "4", harness.response.headers["X-RateLimit-Limit"]
     assert_equal "0", harness.response.headers["X-RateLimit-Remaining"]
     assert_equal :too_many_requests, harness.rendered_payload.fetch(:status)
-    assert_equal "rate_limit_exceeded", harness.rendered_payload.fetch(:json).fetch(:error)
+    assert_equal({ code: "rate_limit_exceeded", message: "Too many requests" }, harness.rendered_payload.fetch(:json).fetch(:error))
   end
 
   test "rate limit redis client uses configured url timeouts and is reused" do

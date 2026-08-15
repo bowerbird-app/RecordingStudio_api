@@ -113,6 +113,11 @@ class AuthenticateOauthAccessTokenTest < ActiveSupport::TestCase
   end
 
   test "rejects access tokens after the parent credential expires" do
+    access_token = RecordingStudioApi::ApiAccessToken.find_by!(
+      token_digest: RecordingStudioApi::OauthAccessToken.digest(@access_token)
+    )
+    assert_nil access_token.revoked_at
+
     @credential.update_columns(expires_at: 1.second.ago, updated_at: Time.current)
 
     result = RecordingStudioApi::Services::AuthenticateOauthAccessToken.call(
@@ -121,6 +126,8 @@ class AuthenticateOauthAccessTokenTest < ActiveSupport::TestCase
 
     assert result.failure?
     assert_equal "Bearer access token is inactive", result.error
+    assert_not_nil access_token.reload.revoked_at
+    assert_nil @credential.reload.revoked_at
   end
 
   test "rejects access tokens after the parent credential is revoked" do

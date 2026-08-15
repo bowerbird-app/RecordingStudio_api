@@ -372,9 +372,8 @@ relationships.
 Write bodies use the same flat field layout. Send registered writable fields at the request body
 root, with `parent_id` only for top-level creates that select a parent Recording Studio record.
 Nested creates take their parent from the URL, and updates do not accept `parent_id`; use the
-registered move action to change a record's parent. During migration, legacy
-`{ attributes: { ... } }` bodies remain accepted, but a request cannot combine that envelope with
-flat writable fields.
+registered move action to change a record's parent. The legacy `{ attributes: { ... } }` envelope
+is rejected.
 
 The engine fetches requested `children` relationships in one scoped query per response,
 preventing serializer-driven N+1 queries. A custom resolver is application code and may issue
