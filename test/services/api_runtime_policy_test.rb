@@ -6,26 +6,22 @@ require_relative "../dummy/config/environment"
 
 class ApiRuntimePolicyTest < ActiveSupport::TestCase
   setup do
+    @original_configuration = RecordingStudioApi.configuration
+    RecordingStudioApi.instance_variable_set(:@configuration, RecordingStudioApi::Configuration.new)
     RecordingStudioApi::ApiSetting.where("key LIKE ?", "api%").delete_all
-    @original_logging = RecordingStudioApi.configuration.api_request_logging_enabled
-    @original_api_rl = RecordingStudioApi.configuration.rate_limit_api_enabled
-    @original_credential_ttl = RecordingStudioApi.configuration.credential_ttl
-    @original_retention = RecordingStudioApi.configuration.api_request_log_retention_days
-    RecordingStudioApi.configuration.api_request_logging_enabled = false
-    RecordingStudioApi.configuration.rate_limit_api_enabled = false
-    RecordingStudioApi.configuration.credential_ttl = 30.days
-    RecordingStudioApi.configuration.api_request_log_retention_days = 30
   end
 
   teardown do
     RecordingStudioApi::ApiSetting.where("key LIKE ?", "api%").delete_all
-    RecordingStudioApi.configuration.api_request_logging_enabled = @original_logging
-    RecordingStudioApi.configuration.rate_limit_api_enabled = @original_api_rl
-    RecordingStudioApi.configuration.credential_ttl = @original_credential_ttl
-    RecordingStudioApi.configuration.api_request_log_retention_days = @original_retention
+    RecordingStudioApi.instance_variable_set(:@configuration, @original_configuration)
   end
 
   test "falls back to initializer defaults when no overrides exist" do
+    RecordingStudioApi.configuration.api_request_logging_enabled = false
+    RecordingStudioApi.configuration.rate_limit_api_enabled = false
+    RecordingStudioApi.configuration.credential_ttl = 30.days
+    RecordingStudioApi.configuration.api_request_log_retention_days = 30
+
     policy = RecordingStudioApi::ApiRuntimePolicy.for(:public)
 
     refute policy.api_request_logging_enabled
@@ -35,6 +31,10 @@ class ApiRuntimePolicyTest < ActiveSupport::TestCase
   end
 
   test "applies per-api overrides over initializer defaults" do
+    RecordingStudioApi.configuration.api_request_logging_enabled = false
+    RecordingStudioApi.configuration.rate_limit_api_enabled = false
+    RecordingStudioApi.configuration.credential_ttl = 30.days
+
     RecordingStudioApi::ApiSetting.for_api(:public).apply_runtime_overrides!(
       "api_request_logging_enabled" => true,
       "rate_limit_api_enabled" => true,
@@ -51,6 +51,7 @@ class ApiRuntimePolicyTest < ActiveSupport::TestCase
   end
 
   test "blank override values clear back to config defaults" do
+    RecordingStudioApi.configuration.api_request_logging_enabled = false
     setting = RecordingStudioApi::ApiSetting.for_api(:public)
     setting.apply_runtime_overrides!("api_request_logging_enabled" => true)
     setting.apply_runtime_overrides!("api_request_logging_enabled" => "")
@@ -61,6 +62,9 @@ class ApiRuntimePolicyTest < ActiveSupport::TestCase
 
   test "retention overrides are global on the public settings row" do
     RecordingStudioApi.configuration.api(:operations)
+    RecordingStudioApi.configuration.api_request_log_retention_days = 30
+    RecordingStudioApi.configuration.api_daily_metric_retention_days = 365
+
     RecordingStudioApi::ApiSetting.for_api(:public).apply_runtime_overrides!(
       "api_request_log_retention_days" => 7,
       "api_daily_metric_retention_days" => "indefinite"
