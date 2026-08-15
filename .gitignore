@@ -30,6 +30,7 @@ Thumbs.db
 # Rails
 test/dummy/log/
 test/dummy/tmp/
+test/dummy/tmp/tailwind_scan/
 test/dummy/storage/
 test/dummy/vendor/bundle/
 test/dummy/app/assets/builds/
