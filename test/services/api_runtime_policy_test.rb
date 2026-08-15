@@ -60,6 +60,7 @@ class ApiRuntimePolicyTest < ActiveSupport::TestCase
   end
 
   test "retention overrides are global on the public settings row" do
+    RecordingStudioApi.configuration.api(:operations)
     RecordingStudioApi::ApiSetting.for_api(:public).apply_runtime_overrides!(
       "api_request_log_retention_days" => 7,
       "api_daily_metric_retention_days" => "indefinite"
