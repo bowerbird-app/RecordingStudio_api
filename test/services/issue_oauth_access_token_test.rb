@@ -134,6 +134,25 @@ class IssueOauthAccessTokenTest < ActiveSupport::TestCase
     assert_equal "invalid_client", result.error.fetch(:error)
   end
 
+  test "revoking a credential also revokes its outstanding access tokens" do
+    issued = RecordingStudioApi::Services::IssueOauthAccessToken.call(
+      grant_type: "client_credentials",
+      client_id: @payload.fetch(:credential).oauth_client_id,
+      client_secret: @payload.fetch(:token)
+    )
+    assert issued.success?, issued.error
+
+    access_token = RecordingStudioApi::ApiAccessToken.find_by!(
+      token_digest: RecordingStudioApi::OauthAccessToken.digest(issued.value.fetch(:access_token))
+    )
+    assert_nil access_token.revoked_at
+
+    @payload.fetch(:credential).revoke!
+
+    assert_not_nil @payload.fetch(:credential).reload.revoked_at
+    assert_not_nil access_token.reload.revoked_at
+  end
+
   test "does not expose database errors during token issuance" do
     result = RecordingStudioApi::ApiAccessToken.stub(:create!, lambda { |**|
       raise ActiveRecord::StatementInvalid, "database constraint detail"

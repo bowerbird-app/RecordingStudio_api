@@ -77,7 +77,16 @@ module RecordingStudioApi
       end
 
       def update_last_used!(credential, _token_record)
-        credential.update_column(:last_used_at, Time.current)
+        touch_last_used_at!(credential)
+      end
+
+      def touch_last_used_at!(record)
+        return if record.nil?
+
+        last_used_at = record.last_used_at if record.respond_to?(:last_used_at)
+        return if last_used_at.present? && last_used_at > 1.minute.ago
+
+        record.update_column(:last_used_at, Time.current)
       end
 
       def service_args

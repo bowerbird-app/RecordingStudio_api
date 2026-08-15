@@ -78,7 +78,7 @@ module RecordingStudioApi
       def safe_id_for(method_name)
         return unless respond_to?(method_name, true)
 
-        value = public_send(method_name)
+        value = send(method_name)
         value&.id
       rescue StandardError
         nil

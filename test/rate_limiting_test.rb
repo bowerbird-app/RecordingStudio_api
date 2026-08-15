@@ -32,7 +32,7 @@ class RateLimitingTest < ActiveSupport::TestCase
   end
 
   class FakeRedis
-    attr_reader :incr_calls, :expire_calls, :ttl_calls
+    attr_reader :incr_calls, :expire_calls, :ttl_calls, :eval_calls
 
     def initialize(incr_values:, ttl:)
       @incr_values = incr_values.dup
@@ -40,6 +40,7 @@ class RateLimitingTest < ActiveSupport::TestCase
       @incr_calls = []
       @expire_calls = []
       @ttl_calls = []
+      @eval_calls = []
     end
 
     def incr(key)
@@ -54,6 +55,14 @@ class RateLimitingTest < ActiveSupport::TestCase
     def ttl(key)
       ttl_calls << key
       @ttl
+    end
+
+    def eval(_script, keys:, argv:)
+      eval_calls << { keys: keys, argv: argv }
+      key = keys.fetch(0)
+      count = incr(key)
+      expire(key, argv.fetch(0))
+      [count, ttl(key)]
     end
   end
 
@@ -95,10 +104,12 @@ class RateLimitingTest < ActiveSupport::TestCase
     @original_configuration = RecordingStudioApi.instance_variable_get(:@configuration)
     RecordingStudioApi.instance_variable_set(:@configuration, RecordingStudioApi::Configuration.new)
     RecordingStudioApi::Concerns::RateLimiting.decider = nil
+    RecordingStudioApi::Concerns::RateLimiting.reset_redis_client!
   end
 
   def teardown
     RecordingStudioApi::Concerns::RateLimiting.decider = nil
+    RecordingStudioApi::Concerns::RateLimiting.reset_redis_client!
     RecordingStudioApi.instance_variable_set(:@configuration, @original_configuration)
   end
 
@@ -130,6 +141,7 @@ class RateLimitingTest < ActiveSupport::TestCase
     assert_equal [expected_key], redis.incr_calls
     assert_equal [[expected_key, 30]], redis.expire_calls
     assert_equal [expected_key], redis.ttl_calls
+    assert_equal 1, redis.eval_calls.length
   end
 
   test "computed oauth decision applies an IP bucket before the recognized client bucket" do
@@ -157,7 +169,7 @@ class RateLimitingTest < ActiveSupport::TestCase
     current_window = (Time.current.to_i / 60).to_i
     expected_key = "recording_studio_api:oauth:ip:203.0.113.9:#{current_window}"
     assert_equal [expected_key], redis.incr_calls
-    assert_equal [], redis.expire_calls
+    assert_equal [[expected_key, 60]], redis.expire_calls
   end
 
   test "computed api pre auth decision uses ip identifier before bearer authentication" do
@@ -186,7 +198,7 @@ class RateLimitingTest < ActiveSupport::TestCase
     current_window = (Time.current.to_i / 20).to_i
     expected_key = "recording_studio_api:api_pre_auth:ip:203.0.113.9:#{current_window}"
     assert_equal [expected_key], redis.incr_calls
-    assert_equal [], redis.expire_calls
+    assert_equal [[expected_key, 20]], redis.expire_calls
   end
 
   test "computed api write decision uses current api client identifier" do
@@ -351,21 +363,33 @@ class RateLimitingTest < ActiveSupport::TestCase
     assert_equal "rate_limit_exceeded", harness.rendered_payload.fetch(:json).fetch(:error)
   end
 
-  test "rate limit redis client uses configured url and returns nil on load error" do
+  test "rate limit redis client uses configured url timeouts and is reused" do
     harness = Harness.new(path: "/recording_studio_api/api/v1/pages", method: :get)
     fake_redis = Object.new
     RecordingStudioApi.configuration.rate_limit_redis_url = "redis://example.test:6379/4"
+    RecordingStudioApi::Concerns::RateLimiting.reset_redis_client!
+    constructed = 0
 
-    redis_client = Redis.stub(:new, lambda do |**kwargs|
-      assert_equal({ url: "redis://example.test:6379/4" }, kwargs)
+    Redis.stub(:new, lambda do |**kwargs|
+      constructed += 1
+      assert_equal "redis://example.test:6379/4", kwargs.fetch(:url)
+      assert_equal 1, kwargs.fetch(:connect_timeout)
+      assert_equal 1, kwargs.fetch(:read_timeout)
+      assert_equal 1, kwargs.fetch(:write_timeout)
       fake_redis
     end) do
-      harness.send(:rate_limit_redis_client)
+      first = harness.send(:rate_limit_redis_client)
+      second = harness.send(:rate_limit_redis_client)
+      assert_same fake_redis, first
+      assert_same first, second
+      assert_equal 1, constructed
     end
+  end
 
-    assert_same fake_redis, redis_client
+  test "rate limit redis client returns nil on load error" do
+    harness = Harness.new(path: "/recording_studio_api/api/v1/pages", method: :get)
 
-    load_error_client = harness.stub(:require, ->(_dependency) { raise LoadError }) do
+    load_error_client = RecordingStudioApi::Concerns::RateLimiting.stub(:redis_client, nil) do
       harness.send(:rate_limit_redis_client)
     end
 

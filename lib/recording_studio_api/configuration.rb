@@ -106,10 +106,10 @@ module RecordingStudioApi
       @layout_name = "recording_studio/default_layout"
       @pagination_default_limit = 50
       @pagination_max_limit = 100
-      @rate_limit_oauth_enabled = false
+      @rate_limit_oauth_enabled = true
       @rate_limit_api_enabled = false
-      @rate_limit_api_pre_auth_enabled = false
-      @rate_limit_fail_closed = false
+      @rate_limit_api_pre_auth_enabled = true
+      @rate_limit_fail_closed = true
       @rate_limit_fail_closed_buckets = %w[oauth api_pre_auth]
       @rate_limit_redis_url = ENV["RECORDING_STUDIO_API_RATE_LIMIT_REDIS_URL"].presence
       @rate_limit_redis_namespace = "recording_studio_api"

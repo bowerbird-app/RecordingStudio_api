@@ -31,8 +31,10 @@ module RecordingStudioApi
       attr_reader :context
 
       def find_destination!
-        destination_id = context.params[:parent_id].presence || context.params[:destination_id].presence || context.params[:new_parent_id].presence
-        raise UnsupportedActionError, "parent_id is required for move" if destination_id.blank?
+        destination_id = context.params[:parent_id].presence ||
+                         context.params[:destination_id].presence ||
+                         context.params[:new_parent_id].presence
+        raise InvalidActionInputError, "parent_id is required for move" if destination_id.blank?
 
         destination = context.access_grant.accessible_recordings.find_by(id: destination_id)
         raise NotFoundError, "Destination recording was not found in this API scope" if destination.nil?

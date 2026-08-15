@@ -5,8 +5,43 @@ module RecordingStudioApi
     module RateLimiting
       extend ActiveSupport::Concern
 
+      # Atomically increment and refresh TTL so a crash between INCR and EXPIRE
+      # cannot leave an immortal counter key.
+      RATE_LIMIT_INCR_EXPIRE_SCRIPT = <<~LUA
+        local count = redis.call("INCR", KEYS[1])
+        redis.call("EXPIRE", KEYS[1], ARGV[1])
+        local ttl = redis.call("TTL", KEYS[1])
+        return { count, ttl }
+      LUA
+
       class << self
         attr_accessor :decider
+
+        def redis_client
+          @redis_client_mutex ||= Mutex.new
+          @redis_client_mutex.synchronize do
+            return @redis_client if defined?(@redis_client) && !@redis_client.nil?
+
+            require "redis"
+            url = RecordingStudioApi.configuration.rate_limit_redis_url.to_s.strip
+            options = {
+              connect_timeout: 1,
+              read_timeout: 1,
+              write_timeout: 1
+            }
+            options[:url] = url if url.present?
+            @redis_client = Redis.new(**options)
+          end
+        rescue LoadError
+          nil
+        end
+
+        def reset_redis_client!
+          @redis_client_mutex ||= Mutex.new
+          @redis_client_mutex.synchronize do
+            @redis_client = nil
+          end
+        end
       end
 
       included do
@@ -76,11 +111,8 @@ module RecordingStudioApi
         current_window = (Time.current.to_i / period).to_i
         key = "#{rate_limit_scoped_namespace}:#{rate_limit_bucket}:#{rate_limit_identifier}:#{current_window}"
 
-        count = redis.incr(key)
-        redis.expire(key, period) if count == 1
-
+        count, retry_after = increment_rate_limit_counter(redis, key, period)
         remaining = [limit - count, 0].max
-        retry_after = redis.ttl(key)
 
         {
           limited: count > limit,
@@ -88,6 +120,17 @@ module RecordingStudioApi
           remaining: remaining,
           retry_after: retry_after.positive? ? retry_after : period
         }
+      end
+
+      def increment_rate_limit_counter(redis, key, period)
+        if redis.respond_to?(:eval)
+          result = redis.eval(RATE_LIMIT_INCR_EXPIRE_SCRIPT, keys: [key], argv: [period.to_i])
+          return [result[0].to_i, result[1].to_i]
+        end
+
+        count = redis.incr(key)
+        redis.expire(key, period)
+        [count, redis.ttl(key)]
       end
 
       def normalize_decision(decision)
@@ -235,12 +278,7 @@ module RecordingStudioApi
       end
 
       def rate_limit_redis_client
-        require "redis"
-
-        url = RecordingStudioApi.configuration.rate_limit_redis_url.to_s.strip
-        @rate_limit_redis_client ||= url.present? ? Redis.new(url: url) : Redis.new
-      rescue LoadError
-        nil
+        RateLimiting.redis_client
       end
     end
   end

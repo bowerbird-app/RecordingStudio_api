@@ -69,7 +69,10 @@ module RecordingStudioApi
     end
 
     def revoke!(time: Time.current)
-      update_columns(revoked_at: time, updated_at: time)
+      transaction do
+        update_columns(revoked_at: time, updated_at: time)
+        access_tokens.where(revoked_at: nil).update_all(revoked_at: time, updated_at: time)
+      end
     end
 
     # Credentials remain mutable during transition while recordables become authoritative.

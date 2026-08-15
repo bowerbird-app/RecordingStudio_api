@@ -354,6 +354,14 @@ module RecordingStudioApi
         required_role: :edit,
         handler: RecordingStudioApi::Services::MoveRecording,
         serializer: RecordingStudioApi::Serializers::ResourceRecordingSerializer,
+        input_contract: {
+          reject_unknown: true,
+          fields: {
+            parent_id: { type: :string, required: false, allow_blank: false },
+            destination_id: { type: :string, required: false, allow_blank: false },
+            new_parent_id: { type: :string, required: false, allow_blank: false }
+          }
+        },
         api: api
       )
     end

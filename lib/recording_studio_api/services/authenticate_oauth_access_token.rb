@@ -41,8 +41,8 @@ module RecordingStudioApi
       end
 
       def update_last_used!(credential, token_record)
-        token_record&.update_column(:last_used_at, Time.current)
-        credential.update_column(:last_used_at, Time.current)
+        touch_last_used_at!(token_record)
+        touch_last_used_at!(credential)
       end
 
       def active_recording_exists_for?(recordable_type, recordable_id)

@@ -121,7 +121,7 @@ module RecordingStudioApi
         root_type: @root_type,
         root_recording_id: @root_recording&.id,
         access_point_recording_id: api_client_params[:access_point_recording_id].presence || access_point_recording&.id,
-        role: api_client_params[:role].presence || "admin",
+        role: api_client_params[:role].presence || "view",
         api_client_name: api_client_params[:api_client_name].presence || default_api_client_name,
         expires_at: api_client_params[:expires_at].to_s,
         api_key: selected_api.name
