@@ -18,8 +18,7 @@ module ApiDummyHelpers
 
   def reset_recording_studio_api_configuration!
     configuration = RecordingStudioApi::Configuration.new
-    # Keep integration tests deterministic; production defaults enable unauthenticated buckets
-    # and require named-API management authorization.
+    # Deterministic tests: disable unauthenticated rate limits and open public management auth.
     configuration.rate_limit_oauth_enabled = false
     configuration.rate_limit_api_pre_auth_enabled = false
     configuration.rate_limit_api_enabled = false
