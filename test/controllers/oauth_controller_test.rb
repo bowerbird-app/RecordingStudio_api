@@ -2,6 +2,7 @@
 
 require_relative "../support/api_dummy_helpers"
 require "devise/test/integration_helpers"
+require "base64"
 
 class OauthControllerTest < ActionDispatch::IntegrationTest
   include ApiDummyHelpers
@@ -265,5 +266,86 @@ class OauthControllerTest < ActionDispatch::IntegrationTest
     assert_nil response.headers["WWW-Authenticate"]
     body = JSON.parse(response.body)
     assert_equal "unsupported_grant_type", body.fetch("error")
+  end
+
+  test "accepts HTTP Basic client credentials for token issuance" do
+    credentials = Base64.strict_encode64(
+      "#{@payload.fetch(:credential).oauth_client_id}:#{@payload.fetch(:token)}"
+    )
+
+    post "/recording_studio_api/oauth/token",
+         params: { grant_type: "client_credentials" },
+         headers: { "Authorization" => "Basic #{credentials}" }
+
+    assert_response :success
+    body = JSON.parse(response.body)
+    assert_equal "Bearer", body.fetch("token_type")
+    assert_match(/\Arsapi_at_/, body.fetch("access_token"))
+  end
+
+  test "prefers body client credentials over HTTP Basic" do
+    other_credentials = Base64.strict_encode64("wrong-id:wrong-secret")
+
+    post "/recording_studio_api/oauth/token",
+         params: {
+           grant_type: "client_credentials",
+           client_id: @payload.fetch(:credential).oauth_client_id,
+           client_secret: @payload.fetch(:token)
+         },
+         headers: { "Authorization" => "Basic #{other_credentials}" }
+
+    assert_response :success
+  end
+
+  test "revokes an issued access token" do
+    post "/recording_studio_api/oauth/token", params: {
+      grant_type: "client_credentials",
+      client_id: @payload.fetch(:credential).oauth_client_id,
+      client_secret: @payload.fetch(:token)
+    }
+    assert_response :success
+    access_token = JSON.parse(response.body).fetch("access_token")
+
+    post "/recording_studio_api/oauth/revoke", params: {
+      token: access_token,
+      token_type_hint: "access_token",
+      client_id: @payload.fetch(:credential).oauth_client_id,
+      client_secret: @payload.fetch(:token)
+    }
+
+    assert_response :success
+    assert_equal "", response.body
+    assert_includes response.headers["Cache-Control"], "no-store"
+
+    token_record = RecordingStudioApi::ApiAccessToken.find_by!(
+      token_digest: RecordingStudioApi::OauthAccessToken.digest(access_token)
+    )
+    assert_not_nil token_record.revoked_at
+
+    get "/recording_studio_api/api/v1/pages",
+        headers: { "Authorization" => "Bearer #{access_token}" }
+    assert_response :unauthorized
+  end
+
+  test "revoke returns success for unknown tokens after client authentication" do
+    post "/recording_studio_api/oauth/revoke", params: {
+      token: "rsapi_at_unknown-token-value",
+      client_id: @payload.fetch(:credential).oauth_client_id,
+      client_secret: @payload.fetch(:token)
+    }
+
+    assert_response :success
+  end
+
+  test "revoke rejects invalid client credentials" do
+    post "/recording_studio_api/oauth/revoke", params: {
+      token: "rsapi_at_anything",
+      client_id: @payload.fetch(:credential).oauth_client_id,
+      client_secret: "bad-secret"
+    }
+
+    assert_response :unauthorized
+    assert_equal 'Basic realm="RecordingStudioApi"', response.headers["WWW-Authenticate"]
+    assert_equal "invalid_client", JSON.parse(response.body).fetch("error")
   end
 end

@@ -139,6 +139,35 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_equal "Invalid pagination token", JSON.parse(response.body).fetch("error")
   end
 
+  test "rejects pagination tokens issued for another api client" do
+    first_page = create_page_recording(root_recording: @root_recording, page_title: "Scoped page one")
+    second_page = create_page_recording(root_recording: @root_recording, page_title: "Scoped page two")
+    third_page = create_page_recording(root_recording: @root_recording, page_title: "Scoped page three")
+    now = Time.current
+    [first_page, second_page, third_page].each { |page| page.update_columns(created_at: now, updated_at: now) }
+
+    get "/recording_studio_api/api/v1/pages", params: { limit: 2 }, headers: authorization_headers
+    assert_response :success
+    pagination_token = JSON.parse(response.body).dig("meta", "next_pagination_token")
+    refute_nil pagination_token
+
+    other_token = issue_oauth_access_token_for(access_recording: @access_recording, name: "Other pagination client")
+
+    get "/recording_studio_api/api/v1/pages",
+        params: { limit: 2, pagination_token: pagination_token },
+        headers: { "Authorization" => "Bearer #{other_token}" }
+
+    assert_response :unprocessable_entity
+    assert_equal "Pagination token does not match authenticated client", JSON.parse(response.body).fetch("error")
+  end
+
+  test "returns WWW-Authenticate Bearer challenge on unauthorized api requests" do
+    get "/recording_studio_api/api/v1/pages", headers: { "Authorization" => "Bearer invalid-token" }
+
+    assert_response :unauthorized
+    assert_equal 'Bearer realm="RecordingStudioApi"', response.headers["WWW-Authenticate"]
+  end
+
   test "returns unprocessable entity for a tampered pagination token" do
     3.times { |index| create_page_recording(root_recording: @root_recording, page_title: "Page #{index}") }
 

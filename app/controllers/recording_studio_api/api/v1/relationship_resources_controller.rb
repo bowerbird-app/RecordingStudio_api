@@ -18,7 +18,8 @@ module RecordingStudioApi
             pagination_token: params[:pagination_token],
             sort: params[:sort],
             order: params[:order],
-            api: current_api_key
+            api: current_api_key,
+            scope_key: "client:#{current_api_client.id}"
           )
           raise RecordingStudioApi::InvalidPaginationTokenError, pagination.error if pagination.failure?
 

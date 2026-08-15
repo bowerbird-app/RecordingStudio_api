@@ -7,10 +7,10 @@ module RecordingStudioApi
   module Services
     class PaginateResourceCollection < BaseService
       SUPPORTED_ORDERS = %w[asc desc].freeze
-      PAGINATION_TOKEN_VERSION = 1
-      PAGINATION_TOKEN_PURPOSE = "recording_studio_api.pagination.v1"
+      PAGINATION_TOKEN_VERSION = 2
+      PAGINATION_TOKEN_PURPOSE = "recording_studio_api.pagination.v2"
 
-      def initialize(relation:, resource:, recordable_type:, limit:, pagination_token:, sort:, order:, api: :public)
+      def initialize(relation:, resource:, recordable_type:, limit:, pagination_token:, sort:, order:, api: :public, scope_key: nil)
         @relation = relation
         @resource = resource.to_s
         @recordable_type = recordable_type.to_s
@@ -19,11 +19,12 @@ module RecordingStudioApi
         @sort = sort
         @order = order
         @api_key = RecordingStudioApi.configuration.fetch_api(api).name
+        @scope_key = scope_key.to_s.presence || "anonymous"
       end
 
       private
 
-      attr_reader :relation, :resource, :recordable_type, :limit, :pagination_token, :sort, :order, :api_key
+      attr_reader :relation, :resource, :recordable_type, :limit, :pagination_token, :sort, :order, :api_key, :scope_key
 
       def perform
         sortable_context = resolve_sortable_context
@@ -93,6 +94,8 @@ module RecordingStudioApi
         encode_pagination_token(
           {
             "v" => PAGINATION_TOKEN_VERSION,
+            "api_key" => api_key,
+            "scope" => scope_key,
             "resource" => resource,
             "sort" => normalized_sort,
             "order" => normalized_order,
@@ -141,6 +144,8 @@ module RecordingStudioApi
         payload = pagination_token_verifier.verify(pagination_token.to_s, purpose: PAGINATION_TOKEN_PURPOSE)
         raise RecordingStudioApi::InvalidPaginationTokenError, "Invalid pagination token" unless payload.is_a?(Hash)
         raise RecordingStudioApi::InvalidPaginationTokenError, "Invalid pagination token" unless payload.fetch("v") == PAGINATION_TOKEN_VERSION
+        raise RecordingStudioApi::InvalidPaginationTokenError, "Pagination token does not match requested API" unless payload.fetch("api_key") == api_key
+        raise RecordingStudioApi::InvalidPaginationTokenError, "Pagination token does not match authenticated client" unless payload.fetch("scope") == scope_key
         raise RecordingStudioApi::InvalidPaginationTokenError, "Pagination token does not match requested resource" unless payload.fetch("resource") == resource
         raise RecordingStudioApi::InvalidPaginationTokenError, "Pagination token does not match requested sort" unless payload.fetch("sort") == normalized_sort
         raise RecordingStudioApi::InvalidPaginationTokenError, "Pagination token does not match requested order" unless payload.fetch("order") == normalized_order

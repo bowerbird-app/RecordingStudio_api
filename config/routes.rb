@@ -31,7 +31,9 @@ RecordingStudioApi::Engine.routes.draw do
     post :rotate, on: :member
   end
   post "/oauth/token", to: "oauth#token", defaults: { api_key: "public" }
+  post "/oauth/revoke", to: "oauth#revoke", defaults: { api_key: "public" }
   post "/apis/:api_key/oauth/token", to: "oauth#token", as: :named_api_oauth_token
+  post "/apis/:api_key/oauth/revoke", to: "oauth#revoke", as: :named_api_oauth_revoke
 
   namespace :api, defaults: { format: :json, api_key: "public" } do
     namespace :v1, defaults: { api_version: "v1" } do

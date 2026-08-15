@@ -4,11 +4,7 @@ module RecordingStudioApi
   module Services
     class IssueOauthAccessToken < BaseService
       SUPPORTED_GRANT_TYPE = "client_credentials"
-      # Fixed digest used when no credential exists so authentication always
-      # performs a constant-time compare of equal-length SHA256 hex digests.
-      DUMMY_CLIENT_SECRET_DIGEST = Token.digest(
-        "recording-studio-api.oauth.dummy-client-secret"
-      ).freeze
+      DUMMY_CLIENT_SECRET = "recording-studio-api.oauth.dummy-client-secret"
 
       def initialize(grant_type:, client_id:, client_secret:, api: :public)
         @grant_type = grant_type
@@ -74,18 +70,15 @@ module RecordingStudioApi
       end
 
       def authenticate_client?(credential)
-        provided_digest = Token.digest(client_secret)
-        expected_digest = credential&.token_digest.presence || DUMMY_CLIENT_SECRET_DIGEST
-        secret_matches = secure_compare(expected_digest, provided_digest)
+        expected_digest = credential&.token_digest.presence || dummy_client_secret_digest
+        secret_matches = Token.digest_matches?(expected_digest, client_secret)
+        TokenDigest.rehash_if_legacy!(credential, client_secret) if secret_matches && credential.present?
 
         credential.present? && credential.active_for_authentication? && secret_matches
       end
 
-      def secure_compare(left, right)
-        return false if left.blank? || right.blank?
-        return false unless left.bytesize == right.bytesize
-
-        ActiveSupport::SecurityUtils.secure_compare(left, right)
+      def dummy_client_secret_digest
+        Token.digest(DUMMY_CLIENT_SECRET)
       end
 
       def resolved_expiry

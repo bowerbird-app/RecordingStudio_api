@@ -8,7 +8,10 @@ module RecordingStudioApi
     include RecordingStudioApi::Concerns::RequestLogging
     include RecordingStudioApi::Concerns::ApiAccessControl
 
+    API_WWW_AUTHENTICATE = 'Bearer realm="RecordingStudioApi"'
+
     rescue_from RecordingStudioApi::AuthenticationError do |error|
+      response.set_header("WWW-Authenticate", API_WWW_AUTHENTICATE)
       render_error(error.message, :unauthorized)
     end
 

@@ -38,13 +38,29 @@ module RecordingStudioApi
             path: oauth_token_path,
             action: "oauth#token",
             summary: "Exchange OAuth client credentials",
-            description: "Exchange client credentials for an OAuth2 access token.",
+            description: "Exchange client credentials for an OAuth2 access token. Supply client_id and client_secret in the form body or via HTTP Basic authentication. Query-string credentials are rejected.",
             capability: nil,
             scope: nil,
             openapi: {
               tags: ["Authentication"],
+              security: [],
               request_body: oauth_token_request_body,
               responses: oauth_token_responses
+            }
+          },
+          {
+            verb: "POST",
+            path: oauth_revoke_path,
+            action: "oauth#revoke",
+            summary: "Revoke an OAuth access token",
+            description: "Revoke a previously issued OAuth2 access token (RFC 7009). Authenticate with client credentials in the form body or via HTTP Basic. Unknown tokens still return 200 once the client authenticates.",
+            capability: nil,
+            scope: nil,
+            openapi: {
+              tags: ["Authentication"],
+              security: [],
+              request_body: oauth_revoke_request_body,
+              responses: oauth_revoke_responses
             }
           }
         ]
@@ -393,6 +409,12 @@ module RecordingStudioApi
         return mounted_path("/oauth/token") if @api_key == "public"
 
         mounted_path("/apis/#{@api_key}/oauth/token")
+      end
+
+      def oauth_revoke_path
+        return mounted_path("/oauth/revoke") if @api_key == "public"
+
+        mounted_path("/apis/#{@api_key}/oauth/revoke")
       end
 
       def api_recordable_types
@@ -868,10 +890,42 @@ module RecordingStudioApi
                 type: "object",
                 properties: {
                   grant_type: { type: "string", enum: ["client_credentials"] },
-                  client_id: { type: "string" },
-                  client_secret: { type: "string" }
+                  client_id: {
+                    type: "string",
+                    description: "OAuth client id. Optional when supplied via HTTP Basic username."
+                  },
+                  client_secret: {
+                    type: "string",
+                    description: "OAuth client secret. Optional when supplied via HTTP Basic password."
+                  }
                 },
-                required: %w[grant_type client_id client_secret]
+                required: %w[grant_type]
+              }
+            }
+          }
+        }
+      end
+
+      def oauth_revoke_request_body
+        {
+          required: true,
+          content: {
+            "application/x-www-form-urlencoded" => {
+              schema: {
+                type: "object",
+                properties: {
+                  token: { type: "string", description: "Access token to revoke." },
+                  token_type_hint: { type: "string", enum: ["access_token"] },
+                  client_id: {
+                    type: "string",
+                    description: "OAuth client id. Optional when supplied via HTTP Basic username."
+                  },
+                  client_secret: {
+                    type: "string",
+                    description: "OAuth client secret. Optional when supplied via HTTP Basic password."
+                  }
+                },
+                required: %w[token]
               }
             }
           }
@@ -888,11 +942,73 @@ module RecordingStudioApi
               }
             }
           },
-          "401" => {
-            "$ref" => "#/components/responses/Unauthorized"
+          "400" => {
+            description: "Invalid OAuth token request.",
+            content: {
+              "application/json" => {
+                schema: { "$ref" => "#/components/schemas/OAuthError" }
+              }
+            }
           },
-          "422" => {
-            "$ref" => "#/components/responses/UnprocessableEntity"
+          "401" => {
+            description: "Client authentication failed.",
+            headers: {
+              "WWW-Authenticate" => {
+                schema: { type: "string" },
+                description: 'Basic realm="RecordingStudioApi"'
+              }
+            },
+            content: {
+              "application/json" => {
+                schema: { "$ref" => "#/components/schemas/OAuthError" }
+              }
+            }
+          },
+          "429" => {
+            description: "OAuth rate limit exceeded.",
+            content: {
+              "application/json" => {
+                schema: { "$ref" => "#/components/schemas/OAuthError" }
+              }
+            }
+          }
+        }
+      end
+
+      def oauth_revoke_responses
+        {
+          "200" => {
+            description: "Token revoked, or the token was unknown to this client."
+          },
+          "400" => {
+            description: "Invalid OAuth revoke request.",
+            content: {
+              "application/json" => {
+                schema: { "$ref" => "#/components/schemas/OAuthError" }
+              }
+            }
+          },
+          "401" => {
+            description: "Client authentication failed.",
+            headers: {
+              "WWW-Authenticate" => {
+                schema: { type: "string" },
+                description: 'Basic realm="RecordingStudioApi"'
+              }
+            },
+            content: {
+              "application/json" => {
+                schema: { "$ref" => "#/components/schemas/OAuthError" }
+              }
+            }
+          },
+          "429" => {
+            description: "OAuth rate limit exceeded.",
+            content: {
+              "application/json" => {
+                schema: { "$ref" => "#/components/schemas/OAuthError" }
+              }
+            }
           }
         }
       end

@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-require "digest"
 require "securerandom"
+require_relative "token_digest"
 
 module RecordingStudioApi
   module Token
@@ -36,7 +36,15 @@ module RecordingStudioApi
     end
 
     def digest(token)
-      Digest::SHA256.hexdigest(token.to_s)
+      TokenDigest.digest(token)
+    end
+
+    def digest_candidates(token)
+      TokenDigest.digest_candidates(token)
+    end
+
+    def digest_matches?(stored_digest, token)
+      TokenDigest.matches?(stored_digest, token)
     end
   end
 end

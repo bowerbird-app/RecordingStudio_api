@@ -138,11 +138,8 @@ module RecordingStudioApi
       end
 
       def default_responses_for(endpoint)
-        if token_endpoint?(endpoint)
-          {
-            "401" => { "$ref" => "#/components/responses/Unauthorized" },
-            "422" => { "$ref" => "#/components/responses/UnprocessableEntity" }
-          }
+        if auth_endpoint?(endpoint)
+          {}
         else
           {
             "401" => { "$ref" => "#/components/responses/Unauthorized" },
@@ -153,7 +150,7 @@ module RecordingStudioApi
       end
 
       def security_for(endpoint, metadata)
-        return metadata.fetch(:security, []) if token_endpoint?(endpoint)
+        return metadata.fetch(:security, []) if auth_endpoint?(endpoint)
 
         metadata.fetch(:security, [{ bearerAuth: [] }])
       end
@@ -180,6 +177,11 @@ module RecordingStudioApi
               type: "http",
               scheme: "bearer",
               bearerFormat: "OAuth2"
+            },
+            oauthHttpBasic: {
+              type: "http",
+              scheme: "basic",
+              description: "OAuth client_id as username and client_secret as password."
             },
             oauthClientCredentials: {
               type: "oauth2",
@@ -211,12 +213,22 @@ module RecordingStudioApi
               },
               required: ["error"]
             },
+            OAuthError: {
+              type: "object",
+              properties: {
+                error: { type: "string" },
+                error_description: { type: "string" }
+              },
+              required: ["error"]
+            },
             OAuthTokenResponse: {
               type: "object",
               properties: {
                 access_token: { type: "string" },
                 token_type: { type: "string", enum: ["Bearer"] },
-                expires_in: { type: "integer" }
+                expires_in: { type: "integer" },
+                created_at: { type: "integer" },
+                api_client_id: { type: "string" }
               },
               required: %w[access_token token_type expires_in]
             }
@@ -224,6 +236,12 @@ module RecordingStudioApi
           responses: {
             Unauthorized: {
               description: "Authentication failed.",
+              headers: {
+                "WWW-Authenticate" => {
+                  schema: { type: "string" },
+                  description: 'Bearer realm="RecordingStudioApi"'
+                }
+              },
               content: {
                 "application/json" => {
                   schema: { "$ref" => "#/components/schemas/Error" }
@@ -285,21 +303,30 @@ module RecordingStudioApi
       end
 
       def tag_for(endpoint)
-        return "auth" if token_endpoint?(endpoint)
+        return "auth" if auth_endpoint?(endpoint)
 
         "resources"
       end
 
+      def auth_endpoint?(endpoint)
+        endpoint.fetch(:action).to_s.start_with?("oauth#")
+      end
+
       def token_endpoint?(endpoint)
-        endpoint.fetch(:path) == oauth_token_path
+        endpoint.fetch(:action).to_s == "oauth#token"
       end
 
       def oauth_token_path
         @oauth_token_path ||= begin
           mount_path = @mount_path.presence || DocumentationCatalog::DEFAULT_MOUNT_PATH
           path_segments = mount_path.to_s.squeeze("/").split("/").reject(&:blank?)
+          segments = if @api_key == "public"
+                       path_segments + %w[oauth token]
+                     else
+                       path_segments + ["apis", @api_key, "oauth", "token"]
+                     end
 
-          "/#{(path_segments + %w[oauth token]).join('/')}"
+          "/#{segments.join('/')}"
         end
       end
     end

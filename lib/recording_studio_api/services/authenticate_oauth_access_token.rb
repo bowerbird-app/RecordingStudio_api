@@ -54,14 +54,18 @@ module RecordingStudioApi
       end
 
       def resolve_api_access_token(token)
-        provided_digest = OauthAccessToken.digest(token)
-        access_token = ApiAccessToken.includes(credential: :api_client).find_by(token_digest: provided_digest)
+        access_token = OauthAccessToken.find_by_token(
+          ApiAccessToken.includes(credential: :api_client),
+          token
+        )
         return if access_token.nil?
         return [nil, nil] unless active_recording_exists_for?("RecordingStudioApi::ApiAccessToken", access_token.id)
 
         credential = access_token.credential
         return [nil, nil] if credential.nil?
         return [nil, nil] unless active_recording_exists_for?("RecordingStudioApi::ApiCredential", credential.id)
+
+        OauthAccessToken.rehash_if_legacy!(access_token, token)
 
         [credential, access_token]
       end

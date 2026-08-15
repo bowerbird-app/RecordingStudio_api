@@ -18,11 +18,13 @@ module ApiDummyHelpers
 
   def reset_recording_studio_api_configuration!
     configuration = RecordingStudioApi::Configuration.new
-    # Keep integration tests deterministic; production defaults enable unauthenticated buckets.
+    # Keep integration tests deterministic; production defaults enable unauthenticated buckets
+    # and require named-API management authorization.
     configuration.rate_limit_oauth_enabled = false
     configuration.rate_limit_api_pre_auth_enabled = false
     configuration.rate_limit_api_enabled = false
     configuration.rate_limit_fail_closed = false
+    configuration.api_management_authorization_required = false
     RecordingStudioApi.instance_variable_set(:@configuration, configuration)
     RecordingStudioApi::Concerns::RateLimiting.reset_redis_client!
     RecordingStudioApi.register_default_capability_actions!

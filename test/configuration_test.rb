@@ -138,7 +138,7 @@ class ConfigurationTest < Minitest::Test
     assert_equal 20.minutes, @configuration.access_token_ttl
     assert_equal 75, @configuration.rate_limit_api_read_requests
     assert_equal %w[query], @configuration.api_request_log_allowed_param_keys
-    refute @configuration.api_management_authorization_required
+    assert @configuration.api_management_authorization_required
   end
 
   def test_api_names_are_normalized_and_invalid_names_are_rejected

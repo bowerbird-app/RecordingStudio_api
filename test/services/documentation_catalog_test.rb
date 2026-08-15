@@ -19,6 +19,8 @@ module RecordingStudioApi
         end
 
         assert_equal "/recording_studio_api/oauth/token", catalog.fetch(:auth_endpoints).first.fetch(:path)
+        assert_equal "/recording_studio_api/oauth/revoke", catalog.fetch(:auth_endpoints).second.fetch(:path)
+        assert_equal 2, catalog.fetch(:auth_endpoints).length
         assert_equal "/recording_studio_api/api/v1", catalog.fetch(:root_endpoints).first.fetch(:path)
 
         resources = catalog.fetch(:resources)
@@ -470,6 +472,7 @@ module RecordingStudioApi
         end
 
         assert_equal "/platform/recording-api/oauth/token", catalog.fetch(:auth_endpoints).first.fetch(:path)
+        assert_equal "/platform/recording-api/oauth/revoke", catalog.fetch(:auth_endpoints).second.fetch(:path)
         assert_equal "/platform/recording-api/public-api/v2", catalog.fetch(:root_endpoints).first.fetch(:path)
       ensure
         RecordingStudioApi.configuration.api_versions = original_versions

@@ -261,7 +261,7 @@ module RecordingStudioApi
       def rate_limit_bucket_override = @rate_limit_bucket_override
 
       def oauth_rate_limited_path?
-        request.path.end_with?("/oauth/token")
+        request.path.end_with?("/oauth/token", "/oauth/revoke")
       end
 
       def api_rate_limited_path?
