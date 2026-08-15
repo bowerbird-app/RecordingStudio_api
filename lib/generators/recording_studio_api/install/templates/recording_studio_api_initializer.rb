@@ -63,7 +63,13 @@ RecordingStudioApi.configure do |config|
   # ActiveJob ("batched") when a queue backend is configured.
   # config.api_request_logging_delivery = "sync"
   # config.api_request_logging_batch_size = 25
-  # Raw request details are retained for 30 days; daily aggregates are retained indefinitely.
+  # Raw request details are retained for 30 days; daily aggregates are retained
+  # indefinitely unless api_daily_metric_retention_days is set.
   # config.api_request_log_retention_days = 30
   # config.api_daily_metric_retention_days = nil
+  #
+  # Schedule nightly maintenance so retention actually runs:
+  #   bin/rails recording_studio_api:api_metrics:maintain
+  # or enqueue from Solid Queue / Sidekiq-Cron:
+  #   RecordingStudioApi::MaintainApiMetricsJob.perform_later
 end

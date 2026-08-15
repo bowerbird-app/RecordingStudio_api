@@ -224,6 +224,36 @@ of `--user-apis` makes it available only from the site administration root. Ever
 an API credential access point must enable Recording Studio's `api_access_point` capability; the gem
 then intersects that capability with the selected API's registered recordables.
 
+### Request logging and metrics retention
+
+When `api_request_logging_enabled` is on, each API request can write a row to the API logging
+database. Admin charts prefer rolled-up daily metrics, so hosts should run maintenance nightly:
+
+1. Aggregate the last few complete days into `api_daily_metrics` (and latency histogram buckets).
+2. Delete raw `api_request_logs` older than `api_request_log_retention_days` (default 30).
+3. Optionally delete daily metrics older than `api_daily_metric_retention_days` (default `nil` =
+   keep forever).
+
+```sh
+# Synchronous maintain (cron / Kamal / systemd timer)
+bin/rails recording_studio_api:api_metrics:maintain
+
+# Or enqueue for an ActiveJob backend (Solid Queue, Sidekiq, etc.)
+bin/rails recording_studio_api:api_metrics:enqueue_maintain
+```
+
+Solid Queue recurring example:
+
+```ruby
+# config/recurring.yml
+maintain_api_metrics:
+  class: RecordingStudioApi::MaintainApiMetricsJob
+  queue: recording_studio_api_metrics
+  schedule: every day at 2am
+```
+
+Without a schedule, retention config is inert and raw request logs keep growing.
+
 ### Core registries
 
 `RecordingStudioApi` is intended to expose explicit registration layers for:
