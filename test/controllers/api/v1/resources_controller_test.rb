@@ -768,7 +768,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
   test "creates a scoped workspace resource and filters unknown attributes" do
     post "/recording_studio_api/api/v1/workspaces", params: {
       name: "Created Workspace",
-        unknown_attribute: "ignored"
+      unknown_attribute: "ignored"
     }, headers: authorization_headers
 
     assert_response :created
