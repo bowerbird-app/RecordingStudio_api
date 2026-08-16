@@ -708,6 +708,11 @@ Sign in with:
 | FlatPack        | v0.1.124 (pinned in `test/dummy/Gemfile`) |
 | Devise          | latest  |
 
+Current declared gems, lockfile drift, and the phased bump to latest compatible
+releases are documented in [docs/DEPENDENCY_UPGRADE_PLAN.md](docs/DEPENDENCY_UPGRADE_PLAN.md).
+
 ## Documentation
 
 The original gem template documentation is preserved in this repository under `docs/gem_template/` as architectural reference material. Those files are for contributors reviewing the repo, not packaged gem docs; the README and dummy app are now the source of truth for the Recording Studio API design handoff.
+
+For gem and dummy-app version bumps, use [docs/DEPENDENCY_UPGRADE_PLAN.md](docs/DEPENDENCY_UPGRADE_PLAN.md).
