@@ -1,6 +1,6 @@
 # Dependency upgrade plan
 
-Snapshot date: **16 August 2026**.
+Snapshot date: **17 August 2026** (rechecked after RecordingStudio **v4.0.0** GitHub Release).
 
 This is a review plan, not an executed upgrade. It inventories every gem declared by
 `recording_studio_api` and the dummy app, compares them with the latest published
@@ -8,6 +8,29 @@ versions, and recommends a phased update order.
 
 Do not treat `UPDATE_SUMMARY.md` as current; that file is an archival snapshot from
 February 2026.
+
+## Recheck verdict (17 Aug 2026)
+
+**RecordingStudio v4.0.0 is now a published GitHub Release**
+([release](https://github.com/bowerbird-app/RecordingStudio/releases/tag/v4.0.0),
+published 17 Aug 2026). It is still **not installable** in this repo: Accessible,
+Moveable, Admin, and Root Switchable gemspecs all require `recording_studio ~> 3.0`.
+
+Sibling upgrade work is converging on the **3.0.3** stack, not 4.0:
+
+| Sibling | Open work | Studio pin |
+| --- | --- | --- |
+| Accessible | PR [#12](https://github.com/bowerbird-app/RecordingStudio_accessible/pull/12) → `0.5.1` | Explicitly stays on **v3.0.3**; defers 4.0 |
+| Moveable | PR [#11](https://github.com/bowerbird-app/RecordingStudio_moveable/pull/11) → `2.1.2` | Stays on **v3.0.3**; Accessible only to **0.3.2** (conservative) |
+| Root Switchable | main already **0.3.5**; Dependabot PRs for Rails/Puma/etc. | Still `recording_studio ~> 3.0` |
+| Admin | no open upgrade PR | Gemfile still on Studio **v3.0.2** / Accessible **0.3.2** |
+
+**Take now:** Studio **v3.0.3** + Accessible **v0.5.0** (or wait for 0.5.1) + Admin
+**1.2.0** + Moveable **2.1.1** (or 2.1.2 when merged) + Root Switchable **v0.3.5** +
+FlatPack **v0.1.129** + Rails **8.1.3.1**.
+
+**Still blocked:** Studio **4.0.0**, Pagy **43**, FlatPack-driven ViewComponent majors
+(none), dummy `image_processing` **2.x** (optional).
 
 ## How dependencies are split
 
@@ -32,10 +55,14 @@ independent of gem updates. Bundler is `4.0.0` in both lockfiles.
 
 | Gem | Constraint | Locked | Latest | Action |
 | --- | --- | --- | --- | --- |
-| `rails` | `~> 8.1.0` | 8.1.3 | **8.1.3.1** (29 Jul 2026) | Take the patch. Constraint already allows it. |
-| `recording_studio` | `~> 3.0` | tag `v3.0.2` resolving as **3.0.1** at SHA `3369c49` | **4.0.0** tagged 16 Aug 2026; latest 3.x release **v3.0.3** | Phase 1: `v3.0.3`. Phase 4 (blocked): `v4.0.0`. |
-| `recording_studio_accessible` | `~> 0.3` | branch `copilot/upgrade-recordingstudio-3-0-0` at **0.3.1** | **v0.5.0** (12 Aug 2026) | Leave the stale copilot branch. Pin `tag: "v0.5.0"`. Dummy config required. |
-| `redis` | `~> 5.3` | 5.4.1 | **6.0.0** (31 Jul 2026) | Widen the gemspec (`>= 5.3`, `< 7` or `~> 6.0`) then bump. This gem only uses INCR/TTL/EXPIRE/EVAL/GET/SET/DEL. |
+| `rails` | `~> 8.1.0` | 8.1.3 | **8.1.3.1** | Take the patch. Constraint already allows it. |
+| `recording_studio` | `~> 3.0` | tag `v3.0.2` resolving as **3.0.1** at SHA `3369c49` | **4.0.0 released**; latest compatible **v3.0.3** | Phase 1: `v3.0.3`. Phase 4 (blocked): `v4.0.0`. |
+| `recording_studio_accessible` | `~> 0.3` | branch `copilot/upgrade-recordingstudio-3-0-0` at **0.3.1** | **v0.5.0** (0.5.1 pending in Accessible PR #12) | Leave the stale copilot branch. Pin `tag: "v0.5.0"` (or `0.5.1` once tagged). Dummy config required. |
+| `redis` | `~> 5.3` | 5.4.1 | **6.0.0** | Widen the gemspec (`>= 5.3`, `< 7` or `~> 6.0`) then bump. This gem only uses INCR/TTL/EXPIRE/EVAL/GET/SET/DEL. |
+
+Note: `~> 0.3` already allows Accessible 0.4/0.5 (`>= 0.3`, `< 1.0`). Bundler is not
+the reason Moveable's PR stays on 0.3.2 — that is a behavioral / coordination choice
+(`access_actor_types` fail-closed in 0.5.0).
 
 ### GitHub ecosystem gems (both Gemfiles)
 
@@ -44,13 +71,13 @@ tag does not exist.
 
 | Gem | Current pin | Locked version | Latest | Action |
 | --- | --- | --- | --- | --- |
-| `recording_studio` | `tag: "v3.0.2"` | 3.0.1 (stale SHA vs current `v3.0.2`) | 4.0.0 tag / 3.0.3 release | Pin `v3.0.3` now. 4.0 is blocked by sibling gemspecs. |
-| `recording_studio_accessible` | **branch** `copilot/upgrade-recordingstudio-3-0-0` | 0.3.1 | **v0.5.0** | Highest-risk compatible bump. Breaking actor-type default. |
-| `recording_studio_admin` | `tag: "1.1.0"` | 1.1.0 | **1.2.0** (11 Aug 2026) | Additive (widget info tooltips). Safe with Accessible 0.5 (`~> 0.3` still). |
+| `recording_studio` | `tag: "v3.0.2"` | 3.0.1 (stale SHA vs current `v3.0.2`) | **4.0.0 released**; compatible target **v3.0.3** | Pin `v3.0.3` now. 4.0 waits on sibling gemspecs. |
+| `recording_studio_accessible` | **branch** `copilot/upgrade-recordingstudio-3-0-0` | 0.3.1 | **v0.5.0** (+ 0.5.1 in flight) | Highest-risk compatible bump. Breaking actor-type default. |
+| `recording_studio_admin` | `tag: "1.1.0"` | 1.1.0 | **1.2.0** | Additive (widget info tooltips). Safe with Accessible 0.5 (`~> 0.3` still). |
 | `recording_studio_icons` | unpinned GitHub HEAD | 0.1.0 @ `7c32c08` | same SHA, no tags | Already latest. Optionally add a tag pin once Icons ships one. |
-| `recording_studio_moveable` | **branch** `copilot/update-access-api-in-moveable` | **0.1.0** | **2.1.1** (5 Aug 2026) | Largest dummy-app jump. The copilot branch is obsolete. |
-| `recording_studio_root_switchable` | SHA `e684aa3` (commented 0.3.0) | 0.3.0 | **v0.3.5** tag (16 Aug 2026); latest GitHub *release* is still v0.3.1 | Pin `tag: "v0.3.5"`. Includes security cookie/redirect changes. |
-| `flat_pack` | `tag: "v0.1.124"` | 0.1.124 | **v0.1.129** (17 Jul 2026) | Patch-level UI gem. Admin still requires `~> 0.1.124`, which allows 0.1.129. |
+| `recording_studio_moveable` | **branch** `copilot/update-access-api-in-moveable` | **0.1.0** | **2.1.1** (2.1.2 pending in Moveable PR #11) | Largest dummy-app jump. The copilot branch is obsolete. |
+| `recording_studio_root_switchable` | SHA `e684aa3` (commented 0.3.0) | 0.3.0 | **v0.3.5** tag; GitHub *Release* list still tops at v0.3.1 | Pin `tag: "v0.3.5"`. Includes security cookie/redirect changes. |
+| `flat_pack` | `tag: "v0.1.124"` | 0.1.124 | **v0.1.129** | Patch-level UI gem. Admin still requires `~> 0.1.124`, which allows 0.1.129. |
 
 `flat_pack` 0.1.129 still depends on `pagy ~> 9.0` and `view_component ~> 4.12.0`.
 Pagy 43 exists on RubyGems but **cannot** be taken until FlatPack loosens that constraint.
@@ -109,16 +136,17 @@ The RecordingStudio Git pin is also inconsistent with GitHub: both lockfiles cla
 
 ## Blocker: RecordingStudio 4.0.0
 
-`recording_studio` **4.0.0** is tagged and `main` is already 4.0.0 (no GitHub Release
-object yet). It is **not** installable with the current sibling gems:
+`recording_studio` **4.0.0** now has a published GitHub Release (17 Aug 2026). It is
+**still not installable** with current sibling gems:
 
-- Accessible 0.5.0 still has `recording_studio ~> 3.0`
+- Accessible 0.5.0 / pending 0.5.1 still have `recording_studio ~> 3.0`
 - Admin 1.2.0 still has `recording_studio_accessible ~> 0.3` (fine) but Accessible
   cannot resolve Studio 4
-- Moveable 2.1.1 has `recording_studio ~> 3.0`
+- Moveable 2.1.1 / pending 2.1.2 have `recording_studio ~> 3.0`
 - Root Switchable 0.3.5 has `recording_studio ~> 3.0`
 
-Bundler will not resolve Studio 4.0 against those gemspecs.
+Bundler will not resolve Studio 4.0 against those gemspecs. Sibling upgrade PRs
+explicitly stay on **v3.0.3** for the same reason.
 
 Studio 4.0 breaking changes that will matter here once unblocked:
 
@@ -134,7 +162,8 @@ do not rely on implicit order today, but collection endpoints and admin queries
 should be re-checked when 4.0 lands.
 
 **Do not attempt Studio 4.0 in the first upgrade PR.** Track it as a follow-up once
-Accessible (at least) publishes a `~> 4.0` or `>= 4.0` constraint.
+Accessible (at least) publishes a `~> 4.0` or `>= 4.0` constraint, then Moveable /
+Root Switchable / this gemspec follow.
 
 ## Recommended phases
 
@@ -142,22 +171,28 @@ Accessible (at least) publishes a `~> 4.0` or `>= 4.0` constraint.
 
 Highest value, highest behavioral risk. One PR, both Gemfiles, both lockfiles.
 
-Target pins:
+Target pins (17 Aug recheck):
 
 ```ruby
 gem "recording_studio", github: "bowerbird-app/RecordingStudio", tag: "v3.0.3"
 gem "recording_studio_accessible", github: "bowerbird-app/RecordingStudio_accessible", tag: "v0.5.0"
+# prefer tag "0.5.1" once Accessible PR #12 merges and tags
 gem "recording_studio_admin", github: "bowerbird-app/RecordingStudio_admin", tag: "1.2.0"
 gem "recording_studio_icons", github: "bowerbird-app/RecordingStudio_icons" # still untagged
 gem "recording_studio_moveable", github: "bowerbird-app/RecordingStudio_moveable", tag: "2.1.1"
+# prefer tag "2.1.2" once Moveable PR #11 merges and tags
 gem "recording_studio_root_switchable", github: "bowerbird-app/RecordingStudio_root_switchable", tag: "v0.3.5"
 gem "flat_pack", github: "bowerbird-app/flatpack", tag: "v0.1.129"
 ```
 
-Gemspec: keep `recording_studio ~> 3.0`. Tighten Accessible only if this gem starts
-depending on 0.4/0.5-only APIs (`authorized_through?`, `access_actor_types`). Hosts
-on Accessible 0.3.x would then need a matching bump. Prefer leaving
-`recording_studio_accessible ~> 0.3` unless tests fail on 0.3 after we stop testing it.
+Gemspec: keep `recording_studio ~> 3.0`. Leave `recording_studio_accessible ~> 0.3`
+unless this gem starts depending on 0.4/0.5-only APIs (`authorized_through?`,
+`access_actor_types`). Hosts on Accessible 0.3.x would then need a matching bump.
+
+Conservative alternative if Accessible 0.5 risk is too high for one PR: pin Accessible
+`0.3.2` first (matches Moveable PR #11), then follow with 0.5.x + `access_actor_types`
+in a second PR. Prefer going straight to 0.5.x here so we leave the stale copilot
+branch and pick up hierarchy / integrity fixes.
 
 Dummy / test changes required for Accessible 0.5.0:
 
@@ -246,12 +281,12 @@ Defer:
 - **pagy 43** — blocked by FlatPack `pagy ~> 9.0`.
 - **Ruby 3.3.12** — optional patch; not required for these gems.
 
-### Phase 4 — RecordingStudio 4.0.0 (blocked)
+### Phase 4 — RecordingStudio 4.0.0 (blocked until siblings move)
 
 When Accessible, Moveable, Admin, and Root Switchable publish Studio 4-compatible
 releases:
 
-1. Pin `recording_studio` to `tag: "v4.0.0"` (or whatever release object ships).
+1. Pin `recording_studio` to `tag: "v4.0.0"`.
 2. Widen this gemspec to `recording_studio ~> 4.0` (breaking for hosts on 3.x).
 3. Run `rails g recording_studio:migrations` and migrate the dummy (unique root
    index / harden constraints).
@@ -285,7 +320,7 @@ releases:
 
 ## Out of scope for the first upgrade PR
 
-- RecordingStudio 4.0.0
+- RecordingStudio 4.0.0 (released, but sibling gemspecs still `~> 3.0`)
 - Pagy 43 / ViewComponent major (none available)
 - Publishing this gem to RubyGems
 - Replacing GitHub source gems with RubyGems.org (they are still GitHub-only)
