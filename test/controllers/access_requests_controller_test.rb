@@ -231,7 +231,6 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_select %(nav.flat-pack-page-nav a[href="/workspace"][aria-label="Close"]), count: 1
   end
 
-  # rubocop:disable Metrics/BlockLength
   test "requests chart filters series by date range status and api key within the scoped recordings" do
     api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Filtered chart client")
 
@@ -328,8 +327,6 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_select %(div[role="option"][data-value="#{outside_api_client.id}"]), count: 0
     assert_select %(select[name="status"] option[value=""]:not([disabled])), text: "All statuses", count: 1
   end
-  # rubocop:enable Metrics/BlockLength
-
   test "index infinite scroll returns paged table content for xhr page requests" do
     52.times do |index|
       create_api_client_for(
@@ -401,6 +398,10 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
   test "index subtitle shows folder name when scoped to a folder root" do
     folder = Folder.create!(name: "Scoped Folder")
     folder_root_recording = RecordingStudio::Recording.create!(recordable: folder)
+    with_access_creation_context do
+      access = RecordingStudio::Access.create!(actor: @user, role: :admin)
+      RecordingStudio::Recording.create!(recordable: access, parent_recording: folder_root_recording)
+    end
     api_client = create_api_client_for(parent_recording: folder_root_recording, name: "Folder scoped client")
 
     get "/recording_studio_api/api_clients", params: { root_recording_id: folder_root_recording.id }
@@ -940,14 +941,12 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
   end
 
   def create_api_client_for(parent_recording:, name:, role: :admin)
-    manager_access_recording = with_access_creation_context do
-      access = RecordingStudio::Access.create!(actor: @user, role: role)
-      RecordingStudio::Recording.create!(recordable: access, parent_recording: parent_recording)
-    end
-
+    # Persist the client first without an access recording. Accessible 0.5+ rejects
+    # a second User access grant under the same parent, so do not create a temporary
+    # manager Access for @user here.
     api_client = RecordingStudioApi::ApiClient.create!(
       name: name,
-      access_recording: manager_access_recording
+      api_key: "public"
     )
 
     access_recording = with_access_creation_context do

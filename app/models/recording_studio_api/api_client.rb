@@ -15,7 +15,8 @@ module RecordingStudioApi
 
     belongs_to :access_recording,
                class_name: "RecordingStudio::Recording",
-               inverse_of: false
+               inverse_of: false,
+               optional: true
 
     has_many :credentials,
              class_name: "RecordingStudioApi::ApiCredential",

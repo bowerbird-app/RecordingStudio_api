@@ -9,7 +9,6 @@ require "devise/test/integration_helpers"
 require "rails/test_help"
 
 class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
-  # rubocop:disable Metrics/BlockLength
   include Devise::Test::IntegrationHelpers
   include ApiDummyHelpers
 
@@ -486,8 +485,6 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "h1", text: "Recording Studio API demo"
   end
-
-  # rubocop:enable Metrics/BlockLength
 
   test "forbids the dashboard when accessed directly from a non-admin root" do
     workspace = Workspace.create!(name: "Workspace root")

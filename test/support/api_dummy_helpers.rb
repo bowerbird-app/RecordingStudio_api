@@ -169,14 +169,20 @@ module ApiDummyHelpers # rubocop:disable Metrics/ModuleLength
   def access_manager_for(access_recording)
     access_point_recording = access_point_recording_for(access_recording)
     actor = access_recording.recordable.actor
+    edit_role = RecordingStudioApi.configuration.access_management_edit_role
 
-    return actor if RecordingStudioApi::AccessManagementPolicy.new(actor: actor).can_manage_recording?(access_point_recording)
+    # Prefer recording-level authorization (Accessible 0.5+). Root membership alone is not
+    # enough when the actor only has a stronger grant on a descendant.
+    return actor if RecordingStudioApi::AccessManagementPolicy.new(actor: actor).authorized_for_recording?(
+      access_point_recording,
+      access_management_role: edit_role
+    )
 
     manager = create_user(email: "api-access-manager-#{SecureRandom.hex(4)}@example.com")
     with_access_creation_context do
       access = RecordingStudio::Access.create!(
         actor: manager,
-        role: RecordingStudioApi.configuration.access_management_edit_role
+        role: edit_role
       )
       RecordingStudio::Recording.create!(recordable: access, parent_recording: access_point_recording)
     end

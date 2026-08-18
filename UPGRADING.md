@@ -21,13 +21,25 @@ steps below.
 
 If the host also upgrades Accessible to `0.5.x`:
 
-1. Set `config.access_actor_types` (for example `["User"]`). Blank/`nil` rejects
-   every new grant.
+1. Set `config.access_actor_types` to the persisted polymorphic types that may
+   receive grants. For hosts that provision API clients through this gem, include
+   both the human actor type and `RecordingStudioApi::ApiClient`, for example
+   `["User", "RecordingStudioApi::ApiClient"]`. Blank/`nil` rejects every new grant.
 2. Remove any `include RecordingStudioAccessible::AllowsAccessibleChildren` or
    `recording_studio_accessible_children` usage. Prefer
    `RecordingStudio.enable_capability(:accessible, on: ...)`.
 3. Optionally run `bin/rails recording_studio_accessible:access_grants:integrity`
    before deploying.
+4. No host code change is required for API client provisioning: `0.5.0` persists
+   the `ApiClient` before calling `grant_access` to satisfy Accessible's
+   persisted-actor requirement.
+5. Run the new install migration that allows `recording_studio_api_api_clients.access_recording_id`
+   to be null during that create-then-grant order (`rails db:migrate`). Completed
+   clients still receive an access recording before the provision transaction commits.
+6. Provisioning and role assignment now authorize the manager at the access-point
+   recording (not merely via root membership). Actors who only hold a stronger
+   grant on a descendant can no longer provision API access at a weaker parent
+   access point.
 
 ### 3. Companion pins (dummy / development hosts)
 
