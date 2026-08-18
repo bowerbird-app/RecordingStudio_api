@@ -26,7 +26,7 @@ module RecordingStudioApi
         return failure("Access role is required") if resolved_role.blank?
         return failure("API client name is required") if name.blank?
         return failure("Access recording must point to RecordingStudio::Access") if access_recording.present? && access_recording.recordable_type != "RecordingStudio::Access"
-        return failure("Not authorized to manage access") unless access_management_policy.can_manage_recording?(resolved_access_point_recording)
+        return failure("Not authorized to manage access") unless authorized_to_manage_access_point?
         return failure("Requested API access role exceeds the manager's access") unless access_management_policy.can_assign_role?(resolved_access_point_recording, resolved_role)
         return failure("Not authorized to manage the selected API") unless authorized_to_manage_api?
 
@@ -34,10 +34,13 @@ module RecordingStudioApi
         payload = nil
 
         ApiCredential.transaction do
-          api_client = ApiClient.new(id: SecureRandom.uuid, name: name, api_key: api_key)
+          # Accessible 0.5+ requires a persisted actor before grant_access. Persist the
+          # client first (access_recording may be null), grant Access, then link it with
+          # update_column because RecordingStudio::Recordable forbids AR updates.
+          api_client = ApiClient.create!(id: SecureRandom.uuid, name: name, api_key: api_key)
           client_access_recording = create_client_access_recording!(api_client)
-          api_client.access_recording = client_access_recording
-          api_client.save!
+          api_client.update_column(:access_recording_id, client_access_recording.id)
+          api_client.reload
 
           recording = RecordingStudio.record!(
             action: "created",
@@ -105,6 +108,15 @@ module RecordingStudioApi
 
       def access_management_policy
         @access_management_policy ||= RecordingStudioApi::AccessManagementPolicy.new(actor: resolved_manager_actor)
+      end
+
+      # Accessible 0.5+ authorizes grants at the access-point recording. Root membership from a
+      # stronger descendant grant must not count as managing this access point.
+      def authorized_to_manage_access_point?
+        access_management_policy.authorized_for_recording?(
+          resolved_access_point_recording,
+          access_management_role: RecordingStudioApi.configuration.access_management_edit_role
+        )
       end
 
       def valid_access_point_recording?

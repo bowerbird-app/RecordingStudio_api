@@ -53,7 +53,10 @@ module RecordingStudioApi
     end
 
     def can_assign_role?(recording, role)
-      return false unless can_manage_recording?(recording)
+      return false unless authorized_for_recording?(
+        recording,
+        access_management_role: RecordingStudioApi.configuration.access_management_edit_role
+      )
 
       requested_rank = access_role_rank(role)
       maximum_rank = access_role_rank(maximum_assignable_role_for(recording))

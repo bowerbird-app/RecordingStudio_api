@@ -701,13 +701,20 @@ Sign in with:
 | Component       | Version |
 |-----------------|---------|
 | Ruby            | 3.3+    |
-| Rails           | ~> 8.1.1 |
+| Rails           | ~> 8.1.1 (locked 8.1.3.1) |
 | PostgreSQL      | 16      |
 | TailwindCSS     | 4       |
-| RecordingStudio | v3.0.2 (pinned in `test/dummy/Gemfile`) |
-| FlatPack        | v0.1.124 (pinned in `test/dummy/Gemfile`) |
+| RecordingStudio | v3.0.3 (pinned in Gemfiles; Studio 4.0 deferred) |
+| Accessible      | v0.5.0 |
+| FlatPack        | v0.1.129 |
+| Redis           | ~> 6.0 |
 | Devise          | latest  |
+
+Current declared gems and the Studio 4.0 follow-up path are documented in
+[docs/DEPENDENCY_UPGRADE_PLAN.md](docs/DEPENDENCY_UPGRADE_PLAN.md).
 
 ## Documentation
 
 The original gem template documentation is preserved in this repository under `docs/gem_template/` as architectural reference material. Those files are for contributors reviewing the repo, not packaged gem docs; the README and dummy app are now the source of truth for the Recording Studio API design handoff.
+
+For gem and dummy-app version bumps, use [docs/DEPENDENCY_UPGRADE_PLAN.md](docs/DEPENDENCY_UPGRADE_PLAN.md).
