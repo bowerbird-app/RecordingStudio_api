@@ -1,6 +1,10 @@
 # Dependency upgrade plan
 
-Snapshot date: **17 August 2026** (rechecked after RecordingStudio **v4.0.0** GitHub Release).
+Snapshot date: **18 August 2026**.
+
+> Status: Phase 1–3 compatible bumps are implemented on
+> `cursor/update-compatible-gems-dbac` (gem `0.5.0`). Studio **4.0.0** remains
+> deferred until sibling gemspecs allow it.
 
 This is a review plan, not an executed upgrade. It inventories every gem declared by
 `recording_studio_api` and the dummy app, compares them with the latest published

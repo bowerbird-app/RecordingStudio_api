@@ -15,3 +15,11 @@ end
 if defined?(RecordingStudioAdmin::Engine)
   pin_all_from RecordingStudioAdmin::Engine.root.join("app/javascript/recording_studio_admin/controllers"), under: "controllers/recording_studio_admin", to: "recording_studio_admin/controllers", preload: false
 end
+
+# Pin RecordingStudioRootSwitchable controllers (0.3.5+ dropdown Stimulus)
+if defined?(RecordingStudioRootSwitchable::Engine)
+  pin_all_from RecordingStudioRootSwitchable::Engine.root.join("app/javascript/recording_studio_root_switchable/controllers"),
+               under: "controllers/recording_studio_root_switchable",
+               to: "recording_studio_root_switchable/controllers",
+               preload: false
+end

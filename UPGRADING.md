@@ -1,5 +1,50 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.5.0
+
+`0.5.0` refreshes the Redis runtime constraint and the dummy/development companion
+gem pins. RecordingStudio stays on the `3.x` line (`v3.0.3`); Studio `4.0.0` is
+still blocked by sibling gemspecs.
+
+Update the host dependency to `recording_studio_api`, `~> 0.5.0`, then apply the
+steps below.
+
+### 1. Redis 6
+
+1. Ensure hosts can resolve `redis ~> 6.0`. Redis 6 defaults to RESP3; this gem's
+   rate-limit and idempotency commands are compatible. Pass `protocol: 2` only if
+   a host must keep RESP2.
+2. Confirm Redis remains reachable for production rate limiting and
+   `Idempotency-Key` caching.
+
+### 2. RecordingStudio Accessible 0.5+
+
+If the host also upgrades Accessible to `0.5.x`:
+
+1. Set `config.access_actor_types` (for example `["User"]`). Blank/`nil` rejects
+   every new grant.
+2. Remove any `include RecordingStudioAccessible::AllowsAccessibleChildren` or
+   `recording_studio_accessible_children` usage. Prefer
+   `RecordingStudio.enable_capability(:accessible, on: ...)`.
+3. Optionally run `bin/rails recording_studio_accessible:access_grants:integrity`
+   before deploying.
+
+### 3. Companion pins (dummy / development hosts)
+
+Recommended tagged pins for a host that mirrors this gem's dummy app:
+
+- RecordingStudio `v3.0.3`
+- RecordingStudio Accessible `v0.5.0`
+- RecordingStudio Admin `1.2.0`
+- RecordingStudio Moveable `2.1.1`
+- RecordingStudio Root Switchable `v0.3.5`
+- FlatPack `v0.1.129`
+
+Do not move hosts to RecordingStudio `4.0.0` until Accessible, Moveable, Admin,
+and Root Switchable publish Studio 4-compatible constraints.
+
+---
+
 ## Upgrading to 0.4.0
 
 `0.4.0` is a pre-production breaking release focused on safer defaults and operational hardening.

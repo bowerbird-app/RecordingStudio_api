@@ -8,7 +8,8 @@ This Rails app exists to validate the RecordingStudio API integration surface an
 - `Current.actor` wiring for Recording Studio events
 - A dedicated admin root rendered through the host app root page
 - `RecordingStudioRootSwitchable` mounted root chooser for switching between admin and standard roots
-- RecordingStudio 3 hierarchy declarations for root-capable `Workspace`/`Folder`, child-only `Page`, API-owned recordables, and accessible parent grants
+- RecordingStudio 3 hierarchy declarations for root-capable `Workspace`/`Folder`, child-only `Page`, API-owned recordables, and accessible parent grants via `RecordingStudio.enable_capability(:accessible, on: ...)`
+- Accessible `0.5` actor allowlisting through `config.access_actor_types`
 - Root workspace plus seeded folder and page recordables
 - FlatPack layout integration and Tailwind source scanning
 - Mounted `RecordingStudio::Engine` route behavior inside a host app

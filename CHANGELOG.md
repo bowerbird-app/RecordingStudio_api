@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-18
+
+### Changed
+- Runtime Redis dependency is now `~> 6.0` (was `~> 5.3`)
+- Dummy and development pins move onto RecordingStudio `v3.0.3`, Accessible `v0.5.0`, Admin `1.2.0`, Moveable `2.1.1`, Root Switchable `v0.3.5`, and FlatPack `v0.1.129`
+- Dummy Accessible setup configures `access_actor_types` and drops legacy `AllowsAccessibleChildren` usage
+
+### Upgrade notes
+- See [UPGRADING.md](UPGRADING.md) for Redis 6 and Accessible 0.5 host steps
+- RecordingStudio `4.0.0` remains deferred until sibling gems allow `recording_studio ~> 4.0`
+
 ## [0.4.0] - 2026-08-15
 
 ### Added
