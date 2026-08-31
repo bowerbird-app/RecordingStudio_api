@@ -30,7 +30,23 @@ def ensure_access_recording_for(recording:, actor:, role:, manager_actor: actor)
   )
   return result.value if result.success?
 
-  bootstrap_access_recording!(recording: recording, actor: actor, role: effective_role, manager_actor: manager_actor)
+  ensure_bootstrap_owner!(recording: recording, actor: actor)
+end
+
+def ensure_bootstrap_owner!(recording:, actor:)
+  result = RecordingStudioAccessible.bootstrap_owner_access!(
+    recording: recording,
+    actor: actor
+  )
+  return result.value if result.success?
+
+  existing_access_recording = RecordingStudioAccessible.access_recordings_for_actor(
+    recording: recording,
+    actor: actor
+  ).first
+  return existing_access_recording if existing_access_recording.present?
+
+  raise result.error
 end
 
 def stronger_access_role(existing_role:, requested_role:)
@@ -48,19 +64,6 @@ def revise_access_recording!(access_recording, role:, manager_actor:)
 
   RecordingStudioAccessible::AccessCreationContext.allow do
     RecordingStudio.root_recording_or_self(access_recording.parent_recording).revise(access_recording, actor: manager_actor) do |access|
-      access.role = role
-    end
-  end
-end
-
-def bootstrap_access_recording!(recording:, actor:, role:, manager_actor:)
-  RecordingStudioAccessible::AccessCreationContext.allow do
-    RecordingStudio.root_recording_or_self(recording).record(
-      RecordingStudio::Access,
-      actor: manager_actor,
-      parent_recording: recording
-    ) do |access|
-      access.actor = actor
       access.role = role
     end
   end

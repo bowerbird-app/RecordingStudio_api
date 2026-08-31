@@ -10,21 +10,21 @@
       text: "API settings",
       style: :default,
       size: :md,
-      url: @api_admin_path
+      href: @api_admin_path
     ) %>
 
     <%= render FlatPack::Button::Component.new(
       text: "API docs",
       style: :default,
       size: :md,
-      url: "/docs/scalar"
+      href: "/docs/scalar"
     ) %>
 
     <%= render FlatPack::Button::Component.new(
       text: "Create API test token",
       style: :default,
       size: :md,
-      url: public_api_scalar_test_credential_path(version: RecordingStudioApi.default_api_version)
+      href: public_api_scalar_test_credential_path(version: RecordingStudioApi.default_api_version)
     ) %>
   </div>
 

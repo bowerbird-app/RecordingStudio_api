@@ -4,6 +4,7 @@ RecordingStudio.configure do |config|
   # Host app recordables; addon engines append their own internal recordables.
   config.recordable_types = [ "Workspace", "Folder", "Page", "AdminRoot", "AdminSection" ]
   config.require_recordable_declarations = true
+  config.app_name = "API Demo" if config.respond_to?(:app_name=)
 
   # Actor resolver for events when no actor is explicitly supplied
   config.actor = -> { Current.actor }
@@ -13,9 +14,6 @@ RecordingStudio.configure do |config|
 
   # Idempotency behavior for log_event!
   config.idempotency_mode = :return_existing # or :raise
-
-  # Removed in RecordingStudio v1.2.0; keep compatibility with older tags.
-  config.include_children = false if config.respond_to?(:include_children=)
 
   # Recordable duplication strategy for revisions
   config.recordable_dup_strategy = :dup

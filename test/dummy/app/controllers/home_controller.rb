@@ -1,10 +1,10 @@
 class HomeController < ApplicationController
   def index
     if admin_root_current?
-      render :admin_root, layout: "flat_pack_sidebar"
+      render :admin_root
     else
       load_standard_root_data
-      render :standard_root, layout: "flat_pack_sidebar"
+      render :standard_root
     end
   end
 

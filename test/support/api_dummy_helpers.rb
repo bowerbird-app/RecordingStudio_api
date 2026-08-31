@@ -118,10 +118,11 @@ module ApiDummyHelpers # rubocop:disable Metrics/ModuleLength
     Current.impersonator = nil if defined?(Current) && Current.respond_to?(:impersonator=)
     workspace = Workspace.create!(name: workspace_name)
     root_recording = RecordingStudio::Recording.create!(recordable: workspace)
-    access_recording = with_access_creation_context do
-      access = RecordingStudio::Access.create!(actor: user, role: role)
-      RecordingStudio::Recording.create!(recordable: access, parent_recording: root_recording)
-    end
+    access_recording = grant_or_bootstrap_access!(
+      recording: root_recording,
+      actor: user,
+      role: role
+    )
 
     [root_recording, access_recording]
   end
@@ -173,14 +174,38 @@ module ApiDummyHelpers # rubocop:disable Metrics/ModuleLength
     return actor if RecordingStudioApi::AccessManagementPolicy.new(actor: actor).can_manage_recording?(access_point_recording)
 
     manager = create_user(email: "api-access-manager-#{SecureRandom.hex(4)}@example.com")
-    with_access_creation_context do
-      access = RecordingStudio::Access.create!(
-        actor: manager,
-        role: RecordingStudioApi.configuration.access_management_edit_role
-      )
-      RecordingStudio::Recording.create!(recordable: access, parent_recording: access_point_recording)
-    end
+    grant_or_bootstrap_access!(
+      recording: access_point_recording,
+      actor: manager,
+      role: RecordingStudioApi.configuration.access_management_edit_role
+    )
     manager
+  end
+
+  def grant_or_bootstrap_access!(recording:, actor:, role:)
+    existing = RecordingStudioAccessible.access_recordings_for_actor(
+      recording: recording,
+      actor: actor
+    ).first
+    return existing if existing.present? && existing.recordable.role.to_s == role.to_s
+
+    result = RecordingStudioAccessible.grant_access(
+      recording: recording,
+      actor: actor,
+      role: role,
+      manager_actor: actor
+    )
+    return result.value if result.success?
+
+    if role.to_s == "admin"
+      bootstrap = RecordingStudioAccessible.bootstrap_owner_access!(recording: recording, actor: actor)
+      return bootstrap.value if bootstrap.success?
+    end
+
+    with_access_creation_context do
+      access = RecordingStudio::Access.create!(actor: actor, role: role)
+      RecordingStudio::Recording.create!(recordable: access, parent_recording: recording)
+    end
   end
 
   def register_dummy_recordable_type_apis!

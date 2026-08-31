@@ -3,6 +3,7 @@
 module RecordingStudioApi
   class ApplicationController < ActionController::Base
     include RecordingStudio::RootSwitchable::ControllerSupport if defined?(RecordingStudio::RootSwitchable::ControllerSupport)
+    include RecordingStudio::UsesDefaultLayout if defined?(RecordingStudio::UsesDefaultLayout)
 
     helper RecordingStudio::LayoutHelper if defined?(RecordingStudio::LayoutHelper)
 

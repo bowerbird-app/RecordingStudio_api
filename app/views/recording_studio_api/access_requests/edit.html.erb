@@ -16,7 +16,7 @@
           text: "Rotate key",
           style: :default,
           size: :md,
-          url: rotate_api_client_path(@api_client, page_nav_close_param),
+          href: rotate_api_client_path(@api_client, page_nav_close_param),
           data: { turbo_method: :post, turbo_confirm: "Rotate this API key? This will revoke the current key." }
         ) %>
       <% end %>
@@ -25,7 +25,7 @@
           text: "Revoke",
           style: :default,
           size: :md,
-          url: revoke_api_client_path(@api_client, page_nav_close_param),
+          href: revoke_api_client_path(@api_client, page_nav_close_param),
           data: { turbo_method: :post, turbo_confirm: "Revoke this API key?" }
         ) %>
       <% end %>

@@ -53,9 +53,11 @@ module RecordingStudioApi
 
       def valid_access_point_recording?
         return false unless RecordingStudioApi.api_access_point_recordable_types(api: api_key).include?(access_point_recording.recordable_type)
-        return false unless defined?(RecordingStudioAccessible::Compatibility)
 
-        RecordingStudioAccessible::Compatibility.access_parent_allowed?(access_point_recording)
+        RecordingStudio.parent_allowed?(
+          child_type: "RecordingStudio::Access",
+          parent_recording: access_point_recording
+        )
       end
 
       def root_recording

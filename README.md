@@ -4,8 +4,8 @@
 
 `RecordingStudioApi` is a mountable Rails engine that provides authenticated, capability-backed JSON APIs for Recording Studio addons.
 
-For breaking changes in `0.4.0` (safer defaults and hardening) and the flat API contract from
-`0.3.0`, see [UPGRADING.md](UPGRADING.md).
+For the Recording Studio 4.2 pin in `0.5.0`, safer defaults in `0.4.0`, and the flat API
+contract from `0.3.0`, see [UPGRADING.md](UPGRADING.md).
 
 ## Current Scope
 
@@ -704,8 +704,8 @@ Sign in with:
 | Rails           | ~> 8.1.1 |
 | PostgreSQL      | 16      |
 | TailwindCSS     | 4       |
-| RecordingStudio | v3.0.2 (pinned in `test/dummy/Gemfile`) |
-| FlatPack        | v0.1.124 (pinned in `test/dummy/Gemfile`) |
+| RecordingStudio | v4.2.0 (pinned in `test/dummy/Gemfile`) |
+| FlatPack        | v0.1.143 (pinned in `test/dummy/Gemfile`) |
 | Devise          | latest  |
 
 ## Documentation
