@@ -444,17 +444,18 @@ class DelegatedOauthTest < ActionDispatch::IntegrationTest
   end
 
   test "deny redirects to the client with access_denied" do
-    post "/recording_studio_api/oauth/authorize", params: authorize_params.merge(
-      access_recording_id: @access_recording.id,
-      role: "view",
-      decision: "deny"
-    )
+    assert_no_difference -> { RecordingStudioApi::OauthAuthorization.where(oauth_client: @oauth_client).count } do
+      post "/recording_studio_api/oauth/authorize", params: authorize_params.merge(
+        access_recording_id: @access_recording.id,
+        role: "view",
+        decision: "deny"
+      )
+    end
 
     assert_response :redirect
     query = redirect_query
     assert_equal "access_denied", query.fetch("error")
     assert_equal "xyz", query.fetch("state")
-    assert_equal 0, RecordingStudioApi::OauthAuthorization.count
   end
 
   test "consent with several workspaces requires a choice" do

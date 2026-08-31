@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class CreateRecordingStudioApiOauthClients < ActiveRecord::Migration[8.1]
+class CreateRecordingStudioApiDelegatedOauthClients < ActiveRecord::Migration[8.1]
   def change
     create_table :recording_studio_api_oauth_clients, id: :uuid do |t|
       t.string :name, null: false

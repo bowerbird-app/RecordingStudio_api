@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-class CreateRecordingStudioApiOauthRefreshTokens < ActiveRecord::Migration[8.1]
+class CreateRecordingStudioApiDelegatedOauthRefreshTokens < ActiveRecord::Migration[8.1]
   def change
     create_table :recording_studio_api_oauth_refresh_tokens, id: :uuid do |t|
       t.references :oauth_authorization,

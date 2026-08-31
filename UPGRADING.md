@@ -12,6 +12,9 @@ that acts as the user.
 1. Run `bin/rails generate recording_studio_api:migrations` and `bin/rails db:migrate`. This adds
    OAuth client, authorization, authorization-code, and refresh-token tables, and allows
    `recording_studio_api_api_access_tokens.oauth_authorization_id` (null = machine token).
+   Copied migration class names use a `Delegated` prefix (`CreateRecordingStudioApiDelegatedOauthClients`
+   and the code/refresh companions) so they do not collide with historical mobile-OAuth migrations
+   that used the same stems. Leave those names as generated.
 2. Include `RecordingStudioApi::OauthAuthorization` in Accessible `access_actor_types` alongside
    User and `RecordingStudioApi::ApiClient`. Consent still uses host authentication (dummy Devise
    in this gem); do not change Users for this flow.
