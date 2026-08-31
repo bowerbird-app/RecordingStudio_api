@@ -10,21 +10,21 @@
       text: "Settings",
       style: :default,
       size: :md,
-      url: RecordingStudioApi.admin_settings_path(controller: self, close_url: request.fullpath)
+      href: RecordingStudioApi.admin_settings_path(controller: self, close_url: request.fullpath)
     ) %>
 
     <%= render FlatPack::Button::Component.new(
       text: "Rate limiting",
       style: :default,
       size: :md,
-      url: RecordingStudioApi.admin_rate_limiting_path(controller: self, close_url: request.fullpath)
+      href: RecordingStudioApi.admin_rate_limiting_path(controller: self, close_url: request.fullpath)
     ) %>
 
     <%= render FlatPack::Button::Component.new(
       text: "Logs",
       style: :default,
       size: :md,
-      url: RecordingStudioApi.admin_logs_path(controller: self, close_url: request.fullpath)
+      href: RecordingStudioApi.admin_logs_path(controller: self, close_url: request.fullpath)
     ) %>
   </div>
 
@@ -41,7 +41,7 @@
             text: "Full screen",
             style: :default,
             size: :sm,
-            url: @last_24_hours_requests_path
+            href: @last_24_hours_requests_path
           ) %>
         </div>
 
@@ -72,7 +72,7 @@
             text: "Full screen",
             style: :default,
             size: :sm,
-            url: @last_30_days_requests_path
+            href: @last_30_days_requests_path
           ) %>
         </div>
 
@@ -142,7 +142,7 @@
             text: "Full screen",
             style: :default,
             size: :sm,
-            url: @last_30_days_errors_path
+            href: @last_30_days_errors_path
           ) %>
         </div>
 

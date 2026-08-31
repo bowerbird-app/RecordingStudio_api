@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-31
+
+### Changed
+- **Breaking dependency floor:** requires RecordingStudio `~> 4.2` (tested against `4.2.0`) and RecordingStudio Accessible `~> 0.7` (tested against `0.7.0`)
+- Dummy and development Gemfiles pin RecordingStudio `v4.2.0`, Accessible `v0.7.0`, Admin `2.0.1`, Moveable `3.0.0`, Root Switchable `v0.5.0`, and FlatPack `v0.1.143`
+- Dummy app uses `RecordingStudio::UsesDefaultLayout` from Recording Studio 4.2 as-is (no vendored `default_layout` copy). Rounded theme is applied on `html` and `body`; API-key pages do not render RootSwitchDropdown
+- Dummy seeds bootstrap the first owner with `bootstrap_owner_access!`, then use `grant_access` for later grants
+- API client provision persists the client before `grant_access` so Accessible 0.7 actor persistence checks pass (`access_recording_id` may be null until the grant is written)
+
+See [UPGRADING.md](UPGRADING.md) for the Recording Studio 4.2 host pin.
+
 ## [0.4.0] - 2026-08-15
 
 ### Added
@@ -78,7 +89,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.1.0...v0.2.0

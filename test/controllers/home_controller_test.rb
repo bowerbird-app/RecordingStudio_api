@@ -38,12 +38,14 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "h1", text: "Recording Studio API demo"
     assert_includes response.body, "Demo to add and remove API access"
-    assert_includes response.body, "RecordingStudio API"
+    assert_select "html[data-theme='rounded']", count: 1
+    assert_select "body[data-theme='rounded']", count: 1
+    assert_select "body[data-recording-studio-default-layout='true']", count: 1
+    assert_select "[data-controller='recording-studio-root-switchable--root-switch-dropdown']", count: 0
     assert_select %(a[href="/api?anchor_url=%2F"]), text: "API settings", count: 1
     assert_select %(a[href="/docs/scalar/v1/test-credential"]), text: "Create API test token", count: 1
     assert_not_includes response.body, "API keys"
     assert_not_includes response.body, "Child access recording"
-    assert_select %(a[href="#{docs_install_path}"]), count: 1
     assert_not_includes response.body, "Open admin"
     assert_not_includes response.body, "Manage users"
     assert_not_includes response.body, "Open tree"
@@ -65,8 +67,6 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "h1", text: "Admin"
     assert_not_includes response.body, "Recording Studio API demo"
-    assert_includes response.body, "RecordingStudio API"
-    assert_includes response.body, "Admin API"
     assert_select "#public-api h2", text: "Public API", count: 1
     assert_select %(a[href="#public-api"][aria-label="Copy link to Public API"]), count: 1
     assert_select %(a[href="/admin/api?anchor_url=%2F"]), text: "Public API Admin dashboard", count: 1
@@ -78,10 +78,7 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
     assert_select %(a[href="/admin/api/operations"]), text: "Operations API Admin dashboard", count: 1
     assert_select %(a[href="/admin/operations-api/docs"]), text: "Operations API docs", count: 1
     assert_select %(a[href="/admin/operations-api/docs/v1/test-credential"]), text: "Create Operations API test token", count: 1
-    assert_includes response.body, "Operations credentials"
     assert_includes response.body, "Operations API docs"
-    # The shared layout now surfaces root-switch choices, including other roots.
-    assert_includes response.body, "Old Workspace"
     assert_not_includes response.body, "API keys"
   end
 
@@ -299,12 +296,5 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
         return_to: root_path
       }
     }
-  end
-
-  def create_access_recording(parent_recording:, user:, role:)
-    with_access_creation_context do
-      access = RecordingStudio::Access.create!(actor: user, role: role)
-      RecordingStudio::Recording.create!(recordable: access, parent_recording: parent_recording)
-    end
   end
 end

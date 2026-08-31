@@ -8,6 +8,7 @@ class ApplicationController < ActionController::Base
   stale_when_importmap_changes if respond_to?(:stale_when_importmap_changes)
 
   include RecordingStudio::RootSwitchable::ControllerSupport
+  include RecordingStudio::UsesDefaultLayout
 
   layout :application_layout
 
@@ -19,7 +20,7 @@ class ApplicationController < ActionController::Base
   def application_layout
     return "application" if devise_controller?
 
-    "flat_pack_sidebar"
+    "recording_studio/default_layout"
   end
 
   def set_current_actor

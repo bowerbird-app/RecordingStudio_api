@@ -55,6 +55,25 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "Boundary minimum role"
   end
 
+  test "API key screens use the gem default layout without a root-switch dropdown" do
+    api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Layout API client")
+
+    [
+      "/recording_studio_api/api_clients",
+      "/recording_studio_api/api_clients/#{api_client.id}",
+      "/recording_studio_api/api_clients/#{api_client.id}/edit",
+      "/recording_studio_api/api_clients/new"
+    ].each do |path|
+      get path
+
+      assert_response :success, "#{path} should render"
+      assert_select "html[data-theme='rounded']", count: 1
+      assert_select "body[data-theme='rounded']", count: 1
+      assert_select "body[data-recording-studio-default-layout='true']", count: 1
+      assert_select "[data-controller='recording-studio-root-switchable--root-switch-dropdown']", count: 0
+    end
+  end
+
   test "renders api access point choices below the requested root recording" do
     folder_recording = RecordingStudio::Recording.create!(
       recordable: Folder.create!(name: "API Access Folder"),
@@ -940,15 +959,15 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
   end
 
   def create_api_client_for(parent_recording:, name:, role: :admin)
-    manager_access_recording = with_access_creation_context do
-      access = RecordingStudio::Access.create!(actor: @user, role: role)
-      RecordingStudio::Recording.create!(recordable: access, parent_recording: parent_recording)
+    if @user.present?
+      existing_manager_access = RecordingStudioAccessible.access_recordings_for_actor(
+        recording: parent_recording,
+        actor: @user
+      ).first
+      grant_or_bootstrap_access!(recording: parent_recording, actor: @user, role: :admin) if existing_manager_access.blank?
     end
 
-    api_client = RecordingStudioApi::ApiClient.create!(
-      name: name,
-      access_recording: manager_access_recording
-    )
+    api_client = RecordingStudioApi::ApiClient.create!(name: name)
 
     access_recording = with_access_creation_context do
       access = RecordingStudio::Access.create!(actor: api_client, role: role)

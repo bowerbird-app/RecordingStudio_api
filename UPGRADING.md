@@ -1,5 +1,40 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.5.0
+
+`0.5.0` pins this engine onto Recording Studio 4.2 and Accessible 0.7. Update the host
+dependency to `recording_studio_api`, `~> 0.5.0`, then apply the steps below.
+
+1. Upgrade RecordingStudio to `4.2.0` or newer (`~> 4.2`) and Accessible to `0.7.0` or newer
+   (`~> 0.7`) before installing this gem. Matching dummy/dev tags are RecordingStudio
+   `v4.2.0`, Accessible `v0.7.0`, Admin `2.0.1`, Moveable `3.0.0`, Root Switchable
+   `v0.5.0`, and FlatPack `v0.1.143`.
+2. Run the Recording Studio 4.0 harden indexes migration in the host
+   (`rails g recording_studio:migrations` or copy
+   `harden_recording_studio_indexes_and_constraints`) and `bin/rails db:migrate`.
+3. Enable Accessible with `RecordingStudio.enable_capability(:accessible, on: Type)` on
+   each recordable that should hold grants. Do not include
+   `AllowsAccessibleChildren` / `recording_studio_accessible_children`.
+4. Include `RecordingStudio::UsesDefaultLayout` on authenticated host controllers (or keep
+   `config.layout_name = "recording_studio/default_layout"`). Recording Studio 4.2 applies
+   `data-theme="rounded"` on `body`; hosts that still key FlatPack off `html` can stamp
+   `html data-theme="rounded"` without copying the layout. Do not vendor
+   `recording_studio/default_layout`.
+5. First owner grants: `RecordingStudioAccessible.bootstrap_owner_access!` on an empty
+   owned root. Later members: `grant_access`. Set `access_actor_types` so User and
+   `RecordingStudioApi::ApiClient` can hold grants.
+6. FlatPack 0.1.143 buttons use `href:` (not `url:`). Sidebar items use `text:` (not
+   `label:`).
+7. Run `bin/rails generate recording_studio_api:migrations` and `bin/rails db:migrate`.
+   `0.5.0` allows `access_recording_id` to be null on API clients so Accessible 0.7 can
+   persist the client before `grant_access` (actors must be persisted). Provision still
+   assigns the access recording in the same transaction.
+
+If you are still on a pre-`0.4.0` digest/rate-limit default, complete
+[Upgrading to 0.4.0](#upgrading-to-040) first.
+
+---
+
 ## Upgrading to 0.4.0
 
 `0.4.0` is a pre-production breaking release focused on safer defaults and operational hardening.

@@ -11,22 +11,29 @@ class RecordingStudioApiTest < Minitest::Test
     assert_kind_of Class, ::RecordingStudioApi::Engine
   end
 
-  def test_dummy_app_uses_flatpack_sidebar_layout
-    layout_path = File.expand_path("dummy/app/views/layouts/flat_pack_sidebar.html.erb", __dir__)
-    assert File.exist?(layout_path)
-
+  def test_dummy_app_uses_default_layout
     application_controller_path = File.expand_path("dummy/app/controllers/application_controller.rb", __dir__)
     controller_source = File.read(application_controller_path)
-    assert_includes controller_source, "flat_pack_sidebar"
+    assert_includes controller_source, "include RecordingStudio::UsesDefaultLayout"
+    assert_includes controller_source, '"recording_studio/default_layout"'
     assert_not_includes controller_source, "flat_pack_admin_sidebar"
+  end
+
+  def test_dummy_does_not_vendor_recording_studio_default_layout
+    dummy_layout = File.expand_path("dummy/app/views/layouts/recording_studio/default_layout.html.erb", __dir__)
+
+    assert_not File.exist?(dummy_layout)
   end
 
   def test_dummy_layouts_default_to_flatpack_rounded_theme
     application_layout = File.read(File.expand_path("dummy/app/views/layouts/application.html.erb", __dir__))
     sidebar_layout = File.read(File.expand_path("dummy/app/views/layouts/flat_pack_sidebar.html.erb", __dir__))
+    application_controller = File.read(File.expand_path("dummy/app/controllers/application_controller.rb", __dir__))
 
     assert_includes application_layout, '<html data-theme="rounded">'
     assert_includes sidebar_layout, '<html data-theme="rounded" class="h-full overflow-hidden overscroll-none">'
+    assert_includes application_controller, "include RecordingStudio::UsesDefaultLayout"
+    assert_not_includes application_controller, "RootSwitchDropdownHelper"
   end
 
   def test_dummy_tailwind_keeps_flatpack_theme_selection_in_flatpack
@@ -152,15 +159,15 @@ class RecordingStudioApiTest < Minitest::Test
 
     assert_includes sidebar_source, 'title: "RecordingStudio API"'
     assert_includes sidebar_source, 'subtitle: "Host app guide"'
-    assert_includes sidebar_source, 'label: "Admin API"'
+    assert_includes sidebar_source, 'text: "Admin API"'
     assert_includes sidebar_source, 'href: "/admin/api"'
-    assert_includes sidebar_source, 'label: "Recordable types"'
+    assert_includes sidebar_source, 'text: "Recordable types"'
     assert_includes sidebar_source, "main_app.docs_recordable_types_path"
-    assert_includes sidebar_source, 'label: "API hierarchy"'
+    assert_includes sidebar_source, 'text: "API hierarchy"'
     assert_includes sidebar_source, "main_app.docs_api_hierarchy_path"
-    assert_includes sidebar_source, 'label: "Recordings tree"'
+    assert_includes sidebar_source, 'text: "Recordings tree"'
     assert_includes sidebar_source, "main_app.docs_recordings_tree_path"
-    assert_includes sidebar_source, 'label: "Versions"'
+    assert_includes sidebar_source, 'text: "Versions"'
     assert_includes sidebar_source, "main_app.docs_versions_path"
     assert_not_includes sidebar_source, 'title: "Addon Template"'
   end
@@ -169,9 +176,9 @@ class RecordingStudioApiTest < Minitest::Test
     sidebar_path = File.expand_path("dummy/app/views/layouts/flat_pack/_sidebar.html.erb", __dir__)
     sidebar_source = File.read(sidebar_path)
 
-    assert_includes sidebar_source, 'label: "Install"'
+    assert_includes sidebar_source, 'text: "Install"'
     assert_includes sidebar_source, "icon: :arrow_down_tray"
-    assert_includes sidebar_source, 'label: "Methods"'
+    assert_includes sidebar_source, 'text: "Methods"'
     assert_includes sidebar_source, "icon: :code_bracket"
     assert_not_includes sidebar_source, "icon: :download"
     assert_not_includes sidebar_source, "icon: :code\n"
@@ -193,6 +200,7 @@ class RecordingStudioApiTest < Minitest::Test
     controller_source = File.read(controller_path)
 
     assert_includes controller_source, "include RecordingStudio::RootSwitchable::ControllerSupport"
+    assert_includes controller_source, "include RecordingStudio::UsesDefaultLayout"
     assert_includes controller_source, 'current_root.recordable_type == "AdminRoot"'
   end
 

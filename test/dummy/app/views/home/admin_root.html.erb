@@ -16,21 +16,21 @@
         text: "Public API Admin dashboard",
         style: :default,
         size: :md,
-        url: ["/admin/api", { anchor_url: root_path }.to_query].join("?")
+        href: ["/admin/api", { anchor_url: root_path }.to_query].join("?")
       ) %>
 
       <%= render FlatPack::Button::Component.new(
         text: "Public API docs",
         style: :default,
         size: :md,
-        url: "/docs/scalar"
+        href: "/docs/scalar"
       ) %>
 
       <%= render FlatPack::Button::Component.new(
         text: "Create API test token",
         style: :default,
         size: :md,
-        url: public_api_scalar_test_credential_path(version: RecordingStudioApi.default_api_version)
+        href: public_api_scalar_test_credential_path(version: RecordingStudioApi.default_api_version)
       ) %>
     </div>
   </section>
@@ -48,21 +48,21 @@
         text: "Operations API Admin dashboard",
         style: :default,
         size: :md,
-        url: "/admin/api/operations"
+        href: "/admin/api/operations"
       ) %>
 
       <%= render FlatPack::Button::Component.new(
         text: "Operations API docs",
         style: :default,
         size: :md,
-        url: "/admin/operations-api/docs"
+        href: "/admin/operations-api/docs"
       ) %>
 
       <%= render FlatPack::Button::Component.new(
         text: "Create Operations API test token",
         style: :default,
         size: :md,
-        url: operations_api_scalar_test_credential_path(version: RecordingStudioApi.default_api_version(api: :operations))
+        href: operations_api_scalar_test_credential_path(version: RecordingStudioApi.default_api_version(api: :operations))
       ) %>
     </div>
   </section>

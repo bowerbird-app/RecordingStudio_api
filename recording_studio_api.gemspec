@@ -23,7 +23,7 @@ Gem::Specification.new do |spec|
   end
 
   spec.add_dependency "rails", "~> 8.1.0"
-  spec.add_dependency "recording_studio", "~> 3.0"
-  spec.add_dependency "recording_studio_accessible", "~> 0.3"
+  spec.add_dependency "recording_studio", "~> 4.2"
+  spec.add_dependency "recording_studio_accessible", "~> 0.7"
   spec.add_dependency "redis", "~> 5.3"
 end

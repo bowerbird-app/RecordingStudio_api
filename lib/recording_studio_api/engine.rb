@@ -213,8 +213,7 @@ module RecordingStudioApi
         "RecordingStudio::Access",
         label: "Access",
         plural_label: "Access",
-        root: false,
-        allowed_parent_types: access_parent_type_names
+        root: false
       )
 
       API_RECORDABLE_DECLARATIONS.each do |recordable_type_name, declaration|
@@ -265,13 +264,6 @@ module RecordingStudioApi
 
     def self.internal_child_recordable_type_names
       API_RECORDABLE_TYPE_NAMES + [ADMIN_API_RECORDABLE_TYPE_NAME]
-    end
-
-    def self.access_parent_type_names
-      return [] unless defined?(RecordingStudioAccessible::Compatibility)
-      return [] unless RecordingStudioAccessible::Compatibility.respond_to?(:access_parent_types)
-
-      RecordingStudioAccessible::Compatibility.access_parent_types.to_a.sort
     end
 
     def self.declare_recordable_type!(recordable_type_name, **declaration)

@@ -34,10 +34,10 @@ module RecordingStudioApi
         payload = nil
 
         ApiCredential.transaction do
-          api_client = ApiClient.new(id: SecureRandom.uuid, name: name, api_key: api_key)
+          api_client = ApiClient.create!(id: SecureRandom.uuid, name: name, api_key: api_key)
           client_access_recording = create_client_access_recording!(api_client)
-          api_client.access_recording = client_access_recording
-          api_client.save!
+          api_client.update_columns(access_recording_id: client_access_recording.id, updated_at: Time.current)
+          api_client.association(:access_recording).reset
 
           recording = RecordingStudio.record!(
             action: "created",
@@ -109,9 +109,11 @@ module RecordingStudioApi
 
       def valid_access_point_recording?
         return false unless RecordingStudioApi.api_access_point_recordable_types(api: api_key).include?(resolved_access_point_recording.recordable_type)
-        return false unless defined?(RecordingStudioAccessible::Compatibility)
 
-        RecordingStudioAccessible::Compatibility.access_parent_allowed?(resolved_access_point_recording)
+        RecordingStudio.parent_allowed?(
+          child_type: "RecordingStudio::Access",
+          parent_recording: resolved_access_point_recording
+        )
       end
 
       def authorized_to_manage_api?

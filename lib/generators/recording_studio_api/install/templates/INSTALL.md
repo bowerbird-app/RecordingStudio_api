@@ -5,7 +5,7 @@ Next steps:
 1. Review `config/initializers/recording_studio_api.rb` and set any required options.
 2. If you use environment-specific settings, create `config/recording_studio_api.yml`.
 3. Ensure the host app already loads Recording Studio and the shared `flat_pack` gem used by the engine views.
-4. Ensure every `RecordingStudio.configuration.recordable_types` entry declares `recording_studio_recordable(...)` for RecordingStudio 3:
+4. Ensure every `RecordingStudio.configuration.recordable_types` entry declares `recording_studio_recordable(...)` for RecordingStudio 4.2:
   - use `root: true` only for recordables that may be created as root recordings
   - provide `allowed_parent_types` for recordables that may be created under other recordings
   - call `RecordingStudio.enable_capability(:accessible, on: "YourRecordable")` for recordables that can own direct access grants

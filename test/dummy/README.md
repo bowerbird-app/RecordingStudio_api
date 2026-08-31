@@ -8,12 +8,13 @@ This Rails app exists to validate the RecordingStudio API integration surface an
 - `Current.actor` wiring for Recording Studio events
 - A dedicated admin root rendered through the host app root page
 - `RecordingStudioRootSwitchable` mounted root chooser for switching between admin and standard roots
-- RecordingStudio 3 hierarchy declarations for root-capable `Workspace`/`Folder`, child-only `Page`, API-owned recordables, and accessible parent grants
+- RecordingStudio 4.2 hierarchy declarations for root-capable `Workspace`/`Folder`, child-only `Page`, API-owned recordables, and accessible parent grants
+- `RecordingStudio::UsesDefaultLayout` from the Recording Studio gem (rounded theme on `html` / `body`; no vendored layout copy)
 - Root workspace plus seeded folder and page recordables
 - FlatPack layout integration and Tailwind source scanning
 - Mounted `RecordingStudio::Engine` route behavior inside a host app
 - Mounted `RecordingStudioAccessible` and `RecordingStudioRootSwitchable` engines
-- A sidebar menu and companion docs pages for the renamed RecordingStudio API install and configuration flow
+- Companion docs pages with in-page documentation links (install, config, Scalar, auth) for the renamed RecordingStudio API install and configuration flow
 - API credential authentication that resolves a `RecordingStudioApi::AccessGrant`
 - Capability-owned authorization examples that use the access grant with Recording Studio Accessible
 
@@ -41,7 +42,7 @@ Then open the app and sign in with:
 - `/recording_studio_root_switchable/v1/root_switch?scope=all_roots` - root switcher used by the top-nav root switch button
 - `/recording_studio_api` - mounted RecordingStudio API engine prefix; JSON API endpoints (including `/oauth/token`) live under this mount, and no browser root page is shipped
 - `/users/sign_in` - Devise sign-in page
-- `/docs/install`, `/docs/config`, `/docs/api_routes`, `/docs/scalar`, `/docs/auth`, `/docs/add_capability`, `/docs/methods`, `/docs/api_hierarchy`, `/docs/recordable_types`, `/docs/recordings_tree`, `/docs/gem_views` - sidebar pages that capture the completed architecture handoff
+- `/docs/install`, `/docs/config`, `/docs/api_routes`, `/docs/scalar`, `/docs/auth`, `/docs/add_capability`, `/docs/methods`, `/docs/api_hierarchy`, `/docs/recordable_types`, `/docs/recordings_tree`, `/docs/gem_views` - documentation pages that capture the completed architecture handoff
 - `/up` - Rails health check
 
 ## Relationship Expansion Demo
@@ -61,6 +62,4 @@ The custom `featured_folder` relationship is embed-only; it intentionally has no
 
 Use this app to verify the renamed engine integration, the admin-root flow, and the API-key OAuth2 client credentials flow in a host app. If a layout, route, asset source, token exchange, access-grant dispatch, root switch, or Recording Studio initializer change breaks here, the RecordingStudio API scaffold needs adjustment before deeper feature work.
 
-The authenticated layout in `app/views/layouts/flat_pack_sidebar.html.erb` and sidebar menu in `app/views/layouts/flat_pack/_sidebar.html.erb` document the RecordingStudio API concepts that the dummy app validates: install, config, auth, API routes, capability registration, and access-grant dispatch. Extend them only when the real HTTP surface exists.
-
-Likewise, the home page in `app/views/home/index.html.erb` stays intentionally small. Use the dedicated sidebar pages for deeper install, config, auth, and API route notes.
+Authenticated pages include `RecordingStudio::UsesDefaultLayout` and render the gem's `recording_studio/default_layout` (theme `rounded` on `body`; dummy also stamps `data-theme="rounded"` on `html`). API-key screens do not render the root-switch dropdown. The home page in `app/views/home/standard_root.html.erb` stays intentionally small and links into this gem's API key screens. Use the dedicated docs pages for deeper install, config, auth, and API route notes.
