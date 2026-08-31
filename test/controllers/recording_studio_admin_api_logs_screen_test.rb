@@ -16,6 +16,7 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
 
   setup do
     configure_dummy_operations_api!
+    RecordingStudioApi::Admin::Queries::AdminApiCredentialsQuery.clear_cache!
     ensure_admin_root_tables!
 
     @user = User.create!(email: "rs-admin-api-logs-#{SecureRandom.hex(4)}@example.com") do |user|
@@ -27,6 +28,11 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     @admin_root = AdminRoot.find_or_create_by!(name: "Admin")
     @admin_root_recording = RecordingStudio::Recording.find_or_create_by!(recordable: @admin_root)
     create_access_recording(parent_recording: @admin_root_recording, user: @user, role: :admin)
+    RecordingStudioApi::Admin::ApiAuthorization.recording_for(
+      api: :public,
+      root_recording: @admin_root_recording,
+      create: true
+    )
 
     ensure_api_request_logs_table!
     RecordingStudioApi::ApiRequestLog.delete_all

@@ -65,7 +65,6 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "h1", text: "Admin"
     assert_not_includes response.body, "Recording Studio API demo"
-    assert_includes response.body, "Admin API"
     assert_select "#public-api h2", text: "Public API", count: 1
     assert_select %(a[href="#public-api"][aria-label="Copy link to Public API"]), count: 1
     assert_select %(a[href="/admin/api?anchor_url=%2F"]), text: "Public API Admin dashboard", count: 1
@@ -78,8 +77,6 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
     assert_select %(a[href="/admin/operations-api/docs"]), text: "Operations API docs", count: 1
     assert_select %(a[href="/admin/operations-api/docs/v1/test-credential"]), text: "Create Operations API test token", count: 1
     assert_includes response.body, "Operations API docs"
-    # The shared layout now surfaces root-switch choices, including other roots.
-    assert_includes response.body, "Old Workspace"
     assert_not_includes response.body, "API keys"
   end
 

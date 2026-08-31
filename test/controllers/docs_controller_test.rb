@@ -91,6 +91,13 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "recordable types page includes dummy app defaults" do
+    workspace = Workspace.create!(name: "Default Workspace")
+    workspace_recording = RecordingStudio::Recording.create!(recordable: workspace)
+    folder = Folder.create!(name: "Default Folder")
+    folder_recording = RecordingStudio::Recording.create!(recordable: folder, parent_recording: workspace_recording)
+    page = Page.create!(title: "Default Page")
+    RecordingStudio::Recording.create!(recordable: page, parent_recording: folder_recording)
+
     get docs_recordable_types_path
 
     assert_response :success
@@ -588,8 +595,10 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     folder_recordings_before = RecordingStudio::Recording.where(recordable_type: "Folder").count
     folders_before = Folder.count
 
-    workspace = Workspace.create!(name: "Counted Workspace")
-    2.times { RecordingStudio::Recording.create!(recordable: workspace) }
+    2.times do |index|
+      workspace = Workspace.create!(name: "Counted Workspace #{index}")
+      RecordingStudio::Recording.create!(recordable: workspace)
+    end
 
     folder = Folder.create!(name: "Counted Folder")
     RecordingStudio::Recording.create!(recordable: folder)
@@ -597,7 +606,7 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     {
       workspace: recordable_type_summary(
         workspace_recordings_before + 2,
-        workspaces_before + 1,
+        workspaces_before + 2,
         "recording",
         "recordable"
       ),

@@ -50,7 +50,9 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
     @admin_root, @admin_root_recording = create_admin_root_recording
     create_access_recording(parent_recording: @admin_root_recording, user: @user, role: :admin)
 
-    @admin_api = RecordingStudioApi::AdminApi.create!(key: "api-#{SecureRandom.hex(4)}", name: "Admin API")
+    @admin_api = RecordingStudioApi::AdminApi.find_or_create_by!(key: "api") do |record|
+      record.name = "Admin API"
+    end
     @admin_api_recording = RecordingStudio::Recording.unscoped.find_or_create_by!(
       recordable: @admin_api,
       root_recording_id: @admin_root_recording.id,

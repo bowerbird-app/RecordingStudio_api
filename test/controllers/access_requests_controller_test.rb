@@ -940,6 +940,14 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
   end
 
   def create_api_client_for(parent_recording:, name:, role: :admin)
+    if @user.present?
+      existing_manager_access = RecordingStudioAccessible.access_recordings_for_actor(
+        recording: parent_recording,
+        actor: @user
+      ).first
+      grant_or_bootstrap_access!(recording: parent_recording, actor: @user, role: :admin) if existing_manager_access.blank?
+    end
+
     api_client = RecordingStudioApi::ApiClient.create!(name: name)
 
     access_recording = with_access_creation_context do

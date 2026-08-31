@@ -134,6 +134,12 @@
         <% end %>
       </div>
 
+      <% if respond_to?(:recording_studio_root_switch_dropdown) %>
+        <div class="mb-4 flex justify-end">
+          <%= recording_studio_root_switch_dropdown(style: :ghost, size: :md) %>
+        </div>
+      <% end %>
+
       <% if controller_name == "docs" %>
         <%= render "docs/nav" %>
       <% end %>
