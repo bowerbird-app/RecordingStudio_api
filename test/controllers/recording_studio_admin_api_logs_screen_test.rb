@@ -15,6 +15,7 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
   TEST_PASSWORD = "AdminApiLogsPassword!2026"
 
   setup do
+    reset_recording_studio_api_configuration!
     configure_dummy_operations_api!
     RecordingStudioApi::Admin::Queries::AdminApiCredentialsQuery.clear_cache!
     ensure_admin_root_tables!
