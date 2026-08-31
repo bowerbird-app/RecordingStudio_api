@@ -116,13 +116,8 @@ module RecordingStudioApi
       # @param errors [Array] Additional error details
       # @return [Result] A failure result
       def failure(error, errors: [])
-        error_value = if error.is_a?(RecordingStudioApi::Error)
-                        error
-                      elsif error.is_a?(Exception)
-                        error.message
-                      else
-                        error
-                      end
+        error_value = error
+        error_value = error.message if error.is_a?(Exception) && !error.is_a?(RecordingStudioApi::AuthorizationError)
         Result.new(success: false, error: error_value, errors: errors)
       end
 

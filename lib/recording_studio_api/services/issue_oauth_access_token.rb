@@ -91,7 +91,7 @@ module RecordingStudioApi
 
         code_record = AuthorizationCode.find_by_token(OauthAuthorizationCode.lock, code)
         if code_record.nil?
-          dummy_pkce_compare
+          perform_dummy_pkce_compare
           return oauth_failure("invalid_grant", "authorization code is invalid")
         end
 
@@ -161,9 +161,7 @@ module RecordingStudioApi
             token_prefix: refresh_data.fetch(:prefix),
             expires_at: refresh_expires_at
           )
-          if replacing.present?
-            replacing.update_columns(replaced_by_id: refresh_record.id, updated_at: Time.current)
-          end
+          replacing.update_columns(replaced_by_id: refresh_record.id, updated_at: Time.current) if replacing.present?
         end
 
         success(
@@ -187,8 +185,9 @@ module RecordingStudioApi
         true
       end
 
-      def dummy_pkce_compare
+      def perform_dummy_pkce_compare
         Pkce.s256_matches?("a" * 43, Pkce.s256_challenge("a" * 43))
+        nil
       end
 
       def authenticate_machine_client?(credential)

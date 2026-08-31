@@ -7,7 +7,7 @@ require_relative "recordable_registry"
 require_relative "api_definition"
 
 module RecordingStudioApi
-  class Configuration
+  class Configuration # rubocop:disable Metrics/ClassLength
     DEFAULT_API_VERSION = "v1"
 
     ACCESS_ROLE_RANKS = {

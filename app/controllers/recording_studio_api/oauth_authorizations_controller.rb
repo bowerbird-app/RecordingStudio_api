@@ -99,15 +99,7 @@ module RecordingStudioApi
         return
       end
 
-      if @oauth_client.public? && (@code_challenge.blank? || @code_challenge_method != Pkce::S256)
-        redirect_to_client(error: "invalid_request", error_description: "PKCE S256 is required for public clients")
-        return
-      end
-
-      if @code_challenge_method.present? && @code_challenge_method != Pkce::S256
-        redirect_to_client(error: "invalid_request", error_description: "PKCE method must be S256")
-        return
-      end
+      return unless pkce_allowed?
 
       resolved = RecordingStudioApi.resolve_access_recording_for_actor(
         actor: current_oauth_actor,
@@ -117,6 +109,20 @@ module RecordingStudioApi
       @selected_access_recording = @access_candidates.find { |recording| recording.id == resolved.fetch(:recording)&.id } ||
                                    (@access_candidates.first if @access_candidates.one?)
       @role_options = role_options_for(@selected_access_recording)
+    end
+
+    def pkce_allowed?
+      if @oauth_client.public? && (@code_challenge.blank? || @code_challenge_method != Pkce::S256)
+        redirect_to_client(error: "invalid_request", error_description: "PKCE S256 is required for public clients")
+        return false
+      end
+
+      if @code_challenge_method.present? && @code_challenge_method != Pkce::S256
+        redirect_to_client(error: "invalid_request", error_description: "PKCE method must be S256")
+        return false
+      end
+
+      true
     end
 
     def grantable_access_recordings(candidates)
@@ -130,9 +136,7 @@ module RecordingStudioApi
 
     def selected_access_recording
       requested_id = params[:access_recording_id].to_s.presence
-      if requested_id.present?
-        return @access_candidates.find { |recording| recording.id == requested_id }
-      end
+      return @access_candidates.find { |recording| recording.id == requested_id } if requested_id.present?
 
       @selected_access_recording
     end
@@ -166,9 +170,11 @@ module RecordingStudioApi
     end
 
     def can_assign_role?(access_recording, role)
-      access_point = access_recording.is_a?(RecordingStudio::Recording) && access_recording.recordable_type == "RecordingStudio::Access" ?
-        (access_recording.parent_recording || access_recording.root_recording) :
-        access_recording
+      access_point = if access_recording.is_a?(RecordingStudio::Recording) && access_recording.recordable_type == "RecordingStudio::Access"
+                       access_recording.parent_recording || access_recording.root_recording
+                     else
+                       access_recording
+                     end
       policy.can_assign_role?(access_point, role)
     end
 

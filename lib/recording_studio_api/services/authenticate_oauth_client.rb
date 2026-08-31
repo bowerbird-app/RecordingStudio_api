@@ -21,7 +21,7 @@ module RecordingStudioApi
         client = resolved.success? ? resolved.value : nil
 
         if client&.public?
-          dummy_compare_secret
+          perform_dummy_secret_compare
           return oauth_failure("invalid_client", "client authentication failed") unless allow_public
 
           return success(client)
@@ -37,8 +37,9 @@ module RecordingStudioApi
         success(client)
       end
 
-      def dummy_compare_secret
+      def perform_dummy_secret_compare
         Token.digest_matches?(dummy_client_secret_digest, client_secret.presence || DUMMY_CLIENT_SECRET)
+        nil
       end
 
       def dummy_client_secret_digest

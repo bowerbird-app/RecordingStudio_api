@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require_relative "../support/api_dummy_helpers"
+require_relative "support/api_dummy_helpers"
 require "devise/test/integration_helpers"
 
 class DelegatedOauthTest < ActionDispatch::IntegrationTest

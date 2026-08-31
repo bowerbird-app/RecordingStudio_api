@@ -19,9 +19,7 @@ module RecordingStudioApi
         OauthAuthorization.transaction do
           authorization.lock!
           time = @time || Time.current
-          unless authorization.revoked?
-            authorization.update_columns(revoked_at: time, updated_at: time)
-          end
+          authorization.update_columns(revoked_at: time, updated_at: time) unless authorization.revoked?
 
           trash_granted_access!(time)
           revoke_tokens!(time)
