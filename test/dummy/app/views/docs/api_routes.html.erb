@@ -40,6 +40,8 @@
         resources :api_clients, controller: "access_requests", only: %i[index show new create edit update]
 
         post "/oauth/token", to: "oauth#token"
+        match "/oauth/authorize", to: "oauth_authorizations#new", via: :get
+        get "/.well-known/oauth-authorization-server", to: "oauth_discoveries#authorization_server"
 
         namespace :api, defaults: { format: :json } do
           namespace :v1 do

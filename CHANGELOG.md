@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-31
+
+### Added
+- Delegated OAuth for third-party apps: each approval creates its own Accessible Access (sibling of the manager's), not a token bound to the user
+- `authorization_code` and `refresh_token` grant types on the existing `/oauth/token` endpoints; `client_credentials` is unchanged
+- Consent and connected-app screens composed from `recording_studio/default_layout` + FlatPack (`UsesDefaultLayout`); host authentication (dummy Devise) owns sign-in
+- RFC 8414 authorization-server metadata and RFC 9728 protected-resource metadata; PKCE S256; optional RFC 8707 `resource`; Client ID Metadata Documents for public clients
+- Immediate voiding when the manager's Access is trashed or their role drops below the grant (Accessible/trash hooks plus per-request checks)
+
+### Changed
+- Access tokens may belong to either a machine `ApiCredential` or an `OauthAuthorization` (exactly one)
+- Delegated `AccessGrant.actor` is the authorization, not the user; handlers keep using `access_grant.authorize!`
+
+See [UPGRADING.md](UPGRADING.md) for migrations, `access_actor_types`, and token-endpoint changes.
+
 ## [0.5.0] - 2026-08-31
 
 ### Changed
@@ -89,7 +104,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.2.0...v0.3.0

@@ -18,7 +18,8 @@ module RecordingStudioApi
         return failure(AuthenticationError.new(invalid_token_format_error_message)) unless valid_token_format?(token)
 
         credential, token_record = resolve_authenticated_entities(token)
-        return failure(AuthenticationError.new(invalid_token_error_message)) if credential.nil?
+        return failure(AuthenticationError.new(invalid_token_error_message)) if credential.nil? && !delegated_token?(token_record)
+        return authenticate_delegated_token(token_record) if delegated_token?(token_record)
         return failure(AuthenticationError.new(invalid_token_error_message)) unless credential.api_client&.api_key == api_key
         return failure(AuthenticationError.new(inactive_token_error_message)) unless token_record_active?(token_record)
 
@@ -29,7 +30,7 @@ module RecordingStudioApi
 
         return failure(AuthenticationError.new(inactive_token_error_message)) unless access_recording_active?(credential)
 
-        root_recording = resolve_root_recording(credential)
+        root_recording = resolve_root_recording(credential.effective_access_recording)
         return failure(AuthenticationError.new(invalid_scope_error_message)) if root_recording.nil?
 
         update_last_used!(credential, token_record)
@@ -43,6 +44,39 @@ module RecordingStudioApi
             api_key: api_key
           )
         )
+      end
+
+      def authenticate_delegated_token(token_record)
+        authorization = token_record.oauth_authorization
+        return failure(AuthenticationError.new(invalid_token_error_message)) if authorization.nil?
+        return failure(AuthenticationError.new(invalid_token_error_message)) unless authorization.oauth_client&.api_key == api_key
+        return failure(AuthenticationError.new(inactive_token_error_message)) unless token_record.active_for_authentication?
+
+        unless authorization.manager_qualifies?
+          VoidOauthAuthorization.call(authorization: authorization)
+          return failure(AuthorizationError.new("Delegated API access is no longer valid"))
+        end
+
+        access_recording = authorization.access_recording
+        root_recording = resolve_root_recording(access_recording)
+        return failure(AuthorizationError.new("Delegated API access is no longer valid")) if root_recording.nil?
+
+        touch_last_used_at!(token_record)
+
+        success(
+          AuthenticatedClient.new(
+            api_client: nil,
+            credential: nil,
+            access_recording: access_recording,
+            root_recording: root_recording,
+            api_key: api_key,
+            oauth_authorization: authorization
+          )
+        )
+      end
+
+      def delegated_token?(token_record)
+        token_record.respond_to?(:delegated?) && token_record.delegated?
       end
 
       def parse_bearer_token
@@ -66,8 +100,7 @@ module RecordingStudioApi
         access_recording.present? && access_recording.trashed_at.nil?
       end
 
-      def resolve_root_recording(credential)
-        access_recording = RecordingStudio::Recording.unscoped.find_by(id: credential.effective_access_recording_id)
+      def resolve_root_recording(access_recording)
         return if access_recording.nil?
 
         root_id = access_recording.root_recording_id.presence || access_recording.id

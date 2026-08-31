@@ -388,6 +388,49 @@ admin_access_recording = ensure_access_recording_for(
   manager_actor: admin_user
 )
 
+second_workspace = Workspace.find_or_create_by!(name: "Docs Workspace")
+second_root_recording = RecordingStudio::Recording.unscoped.find_or_create_by!(
+  recordable: second_workspace,
+  parent_recording_id: nil
+)
+ensure_access_recording_for(
+  recording: second_root_recording,
+  actor: admin_user,
+  role: :admin,
+  manager_actor: admin_user
+)
+
+seeded_oauth_client = RecordingStudioApi::OauthClient.find_or_initialize_by(client_id: "rsapi_oc_seed_demo_app")
+if seeded_oauth_client.new_record?
+  seeded_oauth_client.assign_attributes(
+    name: "Seed Demo App",
+    confidential: false,
+    redirect_uris: ["http://127.0.0.1/callback"],
+    api_key: "public"
+  )
+  seeded_oauth_client.save!
+end
+
+seeded_oauth_authorization = RecordingStudioApi::OauthAuthorization.find_by(
+  oauth_client: seeded_oauth_client,
+  manager_actor: admin_user,
+  revoked_at: nil
+)
+if seeded_oauth_authorization.nil?
+  oauth_grant = RecordingStudioApi::Services::CreateOauthAuthorization.call(
+    oauth_client: seeded_oauth_client,
+    manager_actor: admin_user,
+    access_recording: admin_access_recording,
+    role: "view",
+    redirect_uri: "http://127.0.0.1/callback",
+    code_challenge: RecordingStudioApi::Pkce.s256_challenge("A" * 43),
+    code_challenge_method: "S256"
+  )
+  raise oauth_grant.error unless oauth_grant.success?
+
+  seeded_oauth_authorization = oauth_grant.value.fetch(:authorization)
+end
+
 Current.actor = admin_user
 service_client_name = "Seed Demo Service Client"
 deduplicate_seeded_api_clients!(name: service_client_name)
@@ -474,6 +517,8 @@ puts "Seeded admin root: #{admin_root.name}"
 puts "Seeded workspace children: #{workspace.name} -> folders: #{folders.map(&:name).join(', ')}; pages: #{pages.map(&:title).join(', ')}"
 puts "Seeded admin root access recording: #{admin_root_recording.id}"
 puts "Seeded admin access recording: #{admin_access_recording.id}"
+puts "Seeded OAuth app: #{seeded_oauth_client.name} (#{seeded_oauth_client.client_id})"
+puts "Seeded connected app authorization: #{seeded_oauth_authorization.id}"
 
 puts "Service OAuth client_credentials demo"
 puts "  Client ID: #{service_credential.oauth_client_id}"

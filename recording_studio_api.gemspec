@@ -8,7 +8,7 @@ Gem::Specification.new do |spec|
   spec.authors     = ["Bowerbird"]
   spec.homepage    = "https://github.com/bowerbird-app/RecordingStudio_api"
   spec.summary     = "Recording Studio programmable API engine"
-  spec.description = "Rails engine providing OAuth2 API authentication, Recording Studio-backed API " \
+      spec.description = "Rails engine providing OAuth2 API authentication (machine client credentials and delegated app access), Recording Studio-backed API " \
                      "clients, and capability-driven API actions for Recording Studio addons"
   spec.license     = "MIT"
   spec.required_ruby_version = ">= 3.3.0"

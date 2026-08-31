@@ -26,6 +26,13 @@
       size: :md,
       href: public_api_scalar_test_credential_path(version: RecordingStudioApi.default_api_version)
     ) %>
+
+    <%= render FlatPack::Button::Component.new(
+      text: "Connected apps",
+      style: :default,
+      size: :md,
+      href: connected_apps_path
+    ) %>
   </div>
 
 </div>

@@ -1,0 +1,13 @@
+<div class="mx-auto flex w-full max-w-3xl flex-col gap-6">
+  <% recording_studio_page_nav(title: "Could not connect") %>
+
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "Could not connect",
+    variant: :h1
+  ) %>
+
+  <%= render FlatPack::Alert::Component.new(
+    description: @oauth_error.fetch(:error_description),
+    style: :danger
+  ) %>
+</div>

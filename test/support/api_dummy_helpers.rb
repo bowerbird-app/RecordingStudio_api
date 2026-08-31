@@ -136,6 +136,49 @@ module ApiDummyHelpers # rubocop:disable Metrics/ModuleLength
     RecordingStudio::Recording.create!(recordable: page, parent_recording: folder_recording)
   end
 
+  def create_oauth_client(name: "Demo App", confidential: false, redirect_uris: ["http://127.0.0.1/callback"], api: :public)
+    attrs = {
+      name: name,
+      client_id: RecordingStudioApi::OauthClientSecret.generate_client_id,
+      confidential: confidential,
+      redirect_uris: redirect_uris,
+      api_key: RecordingStudioApi.configuration.fetch_api(api).name
+    }
+    secret_token = nil
+    if confidential
+      secret = RecordingStudioApi::OauthClientSecret.generate
+      attrs[:client_secret_digest] = secret.fetch(:digest)
+      secret_token = secret.fetch(:token)
+    end
+
+    [RecordingStudioApi::OauthClient.create!(attrs), secret_token]
+  end
+
+  def pkce_pair
+    verifier = "V#{SecureRandom.urlsafe_base64(32)}"
+    verifier = verifier.ljust(43, "a")
+    {
+      verifier: verifier,
+      challenge: RecordingStudioApi::Pkce.s256_challenge(verifier)
+    }
+  end
+
+  def approve_delegated_oauth(oauth_client:, user:, access_recording:, role: "view", redirect_uri: "http://127.0.0.1/callback", pkce: nil)
+    pkce ||= pkce_pair
+    result = RecordingStudioApi::Services::CreateOauthAuthorization.call(
+      oauth_client: oauth_client,
+      manager_actor: user,
+      access_recording: access_recording,
+      role: role,
+      redirect_uri: redirect_uri,
+      code_challenge: pkce.fetch(:challenge),
+      code_challenge_method: "S256"
+    )
+    raise result.error unless result.success?
+
+    result.value.merge(pkce: pkce, redirect_uri: redirect_uri)
+  end
+
   def issue_oauth_access_token_for(access_recording:, name: "OAuth client")
     payload = provision_api_client_for(access_recording: access_recording, name: name)
 

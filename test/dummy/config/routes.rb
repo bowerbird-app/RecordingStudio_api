@@ -14,6 +14,9 @@ Rails.application.routes.draw do
 
   get "/workspace", to: "home#workspace", as: :workspace
   get "/folder", to: "home#folder", as: :folder
+  resources :connected_apps, only: %i[index destroy]
+  get "/.well-known/oauth-authorization-server", to: "recording_studio_api/oauth_discoveries#authorization_server", defaults: { api_key: "public" }
+  get "/.well-known/oauth-protected-resource", to: "recording_studio_api/oauth_discoveries#protected_resource", defaults: { api_key: "public" }
   recording_studio_admin_for :api, at: "/api", root_section: :api
   recording_studio_admin_for :admin_api, at: "/admin/api", root_section: :admin_api
   recording_studio_admin_for :admin_operations_api, at: "/admin/api/operations", root_section: :admin_operations_api

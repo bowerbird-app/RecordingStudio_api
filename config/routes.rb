@@ -34,8 +34,16 @@ RecordingStudioApi::Engine.routes.draw do
   end
   post "/oauth/token", to: "oauth#token", defaults: { api_key: "public" }
   post "/oauth/revoke", to: "oauth#revoke", defaults: { api_key: "public" }
+  match "/oauth/authorize", to: "oauth_authorizations#new", via: :get, defaults: { api_key: "public" }, as: :oauth_authorize
+  match "/oauth/authorize", to: "oauth_authorizations#create", via: :post, defaults: { api_key: "public" }
+  get "/.well-known/oauth-authorization-server", to: "oauth_discoveries#authorization_server", defaults: { api_key: "public" }
+  get "/.well-known/oauth-protected-resource", to: "oauth_discoveries#protected_resource", defaults: { api_key: "public" }
   post "/apis/:api_key/oauth/token", to: "oauth#token", as: :named_api_oauth_token
   post "/apis/:api_key/oauth/revoke", to: "oauth#revoke", as: :named_api_oauth_revoke
+  match "/apis/:api_key/oauth/authorize", to: "oauth_authorizations#new", via: :get, as: :named_api_oauth_authorize
+  match "/apis/:api_key/oauth/authorize", to: "oauth_authorizations#create", via: :post
+  get "/apis/:api_key/.well-known/oauth-authorization-server", to: "oauth_discoveries#authorization_server"
+  get "/apis/:api_key/.well-known/oauth-protected-resource", to: "oauth_discoveries#protected_resource"
 
   namespace :api, defaults: { format: :json, api_key: "public" } do
     namespace :v1, defaults: { api_version: "v1" } do

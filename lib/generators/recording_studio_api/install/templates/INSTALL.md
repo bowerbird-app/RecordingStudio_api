@@ -38,6 +38,12 @@ Next steps:
    oauth.value.fetch(:access_token)
    ```
 
+   For third-party apps, register a `RecordingStudioApi::OauthClient` (not an `ApiClient`) and send
+   users to `GET /recording_studio_api/oauth/authorize` (or the named-API authorize URL). Include
+   `RecordingStudioApi::OauthAuthorization` in Accessible `access_actor_types`. The same token
+   endpoint also accepts `authorization_code` and `refresh_token`. Discovery documents are served
+   from `/.well-known/oauth-authorization-server` and `/.well-known/oauth-protected-resource`.
+
 9. Mount routes are added at the configured mount path. Adjust auth, layout, and current actor integration to match your host app.
 10. Add addon gems that enable Recording Studio capabilities, then register the related API action once with `RecordingStudioApi.register_capability_action`.
 11. In each custom capability handler, authorize with the passed `context.access_grant` before exposing or mutating Recording Studio data.

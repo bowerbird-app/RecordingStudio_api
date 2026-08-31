@@ -1,5 +1,37 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.6.0
+
+`0.6.0` adds delegated OAuth next to the existing machine `client_credentials` flow. Update the host
+dependency to `recording_studio_api`, `~> 0.6.0`, then apply the steps below.
+
+Machine API keys, `ApiClient` under Access, named APIs, `AccessGrant`, and `POST /oauth/token` with
+`client_credentials` keep working. Delegated tokens are a separate Accessible grant, not a token
+that acts as the user.
+
+1. Run `bin/rails generate recording_studio_api:migrations` and `bin/rails db:migrate`. This adds
+   OAuth client, authorization, authorization-code, and refresh-token tables, and allows
+   `recording_studio_api_api_access_tokens.oauth_authorization_id` (null = machine token).
+2. Include `RecordingStudioApi::OauthAuthorization` in Accessible `access_actor_types` alongside
+   User and `RecordingStudioApi::ApiClient`. Consent still uses host authentication (dummy Devise
+   in this gem); do not change Users for this flow.
+3. Point third-party apps at the named API's authorize URL. The token endpoint now also accepts
+   `authorization_code` and `refresh_token`. Discovery lives at
+   `/.well-known/oauth-authorization-server` and `/.well-known/oauth-protected-resource` on the
+   engine (and optionally at the host root).
+4. Voiding is automatic: if the manager's Access is trashed or their role drops below the grant,
+   the authorization is revoked, the OAuth Access is trashed, and access/refresh tokens stop
+   working. Do not add a parallel ACL.
+5. Public tokens remain bound to their named API. A public token must not be sent to `:operations`.
+6. Optional: `config.authorization_code_ttl` (10 minutes), `config.refresh_token_ttl` (30 days),
+   and `config.client_id_metadata_documents_enabled` (true). PKCE S256 is required for public
+   clients. Consent and connected-app views use `UsesDefaultLayout`; hosts can override them.
+
+If you are still on a pre-`0.5.0` Recording Studio pin, complete
+[Upgrading to 0.5.0](#upgrading-to-050) first.
+
+---
+
 ## Upgrading to 0.5.0
 
 `0.5.0` pins this engine onto Recording Studio 4.2 and Accessible 0.7. Update the host

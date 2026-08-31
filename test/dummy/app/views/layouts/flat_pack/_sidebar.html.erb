@@ -35,6 +35,12 @@
         ) %>
       <% else %>
         <%= render FlatPack::Sidebar::Item::Component.new(
+          text: "Connected apps",
+          href: main_app.connected_apps_path,
+          icon: :link
+        ) %>
+
+        <%= render FlatPack::Sidebar::Item::Component.new(
           text: "Install",
           href: main_app.docs_install_path,
           icon: :arrow_down_tray

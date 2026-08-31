@@ -19,7 +19,12 @@ module RecordingStudioApi
         grant_type: oauth_body_param("grant_type").to_s,
         client_id: token_params.fetch(:client_id),
         client_secret: token_params.fetch(:client_secret),
-        api: current_api_key
+        api: current_api_key,
+        code: oauth_body_param("code").to_s.presence,
+        redirect_uri: oauth_body_param("redirect_uri").to_s.presence,
+        code_verifier: oauth_body_param("code_verifier").to_s.presence,
+        refresh_token: oauth_body_param("refresh_token").to_s.presence,
+        resource: oauth_body_param("resource").to_s.presence
       )
 
       if result.failure?

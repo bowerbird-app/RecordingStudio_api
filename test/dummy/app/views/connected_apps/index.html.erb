@@ -1,0 +1,42 @@
+<div class="mx-auto flex w-full max-w-3xl flex-col gap-6">
+  <% recording_studio_page_nav(title: "Connected apps") %>
+
+  <%= render FlatPack::PageTitle::Component.new(
+    title: "Connected apps",
+    subtitle: "Apps you have given their own access. Removing an app immediately ends that access.",
+    variant: :h1
+  ) %>
+
+  <% if @authorizations.any? %>
+    <%= render FlatPack::Card::Component.new(style: :default) do %>
+      <div class="space-y-4">
+        <% @authorizations.each do |authorization| %>
+          <div class="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--surface-border-color)] pb-4 last:border-b-0 last:pb-0">
+            <div class="space-y-1">
+              <p class="font-medium"><%= authorization.oauth_client.name %></p>
+              <p class="text-sm text-[var(--surface-muted-content-color)]">
+                <%= connected_app_status(authorization) %>
+              </p>
+            </div>
+            <% if authorization.revoked_at.nil? %>
+              <%= form_with url: connected_app_path(authorization), method: :delete do %>
+                <%= render FlatPack::Button::Component.new(
+                  text: "Remove access",
+                  style: :danger,
+                  size: :sm,
+                  type: "submit"
+                ) %>
+              <% end %>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+  <% else %>
+    <%= render FlatPack::EmptyState::Component.new(
+      title: "No connected apps",
+      description: "When you approve an app, it appears here so you can remove it later.",
+      icon: :link
+    ) %>
+  <% end %>
+</div>

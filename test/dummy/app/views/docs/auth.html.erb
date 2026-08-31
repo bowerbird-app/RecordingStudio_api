@@ -1,7 +1,7 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
   <%= render FlatPack::PageTitle::Component.new(
     title: "Auth",
-    subtitle: "How OAuth2 credentials become a RecordingStudioApi access grant for endpoint dispatch.",
+    subtitle: "How OAuth2 credentials and delegated app connects become a RecordingStudioApi access grant for endpoint dispatch.",
     variant: :h1
   ) %>
 
@@ -47,19 +47,19 @@
         <span>When <code>rate_limit_api_pre_auth_enabled</code> is enabled, configured <code>/api/&lt;version&gt;</code> requests are first throttled by IP before bearer-token lookup.</span>
       <% end %>
       <%= render FlatPack::List::Item.new(icon: :shield_check) do %>
-        <span>The token endpoint calls <code>RecordingStudioApi::Services::IssueOauthAccessToken</code> and only accepts <code>grant_type=client_credentials</code>.</span>
+        <span>The token endpoint calls <code>RecordingStudioApi::Services::IssueOauthAccessToken</code> with <code>grant_type</code> of <code>client_credentials</code>, <code>authorization_code</code>, or <code>refresh_token</code>.</span>
       <% end %>
       <%= render FlatPack::List::Item.new(icon: :key) do %>
         <span>API requests authenticate through <code>RecordingStudioApi::Services::AuthenticateOauthAccessToken</code> with <code>Authorization: Bearer &lt;access_token&gt;</code>.</span>
       <% end %>
       <%= render FlatPack::List::Item.new(icon: :finger_print) do %>
-        <span>The OAuth token service validates issued access token digests and confirms both token and underlying credential are active.</span>
+        <span>The OAuth token service validates issued access token digests. Machine tokens also confirm the underlying credential is active; delegated tokens confirm the authorization and manager Access still qualify.</span>
       <% end %>
       <%= render FlatPack::List::Item.new(icon: :folder_open) do %>
         <span>It resolves <code>access_recording</code> and <code>root_recording</code>, rejecting trashed or invalid recording references.</span>
       <% end %>
       <%= render FlatPack::List::Item.new(icon: :link) do %>
-        <span>The controller builds <code>RecordingStudioApi::AccessGrant</code> from the API client, credential, access recording, and root recording.</span>
+        <span>The controller builds <code>RecordingStudioApi::AccessGrant</code> from the authenticated client. For machine tokens that includes the API client and credential; for delegated tokens <code>AccessGrant.actor</code> is the authorization.</span>
       <% end %>
       <%= render FlatPack::List::Item.new(icon: :chart_bar) do %>
         <span>When <code>rate_limit_api_enabled</code> is enabled, authenticated API requests are then throttled by credential or client using separate read and write buckets.</span>
@@ -79,7 +79,7 @@
   <%= render FlatPack::Card::Component.new(style: :default) do %>
     <%= render FlatPack::List::Component.new(divider: true) do %>
       <%= render FlatPack::List::Item.new(icon: :check_badge) do %>
-        <span>OAuth2 proves that the API credential or mobile access token is valid.</span>
+        <span>OAuth2 proves that the API credential or delegated authorization is valid.</span>
       <% end %>
       <%= render FlatPack::List::Item.new(icon: :adjustments_horizontal) do %>
         <span>The API resolves <code>current_access_grant</code> and dispatches it to the requested capability.</span>

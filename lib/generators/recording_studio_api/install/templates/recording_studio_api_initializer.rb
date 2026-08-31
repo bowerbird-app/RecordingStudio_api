@@ -25,6 +25,11 @@ RecordingStudioApi.configure do |config|
   # OAuth bearer access tokens are short-lived because possession is authentication.
   config.access_token_ttl = 1.hour
 
+  # Delegated authorization codes and refresh tokens.
+  # config.authorization_code_ttl = 10.minutes
+  # config.refresh_token_ttl = 30.days
+  # config.client_id_metadata_documents_enabled = true
+
   # Credential and access-token digests are HMAC-SHA256(pepper, token). Defaults to
   # Rails secret_key_base when token_digest_pepper is unset. Legacy unsalted SHA256
   # verify is off by default; enable only while rotating/rehashing older digests.
