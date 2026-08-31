@@ -25,7 +25,7 @@ module RecordingStudioApi
       end
 
       def test_call_builds_openapi_document_with_paths
-        document = OpenapiDocument.call
+        document = with_isolated_configuration { OpenapiDocument.call }
         expected_title = Rails.application.class.module_parent_name.presence || "RecordingStudioApi"
 
         assert_equal "3.0.3", document.fetch(:openapi)
@@ -170,13 +170,15 @@ module RecordingStudioApi
 
       def test_delete_operation_description_mentions_permanent_delete
         with_stubbed_recordable_class("Page", [column_stub("id", :uuid, false)]) do
-          document = with_recordable_types(["Page"]) { OpenapiDocument.call }
-          delete_operation = document.fetch(:paths).fetch("/recording_studio_api/api/v1/pages/{id}").fetch("delete")
+          with_recordable_registration("Page", openapi: {}, operations: %i[index show create update destroy]) do
+            document = with_recordable_types(["Page"]) { OpenapiDocument.call }
+            delete_operation = document.fetch(:paths).fetch("/recording_studio_api/api/v1/pages/{id}").fetch("delete")
 
-          assert_equal(
-            "Permanently delete Page. Recording Studio API hard-deletes the recording and recordable; it does not soft-delete or move to trash.",
-            delete_operation.fetch(:description)
-          )
+            assert_equal(
+              "Permanently delete Page. Recording Studio API hard-deletes the recording and recordable; it does not soft-delete or move to trash.",
+              delete_operation.fetch(:description)
+            )
+          end
         end
       end
 
@@ -592,6 +594,19 @@ module RecordingStudioApi
       end
 
       private
+
+      def with_isolated_configuration
+        original_configuration_defined = RecordingStudioApi.instance_variable_defined?(:@configuration)
+        original_configuration = RecordingStudioApi.instance_variable_get(:@configuration)
+        RecordingStudioApi.instance_variable_set(:@configuration, RecordingStudioApi::Configuration.new)
+        yield
+      ensure
+        if original_configuration_defined
+          RecordingStudioApi.instance_variable_set(:@configuration, original_configuration)
+        elsif RecordingStudioApi.instance_variable_defined?(:@configuration)
+          RecordingStudioApi.remove_instance_variable(:@configuration)
+        end
+      end
 
       def with_recordable_types(recordable_types)
         singleton = RecordingStudioApi.singleton_class
