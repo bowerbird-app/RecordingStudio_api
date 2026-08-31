@@ -489,7 +489,7 @@ seed_api_request_logs!(
   seeded_api_clients: seeded_api_clients
 )
 
-puts "Seeded API keys: #{RecordingStudioApi::ApiClient.where(access_recording_id: admin_access_recording.id, name: seeded_api_client_names).count}"
+puts "Seeded API keys: #{RecordingStudioApi::ApiClient.where(name: seeded_api_client_names).count}"
 puts "Seeded API request logs: #{RecordingStudioApi::ApiRequestLog.where("request_id LIKE ?", "seed-log-%").count}"
 
 Current.actor = nil

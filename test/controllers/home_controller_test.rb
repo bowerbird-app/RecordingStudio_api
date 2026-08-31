@@ -295,5 +295,4 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
       }
     }
   end
-
 end
