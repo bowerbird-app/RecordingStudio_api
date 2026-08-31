@@ -18,7 +18,7 @@
     <div class="space-y-6">
       <%= render FlatPack::SectionTitle::Component.new(
         title: @oauth_client.name,
-        subtitle: "Choose a workspace and the highest permission this app may use."
+        subtitle: consent_section_subtitle
       ) %>
 
       <%= form_with url: authorize_form_url, method: :post, class: "space-y-6" do %>
@@ -31,17 +31,21 @@
         <%= hidden_field_tag :resource, @resource if @resource.present? %>
 
         <% if @access_candidates.many? %>
-          <%= render FlatPack::Select::Component.new(
-            name: "access_recording_id",
-            options: @access_candidates.map { |recording| [access_recording_label(recording), recording.id] },
-            value: @selected_access_recording&.id,
-            label: "Workspace",
-            help_text: "This app receives its own access to the workspace you choose.",
-            class: "w-full"
-          ) %>
+          <div class="w-full">
+            <%= render FlatPack::Select::Component.new(
+              name: "access_recording_id",
+              options: @access_candidates.map { |recording| [access_workspace_name(recording), recording.id] },
+              value: @selected_access_recording&.id,
+              label: "Workspace",
+              placeholder: nil,
+              required: true,
+              help_text: "This app receives its own access to the workspace you choose.",
+              class: "w-full"
+            ) %>
+          </div>
         <% elsif @selected_access_recording.present? %>
           <%= hidden_field_tag :access_recording_id, @selected_access_recording.id %>
-          <p class="text-sm text-[var(--surface-muted-content-color)]">
+          <p class="w-full text-sm text-[var(--surface-muted-content-color)]">
             Workspace: <%= access_recording_label(@selected_access_recording) %>
           </p>
         <% else %>
@@ -52,26 +56,32 @@
           ) %>
         <% end %>
 
-        <% if @role_options.any? %>
-          <%= render FlatPack::Select::Component.new(
-            name: "role",
-            options: @role_options,
-            value: params[:role].presence || @role_options.last&.last,
-            label: "Permission",
-            help_text: "Cannot be higher than your own access on that workspace.",
-            class: "w-full"
-          ) %>
+        <% if @selected_access_recording.present? && @role_options.any? %>
+          <div class="w-full">
+            <%= render FlatPack::Select::Component.new(
+              name: "role",
+              options: @role_options,
+              value: params[:role].presence || @role_options.last&.last,
+              label: "Permission",
+              placeholder: nil,
+              required: true,
+              help_text: "Cannot be higher than your own access on that workspace.",
+              class: "w-full"
+            ) %>
+          </div>
         <% end %>
 
         <div class="flex flex-wrap gap-3">
-          <%= render FlatPack::Button::Component.new(
-            text: "Approve",
-            style: :primary,
-            size: :md,
-            type: "submit",
-            name: "decision",
-            value: "approve"
-          ) %>
+          <% if @selected_access_recording.present? %>
+            <%= render FlatPack::Button::Component.new(
+              text: "Approve",
+              style: :primary,
+              size: :md,
+              type: "submit",
+              name: "decision",
+              value: "approve"
+            ) %>
+          <% end %>
           <%= render FlatPack::Button::Component.new(
             text: "Deny",
             style: :secondary,

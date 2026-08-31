@@ -106,8 +106,7 @@ module RecordingStudioApi
         requested_access_recording_id: params[:access_recording_id]
       )
       @access_candidates = grantable_access_recordings(resolved.fetch(:candidates))
-      @selected_access_recording = @access_candidates.find { |recording| recording.id == resolved.fetch(:recording)&.id } ||
-                                   (@access_candidates.first if @access_candidates.one?)
+      @selected_access_recording = selected_access_recording_for_display(resolved.fetch(:recording))
       @role_options = role_options_for(@selected_access_recording)
     end
 
@@ -137,9 +136,28 @@ module RecordingStudioApi
     def selected_access_recording
       requested_id = params[:access_recording_id].to_s.presence
       return @access_candidates.find { |recording| recording.id == requested_id } if requested_id.present?
+      return @access_candidates.first if @access_candidates.one?
 
-      @selected_access_recording
+      nil
     end
+
+    def selected_access_recording_for_display(resolved_recording)
+      matched = @access_candidates.find { |recording| recording.id == resolved_recording&.id }
+      return matched if matched.present?
+      return @access_candidates.first if @access_candidates.one?
+      return @access_candidates.first if @access_candidates.many? && request.get?
+
+      nil
+    end
+
+    def consent_section_subtitle
+      if @access_candidates.many?
+        "Choose a workspace and the highest permission this app may use."
+      else
+        "Choose the highest permission this app may use."
+      end
+    end
+    helper_method :consent_section_subtitle
 
     def access_selection_error
       return "No workspace access is available to connect" if @access_candidates.empty?
@@ -191,14 +209,19 @@ module RecordingStudioApi
     end
     helper_method :authorize_form_url
 
-    def access_recording_label(access_recording)
+    def access_workspace_name(access_recording)
       point = access_recording.parent_recording || access_recording.root_recording
       recordable = point&.recordable
-      workspace_name = if recordable.respond_to?(:name) && recordable.name.present?
-                         recordable.name
-                       else
-                         point&.recordable_type.to_s.demodulize.underscore.humanize
-                       end
+      if recordable.respond_to?(:name) && recordable.name.present?
+        recordable.name
+      else
+        point&.recordable_type.to_s.demodulize.underscore.humanize
+      end
+    end
+    helper_method :access_workspace_name
+
+    def access_recording_label(access_recording)
+      workspace_name = access_workspace_name(access_recording)
       role = access_recording.recordable&.role.to_s.humanize
       role.present? ? "#{workspace_name} (#{role})" : workspace_name
     end
