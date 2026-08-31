@@ -16,7 +16,10 @@ dependency to `recording_studio_api`, `~> 0.5.0`, then apply the steps below.
    each recordable that should hold grants. Do not include
    `AllowsAccessibleChildren` / `recording_studio_accessible_children`.
 4. Include `RecordingStudio::UsesDefaultLayout` on authenticated host controllers (or keep
-   `config.layout_name = "recording_studio/default_layout"`). Set `html data-theme="rounded"`.
+   `config.layout_name = "recording_studio/default_layout"`). Recording Studio 4.2 applies
+   `data-theme="rounded"` on `body`; hosts that still key FlatPack off `html` can stamp
+   `html data-theme="rounded"` without copying the layout. Do not vendor
+   `recording_studio/default_layout`.
 5. First owner grants: `RecordingStudioAccessible.bootstrap_owner_access!` on an empty
    owned root. Later members: `grant_access`. Set `access_actor_types` so User and
    `RecordingStudioApi::ApiClient` can hold grants.

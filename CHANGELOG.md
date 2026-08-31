@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Breaking dependency floor:** requires RecordingStudio `~> 4.2` (tested against `4.2.0`) and RecordingStudio Accessible `~> 0.7` (tested against `0.7.0`)
 - Dummy and development Gemfiles pin RecordingStudio `v4.2.0`, Accessible `v0.7.0`, Admin `2.0.1`, Moveable `3.0.0`, Root Switchable `v0.5.0`, and FlatPack `v0.1.143`
-- Dummy app uses `RecordingStudio::UsesDefaultLayout` / `recording_studio/default_layout` with `html data-theme="rounded"` and FlatPack 0.1.143 PageNav `anchor_href` close links
+- Dummy app uses `RecordingStudio::UsesDefaultLayout` from Recording Studio 4.2 as-is (no vendored `default_layout` copy). Rounded theme is applied on `html` and `body`; API-key pages do not render RootSwitchDropdown
 - Dummy seeds bootstrap the first owner with `bootstrap_owner_access!`, then use `grant_access` for later grants
 - API client provision persists the client before `grant_access` so Accessible 0.7 actor persistence checks pass (`access_recording_id` may be null until the grant is written)
 

@@ -19,12 +19,21 @@ class RecordingStudioApiTest < Minitest::Test
     assert_not_includes controller_source, "flat_pack_admin_sidebar"
   end
 
+  def test_dummy_does_not_vendor_recording_studio_default_layout
+    dummy_layout = File.expand_path("dummy/app/views/layouts/recording_studio/default_layout.html.erb", __dir__)
+
+    assert_not File.exist?(dummy_layout)
+  end
+
   def test_dummy_layouts_default_to_flatpack_rounded_theme
     application_layout = File.read(File.expand_path("dummy/app/views/layouts/application.html.erb", __dir__))
     sidebar_layout = File.read(File.expand_path("dummy/app/views/layouts/flat_pack_sidebar.html.erb", __dir__))
+    application_controller = File.read(File.expand_path("dummy/app/controllers/application_controller.rb", __dir__))
 
     assert_includes application_layout, '<html data-theme="rounded">'
     assert_includes sidebar_layout, '<html data-theme="rounded" class="h-full overflow-hidden overscroll-none">'
+    assert_includes application_controller, "include RecordingStudio::UsesDefaultLayout"
+    assert_not_includes application_controller, "RootSwitchDropdownHelper"
   end
 
   def test_dummy_tailwind_keeps_flatpack_theme_selection_in_flatpack

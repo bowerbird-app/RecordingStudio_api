@@ -9,7 +9,6 @@ class ApplicationController < ActionController::Base
 
   include RecordingStudio::RootSwitchable::ControllerSupport
   include RecordingStudio::UsesDefaultLayout
-  helper RecordingStudioRootSwitchable::RootSwitchDropdownHelper if defined?(RecordingStudioRootSwitchable::RootSwitchDropdownHelper)
 
   layout :application_layout
 

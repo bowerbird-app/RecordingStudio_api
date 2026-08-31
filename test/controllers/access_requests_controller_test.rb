@@ -55,6 +55,25 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "Boundary minimum role"
   end
 
+  test "API key screens use the gem default layout without a root-switch dropdown" do
+    api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Layout API client")
+
+    [
+      "/recording_studio_api/api_clients",
+      "/recording_studio_api/api_clients/#{api_client.id}",
+      "/recording_studio_api/api_clients/#{api_client.id}/edit",
+      "/recording_studio_api/api_clients/new"
+    ].each do |path|
+      get path
+
+      assert_response :success, "#{path} should render"
+      assert_select "html[data-theme='rounded']", count: 1
+      assert_select "body[data-theme='rounded']", count: 1
+      assert_select "body[data-recording-studio-default-layout='true']", count: 1
+      assert_select "[data-controller='recording-studio-root-switchable--root-switch-dropdown']", count: 0
+    end
+  end
+
   test "renders api access point choices below the requested root recording" do
     folder_recording = RecordingStudio::Recording.create!(
       recordable: Folder.create!(name: "API Access Folder"),

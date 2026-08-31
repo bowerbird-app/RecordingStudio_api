@@ -39,7 +39,9 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
     assert_select "h1", text: "Recording Studio API demo"
     assert_includes response.body, "Demo to add and remove API access"
     assert_select "html[data-theme='rounded']", count: 1
+    assert_select "body[data-theme='rounded']", count: 1
     assert_select "body[data-recording-studio-default-layout='true']", count: 1
+    assert_select "[data-controller='recording-studio-root-switchable--root-switch-dropdown']", count: 0
     assert_select %(a[href="/api?anchor_url=%2F"]), text: "API settings", count: 1
     assert_select %(a[href="/docs/scalar/v1/test-credential"]), text: "Create API test token", count: 1
     assert_not_includes response.body, "API keys"
