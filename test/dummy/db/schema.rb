@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_15_010019) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_31_010020) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -81,7 +81,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_15_010019) do
   end
 
   create_table "recording_studio_api_api_clients", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.uuid "access_recording_id", null: false
+    t.uuid "access_recording_id"
     t.string "api_key", default: "public", null: false
     t.datetime "created_at", null: false
     t.string "name", null: false
@@ -152,20 +152,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_15_010019) do
     t.index ["key"], name: "index_recording_studio_api_api_settings_on_key", unique: true
   end
 
-  create_table "recording_studio_device_sessions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.uuid "actor_id", null: false
-    t.string "actor_type", null: false
-    t.datetime "created_at", null: false
-    t.string "device_fingerprint", null: false
-    t.string "device_name"
-    t.datetime "last_active_at", default: -> { "CURRENT_TIMESTAMP" }, null: false
-    t.uuid "root_recording_id", null: false
-    t.datetime "updated_at", null: false
-    t.string "user_agent"
-    t.index ["actor_type", "actor_id", "device_fingerprint"], name: "index_rs_device_sessions_on_actor_and_fingerprint", unique: true
-    t.index ["root_recording_id"], name: "index_rs_device_sessions_on_root_recording"
-  end
-
   create_table "recording_studio_events", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "action", null: false
     t.uuid "actor_id"
@@ -181,7 +167,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_15_010019) do
     t.uuid "recordable_id", null: false
     t.string "recordable_type", null: false
     t.uuid "recording_id", null: false
+    t.index ["action", "occurred_at"], name: "index_rs_events_on_action_and_occurred_at"
+    t.index ["actor_type", "actor_id", "occurred_at"], name: "index_rs_events_on_actor_and_occurred_at"
     t.index ["recording_id", "idempotency_key"], name: "index_recording_studio_events_on_recording_and_idempotency_key", unique: true, where: "(idempotency_key IS NOT NULL)"
+    t.index ["recording_id", "occurred_at", "created_at"], name: "index_rs_events_on_recording_and_timeline", order: { occurred_at: :desc, created_at: :desc }
     t.index ["recording_id"], name: "index_recording_studio_events_on_recording_id"
   end
 
@@ -197,6 +186,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_15_010019) do
     t.index ["recordable_id", "root_recording_id"], name: "idx_rs_recordings_root_access", where: "(((recordable_type)::text = 'RecordingStudio::Access'::text) AND (parent_recording_id IS NOT NULL) AND (trashed_at IS NULL))"
     t.index ["recordable_type", "recordable_id", "parent_recording_id", "trashed_at"], name: "index_recording_studio_recordings_on_recordable_parent_trashed"
     t.index ["recordable_type", "recordable_id"], name: "index_recording_studio_recordings_on_recordable"
+    t.index ["recordable_type", "recordable_id"], name: "index_rs_unique_root_recording_per_recordable", unique: true, where: "(parent_recording_id IS NULL)"
+    t.index ["root_recording_id", "parent_recording_id"], name: "index_rs_recordings_on_root_and_parent"
+    t.index ["root_recording_id", "recordable_type", "recordable_id"], name: "index_rs_recordings_on_root_and_recordable"
     t.index ["root_recording_id"], name: "index_rs_recordings_on_root_recording"
   end
 
@@ -239,7 +231,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_15_010019) do
 
   add_foreign_key "recording_studio_api_api_access_tokens", "recording_studio_api_api_credentials", column: "api_credential_id"
   add_foreign_key "recording_studio_api_api_credentials", "recording_studio_api_api_clients", column: "api_client_id"
-  add_foreign_key "recording_studio_device_sessions", "recording_studio_recordings", column: "root_recording_id"
   add_foreign_key "recording_studio_events", "recording_studio_recordings", column: "recording_id"
   add_foreign_key "recording_studio_recordings", "recording_studio_recordings", column: "parent_recording_id"
   add_foreign_key "recording_studio_recordings", "recording_studio_recordings", column: "root_recording_id"

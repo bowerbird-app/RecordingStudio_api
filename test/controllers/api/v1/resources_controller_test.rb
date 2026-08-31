@@ -1096,10 +1096,12 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
   test "view token cannot inherit another access recording owned by the same actor" do
     user = create_user(email: "view-token-other-access@example.com")
     root_recording, view_access_recording = create_access_recording_for(user: user, role: :view)
-    with_access_creation_context do
-      admin_access = RecordingStudio::Access.create!(actor: user, role: :admin)
-      RecordingStudio::Recording.create!(recordable: admin_access, parent_recording: root_recording)
-    end
+    nested_folder = Folder.create!(name: "Sibling admin folder")
+    nested_folder_recording = RecordingStudio::Recording.create!(
+      recordable: nested_folder,
+      parent_recording: root_recording
+    )
+    grant_or_bootstrap_access!(recording: nested_folder_recording, actor: user, role: :admin)
     view_token = issue_oauth_access_token_for(access_recording: view_access_recording, name: "View token with sibling admin")
 
     post "/recording_studio_api/api/v1/workspaces", params: {

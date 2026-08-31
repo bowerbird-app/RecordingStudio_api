@@ -182,6 +182,10 @@ module ApiDummyHelpers # rubocop:disable Metrics/ModuleLength
     manager
   end
 
+  def create_access_recording(parent_recording:, user:, role:)
+    grant_or_bootstrap_access!(recording: parent_recording, actor: user, role: role)
+  end
+
   def grant_or_bootstrap_access!(recording:, actor:, role:)
     existing = RecordingStudioAccessible.access_recordings_for_actor(
       recording: recording,

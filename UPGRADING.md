@@ -22,8 +22,10 @@ dependency to `recording_studio_api`, `~> 0.5.0`, then apply the steps below.
    `RecordingStudioApi::ApiClient` can hold grants.
 6. FlatPack 0.1.143 buttons use `href:` (not `url:`). Sidebar items use `text:` (not
    `label:`).
-
-No engine database migration is required for `0.5.0`.
+7. Run `bin/rails generate recording_studio_api:migrations` and `bin/rails db:migrate`.
+   `0.5.0` allows `access_recording_id` to be null on API clients so Accessible 0.7 can
+   persist the client before `grant_access` (actors must be persisted). Provision still
+   assigns the access recording in the same transaction.
 
 If you are still on a pre-`0.4.0` digest/rate-limit default, complete
 [Upgrading to 0.4.0](#upgrading-to-040) first.

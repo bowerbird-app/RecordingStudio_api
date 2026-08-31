@@ -513,7 +513,7 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
-  test "sidebar includes documentation links" do
+  test "docs pages include documentation links" do
     get docs_install_path
 
     assert_select %(a[href="#{docs_install_path}"]), text: /Install/

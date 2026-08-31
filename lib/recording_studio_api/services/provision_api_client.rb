@@ -34,10 +34,10 @@ module RecordingStudioApi
         payload = nil
 
         ApiCredential.transaction do
-          api_client = ApiClient.new(id: SecureRandom.uuid, name: name, api_key: api_key)
+          api_client = ApiClient.create!(id: SecureRandom.uuid, name: name, api_key: api_key)
           client_access_recording = create_client_access_recording!(api_client)
-          api_client.access_recording = client_access_recording
-          api_client.save!
+          api_client.update_columns(access_recording_id: client_access_recording.id, updated_at: Time.current)
+          api_client.association(:access_recording).reset
 
           recording = RecordingStudio.record!(
             action: "created",

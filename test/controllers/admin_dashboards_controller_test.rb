@@ -542,10 +542,7 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
   end
 
   def create_access_recording(parent_recording:, user:, role:)
-    with_access_creation_context do
-      access = RecordingStudio::Access.create!(actor: user, role: role)
-      RecordingStudio::Recording.create!(recordable: access, parent_recording: parent_recording)
-    end
+    grant_or_bootstrap_access!(recording: parent_recording, actor: user, role: role)
   end
 
   def ensure_api_request_logs_table!
