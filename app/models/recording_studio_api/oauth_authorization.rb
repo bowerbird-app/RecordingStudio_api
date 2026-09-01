@@ -64,5 +64,23 @@ module RecordingStudioApi
         role: role
       )
     end
+
+    def self.role_rank(role)
+      RecordingStudioApi::Configuration::ACCESS_ROLE_RANKS[role.to_s.to_sym]
+    end
+
+    def self.role_at_or_below?(requested, current)
+      requested_rank = role_rank(requested)
+      current_rank = role_rank(current)
+      requested_rank.present? && current_rank.present? && requested_rank <= current_rank
+    end
+
+    def self.for_client_manager_and_access(oauth_client:, manager_actor:, access_recording:)
+      find_by(
+        oauth_client: oauth_client,
+        manager_actor: manager_actor,
+        manager_access_recording: access_recording
+      )
+    end
   end
 end

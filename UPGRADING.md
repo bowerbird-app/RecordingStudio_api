@@ -30,12 +30,16 @@ that acts as the user.
    `authorization_code` and `refresh_token`. Discovery lives at
    `/.well-known/oauth-authorization-server` and `/.well-known/oauth-protected-resource` on the
    engine (and optionally at the host root).
-6. Accessible owns the ACL. Consent stores the manager Access recording on `depends_on_recording_id`.
-   `authorized?` / `role_for` fail closed if that manager Access is missing, trashed, off-root, or
-   weaker. `VoidDependentAccesses` / `VoidDependentAccessesJob` void dependents when the manager is
-   revised, trashed, or destroyed. This gem does not monkey-patch `RecordingStudio::Recording` or
-   `RecordingStudio::Access`. User Cancel and connected-apps revoke still call `VoidOauthAuthorization`
-   (authorization + tokens only).
+6. Accessible owns the ACL. Consent stores the manager Access recording on `depends_on_recording_id`
+   and places the app Access on the parent of the Access the person clicked (a Folder or a Root), as
+   a sibling of theirs. `authorized?` / `role_for` fail closed if that manager Access is missing,
+   trashed, off-root, or weaker. `VoidDependentAccesses` / `VoidDependentAccessesJob` void dependents
+   when the manager is revised, trashed, or destroyed. This gem does not monkey-patch
+   `RecordingStudio::Recording` or `RecordingStudio::Access`. User Cancel and connected-apps revoke
+   still call `VoidOauthAuthorization` (authorization + tokens only). Same app plus the same Access
+   reconnects that grant instead of stacking a second sibling. If their Access is gone or the
+   requested role is above what they hold now, consent rejects and sends them to reconnect — it does
+   not silently clamp.
 7. Public tokens remain bound to their named API. A public token must not be sent to `:operations`.
 8. Optional: `config.authorization_code_ttl` (10 minutes), `config.refresh_token_ttl` (30 days),
    and `config.client_id_metadata_documents_enabled` (true). PKCE S256 is required for public

@@ -81,25 +81,35 @@ class DelegatedOauthTest < ActionDispatch::IntegrationTest
     assert_select "title", text: /Connect #{Regexp.escape(@oauth_client.name)}/
     assert_includes response.body, "Connect #{@oauth_client.name}"
     assert_includes response.body, "It gets its own access here. Yours stays yours."
-    assert_not_includes response.body, @root_recording.recordable.name
+    assert_includes response.body, @root_recording.recordable.name
     assert_select "label", text: "Workspace", count: 0
-    assert_not_includes response.body, "Workspace:"
-    assert_not_includes response.body, "#{@root_recording.recordable.name} (Admin)"
-    assert_not_includes response.body, "Approve access"
     assert_select "select[name='access_recording_id']", count: 0
+    assert_select "button[name='decision'][value='continue']", count: 0
+    assert_select "[role='list']"
+    assert_select "[role='listitem']", count: 1
+    assert_includes response.body, "access_recording_id=#{@access_recording.id}"
+    assert_not_includes response.body, "Approve access"
+    assert_not_includes response.body, "max-w-3xl"
+    assert_includes response.body, "md:grid-cols-2"
+    assert_select "[data-controller='recording-studio-root-switchable--root-switch-dropdown']", count: 0
+    assert_not_includes response.body, "Sign out"
+
+    get "/recording_studio_api/oauth/authorize", params: authorize_params.merge(
+      access_recording_id: @access_recording.id
+    )
+
+    assert_response :success
+    assert_includes response.body, "Connect #{@oauth_client.name}"
+    assert_includes response.body, @root_recording.recordable.name
     assert_select "input[name='access_recording_id'][value=?]", @access_recording.id
     assert_select "input[name='role'][value=view]"
-    assert_select "input[name='role'][value=admin]", count: 0
-    assert_select "label", text: "Permission", count: 0
+    assert_select "label", text: "Permission"
     assert_select "button[name='decision'][value='continue']"
     assert_select "button[name='decision'][value='cancel']"
     assert_select "button[name='decision'][value='approve']", count: 0
     assert_select "button[name='decision'][value='deny']", count: 0
     assert_not_includes response.body, "max-w-3xl"
     assert_includes response.body, "md:grid-cols-2"
-    assert_not_includes response.body, "Select an option"
-    assert_select "[data-controller='recording-studio-root-switchable--root-switch-dropdown']", count: 0
-    assert_not_includes response.body, "Sign out"
 
     post "/recording_studio_api/oauth/authorize", params: authorize_params.merge(
       access_recording_id: @access_recording.id,
@@ -264,7 +274,6 @@ class DelegatedOauthTest < ActionDispatch::IntegrationTest
   test "cannot grant a role above the manager" do
     edit_user = create_user(email: "edit-oauth-manager@example.com")
     _edit_root, edit_access = create_access_recording_for(user: edit_user, role: :edit)
-    RecordingStudioApi.configuration.access_management_edit_role = :edit
     sign_in edit_user
 
     post "/recording_studio_api/oauth/authorize", params: authorize_params.merge(
@@ -274,7 +283,9 @@ class DelegatedOauthTest < ActionDispatch::IntegrationTest
     )
 
     assert_response :unprocessable_entity
-    assert_includes response.body, "Requested role exceeds your access"
+    assert_includes response.body, "Your access changed. Connect again."
+    assert_select "[role='list']"
+    assert_select "button[name='decision'][value='continue']", count: 0
     assert_equal 0, RecordingStudioApi::OauthAuthorization.where(manager_actor: edit_user).count
   end
 
@@ -522,7 +533,12 @@ class DelegatedOauthTest < ActionDispatch::IntegrationTest
     assert_equal "xyz", query.fetch("state")
   end
 
-  test "consent with several workspaces requires a choice" do
+  test "screen 1 lists every access they hold including a folder" do
+    folder_name = "Product Docs"
+    _root, folder_recording, folder_access = create_folder_access_for(
+      user: @user,
+      folder_name: folder_name
+    )
     second_root, = create_access_recording_for(user: @user, workspace_name: "Second workspace")
 
     get "/recording_studio_api/oauth/authorize", params: authorize_params
@@ -530,21 +546,22 @@ class DelegatedOauthTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "title", text: /Connect #{Regexp.escape(@oauth_client.name)}/
     assert_includes response.body, "It gets its own access here. Yours stays yours."
-    assert_select "input[name='access_recording_id']"
-    assert_select "input[name='access_recording_id'][value='']", count: 0
+    assert_select "select[name='access_recording_id']", count: 0
+    assert_select "label", text: "Workspace", count: 0
+    assert_select "button[name='decision'][value='continue']", count: 0
+    assert_select "[role='listitem']"
     assert_includes response.body, @root_recording.recordable.name
     assert_includes response.body, second_root.recordable.name
+    assert_includes response.body, folder_name
+    assert_includes response.body, "access_recording_id=#{folder_access.id}"
+    assert_includes response.body, "access_recording_id=#{@access_recording.id}"
+    refute_equal @root_recording.id, folder_recording.id
     assert_not_includes response.body, "Select an option"
-    assert_select "input[name='role'][value=view]"
-    assert_select "input[name='role'][value=admin]", count: 0
-    assert_includes response.body, "Permission"
-    assert_select "button[name='decision'][value='continue']"
-    assert_select "button[name='decision'][value='cancel']"
     assert_not_includes response.body, "max-w-3xl"
     assert_includes response.body, "md:grid-cols-2"
   end
 
-  test "cancel without a workspace still redirects to the client" do
+  test "cancel without a chosen access still redirects to the client" do
     create_access_recording_for(user: @user, workspace_name: "Second workspace")
 
     assert_no_difference -> { RecordingStudioApi::OauthAuthorization.where(oauth_client: @oauth_client).count } do
@@ -559,7 +576,7 @@ class DelegatedOauthTest < ActionDispatch::IntegrationTest
     assert_equal "xyz", query.fetch("state")
   end
 
-  test "continue without a workspace does not create an authorization" do
+  test "continue without a chosen access does not create an authorization" do
     create_access_recording_for(user: @user, workspace_name: "Second workspace")
 
     assert_no_difference -> { RecordingStudioApi::OauthAuthorization.where(oauth_client: @oauth_client).count } do
@@ -570,9 +587,203 @@ class DelegatedOauthTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :unprocessable_entity
-    assert_includes response.body, "Choose a workspace"
+    assert_includes response.body, "Pick a place first"
     assert_select "button[name='decision'][value='continue']", count: 0
+    assert_select "[role='list']"
+  end
+
+  test "grant on folder access is a sibling of that access and depends on it" do
+    folder_user = create_user(email: "folder-only-oauth@example.com")
+    root_recording, folder_recording, folder_access = create_folder_access_for(
+      user: folder_user,
+      folder_name: "Release Notes",
+      role: :admin
+    )
+    sign_in folder_user
+
+    post "/recording_studio_api/oauth/authorize", params: authorize_params.merge(
+      access_recording_id: folder_access.id,
+      role: "view",
+      decision: "continue"
+    )
+
+    assert_response :redirect
+    authorization = RecordingStudioApi::OauthAuthorization.find_by!(manager_actor: folder_user, oauth_client: @oauth_client)
+    granted = authorization.access_recording
+
+    assert_equal folder_recording.id, granted.parent_recording_id
+    refute_equal root_recording.id, granted.parent_recording_id
+    assert_equal folder_access.id, granted.recordable.depends_on_recording_id
+    assert_equal folder_access.id, authorization.manager_access_recording_id
+  end
+
+  test "same client and access reconnect does not stack a second grant" do
+    first = approve_delegated_oauth(
+      oauth_client: @oauth_client,
+      user: @user,
+      access_recording: @access_recording,
+      pkce: @pkce
+    )
+    first_granted_id = first.fetch(:access_recording).id
+
+    post "/recording_studio_api/oauth/authorize", params: authorize_params.merge(
+      access_recording_id: @access_recording.id,
+      role: "view",
+      decision: "continue"
+    )
+
+    assert_response :redirect
+    authorizations = RecordingStudioApi::OauthAuthorization.where(
+      oauth_client: @oauth_client,
+      manager_actor: @user,
+      manager_access_recording: @access_recording
+    )
+
+    assert_equal 1, authorizations.count
+    assert_equal first.fetch(:authorization).id, authorizations.first.id
+    assert_not_nil RecordingStudio::Recording.unscoped.find(first_granted_id).trashed_at
+    assert_not_nil authorizations.first.access_recording
+    refute_equal first_granted_id, authorizations.first.access_recording_id
+    assert_nil authorizations.first.access_recording.trashed_at
+    assert_equal @access_recording.id, authorizations.first.access_recording.recordable.depends_on_recording_id
+  end
+
+  test "two workspaces create two authorizations and two tokens" do
+    second_root, second_access = create_access_recording_for(user: @user, workspace_name: "Second workspace")
+    first_pkce = @pkce
+    second_pkce = pkce_pair
+
+    first = approve_delegated_oauth(
+      oauth_client: @oauth_client,
+      user: @user,
+      access_recording: @access_recording,
+      pkce: first_pkce
+    )
+    second = approve_delegated_oauth(
+      oauth_client: @oauth_client,
+      user: @user,
+      access_recording: second_access,
+      pkce: second_pkce
+    )
+
+    first_token = RecordingStudioApi::Services::IssueOauthAccessToken.call(
+      grant_type: "authorization_code",
+      client_id: @oauth_client.client_id,
+      code: first.fetch(:code),
+      redirect_uri: "http://127.0.0.1/callback",
+      code_verifier: first_pkce.fetch(:verifier)
+    )
+    second_token = RecordingStudioApi::Services::IssueOauthAccessToken.call(
+      grant_type: "authorization_code",
+      client_id: @oauth_client.client_id,
+      code: second.fetch(:code),
+      redirect_uri: "http://127.0.0.1/callback",
+      code_verifier: second_pkce.fetch(:verifier)
+    )
+
+    assert first_token.success?, first_token.error
+    assert second_token.success?, second_token.error
+    refute_equal first_token.value.fetch(:access_token), second_token.value.fetch(:access_token)
+    assert_equal 2, RecordingStudioApi::OauthAuthorization.where(oauth_client: @oauth_client, manager_actor: @user).count
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}",
+        headers: { "Authorization" => "Bearer #{first_token.value.fetch(:access_token)}" }
+    assert_response :success
+
+    get "/recording_studio_api/api/v1/workspaces/#{second_root.id}",
+        headers: { "Authorization" => "Bearer #{second_token.value.fetch(:access_token)}" }
+    assert_response :success
+  end
+
+  test "edit over current role rejects and points at reconnect without clamping" do
+    approve_delegated_oauth(
+      oauth_client: @oauth_client,
+      user: @user,
+      access_recording: @access_recording,
+      role: "admin",
+      pkce: @pkce
+    )
+    RecordingStudioAccessible::AccessCreationContext.allow do
+      RecordingStudio.root_recording_or_self(@access_recording).revise(@access_recording, actor: @user) do |access|
+        access.role = :view
+      end
+    end
+
+    assert_no_difference -> { RecordingStudioApi::OauthAuthorization.where(oauth_client: @oauth_client, manager_actor: @user).count } do
+      post "/recording_studio_api/oauth/authorize", params: authorize_params.merge(
+        access_recording_id: @access_recording.id,
+        role: "admin",
+        decision: "continue"
+      )
+    end
+
+    assert_response :unprocessable_entity
+    assert_includes response.body, "Your access changed. Connect again."
+    assert_select "button[name='decision'][value='continue']", count: 0
+    authorization = RecordingStudioApi::OauthAuthorization.find_by!(oauth_client: @oauth_client, manager_actor: @user)
+    assert_equal "admin", authorization.role
+    refute_equal "view", authorization.reload.role
+  end
+
+  test "edit with access gone rejects and points at reconnect" do
+    approve_delegated_oauth(
+      oauth_client: @oauth_client,
+      user: @user,
+      access_recording: @access_recording,
+      pkce: @pkce
+    )
+    stale_access_id = @access_recording.id
+    @access_recording.update!(trashed_at: Time.current)
+
+    assert_no_difference -> { RecordingStudioApi::OauthAuthorization.where(oauth_client: @oauth_client, manager_actor: @user).count } do
+      post "/recording_studio_api/oauth/authorize", params: authorize_params.merge(
+        access_recording_id: stale_access_id,
+        role: "view",
+        decision: "continue"
+      )
+    end
+
+    assert_response :unprocessable_entity
+    assert_includes response.body, "That access is gone. Connect again."
+    assert_select "button[name='decision'][value='continue']", count: 0
+  end
+
+  test "view-only screen 2 has no permission select" do
+    view_user = create_user(email: "view-only-oauth@example.com")
+    _root, view_access = create_access_recording_for(user: view_user, role: :view)
+    sign_in view_user
+
+    get "/recording_studio_api/oauth/authorize", params: authorize_params.merge(
+      access_recording_id: view_access.id
+    )
+
+    assert_response :success
+    assert_select "label", text: "Permission", count: 0
+    assert_select "input[name='role'][value=view]"
+    assert_select "button[name='decision'][value='continue']"
     assert_select "button[name='decision'][value='cancel']"
+  end
+
+  test "screen 1 shows connected and reconnect states" do
+    approve_delegated_oauth(
+      oauth_client: @oauth_client,
+      user: @user,
+      access_recording: @access_recording,
+      pkce: @pkce
+    )
+    _second_root, second_access = create_access_recording_for(user: @user, workspace_name: "Reconnect workspace")
+    reconnect = approve_delegated_oauth(
+      oauth_client: @oauth_client,
+      user: @user,
+      access_recording: second_access
+    )
+    RecordingStudioApi::Services::VoidOauthAuthorization.call(authorization: reconnect.fetch(:authorization))
+
+    get "/recording_studio_api/oauth/authorize", params: authorize_params
+
+    assert_response :success
+    assert_includes response.body, "Connected"
+    assert_includes response.body, "Reconnect"
   end
 
   private

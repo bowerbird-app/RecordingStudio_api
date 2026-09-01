@@ -11,7 +11,12 @@ module RecordingStudioApi
     def new
       return unless @oauth_client
 
-      render :new
+      if @selected_access_recording.present?
+        render :new
+      else
+        @errors << reconnect_missing_access_message if requested_access_recording_id.present?
+        render :index
+      end
     end
 
     def create
@@ -22,16 +27,16 @@ module RecordingStudioApi
         return
       end
 
-      selected = selected_access_recording
+      selected = @selected_access_recording
       if selected.nil?
         @errors << access_selection_error
-        render :new, status: :unprocessable_entity
+        render :index, status: :unprocessable_entity
         return
       end
 
-      unless can_assign_role?(selected, requested_role)
-        @errors << "Requested role exceeds your access"
-        render :new, status: :unprocessable_entity
+      unless role_allowed_for?(selected, requested_role)
+        @errors << Services::CreateOauthAuthorization::ROLE_CHANGED_MESSAGE
+        render :index, status: :unprocessable_entity
         return
       end
 
@@ -47,7 +52,8 @@ module RecordingStudioApi
 
       if result.failure?
         @errors << result.error.to_s
-        render :new, status: :unprocessable_entity
+        template = reconnect_error?(result.error) ? :index : :new
+        render template, status: :unprocessable_entity
         return
       end
 
@@ -103,10 +109,10 @@ module RecordingStudioApi
 
       resolved = RecordingStudioApi.resolve_access_recording_for_actor(
         actor: current_oauth_actor,
-        requested_access_recording_id: params[:access_recording_id]
+        requested_access_recording_id: requested_access_recording_id
       )
-      @access_candidates = grantable_access_recordings(resolved.fetch(:candidates))
-      @selected_access_recording = selected_access_recording_for_display(resolved.fetch(:recording))
+      @access_candidates = Array(resolved.fetch(:candidates))
+      @selected_access_recording = selected_access_recording_from_params
       @role_options = role_options_for(@selected_access_recording)
     end
 
@@ -124,30 +130,15 @@ module RecordingStudioApi
       true
     end
 
-    def grantable_access_recordings(candidates)
-      Array(candidates).select do |recording|
-        access_point = recording.parent_recording || recording.root_recording
-        next false unless RecordingStudioApi.api_access_point_recordable_type?(access_point&.recordable_type, api: current_api_key)
-
-        can_assign_any_role?(access_point)
-      end
+    def requested_access_recording_id
+      params[:access_recording_id].to_s.presence
     end
 
-    def selected_access_recording
-      requested_id = params[:access_recording_id].to_s.presence
-      return @access_candidates.find { |recording| recording.id == requested_id } if requested_id.present?
-      return @access_candidates.first if @access_candidates.one?
+    def selected_access_recording_from_params
+      requested_id = requested_access_recording_id
+      return nil if requested_id.blank?
 
-      nil
-    end
-
-    def selected_access_recording_for_display(resolved_recording)
-      matched = @access_candidates.find { |recording| recording.id == resolved_recording&.id }
-      return matched if matched.present?
-      return @access_candidates.first if @access_candidates.one?
-      return @access_candidates.first if @access_candidates.many? && request.get?
-
-      nil
+      @access_candidates.find { |recording| recording.id == requested_id }
     end
 
     def connect_page_title
@@ -156,15 +147,24 @@ module RecordingStudioApi
     helper_method :connect_page_title
 
     def show_permission_choice?
-      @access_candidates.many? && Array(@role_options).many?
+      Array(@role_options).many?
     end
     helper_method :show_permission_choice?
 
     def access_selection_error
-      return "Ask someone to invite you to a workspace first" if @access_candidates.empty?
-      return "Choose a workspace" if @access_candidates.many?
+      return "Ask someone to invite you first" if @access_candidates.empty?
+      return reconnect_missing_access_message if requested_access_recording_id.present?
 
-      "That workspace is not available"
+      "Pick a place first"
+    end
+
+    def reconnect_missing_access_message
+      Services::CreateOauthAuthorization::ACCESS_GONE_MESSAGE
+    end
+
+    def reconnect_error?(error)
+      message = error.to_s
+      message.include?("Connect again") || message.include?("exceed")
     end
 
     def deny_requested?
@@ -182,29 +182,25 @@ module RecordingStudioApi
     helper_method :default_consent_role
 
     def role_options_for(access_recording)
-      access_point = access_recording&.parent_recording || access_recording&.root_recording
+      current_role = manager_access_role(access_recording)
+      return [] if current_role.blank?
+
       OauthAuthorization::ROLES.filter_map do |role|
-        next unless access_point && can_assign_role?(access_recording, role)
+        next unless OauthAuthorization.role_at_or_below?(role, current_role)
 
         [role.to_s.humanize, role]
       end
     end
 
-    def can_assign_any_role?(access_point)
-      OauthAuthorization::ROLES.any? { |role| policy.can_assign_role?(access_point, role) }
+    def role_allowed_for?(access_recording, role)
+      OauthAuthorization.role_at_or_below?(role, manager_access_role(access_recording))
     end
 
-    def can_assign_role?(access_recording, role)
-      access_point = if access_recording.is_a?(RecordingStudio::Recording) && access_recording.recordable_type == "RecordingStudio::Access"
-                       access_recording.parent_recording || access_recording.root_recording
-                     else
-                       access_recording
-                     end
-      policy.can_assign_role?(access_point, role)
-    end
+    def manager_access_role(access_recording)
+      recordable = access_recording&.recordable
+      return unless recordable.is_a?(RecordingStudio::Access)
 
-    def policy
-      @policy ||= AccessManagementPolicy.new(actor: current_oauth_actor)
+      recordable.role
     end
 
     def authorize_form_url
@@ -216,7 +212,30 @@ module RecordingStudioApi
     end
     helper_method :authorize_form_url
 
-    def access_workspace_name(access_recording)
+    def oauth_query_params
+      {
+        response_type: "code",
+        client_id: @oauth_client.client_id,
+        redirect_uri: @redirect_uri,
+        state: @state,
+        code_challenge: @code_challenge,
+        code_challenge_method: @code_challenge_method,
+        resource: @resource
+      }.compact
+    end
+
+    def connect_choice_url(access_recording = nil)
+      extras = oauth_query_params
+      extras[:access_recording_id] = access_recording.id if access_recording
+      if current_api_key == "public"
+        oauth_authorize_path(extras)
+      else
+        named_api_oauth_authorize_path(extras.merge(api_key: current_api_key))
+      end
+    end
+    helper_method :connect_choice_url
+
+    def access_parent_name(access_recording)
       point = access_recording.parent_recording || access_recording.root_recording
       recordable = point&.recordable
       if recordable.respond_to?(:name) && recordable.name.present?
@@ -225,7 +244,20 @@ module RecordingStudioApi
         point&.recordable_type.to_s.demodulize.underscore.humanize
       end
     end
-    helper_method :access_workspace_name
+    helper_method :access_parent_name
+
+    def connection_status_for(access_recording)
+      authorization = OauthAuthorization.for_client_manager_and_access(
+        oauth_client: @oauth_client,
+        manager_actor: current_oauth_actor,
+        access_recording: access_recording
+      )
+      return nil unless authorization
+      return "Connected" if authorization.active?
+
+      "Reconnect"
+    end
+    helper_method :connection_status_for
 
     def redirect_to_client(**query)
       uri = URI.parse(@redirect_uri)

@@ -127,6 +127,26 @@ module ApiDummyHelpers # rubocop:disable Metrics/ModuleLength
     [root_recording, access_recording]
   end
 
+  def create_folder_access_for(user:, folder_name: "Folder #{SecureRandom.hex(4)}", role: :admin, workspace_name: nil)
+    owner = create_user(email: "folder-owner-#{SecureRandom.hex(4)}@example.com")
+    root_recording, = create_access_recording_for(
+      user: owner,
+      workspace_name: workspace_name || "Folder workspace #{SecureRandom.hex(4)}"
+    )
+    folder = Folder.create!(name: folder_name)
+    folder_recording = RecordingStudio::Recording.create!(recordable: folder, parent_recording: root_recording)
+    Current.actor = owner
+    result = RecordingStudioAccessible.grant_access(
+      recording: folder_recording,
+      actor: user,
+      role: role,
+      manager_actor: owner
+    )
+    raise result.error unless result.success?
+
+    [root_recording, folder_recording, result.value]
+  end
+
   def create_page_recording(root_recording:, parent_recording: nil, folder_name: "Folder #{SecureRandom.hex(4)}", page_title: "Page #{SecureRandom.hex(4)}")
     parent_recording ||= root_recording
     folder = Folder.create!(name: folder_name)

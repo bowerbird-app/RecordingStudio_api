@@ -533,13 +533,15 @@ grant_type=client_credentials&client_id=<client_id>&client_secret=<client_secret
 Third-party apps use the authorization-code flow on the same token endpoint. Consent is a host
 signed-in page (`GET /recording_studio_api/oauth/authorize` or the named-API equivalent). The page
 uses `UsesDefaultLayout` and sits in the first cell of a two-column Flatpack Grid. The title is
-`Connect {app}`. One workspace shows title and Continue / Cancel only, with no workspace name on
-the page. Several workspaces use a Flatpack Select; permission appears only when the person can pick
-more than View, and defaults to View. Continue grants access; Cancel returns `access_denied`. On
-continue, `RecordingStudioAccessible.grant_access` creates a new Access whose actor is the
-`OauthAuthorization`, with `depends_on:` set to the manager's Access recording (Accessible `~> 0.8`
-writes `depends_on_recording_id`). Hosts must run Accessible 0.8 migrations before this grant path
-works. `IssueOauthAccessToken` still takes `grant_type:`; delegated tokens also
+`Connect {app}`. Screen 1 lists every Access the signed-in person holds — including a Folder, not
+only workspace roots — as a Flatpack List inside a Card. Each row is labeled with that parent’s
+name and can show Connected or Reconnect. Clicking a row opens Screen 2. Permission is capped at
+their current role on that Access and appears only when they can pick more than View (default View).
+Continue grants; Cancel returns `access_denied`. The new Access is a sibling of theirs on the parent
+of the Access they clicked (`grant_access` on that parent, `depends_on:` the clicked Access). Same
+app plus same Access reconnects that grant instead of stacking a second sibling. Two workspaces
+still mean two authorizations and two tokens. Hosts must run Accessible 0.8 migrations before this
+grant path works. `IssueOauthAccessToken` still takes `grant_type:`; delegated tokens also
 return a rotating refresh token. `AccessGrant.actor` is that authorization, not the user.
 
 Authenticate API requests with:
