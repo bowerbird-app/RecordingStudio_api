@@ -437,6 +437,11 @@ ensure_access_recording_for(
 seeded_oauth_authorization = RecordingStudioApi::OauthAuthorization.find_by(
   oauth_client: seeded_oauth_client,
   manager_actor: admin_user,
+  manager_access_recording: admin_access_recording,
+  revoked_at: nil
+) || RecordingStudioApi::OauthAuthorization.find_by(
+  oauth_client: seeded_oauth_client,
+  manager_actor: admin_user,
   manager_access_recording: admin_access_recording
 )
 if seeded_oauth_authorization.nil?

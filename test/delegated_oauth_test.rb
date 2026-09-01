@@ -786,6 +786,28 @@ class DelegatedOauthTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Reconnect"
   end
 
+  test "screen 1 stays connected when a revoked duplicate exists for the same access" do
+    approve_delegated_oauth(
+      oauth_client: @oauth_client,
+      user: @user,
+      access_recording: @access_recording,
+      pkce: @pkce
+    )
+    RecordingStudioApi::OauthAuthorization.create!(
+      oauth_client: @oauth_client,
+      manager_actor: @user,
+      manager_access_recording: @access_recording,
+      role: "view",
+      revoked_at: Time.current
+    )
+
+    get "/recording_studio_api/oauth/authorize", params: authorize_params
+
+    assert_response :success
+    assert_includes response.body, "Connected"
+    assert_not_includes response.body, "Reconnect"
+  end
+
   private
 
   def authorize_params

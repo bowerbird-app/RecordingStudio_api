@@ -102,11 +102,12 @@ module RecordingStudioApi
       end
 
       def existing_authorization_for_node
-        OauthAuthorization.lock.find_by(
+        scope = OauthAuthorization.lock.where(
           oauth_client: oauth_client,
           manager_actor: manager_actor,
           manager_access_recording: access_recording
         )
+        scope.find_by(revoked_at: nil) || scope.order(created_at: :desc).first
       end
 
       def prepare_reopen!(authorization)

@@ -247,13 +247,13 @@ module RecordingStudioApi
     helper_method :access_parent_name
 
     def connection_status_for(access_recording)
-      authorization = OauthAuthorization.for_client_manager_and_access(
+      authorizations = OauthAuthorization.where(
         oauth_client: @oauth_client,
         manager_actor: current_oauth_actor,
-        access_recording: access_recording
+        manager_access_recording: access_recording
       )
-      return nil unless authorization
-      return "Connected" if authorization.active?
+      return nil if authorizations.none?
+      return "Connected" if authorizations.any?(&:active?)
 
       "Reconnect"
     end
