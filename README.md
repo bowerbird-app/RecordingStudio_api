@@ -531,7 +531,9 @@ grant_type=client_credentials&client_id=<client_id>&client_secret=<client_secret
 ```
 
 Third-party apps use the authorization-code flow on the same token endpoint. Consent is a host
-signed-in page (`GET /recording_studio_api/oauth/authorize` or the named-API equivalent). On
+signed-in page (`GET /recording_studio_api/oauth/authorize` or the named-API equivalent). The page
+uses `UsesDefaultLayout` and sits in the first cell of a two-column Flatpack Grid. Permission
+defaults to the lowest role (`view`). On
 approve, `RecordingStudioAccessible.grant_access` creates a new Access whose actor is the
 `OauthAuthorization`, with `depends_on:` set to the manager's Access recording (Accessible `~> 0.8`
 writes `depends_on_recording_id`). Hosts must run Accessible 0.8 migrations before this grant path

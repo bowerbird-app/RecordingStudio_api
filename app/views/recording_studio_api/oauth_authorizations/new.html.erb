@@ -1,97 +1,91 @@
-<div class="mx-auto flex w-full max-w-3xl flex-col gap-6">
-  <% recording_studio_page_nav(title: "Approve access") %>
+<%= render FlatPack::Grid::Component.new(cols: 2) do %>
+  <div class="space-y-6">
+    <% recording_studio_page_nav(title: "Approve access") %>
 
-  <%= render FlatPack::PageTitle::Component.new(
-    title: "Approve access",
-    subtitle: "#{@oauth_client.name} is asking to use this API with its own access, not yours.",
-    variant: :h1
-  ) %>
-
-  <% if @errors.any? %>
-    <%= render FlatPack::Alert::Component.new(
-      description: @errors.uniq.join(" "),
-      style: :danger
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Approve access",
+      subtitle: "#{@oauth_client.name} is asking to use this API with its own access, not yours.",
+      variant: :h1
     ) %>
-  <% end %>
 
-  <%= render FlatPack::Card::Component.new(style: :default) do %>
-    <div class="space-y-6">
-      <%= render FlatPack::SectionTitle::Component.new(
-        title: @oauth_client.name,
-        subtitle: consent_section_subtitle
+    <% if @errors.any? %>
+      <%= render FlatPack::Alert::Component.new(
+        description: @errors.uniq.join(" "),
+        style: :danger
       ) %>
+    <% end %>
 
-      <%= form_with url: authorize_form_url, method: :post, class: "space-y-6" do %>
-        <%= hidden_field_tag :response_type, "code" %>
-        <%= hidden_field_tag :client_id, @oauth_client.client_id %>
-        <%= hidden_field_tag :redirect_uri, @redirect_uri %>
-        <%= hidden_field_tag :state, @state if @state.present? %>
-        <%= hidden_field_tag :code_challenge, @code_challenge if @code_challenge.present? %>
-        <%= hidden_field_tag :code_challenge_method, @code_challenge_method if @code_challenge_method.present? %>
-        <%= hidden_field_tag :resource, @resource if @resource.present? %>
+    <%= render FlatPack::SectionTitle::Component.new(
+      title: @oauth_client.name,
+      subtitle: consent_section_subtitle
+    ) %>
 
-        <% if @access_candidates.many? %>
-          <div class="w-full">
-            <%= render FlatPack::Select::Component.new(
-              name: "access_recording_id",
-              options: @access_candidates.map { |recording| [access_workspace_name(recording), recording.id] },
-              value: @selected_access_recording&.id,
-              label: "Workspace",
-              placeholder: nil,
-              required: true,
-              help_text: "This app receives its own access to the workspace you choose.",
-              class: "w-full"
-            ) %>
-          </div>
-        <% elsif @selected_access_recording.present? %>
-          <%= hidden_field_tag :access_recording_id, @selected_access_recording.id %>
-          <p class="w-full text-sm text-[var(--surface-muted-content-color)]">
-            Workspace: <%= access_recording_label(@selected_access_recording) %>
-          </p>
-        <% else %>
-          <%= render FlatPack::EmptyState::Component.new(
-            title: "No workspace available",
-            description: "You need workspace access before you can connect an app.",
-            icon: :lock
-          ) %>
-        <% end %>
+    <%= form_with url: authorize_form_url, method: :post, class: "space-y-6" do %>
+      <%= hidden_field_tag :response_type, "code" %>
+      <%= hidden_field_tag :client_id, @oauth_client.client_id %>
+      <%= hidden_field_tag :redirect_uri, @redirect_uri %>
+      <%= hidden_field_tag :state, @state if @state.present? %>
+      <%= hidden_field_tag :code_challenge, @code_challenge if @code_challenge.present? %>
+      <%= hidden_field_tag :code_challenge_method, @code_challenge_method if @code_challenge_method.present? %>
+      <%= hidden_field_tag :resource, @resource if @resource.present? %>
 
-        <% if @selected_access_recording.present? && @role_options.any? %>
-          <div class="w-full">
-            <%= render FlatPack::Select::Component.new(
-              name: "role",
-              options: @role_options,
-              value: params[:role].presence || @role_options.last&.last,
-              label: "Permission",
-              placeholder: nil,
-              required: true,
-              help_text: "Cannot be higher than your own access on that workspace.",
-              class: "w-full"
-            ) %>
-          </div>
-        <% end %>
+      <% if @access_candidates.many? %>
+        <%= render FlatPack::Select::Component.new(
+          name: "access_recording_id",
+          options: @access_candidates.map { |recording| [access_workspace_name(recording), recording.id] },
+          value: @selected_access_recording&.id,
+          label: "Workspace",
+          placeholder: nil,
+          searchable: true,
+          required: true,
+          help_text: "This app receives its own access to the workspace you choose."
+        ) %>
+      <% elsif @selected_access_recording.present? %>
+        <%= hidden_field_tag :access_recording_id, @selected_access_recording.id %>
+        <p class="text-sm text-[var(--surface-muted-content-color)]">
+          Workspace: <%= access_workspace_name(@selected_access_recording) %>
+        </p>
+      <% else %>
+        <%= render FlatPack::EmptyState::Component.new(
+          title: "No workspace available",
+          description: "You need workspace access before you can connect an app.",
+          icon: :lock
+        ) %>
+      <% end %>
 
-        <div class="flex flex-wrap gap-3">
-          <% if @selected_access_recording.present? %>
-            <%= render FlatPack::Button::Component.new(
-              text: "Approve",
-              style: :primary,
-              size: :md,
-              type: "submit",
-              name: "decision",
-              value: "approve"
-            ) %>
-          <% end %>
+      <% if @selected_access_recording.present? && @role_options.any? %>
+        <%= render FlatPack::Select::Component.new(
+          name: "role",
+          options: @role_options,
+          value: params[:role].presence || default_consent_role,
+          label: "Permission",
+          placeholder: nil,
+          searchable: true,
+          required: true,
+          help_text: "Cannot be higher than your own access on that workspace."
+        ) %>
+      <% end %>
+
+      <div>
+        <% if @selected_access_recording.present? %>
           <%= render FlatPack::Button::Component.new(
-            text: "Deny",
-            style: :secondary,
+            text: "Approve",
+            style: :primary,
             size: :md,
             type: "submit",
             name: "decision",
-            value: "deny"
+            value: "approve"
           ) %>
-        </div>
-      <% end %>
-    </div>
-  <% end %>
-</div>
+        <% end %>
+        <%= render FlatPack::Button::Component.new(
+          text: "Deny",
+          style: :secondary,
+          size: :md,
+          type: "submit",
+          name: "decision",
+          value: "deny"
+        ) %>
+      </div>
+    <% end %>
+  </div>
+<% end %>

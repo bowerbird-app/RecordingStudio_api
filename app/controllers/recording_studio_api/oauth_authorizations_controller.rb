@@ -171,8 +171,14 @@ module RecordingStudioApi
     end
 
     def requested_role
-      params[:role].to_s.presence || @role_options.last&.last || "view"
+      params[:role].to_s.presence || default_consent_role
     end
+
+    def default_consent_role
+      view_option = Array(@role_options).find { |(_label, value)| value.to_s == "view" }
+      view_option&.last || @role_options.first&.last || "view"
+    end
+    helper_method :default_consent_role
 
     def role_options_for(access_recording)
       access_point = access_recording&.parent_recording || access_recording&.root_recording

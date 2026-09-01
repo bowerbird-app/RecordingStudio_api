@@ -34,6 +34,11 @@ class ConnectedAppsControllerTest < ActionDispatch::IntegrationTest
     assert_select "body[data-recording-studio-default-layout='true']", count: 1
     assert_select "title", text: /Connected apps/
     assert_includes response.body, "Notes App"
+    assert_select "[role='list']"
+    assert_select "[role='listitem']"
+    assert_includes response.body, "Remove access"
+    assert_includes response.body, "md:grid-cols-2"
+    assert_not_includes response.body, "max-w-3xl"
     assert_select "[data-controller='recording-studio-root-switchable--root-switch-dropdown']", count: 0
     assert_not_includes response.body, "Sign out"
   end

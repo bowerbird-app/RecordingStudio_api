@@ -83,8 +83,12 @@ class DelegatedOauthTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Choose the highest permission this app may use."
     assert_not_includes response.body, "Choose a workspace and the highest permission this app may use."
     assert_select "select[name='access_recording_id']", count: 0
-    assert_select "input[name='access_recording_id'][type='hidden'][value=?]", @access_recording.id
-    assert_select "select[name='role']"
+    assert_select "input[name='access_recording_id'][value=?]", @access_recording.id
+    assert_select "input[name='role'][value=view]"
+    assert_select "input[name='role'][value=admin]", count: 0
+    assert_includes response.body, "View"
+    assert_not_includes response.body, "max-w-3xl"
+    assert_includes response.body, "md:grid-cols-2"
     assert_not_includes response.body, "Select an option"
     assert_select "[data-controller='recording-studio-root-switchable--root-switch-dropdown']", count: 0
     assert_not_includes response.body, "Sign out"
@@ -517,14 +521,31 @@ class DelegatedOauthTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_includes response.body, "Choose a workspace and the highest permission this app may use."
-    assert_select "select[name='access_recording_id']"
-    assert_select "select[name='access_recording_id'] option[value='']", count: 0
-    assert_select "select[name='access_recording_id'] option", count: 2
+    assert_select "input[name='access_recording_id']"
+    assert_select "input[name='access_recording_id'][value='']", count: 0
     assert_includes response.body, @root_recording.recordable.name
     assert_includes response.body, second_root.recordable.name
     assert_not_includes response.body, "Select an option"
-    assert_select "select[name='role']"
+    assert_select "input[name='role'][value=view]"
+    assert_select "input[name='role'][value=admin]", count: 0
     assert_includes response.body, "Cannot be higher than your own access on that workspace."
+    assert_not_includes response.body, "max-w-3xl"
+    assert_includes response.body, "md:grid-cols-2"
+  end
+
+  test "deny without a workspace still redirects to the client" do
+    create_access_recording_for(user: @user, workspace_name: "Second workspace")
+
+    assert_no_difference -> { RecordingStudioApi::OauthAuthorization.where(oauth_client: @oauth_client).count } do
+      post "/recording_studio_api/oauth/authorize", params: authorize_params.merge(
+        decision: "deny"
+      )
+    end
+
+    assert_response :redirect
+    query = redirect_query
+    assert_equal "access_denied", query.fetch("error")
+    assert_equal "xyz", query.fetch("state")
   end
 
   test "approve without a workspace does not create an authorization" do
