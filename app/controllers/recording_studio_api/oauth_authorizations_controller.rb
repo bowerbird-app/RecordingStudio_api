@@ -258,12 +258,20 @@ module RecordingStudioApi
         manager_actor: current_oauth_actor,
         manager_access_recording: access_recording
       )
-      return nil if authorizations.none?
+      return "Connect" if authorizations.none?
       return "Connected" if authorizations.any?(&:active?)
 
       "Reconnect"
     end
     helper_method :connection_status_for
+
+    def connection_status_trailing(access_recording)
+      view_context.tag.span(
+        connection_status_for(access_recording),
+        class: "text-sm text-[var(--surface-muted-content-color)]"
+      )
+    end
+    helper_method :connection_status_trailing
 
     def redirect_to_client(**query)
       uri = URI.parse(@redirect_uri)

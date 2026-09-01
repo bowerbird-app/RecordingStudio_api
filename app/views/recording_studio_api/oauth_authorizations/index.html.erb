@@ -1,4 +1,4 @@
-<%= render FlatPack::Grid::Component.new(cols: 2) do %>
+<%= render FlatPack::Grid::Component.new(cols: 2, align: :start) do %>
   <div class="space-y-6">
     <% recording_studio_page_nav(title: connect_page_title) %>
 
@@ -16,24 +16,13 @@
     <% end %>
 
     <% if @access_candidates.any? %>
-      <%= render FlatPack::Card::Component.new(style: :default) do %>
+      <%= render FlatPack::Card::Component.new(style: :default, padding: :none) do %>
         <%= render FlatPack::List::Component.new(divider: true) do %>
           <% @access_candidates.each do |recording| %>
-            <% status = connection_status_for(recording) %>
-            <% trailing = nil %>
-            <% if status.present? %>
-              <% trailing = capture do %>
-                <%= render FlatPack::Badge::Component.new(
-                  text: status,
-                  style: (status == "Connected" ? :success : :warning),
-                  size: :sm
-                ) %>
-              <% end %>
-            <% end %>
             <%= render FlatPack::List::Item.new(
               href: connect_choice_url(recording),
               hover: true,
-              trailing: trailing
+              trailing: connection_status_trailing(recording)
             ) do %>
               <p class="font-medium"><%= access_parent_name(recording) %></p>
             <% end %>

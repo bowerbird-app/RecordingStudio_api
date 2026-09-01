@@ -534,9 +534,9 @@ Third-party apps use the authorization-code flow on the same token endpoint. Con
 signed-in page (`GET /recording_studio_api/oauth/authorize` or the named-API equivalent). The page
 uses `UsesDefaultLayout` and sits in the first cell of a two-column Flatpack Grid. The title is
 `Connect {app}`. Screen 1 lists Access the signed-in person can grant from — including a Folder, not
-only workspace roots — as a Flatpack List inside a Card. Each row is the same List item, labeled
-with that parent’s name (workspace or folder), not a role, and can show Connected or Reconnect.
-Staff AdminRoot Access is not a Connect row. Clicking a row opens Screen 2. Permission is capped at
+only workspace roots — as a Flatpack List inside a Card that hugs the rows. Each row is the same List item, labeled
+with that parent’s name (workspace or folder), not a role, and trailing Connect, Connected, or
+Reconnect. Staff AdminRoot Access is not a Connect row. Clicking a row opens Screen 2. Permission is capped at
 their current role on that Access and appears only when they can pick more than View (default View).
 Continue grants; Cancel returns `access_denied`. The new Access is a sibling of theirs on the parent
 of the Access they clicked (`grant_access` on that parent, `depends_on:` the clicked Access). Same

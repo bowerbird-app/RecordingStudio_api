@@ -89,6 +89,7 @@ class DelegatedOauthTest < ActionDispatch::IntegrationTest
     assert_select "[role='list'] [role='list']", count: 0
     assert_select "[role='listitem']", count: 1
     assert_select "[role='listitem'] p", text: @root_recording.recordable.name
+    assert_match(/\bConnect\b/, css_select("[role='listitem']").first.text)
     %w[Admin View Edit].each do |role_label|
       assert_select "[role='listitem'] p", text: role_label, count: 0
     end
@@ -572,6 +573,14 @@ class DelegatedOauthTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "access_recording_id=#{admin_root_access.id}"
     assert_includes response.body, "access_recording_id=#{folder_access.id}"
     assert_includes response.body, "access_recording_id=#{@access_recording.id}"
+    css_select("[role='listitem']").each do |item|
+      assert_match(/\bConnect(ed)?\b|\bReconnect\b/, item.text)
+    end
+    assert_match(/\bConnect\b/, css_select("[role='listitem']").find { |item| item.text.include?(folder_name) }.text)
+    assert_not_includes response.body, "--badge-success-background-color"
+    assert_not_includes response.body, "--badge-warning-background-color"
+    assert_includes response.body, "items-start"
+    assert_not_includes response.body, "p-[var(--card-padding-md)]"
     refute_equal @root_recording.id, folder_recording.id
     assert_not_includes response.body, "Select an option"
     assert_not_includes response.body, "max-w-3xl"
@@ -801,6 +810,9 @@ class DelegatedOauthTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "Connected"
     assert_includes response.body, "Reconnect"
+    assert_includes response.body, "Connect"
+    assert_not_includes response.body, "--badge-success-background-color"
+    assert_not_includes response.body, "--badge-warning-background-color"
   end
 
   test "screen 1 stays connected when a revoked duplicate exists for the same access" do
