@@ -152,8 +152,8 @@ module RecordingStudioApi
     helper_method :show_permission_choice?
 
     def access_selection_error
-      return "Ask someone to invite you first" if @access_candidates.empty?
       return reconnect_missing_access_message if requested_access_recording_id.present?
+      return "Ask someone to invite you first" if @access_candidates.empty?
 
       "Pick a place first"
     end
