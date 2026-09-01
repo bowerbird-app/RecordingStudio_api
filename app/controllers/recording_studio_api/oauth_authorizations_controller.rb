@@ -109,7 +109,8 @@ module RecordingStudioApi
 
       resolved = RecordingStudioApi.resolve_access_recording_for_actor(
         actor: current_oauth_actor,
-        requested_access_recording_id: requested_access_recording_id
+        requested_access_recording_id: requested_access_recording_id,
+        connect: true
       )
       @access_candidates = Array(resolved.fetch(:candidates))
       @selected_access_recording = selected_access_recording_from_params
@@ -236,12 +237,17 @@ module RecordingStudioApi
     helper_method :connect_choice_url
 
     def access_parent_name(access_recording)
-      point = access_recording.parent_recording || access_recording.root_recording
-      recordable = point&.recordable
+      point = access_recording.parent_recording
+      return "" if point.nil?
+      return "" if point.recordable_type == "RecordingStudio::Access"
+
+      recordable = point.recordable
       if recordable.respond_to?(:name) && recordable.name.present?
-        recordable.name
+        recordable.name.to_s
+      elsif recordable.respond_to?(:title) && recordable.title.present?
+        recordable.title.to_s
       else
-        point&.recordable_type.to_s.demodulize.underscore.humanize
+        point.recordable_type.to_s.demodulize.underscore.humanize
       end
     end
     helper_method :access_parent_name

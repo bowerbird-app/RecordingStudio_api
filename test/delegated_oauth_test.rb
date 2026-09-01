@@ -86,7 +86,12 @@ class DelegatedOauthTest < ActionDispatch::IntegrationTest
     assert_select "select[name='access_recording_id']", count: 0
     assert_select "button[name='decision'][value='continue']", count: 0
     assert_select "[role='list']"
+    assert_select "[role='list'] [role='list']", count: 0
     assert_select "[role='listitem']", count: 1
+    assert_select "[role='listitem'] p", text: @root_recording.recordable.name
+    %w[Admin View Edit].each do |role_label|
+      assert_select "[role='listitem'] p", text: role_label, count: 0
+    end
     assert_includes response.body, "access_recording_id=#{@access_recording.id}"
     assert_not_includes response.body, "Approve access"
     assert_not_includes response.body, "max-w-3xl"
@@ -533,13 +538,19 @@ class DelegatedOauthTest < ActionDispatch::IntegrationTest
     assert_equal "xyz", query.fetch("state")
   end
 
-  test "screen 1 lists every access they hold including a folder" do
+  test "screen 1 lists grant-from access by parent name including a folder" do
     folder_name = "Product Docs"
     _root, folder_recording, folder_access = create_folder_access_for(
       user: @user,
       folder_name: folder_name
     )
-    second_root, = create_access_recording_for(user: @user, workspace_name: "Second workspace")
+    second_root, = create_access_recording_for(user: @user, workspace_name: "Docs Workspace")
+    _admin_root, admin_root_recording = create_admin_root_recording
+    admin_root_access = grant_or_bootstrap_access!(
+      recording: admin_root_recording,
+      actor: @user,
+      role: :admin
+    )
 
     get "/recording_studio_api/oauth/authorize", params: authorize_params
 
@@ -549,10 +560,16 @@ class DelegatedOauthTest < ActionDispatch::IntegrationTest
     assert_select "select[name='access_recording_id']", count: 0
     assert_select "label", text: "Workspace", count: 0
     assert_select "button[name='decision'][value='continue']", count: 0
-    assert_select "[role='listitem']"
-    assert_includes response.body, @root_recording.recordable.name
-    assert_includes response.body, second_root.recordable.name
-    assert_includes response.body, folder_name
+    assert_select "[role='list']"
+    assert_select "[role='list'] [role='list']", count: 0
+    labels = css_select("[role='listitem'] p").map { |node| node.text.strip }
+    assert_includes labels, @root_recording.recordable.name
+    assert_includes labels, second_root.recordable.name
+    assert_includes labels, folder_name
+    assert_equal labels.length, labels.uniq.length
+    %w[Admin View Edit].each { |role_label| refute_includes labels, role_label }
+    assert_not_includes labels, admin_root_recording.recordable.name
+    assert_not_includes response.body, "access_recording_id=#{admin_root_access.id}"
     assert_includes response.body, "access_recording_id=#{folder_access.id}"
     assert_includes response.body, "access_recording_id=#{@access_recording.id}"
     refute_equal @root_recording.id, folder_recording.id

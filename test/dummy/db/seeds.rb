@@ -375,6 +375,7 @@ folder_recording = folder_recordings.first
 page_recording = page_recordings.first
 
 Current.actor = admin_user
+# Staff AdminRoot Access is for dummy admin screens. Connect Screen 1 omits it.
 ensure_access_recording_for(
   recording: admin_root_recording,
   actor: admin_user,

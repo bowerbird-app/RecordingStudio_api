@@ -111,10 +111,15 @@ module RecordingStudioApi
       Integration.actor_access_recordings(actor: actor)
     end
 
-    def resolve_access_recording_for_actor(actor:, requested_access_recording_id: nil)
+    def connect_access_recordings(actor:)
+      Integration.connect_access_recordings(actor: actor)
+    end
+
+    def resolve_access_recording_for_actor(actor:, requested_access_recording_id: nil, connect: false)
       Integration.resolve_access_recording_for_actor(
         actor: actor,
-        requested_access_recording_id: requested_access_recording_id
+        requested_access_recording_id: requested_access_recording_id,
+        connect: connect
       )
     end
 

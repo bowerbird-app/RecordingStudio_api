@@ -533,9 +533,10 @@ grant_type=client_credentials&client_id=<client_id>&client_secret=<client_secret
 Third-party apps use the authorization-code flow on the same token endpoint. Consent is a host
 signed-in page (`GET /recording_studio_api/oauth/authorize` or the named-API equivalent). The page
 uses `UsesDefaultLayout` and sits in the first cell of a two-column Flatpack Grid. The title is
-`Connect {app}`. Screen 1 lists every Access the signed-in person holds — including a Folder, not
-only workspace roots — as a Flatpack List inside a Card. Each row is labeled with that parent’s
-name and can show Connected or Reconnect. Clicking a row opens Screen 2. Permission is capped at
+`Connect {app}`. Screen 1 lists Access the signed-in person can grant from — including a Folder, not
+only workspace roots — as a Flatpack List inside a Card. Each row is the same List item, labeled
+with that parent’s name (workspace or folder), not a role, and can show Connected or Reconnect.
+Staff AdminRoot Access is not a Connect row. Clicking a row opens Screen 2. Permission is capped at
 their current role on that Access and appears only when they can pick more than View (default View).
 Continue grants; Cancel returns `access_denied`. The new Access is a sibling of theirs on the parent
 of the Access they clicked (`grant_access` on that parent, `depends_on:` the clicked Access). Same
@@ -575,8 +576,10 @@ This gem exposes a small integration surface so a separate app-auth gem can auth
   - One-step helper that authenticates and returns an `AccessGrant` in the result `value`.
 - `RecordingStudioApi.actor_access_recordings(actor:)`
   - Returns active access recordings available to an actor.
-- `RecordingStudioApi.resolve_access_recording_for_actor(actor:, requested_access_recording_id: nil)`
-  - Resolves access selection for multi-workspace actors and returns `{ recording:, candidates:, error: }`.
+- `RecordingStudioApi.connect_access_recordings(actor:)`
+  - Returns Access the actor can grant a Connect from (parent names such as a workspace or folder; not staff AdminRoot).
+- `RecordingStudioApi.resolve_access_recording_for_actor(actor:, requested_access_recording_id: nil, connect: false)`
+  - Resolves access selection for multi-workspace actors and returns `{ recording:, candidates:, error: }`. Pass `connect: true` for the Connect list.
 - `RecordingStudioApi.oauth_error_payload(error)` and `RecordingStudioApi.oauth_error_status(error)`
   - Maps OAuth-style errors to normalized payloads and HTTP statuses.
 

@@ -42,8 +42,12 @@ module RecordingStudioApi
                                 .to_a
     end
 
-    def resolve_access_recording_for_actor(actor:, requested_access_recording_id: nil)
-      candidates = actor_access_recordings(actor: actor)
+    def connect_access_recordings(actor:)
+      actor_access_recordings(actor: actor).select { |recording| connectable_access_parent?(recording) }
+    end
+
+    def resolve_access_recording_for_actor(actor:, requested_access_recording_id: nil, connect: false)
+      candidates = connect ? connect_access_recordings(actor: actor) : actor_access_recordings(actor: actor)
       return { recording: nil, candidates: [], error: :no_access_recordings } if candidates.empty?
 
       requested_id = requested_access_recording_id.to_s.presence
@@ -57,6 +61,19 @@ module RecordingStudioApi
       return { recording: candidates.first, candidates: candidates, error: nil } if candidates.one?
 
       { recording: nil, candidates: candidates, error: :selection_required }
+    end
+
+    def connectable_access_parent?(access_recording)
+      parent = access_recording.parent_recording
+      return false if parent.nil?
+      return false if parent.recordable_type == "RecordingStudio::Access"
+      return false if admin_root_recordable_type?(parent.recordable_type)
+
+      true
+    end
+
+    def admin_root_recordable_type?(recordable_type)
+      Array(RecordingStudioApi.configuration.admin_root_recordable_type_names).map(&:to_s).include?(recordable_type.to_s)
     end
 
     def oauth_error_payload(error)
