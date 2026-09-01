@@ -4,12 +4,15 @@
 
 `RecordingStudioApi` is a mountable Rails engine that provides authenticated, capability-backed JSON APIs for Recording Studio addons.
 
-For the Recording Studio 4.2 pin in `0.5.0`, safer defaults in `0.4.0`, and the flat API
+For the delegated OAuth flow in `0.6.0` (Accessible `~> 0.8` dependent grants), the Recording Studio 4.2 pin in `0.5.0`, safer defaults in `0.4.0`, and the flat API
 contract from `0.3.0`, see [UPGRADING.md](UPGRADING.md).
 
 ## Current Scope
 
 - OAuth2 `client_credentials` authentication backed by `RecordingStudioApi::ApiClient`, `ApiCredential`, and issued access tokens
+- Delegated OAuth (`authorization_code` + rotating `refresh_token`) for third-party apps: each connect is its own Accessible Access, capped by the manager's Access recording (`depends_on`). Accessible 0.8 fail-closes and voids dependents; this gem does not watch Recording/Access
+- `RecordingStudioApi::OauthClient` registry (not a recordable, not a child of Access) plus consent using host authentication
+- RFC 8414 / RFC 9728 discovery, PKCE S256, and named-API token binding (RFC 8707 `resource` when present)
 - external bearer-token authenticator support for host application authentication systems
 - API client recordables stored beneath `RecordingStudio::Access` recordings in the Recording Studio tree
 - authenticated API requests resolved into a `RecordingStudioApi::AccessGrant` that is passed to capability handlers
@@ -189,7 +192,8 @@ RecordingStudioApi.register_recordable_type_api(
 
 Public routes remain `/recording_studio_api/api/<version>`. Named APIs use
 `/recording_studio_api/apis/<api-name>/<version>` and obtain tokens from
-`/recording_studio_api/apis/<api-name>/oauth/token`.
+`/recording_studio_api/apis/<api-name>/oauth/token`. Authorize and discovery for a named API
+use the same `/apis/<api-name>/` prefix.
 
 API clients are bound to exactly one API. Provision and authenticate named clients with `api:`;
 a public token is rejected on every named API and vice versa. The existing site-wide API switch remains a global kill switch, while `ApiSetting.for_api`
@@ -494,11 +498,12 @@ end
 
 Allowed values are `:view`, `:edit`, and `:admin`. The view role must be less than or equal to the edit role.
 
-Inbound API authentication uses OAuth2 access tokens issued from provisioned API client credentials.
+Inbound API authentication uses OAuth2 access tokens issued from provisioned API client credentials
+or from a delegated OAuth authorization.
 
 ### Provisioning and authentication
 
-Provision client credentials from an existing `RecordingStudio::Access` recording:
+Provision machine client credentials from an existing `RecordingStudio::Access` recording:
 
 ```ruby
 result = RecordingStudioApi::Services::ProvisionApiClient.call(
@@ -524,6 +529,21 @@ Or exchange credentials over HTTP:
 POST /recording_studio_api/oauth/token
 grant_type=client_credentials&client_id=<client_id>&client_secret=<client_secret>
 ```
+
+Third-party apps use the authorization-code flow on the same token endpoint. Consent is a host
+signed-in page (`GET /recording_studio_api/oauth/authorize` or the named-API equivalent). The page
+uses `UsesDefaultLayout` and sits in the first cell of a two-column Flatpack Grid. The title is
+`Connect {app}`. Screen 1 lists Access the signed-in person can grant from — including a Folder, not
+only workspace roots — as a Flatpack List inside a Card that hugs the rows. Each row is the same List item, labeled
+with that parent’s name (workspace or folder), not a role, and trailing Connect, Connected, or
+Reconnect. Staff AdminRoot Access is not a Connect row. Clicking a row opens Screen 2. Permission is capped at
+their current role on that Access and appears only when they can pick more than View (default View).
+Continue grants; Cancel returns `access_denied`. The new Access is a sibling of theirs on the parent
+of the Access they clicked (`grant_access` on that parent, `depends_on:` the clicked Access). Same
+app plus same Access reconnects that grant instead of stacking a second sibling. Two workspaces
+still mean two authorizations and two tokens. Hosts must run Accessible 0.8 migrations before this
+grant path works. `IssueOauthAccessToken` still takes `grant_type:`; delegated tokens also
+return a rotating refresh token. `AccessGrant.actor` is that authorization, not the user.
 
 Authenticate API requests with:
 
@@ -556,8 +576,10 @@ This gem exposes a small integration surface so a separate app-auth gem can auth
   - One-step helper that authenticates and returns an `AccessGrant` in the result `value`.
 - `RecordingStudioApi.actor_access_recordings(actor:)`
   - Returns active access recordings available to an actor.
-- `RecordingStudioApi.resolve_access_recording_for_actor(actor:, requested_access_recording_id: nil)`
-  - Resolves access selection for multi-workspace actors and returns `{ recording:, candidates:, error: }`.
+- `RecordingStudioApi.connect_access_recordings(actor:)`
+  - Returns Access the actor can grant a Connect from (parent names such as a workspace or folder; not staff AdminRoot).
+- `RecordingStudioApi.resolve_access_recording_for_actor(actor:, requested_access_recording_id: nil, connect: false)`
+  - Resolves access selection for multi-workspace actors and returns `{ recording:, candidates:, error: }`. Pass `connect: true` for the Connect list.
 - `RecordingStudioApi.oauth_error_payload(error)` and `RecordingStudioApi.oauth_error_status(error)`
   - Maps OAuth-style errors to normalized payloads and HTTP statuses.
 
@@ -651,8 +673,11 @@ end
 - `GET /api/screens/api_keys` — RecordingStudioAdmin API key screen when the host mounts the API surface
 - `GET /api/screens/api_requests` — RecordingStudioAdmin API request screen when the host mounts the API surface
 - `GET /recording_studio_api/admin_api/logs` — browser admin request-log route
-- `POST /recording_studio_api/oauth/token` — issue OAuth2 bearer access tokens using `client_credentials`
-- `POST /recording_studio_api/apis/<api-name>/oauth/token` — issue OAuth2 bearer access tokens for a named API using `client_credentials`
+- `POST /recording_studio_api/oauth/token` — issue OAuth2 bearer access tokens (`client_credentials`, `authorization_code`, `refresh_token`)
+- `POST /recording_studio_api/apis/<api-name>/oauth/token` — same grants for a named API
+- `GET /recording_studio_api/oauth/authorize` — host-authenticated consent (named APIs: `/apis/<api-name>/oauth/authorize`)
+- `GET /recording_studio_api/.well-known/oauth-authorization-server` — RFC 8414 metadata
+- `GET /recording_studio_api/.well-known/oauth-protected-resource` — RFC 9728 metadata
 - `GET /recording_studio_api/api/<version>` — list available API resources for the selected public API version
 - `GET /recording_studio_api/api/<version>/:resource` — list recordings of a resource type inside the authenticated root
 - `GET /recording_studio_api/api/<version>/:resource/:id` — show one recording
@@ -678,7 +703,7 @@ Use `test/dummy/` as the review surface for the completed handoff:
 - `/docs/versions` explains public API versions, contribution versions, version notes, deprecation metadata, and validation rules
 - `/docs/api_routes` documents mounted API endpoints and the generated JSON endpoint inventory
 - `/docs/scalar` renders the generated OpenAPI explorer
-- `/docs/auth` explains token exchange, access-grant resolution, and capability-owned authorization
+- `/docs/auth` explains token exchange (machine and delegated), access-grant resolution, and capability-owned authorization
 - `/docs/add_capability` shows capability action registration patterns
 - `/docs/methods` documents the live Ruby entrypoints
 - `/docs/recordable_types`, `/docs/recordings_tree`, and `/docs/gem_views` verify Recording Studio wiring and the current gem view footprint

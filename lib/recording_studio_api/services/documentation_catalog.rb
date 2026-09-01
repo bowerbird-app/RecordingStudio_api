@@ -37,8 +37,8 @@ module RecordingStudioApi
             verb: "POST",
             path: oauth_token_path,
             action: "oauth#token",
-            summary: "Exchange OAuth client credentials",
-            description: "Exchange client credentials for an OAuth2 access token. Supply client_id and client_secret in the form body or via HTTP Basic authentication. Query-string credentials are rejected.",
+            summary: "Issue an OAuth access token",
+            description: "Issue an OAuth2 access token using client_credentials, authorization_code, or refresh_token. Supply client_id and client_secret in the form body or via HTTP Basic authentication for confidential clients. Query-string credentials are rejected.",
             capability: nil,
             scope: nil,
             openapi: {
@@ -53,7 +53,7 @@ module RecordingStudioApi
             path: oauth_revoke_path,
             action: "oauth#revoke",
             summary: "Revoke an OAuth access token",
-            description: "Revoke a previously issued OAuth2 access token (RFC 7009). Authenticate with client credentials in the form body or via HTTP Basic. Unknown tokens still return 200 once the client authenticates.",
+            description: "Revoke a previously issued OAuth2 access or refresh token (RFC 7009). Authenticate with client credentials in the form body or via HTTP Basic. Public clients may omit the secret. Unknown tokens still return 200 once the client authenticates.",
             capability: nil,
             scope: nil,
             openapi: {
@@ -939,14 +939,34 @@ module RecordingStudioApi
               schema: {
                 type: "object",
                 properties: {
-                  grant_type: { type: "string", enum: ["client_credentials"] },
+                  grant_type: { type: "string", enum: %w[client_credentials authorization_code refresh_token] },
                   client_id: {
                     type: "string",
                     description: "OAuth client id. Optional when supplied via HTTP Basic username."
                   },
                   client_secret: {
                     type: "string",
-                    description: "OAuth client secret. Optional when supplied via HTTP Basic password."
+                    description: "OAuth client secret. Required for confidential clients; omit for public clients."
+                  },
+                  code: {
+                    type: "string",
+                    description: "Authorization code from the authorize endpoint. Required for authorization_code."
+                  },
+                  redirect_uri: {
+                    type: "string",
+                    description: "Must match the redirect_uri used to obtain the authorization code."
+                  },
+                  code_verifier: {
+                    type: "string",
+                    description: "PKCE S256 verifier. Required for public clients on authorization_code."
+                  },
+                  refresh_token: {
+                    type: "string",
+                    description: "Refresh token to rotate. Required for refresh_token."
+                  },
+                  resource: {
+                    type: "string",
+                    description: "Optional RFC 8707 resource indicator. Must match this API when present."
                   }
                 },
                 required: %w[grant_type]
@@ -964,8 +984,8 @@ module RecordingStudioApi
               schema: {
                 type: "object",
                 properties: {
-                  token: { type: "string", description: "Access token to revoke." },
-                  token_type_hint: { type: "string", enum: ["access_token"] },
+                  token: { type: "string", description: "Access or refresh token to revoke." },
+                  token_type_hint: { type: "string", enum: %w[access_token refresh_token] },
                   client_id: {
                     type: "string",
                     description: "OAuth client id. Optional when supplied via HTTP Basic username."

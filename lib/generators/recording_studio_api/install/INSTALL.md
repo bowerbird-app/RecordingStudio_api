@@ -21,4 +21,7 @@ For separate public and site-administration APIs, configure each named API and t
 Enable Recording Studio's accessible and api_access_point capabilities on each root that can receive
 credentials. Access points are still limited to recordables registered on the selected API.
 
+Delegated OAuth in 0.6.0 requires Accessible ~> 0.8 and the depends_on_recording_id column
+(run Accessible migrations). Include RecordingStudioApi::OauthAuthorization in access_actor_types.
+
 ===============================================================================

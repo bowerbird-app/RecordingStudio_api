@@ -23,7 +23,11 @@ module RecordingStudioApi
           authorization_header: request.headers["Authorization"],
           api: current_api_key
         )
-        raise AuthenticationError, result.error if result.failure?
+        if result.failure?
+          raise result.error if result.error.is_a?(RecordingStudioApi::Error)
+
+          raise AuthenticationError, result.error
+        end
 
         authenticated_client = result.value
         @current_api_client = authenticated_client.api_client

@@ -235,7 +235,7 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "h1", text: "Auth"
-    assert_includes response.body, "How OAuth2 credentials become a RecordingStudioApi access grant for endpoint dispatch."
+    assert_includes response.body, "How OAuth2 credentials and delegated app connects become a RecordingStudioApi access grant for endpoint dispatch."
     assert_includes response.body, "grant_type=client_credentials"
     assert_includes response.body, "http://localhost:3000/recording_studio_api/api/v2/workspaces"
     assert_includes response.body, "/api/&lt;version&gt;"

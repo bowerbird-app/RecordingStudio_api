@@ -210,6 +210,7 @@ module RecordingStudioApi
                 token_type: { type: "string", enum: ["Bearer"] },
                 expires_in: { type: "integer" },
                 created_at: { type: "integer" },
+                refresh_token: { type: "string" },
                 api_client_id: { type: "string" }
               },
               required: %w[access_token token_type expires_in]

@@ -375,6 +375,7 @@ folder_recording = folder_recordings.first
 page_recording = page_recordings.first
 
 Current.actor = admin_user
+# Staff AdminRoot Access is for dummy admin screens. Connect Screen 1 omits it.
 ensure_access_recording_for(
   recording: admin_root_recording,
   actor: admin_user,
@@ -387,6 +388,101 @@ admin_access_recording = ensure_access_recording_for(
   role: :admin,
   manager_actor: admin_user
 )
+
+second_workspace = Workspace.find_or_create_by!(name: "Docs Workspace")
+second_root_recording = RecordingStudio::Recording.unscoped.find_or_create_by!(
+  recordable: second_workspace,
+  parent_recording_id: nil
+)
+ensure_access_recording_for(
+  recording: second_root_recording,
+  actor: admin_user,
+  role: :admin,
+  manager_actor: admin_user
+)
+
+seeded_oauth_client = RecordingStudioApi::OauthClient.find_or_initialize_by(client_id: "rsapi_oc_seed_demo_app")
+if seeded_oauth_client.new_record?
+  seeded_oauth_client.assign_attributes(
+    name: "Seed Demo App",
+    confidential: false,
+    redirect_uris: ["http://127.0.0.1/callback"],
+    api_key: "public"
+  )
+  seeded_oauth_client.save!
+end
+
+docs_access_recording = RecordingStudioAccessible.access_recordings_for_actor(
+  recording: second_root_recording,
+  actor: admin_user
+).first
+
+folder_access_recording = ensure_access_recording_for(
+  recording: folder_recording,
+  actor: admin_user,
+  role: :admin,
+  manager_actor: admin_user
+)
+
+folder_user = User.find_or_create_by!(email: "folder@example.com") do |user|
+  user.password = "Password"
+  user.password_confirmation = "Password"
+end
+ensure_access_recording_for(
+  recording: folder_recording,
+  actor: folder_user,
+  role: :admin,
+  manager_actor: admin_user
+)
+
+seeded_oauth_authorization = RecordingStudioApi::OauthAuthorization.find_by(
+  oauth_client: seeded_oauth_client,
+  manager_actor: admin_user,
+  manager_access_recording: admin_access_recording,
+  revoked_at: nil
+) || RecordingStudioApi::OauthAuthorization.find_by(
+  oauth_client: seeded_oauth_client,
+  manager_actor: admin_user,
+  manager_access_recording: admin_access_recording
+)
+if seeded_oauth_authorization.nil?
+  oauth_grant = RecordingStudioApi::Services::CreateOauthAuthorization.call(
+    oauth_client: seeded_oauth_client,
+    manager_actor: admin_user,
+    access_recording: admin_access_recording,
+    role: "view",
+    redirect_uri: "http://127.0.0.1/callback",
+    code_challenge: RecordingStudioApi::Pkce.s256_challenge("A" * 43),
+    code_challenge_method: "S256"
+  )
+  raise oauth_grant.error unless oauth_grant.success?
+
+  seeded_oauth_authorization = oauth_grant.value.fetch(:authorization)
+end
+
+reconnect_authorization = RecordingStudioApi::OauthAuthorization.find_by(
+  oauth_client: seeded_oauth_client,
+  manager_actor: admin_user,
+  manager_access_recording: docs_access_recording
+)
+if reconnect_authorization.nil? && docs_access_recording.present?
+  reconnect_grant = RecordingStudioApi::Services::CreateOauthAuthorization.call(
+    oauth_client: seeded_oauth_client,
+    manager_actor: admin_user,
+    access_recording: docs_access_recording,
+    role: "view",
+    redirect_uri: "http://127.0.0.1/callback",
+    code_challenge: RecordingStudioApi::Pkce.s256_challenge("B" * 43),
+    code_challenge_method: "S256"
+  )
+  raise reconnect_grant.error unless reconnect_grant.success?
+
+  reconnect_authorization = reconnect_grant.value.fetch(:authorization)
+end
+if reconnect_authorization.present? && reconnect_authorization.revoked_at.nil?
+  RecordingStudioApi::Services::VoidOauthAuthorization.call(authorization: reconnect_authorization)
+  reconnect_authorization.reload
+end
 
 Current.actor = admin_user
 service_client_name = "Seed Demo Service Client"
@@ -469,11 +565,15 @@ service_name_variant_clients = RecordingStudioApi::ApiClient
 
 seeded_api_clients.concat(service_name_variant_clients)
 
-puts "Seeded users: admin@admin.com (password: Password)"
+puts "Seeded users: admin@admin.com (password: Password), folder@example.com (password: Password)"
 puts "Seeded admin root: #{admin_root.name}"
 puts "Seeded workspace children: #{workspace.name} -> folders: #{folders.map(&:name).join(', ')}; pages: #{pages.map(&:title).join(', ')}"
 puts "Seeded admin root access recording: #{admin_root_recording.id}"
 puts "Seeded admin access recording: #{admin_access_recording.id}"
+puts "Seeded folder access recording: #{folder_access_recording.id}"
+puts "Seeded OAuth app: #{seeded_oauth_client.name} (#{seeded_oauth_client.client_id})"
+puts "Seeded connected app authorization: #{seeded_oauth_authorization.id}"
+puts "Seeded reconnect authorization: #{reconnect_authorization&.id}"
 
 puts "Service OAuth client_credentials demo"
 puts "  Client ID: #{service_credential.oauth_client_id}"

@@ -7,7 +7,7 @@ require_relative "recordable_registry"
 require_relative "api_definition"
 
 module RecordingStudioApi
-  class Configuration
+  class Configuration # rubocop:disable Metrics/ClassLength
     DEFAULT_API_VERSION = "v1"
 
     ACCESS_ROLE_RANKS = {
@@ -65,7 +65,10 @@ module RecordingStudioApi
                   :api_request_logging_batch_size,
                   :api_request_log_allowed_param_keys,
                   :api_request_log_retention_days,
-                  :api_daily_metric_retention_days
+                  :api_daily_metric_retention_days,
+                  :authorization_code_ttl,
+                  :refresh_token_ttl,
+                  :client_id_metadata_documents_enabled
     attr_reader :hooks, :action_registry, :recordable_registry, :default_api_version, :api_version_profiles, :capability_action_roles
 
     # rubocop:disable Metrics/AbcSize
@@ -139,6 +142,9 @@ module RecordingStudioApi
       @api_request_log_allowed_param_keys = []
       @api_request_log_retention_days = 30
       @api_daily_metric_retention_days = nil
+      @authorization_code_ttl = 10.respond_to?(:minutes) ? 10.minutes : 10 * 60
+      @refresh_token_ttl = 30.respond_to?(:days) ? 30.days : 30 * 24 * 60 * 60
+      @client_id_metadata_documents_enabled = true
       @hooks = Hooks.new
       @action_registry = ActionRegistry.new
       @recordable_registry = RecordableRegistry.new
@@ -202,6 +208,9 @@ module RecordingStudioApi
         api_request_log_allowed_param_keys: api_request_log_allowed_param_keys,
         api_request_log_retention_days: api_request_log_retention_days,
         api_daily_metric_retention_days: api_daily_metric_retention_days,
+        authorization_code_ttl: authorization_code_ttl,
+        refresh_token_ttl: refresh_token_ttl,
+        client_id_metadata_documents_enabled: client_id_metadata_documents_enabled,
         action_registrations: action_registry.to_h,
         recordable_registrations: recordable_registry.to_h,
         hooks_registered: hooks.instance_variable_get(:@registry).transform_values(&:size)
@@ -417,6 +426,8 @@ module RecordingStudioApi
     def validate_security_configuration!
       validate_token_digest_pepper!
       validate_positive_duration!(:access_token_ttl, access_token_ttl)
+      validate_positive_duration!(:authorization_code_ttl, authorization_code_ttl)
+      validate_positive_duration!(:refresh_token_ttl, refresh_token_ttl)
       validate_non_negative_duration!(:credential_ttl, credential_ttl) if credential_ttl.present?
       validate_enabled_rate_limits!
       validate_positive_days!(:api_request_log_retention_days, api_request_log_retention_days)

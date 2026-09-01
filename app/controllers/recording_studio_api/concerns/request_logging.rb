@@ -10,6 +10,8 @@ module RecordingStudioApi
         authorization
         bearer
         client_secret
+        code
+        code_verifier
         password
         refresh_token
         token

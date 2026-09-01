@@ -20,6 +20,10 @@ require "recording_studio_api/api_request_log_batch"
 require "recording_studio_api/api_request_log_delivery"
 require "recording_studio_api/token_digest"
 require "recording_studio_api/token"
+require "recording_studio_api/pkce"
+require "recording_studio_api/authorization_code"
+require "recording_studio_api/refresh_token"
+require "recording_studio_api/oauth_client_secret"
 require "recording_studio_api/oauth_access_token"
 require "recording_studio_api/oauth_error_mapper"
 require "recording_studio_api/idempotency_store"
@@ -38,6 +42,10 @@ require "recording_studio_api/services/provision_access_request"
 require "recording_studio_api/services/rotate_api_credential"
 require "recording_studio_api/services/authenticate_bearer_token"
 require "recording_studio_api/services/issue_oauth_access_token"
+require "recording_studio_api/services/resolve_oauth_client"
+require "recording_studio_api/services/authenticate_oauth_client"
+require "recording_studio_api/services/create_oauth_authorization"
+require "recording_studio_api/services/void_oauth_authorization"
 require "recording_studio_api/services/revoke_oauth_access_token"
 require "recording_studio_api/services/authenticate_oauth_access_token"
 require "recording_studio_api/services/issue_test_credential"
@@ -103,10 +111,15 @@ module RecordingStudioApi
       Integration.actor_access_recordings(actor: actor)
     end
 
-    def resolve_access_recording_for_actor(actor:, requested_access_recording_id: nil)
+    def connect_access_recordings(actor:)
+      Integration.connect_access_recordings(actor: actor)
+    end
+
+    def resolve_access_recording_for_actor(actor:, requested_access_recording_id: nil, connect: false)
       Integration.resolve_access_recording_for_actor(
         actor: actor,
-        requested_access_recording_id: requested_access_recording_id
+        requested_access_recording_id: requested_access_recording_id,
+        connect: connect
       )
     end
 

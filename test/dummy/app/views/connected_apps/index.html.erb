@@ -1,0 +1,45 @@
+<%= render FlatPack::Grid::Component.new(cols: 2) do %>
+  <div class="space-y-6">
+    <% recording_studio_page_nav(title: "Connected apps") %>
+
+    <%= render FlatPack::PageTitle::Component.new(
+      title: "Connected apps",
+      subtitle: "These apps have their own access. Remove one to shut it off.",
+      variant: :h1
+    ) %>
+
+    <% if @authorizations.any? %>
+      <%= render FlatPack::Card::Component.new(style: :default) do %>
+        <%= render FlatPack::List::Component.new(divider: true) do %>
+          <% @authorizations.each do |authorization| %>
+            <% remove_button = nil %>
+            <% if authorization.revoked_at.nil? %>
+              <% remove_button = capture do %>
+                <%= form_with url: connected_app_path(authorization), method: :delete do %>
+                  <%= render FlatPack::Button::Component.new(
+                    text: "Remove access",
+                    style: :danger,
+                    size: :sm,
+                    type: "submit"
+                  ) %>
+                <% end %>
+              <% end %>
+            <% end %>
+            <%= render FlatPack::List::Item.new(trailing: remove_button) do %>
+              <p class="font-medium"><%= authorization.oauth_client.name %></p>
+              <p class="text-sm text-[var(--surface-muted-content-color)]">
+                <%= connected_app_status(authorization) %>
+              </p>
+            <% end %>
+          <% end %>
+        <% end %>
+      <% end %>
+    <% else %>
+      <%= render FlatPack::EmptyState::Component.new(
+        title: "Nothing connected yet",
+        description: "When you connect an app, it shows up here.",
+        icon: :link
+      ) %>
+    <% end %>
+  </div>
+<% end %>

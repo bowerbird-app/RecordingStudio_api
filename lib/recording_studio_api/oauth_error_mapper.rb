@@ -8,6 +8,7 @@ module RecordingStudioApi
       "invalid_request" => :bad_request,
       "invalid_grant" => :bad_request,
       "invalid_scope" => :bad_request,
+      "invalid_target" => :bad_request,
       "unsupported_grant_type" => :bad_request,
       "unsupported_response_type" => :bad_request,
       "unauthorized_client" => :bad_request,

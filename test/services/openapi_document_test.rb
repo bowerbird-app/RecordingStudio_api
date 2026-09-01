@@ -89,7 +89,7 @@ module RecordingStudioApi
         token_operation = document.fetch(:paths).fetch("/recording_studio_api/oauth/token").fetch("post")
 
         assert_equal [], token_operation.fetch(:security)
-        assert_equal "Exchange OAuth client credentials", token_operation.fetch(:summary)
+        assert_equal "Issue an OAuth access token", token_operation.fetch(:summary)
         assert token_operation.key?(:requestBody)
         assert_equal %w[grant_type],
                      token_operation.dig(:requestBody, :content, "application/x-www-form-urlencoded", :schema, :required)

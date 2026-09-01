@@ -1,0 +1,40 @@
+<%= render FlatPack::Grid::Component.new(cols: 2, align: :start) do %>
+  <div class="space-y-6">
+    <% recording_studio_page_nav(title: connect_page_title) %>
+
+    <%= render FlatPack::PageTitle::Component.new(
+      title: connect_page_title,
+      subtitle: "It gets its own access here. Yours stays yours.",
+      variant: :h1
+    ) %>
+
+    <% if @errors.any? %>
+      <%= render FlatPack::Alert::Component.new(
+        description: @errors.uniq.join(" "),
+        style: :danger
+      ) %>
+    <% end %>
+
+    <% if @access_candidates.any? %>
+      <%= render FlatPack::Card::Component.new(style: :default, padding: :none) do %>
+        <%= render FlatPack::List::Component.new(divider: true) do %>
+          <% @access_candidates.each do |recording| %>
+            <%= render FlatPack::List::Item.new(
+              href: connect_choice_url(recording),
+              hover: true,
+              trailing: connection_status_trailing(recording)
+            ) do %>
+              <p class="font-medium"><%= access_parent_name(recording) %></p>
+            <% end %>
+          <% end %>
+        <% end %>
+      <% end %>
+    <% else %>
+      <%= render FlatPack::EmptyState::Component.new(
+        title: "No place to connect from yet",
+        description: "Ask someone to invite you, then try again.",
+        icon: :lock
+      ) %>
+    <% end %>
+  </div>
+<% end %>

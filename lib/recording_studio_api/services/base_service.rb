@@ -116,8 +116,9 @@ module RecordingStudioApi
       # @param errors [Array] Additional error details
       # @return [Result] A failure result
       def failure(error, errors: [])
-        error_message = error.is_a?(Exception) ? error.message : error
-        Result.new(success: false, error: error_message, errors: errors)
+        error_value = error
+        error_value = error.message if error.is_a?(Exception) && !error.is_a?(RecordingStudioApi::AuthorizationError)
+        Result.new(success: false, error: error_value, errors: errors)
       end
 
       # Run before_service hooks

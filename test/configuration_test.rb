@@ -40,6 +40,9 @@ class ConfigurationTest < Minitest::Test
     assert_equal 5, configuration.timeout
     assert_equal 30.days, configuration.credential_ttl
     assert_equal 1.hour, configuration.access_token_ttl
+    assert_equal 10.minutes, configuration.authorization_code_ttl
+    assert_equal 30.days, configuration.refresh_token_ttl
+    assert_equal true, configuration.client_id_metadata_documents_enabled
     assert_equal [], configuration.token_authenticators
     assert_equal :view, configuration.access_management_view_role
     assert_equal :admin, configuration.access_management_edit_role

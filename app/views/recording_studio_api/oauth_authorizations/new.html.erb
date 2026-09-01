@@ -1,0 +1,67 @@
+<%= render FlatPack::Grid::Component.new(cols: 2, align: :start) do %>
+  <div class="space-y-6">
+    <% recording_studio_page_nav(
+      title: connect_page_title,
+      page_nav_back_url: connect_choice_url
+    ) %>
+
+    <%= render FlatPack::PageTitle::Component.new(
+      title: connect_page_title,
+      subtitle: access_parent_name(@selected_access_recording),
+      variant: :h1
+    ) %>
+
+    <% if @errors.any? %>
+      <%= render FlatPack::Alert::Component.new(
+        description: @errors.uniq.join(" "),
+        style: :danger
+      ) %>
+    <% end %>
+
+    <%= form_with url: authorize_form_url, method: :post, class: "space-y-6" do %>
+      <%= hidden_field_tag :response_type, "code" %>
+      <%= hidden_field_tag :client_id, @oauth_client.client_id %>
+      <%= hidden_field_tag :redirect_uri, @redirect_uri %>
+      <%= hidden_field_tag :state, @state if @state.present? %>
+      <%= hidden_field_tag :code_challenge, @code_challenge if @code_challenge.present? %>
+      <%= hidden_field_tag :code_challenge_method, @code_challenge_method if @code_challenge_method.present? %>
+      <%= hidden_field_tag :resource, @resource if @resource.present? %>
+      <%= hidden_field_tag :access_recording_id, @selected_access_recording.id %>
+
+      <% if show_permission_choice? %>
+        <%= render FlatPack::Select::Component.new(
+          name: "role",
+          options: @role_options,
+          value: params[:role].presence || default_consent_role,
+          label: "Permission",
+          placeholder: nil,
+          searchable: true,
+          required: true
+        ) %>
+      <% else %>
+        <%= hidden_field_tag :role, default_consent_role %>
+      <% end %>
+
+      <div class="space-y-3">
+        <%= render FlatPack::Button::Component.new(
+          text: "Continue",
+          style: :primary,
+          size: :md,
+          type: "submit",
+          name: "decision",
+          value: "continue",
+          class: "w-full"
+        ) %>
+        <%= render FlatPack::Button::Component.new(
+          text: "Cancel",
+          style: :secondary,
+          size: :md,
+          type: "submit",
+          name: "decision",
+          value: "cancel",
+          class: "w-full"
+        ) %>
+      </div>
+    <% end %>
+  </div>
+<% end %>
