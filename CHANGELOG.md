@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Delegated OAuth for third-party apps: each approval creates its own Accessible Access (sibling of the manager's), not a token bound to the user
 - `authorization_code` and `refresh_token` grant types on the existing `/oauth/token` endpoints; `client_credentials` is unchanged
-- Consent and connected-app screens composed from `recording_studio/default_layout` + FlatPack (`UsesDefaultLayout`); host authentication (dummy Devise) owns sign-in. Consent is a connect screen (`Connect {app}`) in the first cell of `FlatPack::Grid` (`cols: 2`): one workspace is a quiet name (no permission field), several use a Flatpack Select, permission only when there is more than View (default `view`), and stacked full-width Continue / Cancel. Connected apps uses a Flatpack List inside a Card.
+- Consent and connected-app screens composed from `recording_studio/default_layout` + FlatPack (`UsesDefaultLayout`); host authentication (dummy Devise) owns sign-in. Consent is a connect screen (`Connect {app}`) in the first cell of `FlatPack::Grid` (`cols: 2`): one workspace is title + Continue / Cancel only; several use a Flatpack Workspace Select, with permission only when there is more than View (default `view`), and stacked full-width Continue / Cancel. Connected apps uses a Flatpack List inside a Card.
 - RFC 8414 authorization-server metadata and RFC 9728 protected-resource metadata; PKCE S256; optional RFC 8707 `resource`; Client ID Metadata Documents for public clients
 - Consent `grant_access` passes `depends_on:` with the manager's Access recording so Accessible 0.8 owns the cap, authorize-time fail-closed, and dependent voiding
 

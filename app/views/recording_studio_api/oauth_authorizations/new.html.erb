@@ -36,9 +36,6 @@
         ) %>
       <% elsif @selected_access_recording.present? %>
         <%= hidden_field_tag :access_recording_id, @selected_access_recording.id %>
-        <p class="text-sm text-[var(--surface-muted-content-color)]">
-          <%= access_workspace_name(@selected_access_recording) %>
-        </p>
       <% else %>
         <%= render FlatPack::EmptyState::Component.new(
           title: "No workspace yet",

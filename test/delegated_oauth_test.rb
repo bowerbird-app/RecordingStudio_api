@@ -81,7 +81,8 @@ class DelegatedOauthTest < ActionDispatch::IntegrationTest
     assert_select "title", text: /Connect #{Regexp.escape(@oauth_client.name)}/
     assert_includes response.body, "Connect #{@oauth_client.name}"
     assert_includes response.body, "It gets its own access here. Yours stays yours."
-    assert_includes response.body, @root_recording.recordable.name
+    assert_not_includes response.body, @root_recording.recordable.name
+    assert_select "label", text: "Workspace", count: 0
     assert_not_includes response.body, "Workspace:"
     assert_not_includes response.body, "#{@root_recording.recordable.name} (Admin)"
     assert_not_includes response.body, "Approve access"
