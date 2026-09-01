@@ -4,7 +4,7 @@
 
     <%= render FlatPack::PageTitle::Component.new(
       title: "Connected apps",
-      subtitle: "Apps you have given their own access. Removing an app immediately ends that access.",
+      subtitle: "These apps have their own access. Remove one to shut it off.",
       variant: :h1
     ) %>
 
@@ -36,8 +36,8 @@
       <% end %>
     <% else %>
       <%= render FlatPack::EmptyState::Component.new(
-        title: "No connected apps",
-        description: "When you approve an app, it appears here so you can remove it later.",
+        title: "Nothing connected yet",
+        description: "When you connect an app, it shows up here.",
         icon: :link
       ) %>
     <% end %>

@@ -150,24 +150,25 @@ module RecordingStudioApi
       nil
     end
 
-    def consent_section_subtitle
-      if @access_candidates.many?
-        "Choose a workspace and the highest permission this app may use."
-      else
-        "Choose the highest permission this app may use."
-      end
+    def connect_page_title
+      "Connect #{@oauth_client.name}"
     end
-    helper_method :consent_section_subtitle
+    helper_method :connect_page_title
+
+    def show_permission_choice?
+      @access_candidates.many? && Array(@role_options).many?
+    end
+    helper_method :show_permission_choice?
 
     def access_selection_error
-      return "No workspace access is available to connect" if @access_candidates.empty?
+      return "Ask someone to invite you to a workspace first" if @access_candidates.empty?
       return "Choose a workspace" if @access_candidates.many?
 
-      "Access is invalid"
+      "That workspace is not available"
     end
 
     def deny_requested?
-      params[:decision].to_s == "deny"
+      %w[cancel deny].include?(params[:decision].to_s)
     end
 
     def requested_role
@@ -225,13 +226,6 @@ module RecordingStudioApi
       end
     end
     helper_method :access_workspace_name
-
-    def access_recording_label(access_recording)
-      workspace_name = access_workspace_name(access_recording)
-      role = access_recording.recordable&.role.to_s.humanize
-      role.present? ? "#{workspace_name} (#{role})" : workspace_name
-    end
-    helper_method :access_recording_label
 
     def redirect_to_client(**query)
       uri = URI.parse(@redirect_uri)

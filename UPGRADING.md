@@ -34,7 +34,7 @@ that acts as the user.
    `authorized?` / `role_for` fail closed if that manager Access is missing, trashed, off-root, or
    weaker. `VoidDependentAccesses` / `VoidDependentAccessesJob` void dependents when the manager is
    revised, trashed, or destroyed. This gem does not monkey-patch `RecordingStudio::Recording` or
-   `RecordingStudio::Access`. User Deny and connected-apps revoke still call `VoidOauthAuthorization`
+   `RecordingStudio::Access`. User Cancel and connected-apps revoke still call `VoidOauthAuthorization`
    (authorization + tokens only).
 7. Public tokens remain bound to their named API. A public token must not be sent to `:operations`.
 8. Optional: `config.authorization_code_ttl` (10 minutes), `config.refresh_token_ttl` (30 days),

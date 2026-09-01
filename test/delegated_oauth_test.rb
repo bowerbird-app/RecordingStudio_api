@@ -78,15 +78,22 @@ class DelegatedOauthTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "body[data-recording-studio-default-layout='true']", count: 1
-    assert_select "title", text: /Approve access/
-    assert_includes response.body, @oauth_client.name
-    assert_includes response.body, "Choose the highest permission this app may use."
-    assert_not_includes response.body, "Choose a workspace and the highest permission this app may use."
+    assert_select "title", text: /Connect #{Regexp.escape(@oauth_client.name)}/
+    assert_includes response.body, "Connect #{@oauth_client.name}"
+    assert_includes response.body, "It gets its own access here. Yours stays yours."
+    assert_includes response.body, @root_recording.recordable.name
+    assert_not_includes response.body, "Workspace:"
+    assert_not_includes response.body, "#{@root_recording.recordable.name} (Admin)"
+    assert_not_includes response.body, "Approve access"
     assert_select "select[name='access_recording_id']", count: 0
     assert_select "input[name='access_recording_id'][value=?]", @access_recording.id
     assert_select "input[name='role'][value=view]"
     assert_select "input[name='role'][value=admin]", count: 0
-    assert_includes response.body, "View"
+    assert_select "label", text: "Permission", count: 0
+    assert_select "button[name='decision'][value='continue']"
+    assert_select "button[name='decision'][value='cancel']"
+    assert_select "button[name='decision'][value='approve']", count: 0
+    assert_select "button[name='decision'][value='deny']", count: 0
     assert_not_includes response.body, "max-w-3xl"
     assert_includes response.body, "md:grid-cols-2"
     assert_not_includes response.body, "Select an option"
@@ -96,7 +103,7 @@ class DelegatedOauthTest < ActionDispatch::IntegrationTest
     post "/recording_studio_api/oauth/authorize", params: authorize_params.merge(
       access_recording_id: @access_recording.id,
       role: "view",
-      decision: "approve"
+      decision: "continue"
     )
 
     assert_response :redirect
@@ -262,7 +269,7 @@ class DelegatedOauthTest < ActionDispatch::IntegrationTest
     post "/recording_studio_api/oauth/authorize", params: authorize_params.merge(
       access_recording_id: edit_access.id,
       role: "admin",
-      decision: "approve"
+      decision: "continue"
     )
 
     assert_response :unprocessable_entity
@@ -499,12 +506,12 @@ class DelegatedOauthTest < ActionDispatch::IntegrationTest
     assert_includes operations.fetch("token_endpoint"), "/apis/operations/oauth/token"
   end
 
-  test "deny redirects to the client with access_denied" do
+  test "cancel redirects to the client with access_denied" do
     assert_no_difference -> { RecordingStudioApi::OauthAuthorization.where(oauth_client: @oauth_client).count } do
       post "/recording_studio_api/oauth/authorize", params: authorize_params.merge(
         access_recording_id: @access_recording.id,
         role: "view",
-        decision: "deny"
+        decision: "cancel"
       )
     end
 
@@ -520,7 +527,8 @@ class DelegatedOauthTest < ActionDispatch::IntegrationTest
     get "/recording_studio_api/oauth/authorize", params: authorize_params
 
     assert_response :success
-    assert_includes response.body, "Choose a workspace and the highest permission this app may use."
+    assert_select "title", text: /Connect #{Regexp.escape(@oauth_client.name)}/
+    assert_includes response.body, "It gets its own access here. Yours stays yours."
     assert_select "input[name='access_recording_id']"
     assert_select "input[name='access_recording_id'][value='']", count: 0
     assert_includes response.body, @root_recording.recordable.name
@@ -528,17 +536,19 @@ class DelegatedOauthTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "Select an option"
     assert_select "input[name='role'][value=view]"
     assert_select "input[name='role'][value=admin]", count: 0
-    assert_includes response.body, "Cannot be higher than your own access on that workspace."
+    assert_includes response.body, "Permission"
+    assert_select "button[name='decision'][value='continue']"
+    assert_select "button[name='decision'][value='cancel']"
     assert_not_includes response.body, "max-w-3xl"
     assert_includes response.body, "md:grid-cols-2"
   end
 
-  test "deny without a workspace still redirects to the client" do
+  test "cancel without a workspace still redirects to the client" do
     create_access_recording_for(user: @user, workspace_name: "Second workspace")
 
     assert_no_difference -> { RecordingStudioApi::OauthAuthorization.where(oauth_client: @oauth_client).count } do
       post "/recording_studio_api/oauth/authorize", params: authorize_params.merge(
-        decision: "deny"
+        decision: "cancel"
       )
     end
 
@@ -548,18 +558,20 @@ class DelegatedOauthTest < ActionDispatch::IntegrationTest
     assert_equal "xyz", query.fetch("state")
   end
 
-  test "approve without a workspace does not create an authorization" do
+  test "continue without a workspace does not create an authorization" do
     create_access_recording_for(user: @user, workspace_name: "Second workspace")
 
     assert_no_difference -> { RecordingStudioApi::OauthAuthorization.where(oauth_client: @oauth_client).count } do
       post "/recording_studio_api/oauth/authorize", params: authorize_params.merge(
         role: "view",
-        decision: "approve"
+        decision: "continue"
       )
     end
 
     assert_response :unprocessable_entity
     assert_includes response.body, "Choose a workspace"
+    assert_select "button[name='decision'][value='continue']", count: 0
+    assert_select "button[name='decision'][value='cancel']"
   end
 
   private

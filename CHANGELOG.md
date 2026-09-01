@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Delegated OAuth for third-party apps: each approval creates its own Accessible Access (sibling of the manager's), not a token bound to the user
 - `authorization_code` and `refresh_token` grant types on the existing `/oauth/token` endpoints; `client_credentials` is unchanged
-- Consent and connected-app screens composed from `recording_studio/default_layout` + FlatPack (`UsesDefaultLayout`); host authentication (dummy Devise) owns sign-in. Consent and connected apps sit in the first cell of `FlatPack::Grid` (`cols: 2`). Permission defaults to the lowest role (`view`). Connected apps uses a Flatpack List inside a Card.
+- Consent and connected-app screens composed from `recording_studio/default_layout` + FlatPack (`UsesDefaultLayout`); host authentication (dummy Devise) owns sign-in. Consent is a connect screen (`Connect {app}`) in the first cell of `FlatPack::Grid` (`cols: 2`): one workspace is a quiet name (no permission field), several use a Flatpack Select, permission only when there is more than View (default `view`), and stacked full-width Continue / Cancel. Connected apps uses a Flatpack List inside a Card.
 - RFC 8414 authorization-server metadata and RFC 9728 protected-resource metadata; PKCE S256; optional RFC 8707 `resource`; Client ID Metadata Documents for public clients
 - Consent `grant_access` passes `depends_on:` with the manager's Access recording so Accessible 0.8 owns the cap, authorize-time fail-closed, and dependent voiding
 
@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking dependency floor:** requires RecordingStudio Accessible `~> 0.8` (tested against `0.8.0`) so `depends_on_recording_id` exists. RecordingStudio stays `~> 4.2`
 
 ### Removed
-- API-side Recording/Access after_commit monkey-patches that voided OAuth grants. Accessible `VoidDependentAccesses` / `authorized?` own that ACL. User Deny and connected-apps revoke still use `VoidOauthAuthorization`
+- API-side Recording/Access after_commit monkey-patches that voided OAuth grants. Accessible `VoidDependentAccesses` / `authorized?` own that ACL. User Cancel and connected-apps revoke still use `VoidOauthAuthorization`
 
 See [UPGRADING.md](UPGRADING.md) for Accessible 0.8, `depends_on_recording_id`, `access_actor_types`, and token-endpoint changes.
 

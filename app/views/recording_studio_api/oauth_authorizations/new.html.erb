@@ -1,10 +1,10 @@
 <%= render FlatPack::Grid::Component.new(cols: 2) do %>
   <div class="space-y-6">
-    <% recording_studio_page_nav(title: "Approve access") %>
+    <% recording_studio_page_nav(title: connect_page_title) %>
 
     <%= render FlatPack::PageTitle::Component.new(
-      title: "Approve access",
-      subtitle: "#{@oauth_client.name} is asking to use this API with its own access, not yours.",
+      title: connect_page_title,
+      subtitle: "It gets its own access here. Yours stays yours.",
       variant: :h1
     ) %>
 
@@ -14,11 +14,6 @@
         style: :danger
       ) %>
     <% end %>
-
-    <%= render FlatPack::SectionTitle::Component.new(
-      title: @oauth_client.name,
-      subtitle: consent_section_subtitle
-    ) %>
 
     <%= form_with url: authorize_form_url, method: :post, class: "space-y-6" do %>
       <%= hidden_field_tag :response_type, "code" %>
@@ -37,23 +32,22 @@
           label: "Workspace",
           placeholder: nil,
           searchable: true,
-          required: true,
-          help_text: "This app receives its own access to the workspace you choose."
+          required: true
         ) %>
       <% elsif @selected_access_recording.present? %>
         <%= hidden_field_tag :access_recording_id, @selected_access_recording.id %>
         <p class="text-sm text-[var(--surface-muted-content-color)]">
-          Workspace: <%= access_workspace_name(@selected_access_recording) %>
+          <%= access_workspace_name(@selected_access_recording) %>
         </p>
       <% else %>
         <%= render FlatPack::EmptyState::Component.new(
-          title: "No workspace available",
-          description: "You need workspace access before you can connect an app.",
+          title: "No workspace yet",
+          description: "Ask someone to invite you, then try again.",
           icon: :lock
         ) %>
       <% end %>
 
-      <% if @selected_access_recording.present? && @role_options.any? %>
+      <% if show_permission_choice? %>
         <%= render FlatPack::Select::Component.new(
           name: "role",
           options: @role_options,
@@ -61,29 +55,32 @@
           label: "Permission",
           placeholder: nil,
           searchable: true,
-          required: true,
-          help_text: "Cannot be higher than your own access on that workspace."
+          required: true
         ) %>
+      <% elsif @selected_access_recording.present? %>
+        <%= hidden_field_tag :role, default_consent_role %>
       <% end %>
 
-      <div>
+      <div class="space-y-3">
         <% if @selected_access_recording.present? %>
           <%= render FlatPack::Button::Component.new(
-            text: "Approve",
+            text: "Continue",
             style: :primary,
             size: :md,
             type: "submit",
             name: "decision",
-            value: "approve"
+            value: "continue",
+            class: "w-full"
           ) %>
         <% end %>
         <%= render FlatPack::Button::Component.new(
-          text: "Deny",
+          text: "Cancel",
           style: :secondary,
           size: :md,
           type: "submit",
           name: "decision",
-          value: "deny"
+          value: "cancel",
+          class: "w-full"
         ) %>
       </div>
     <% end %>
