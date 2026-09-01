@@ -8,7 +8,8 @@ authorization-code tokens for third-party apps. This note records the remaining 
 - Machine clients still use `ApiClient` / `ApiCredential` under a Recording Studio Access, and
   `POST /recording_studio_api/oauth/token` with `grant_type=client_credentials`.
 - Delegated apps use `OauthClient` (not a recordable) plus one `OauthAuthorization` per connect.
-  Each approval creates its own Accessible Access. The token does not act as the user.
+- Each approval creates its own Accessible Access, capped by the manager Access recording
+  (`depends_on`). The token does not act as the user.
 - Consent uses host authentication. Dummy Devise covers sign-in in this repository; Google login
   stays in Users.
 - Bearer authentication still resolves either an issued API access token or a token from

@@ -34,7 +34,8 @@ module RecordingStudioApi
             recording: access_point_recording,
             actor: authorization,
             role: role,
-            manager_actor: manager_actor
+            manager_actor: manager_actor,
+            depends_on: access_recording
           )
           raise RecordingStudioApi::Error, grant_result.error if grant_result.failure?
 

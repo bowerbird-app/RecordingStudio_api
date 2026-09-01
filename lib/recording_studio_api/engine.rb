@@ -145,12 +145,6 @@ module RecordingStudioApi
       RecordingStudioApi::Hooks.run(:after_initialize, self)
     end
 
-    initializer "recording_studio_api.delegated_oauth_voiding", after: "recording_studio_api.after_initialize" do
-      config.to_prepare do
-        RecordingStudioApi::DelegatedOauthVoiding.install!
-      end
-    end
-
     initializer "recording_studio_api.flush_request_log_batches" do
       next unless defined?(ActiveSupport::Executor)
 

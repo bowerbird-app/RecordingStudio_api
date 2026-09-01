@@ -103,7 +103,7 @@ module RecordingStudioApi
         return oauth_failure("invalid_grant", "authorization code has expired") if code_record.expired?
         return oauth_failure("invalid_grant", "authorization code does not belong to this client") unless code_record.oauth_authorization.oauth_client_id == client.id
         return oauth_failure("invalid_grant", "redirect_uri does not match") unless code_record.redirect_uri == redirect_uri
-        return oauth_failure("invalid_grant", "authorization is no longer valid") unless code_record.oauth_authorization.manager_qualifies?
+        return oauth_failure("invalid_grant", "authorization is no longer valid") unless code_record.oauth_authorization.active?
 
         pkce_result = validate_pkce!(client, code_record)
         return pkce_result if pkce_result != true
@@ -131,10 +131,7 @@ module RecordingStudioApi
         return oauth_failure("invalid_grant", "refresh token has expired") if stored.expired?
 
         authorization = stored.oauth_authorization
-        unless authorization.manager_qualifies?
-          VoidOauthAuthorization.call(authorization: authorization)
-          return oauth_failure("invalid_grant", "authorization is no longer valid")
-        end
+        return oauth_failure("invalid_grant", "authorization is no longer valid") unless authorization.active?
 
         stored.revoke!
         issue_delegated_tokens(authorization, replacing: stored)

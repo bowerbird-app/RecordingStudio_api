@@ -16,7 +16,7 @@ This Rails app exists to validate the RecordingStudio API integration surface an
 - Mounted `RecordingStudioAccessible` and `RecordingStudioRootSwitchable` engines
 - Companion docs pages with in-page documentation links (install, config, Scalar, auth) for the renamed RecordingStudio API install and configuration flow
 - API credential authentication that resolves a `RecordingStudioApi::AccessGrant`
-- Delegated OAuth consent (`/recording_studio_api/oauth/authorize`) and a dummy connected-apps list
+- Delegated OAuth consent (`/recording_studio_api/oauth/authorize`) and a dummy connected-apps list; Accessible 0.8 dependent grants (`depends_on_recording_id`) cap each connect by the manager Access recording
 - Capability-owned authorization examples that use the access grant with Recording Studio Accessible
 
 ## Quick Start

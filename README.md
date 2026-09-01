@@ -4,13 +4,13 @@
 
 `RecordingStudioApi` is a mountable Rails engine that provides authenticated, capability-backed JSON APIs for Recording Studio addons.
 
-For the delegated OAuth flow in `0.6.0`, the Recording Studio 4.2 pin in `0.5.0`, safer defaults in `0.4.0`, and the flat API
+For the delegated OAuth flow in `0.6.0` (Accessible `~> 0.8` dependent grants), the Recording Studio 4.2 pin in `0.5.0`, safer defaults in `0.4.0`, and the flat API
 contract from `0.3.0`, see [UPGRADING.md](UPGRADING.md).
 
 ## Current Scope
 
 - OAuth2 `client_credentials` authentication backed by `RecordingStudioApi::ApiClient`, `ApiCredential`, and issued access tokens
-- Delegated OAuth (`authorization_code` + rotating `refresh_token`) for third-party apps: each connect is its own Accessible Access, manager-capped, voided if the manager is removed or their role drops
+- Delegated OAuth (`authorization_code` + rotating `refresh_token`) for third-party apps: each connect is its own Accessible Access, capped by the manager's Access recording (`depends_on`). Accessible 0.8 fail-closes and voids dependents; this gem does not watch Recording/Access
 - `RecordingStudioApi::OauthClient` registry (not a recordable, not a child of Access) plus consent using host authentication
 - RFC 8414 / RFC 9728 discovery, PKCE S256, and named-API token binding (RFC 8707 `resource` when present)
 - external bearer-token authenticator support for host application authentication systems
@@ -533,7 +533,9 @@ grant_type=client_credentials&client_id=<client_id>&client_secret=<client_secret
 Third-party apps use the authorization-code flow on the same token endpoint. Consent is a host
 signed-in page (`GET /recording_studio_api/oauth/authorize` or the named-API equivalent). On
 approve, `RecordingStudioAccessible.grant_access` creates a new Access whose actor is the
-`OauthAuthorization`. `IssueOauthAccessToken` still takes `grant_type:`; delegated tokens also
+`OauthAuthorization`, with `depends_on:` set to the manager's Access recording (Accessible `~> 0.8`
+writes `depends_on_recording_id`). Hosts must run Accessible 0.8 migrations before this grant path
+works. `IssueOauthAccessToken` still takes `grant_type:`; delegated tokens also
 return a rotating refresh token. `AccessGrant.actor` is that authorization, not the user.
 
 Authenticate API requests with:

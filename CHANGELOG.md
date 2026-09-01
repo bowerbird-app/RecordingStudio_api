@@ -14,13 +14,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `authorization_code` and `refresh_token` grant types on the existing `/oauth/token` endpoints; `client_credentials` is unchanged
 - Consent and connected-app screens composed from `recording_studio/default_layout` + FlatPack (`UsesDefaultLayout`); host authentication (dummy Devise) owns sign-in
 - RFC 8414 authorization-server metadata and RFC 9728 protected-resource metadata; PKCE S256; optional RFC 8707 `resource`; Client ID Metadata Documents for public clients
-- Immediate voiding when the manager's Access is trashed or their role drops below the grant (Accessible/trash hooks plus per-request checks)
+- Consent `grant_access` passes `depends_on:` with the manager's Access recording so Accessible 0.8 owns the cap, authorize-time fail-closed, and dependent voiding
 
 ### Changed
 - Access tokens may belong to either a machine `ApiCredential` or an `OauthAuthorization` (exactly one)
 - Delegated `AccessGrant.actor` is the authorization, not the user; handlers keep using `access_grant.authorize!`
+- **Breaking dependency floor:** requires RecordingStudio Accessible `~> 0.8` (tested against `0.8.0`) so `depends_on_recording_id` exists. RecordingStudio stays `~> 4.2`
 
-See [UPGRADING.md](UPGRADING.md) for migrations, `access_actor_types`, and token-endpoint changes.
+### Removed
+- API-side Recording/Access after_commit monkey-patches that voided OAuth grants. Accessible `VoidDependentAccesses` / `authorized?` own that ACL. User Deny and connected-apps revoke still use `VoidOauthAuthorization`
+
+See [UPGRADING.md](UPGRADING.md) for Accessible 0.8, `depends_on_recording_id`, `access_actor_types`, and token-endpoint changes.
 
 ## [0.5.0] - 2026-08-31
 

@@ -42,7 +42,7 @@ module RecordingStudioApi
     end
 
     def active?
-      !revoked? && granted_access_recording_active?
+      !revoked? && granted_access_recording_active? && accessible_authorized?
     end
 
     def granted_access_recording_active?
@@ -54,31 +54,15 @@ module RecordingStudioApi
         manager_access_recording&.parent_recording || manager_access_recording&.root_recording
     end
 
-    def manager_role_rank
-      role_rank(RecordingStudioAccessible.role_for(actor: manager_actor, recording: workspace_recording))
-    end
+    def accessible_authorized?
+      workspace = workspace_recording
+      return false if workspace.blank? || workspace.trashed_at.present?
 
-    def granted_role_rank
-      role_rank(role)
-    end
-
-    def manager_qualifies?
-      return false if revoked?
-      return false if manager_actor.blank?
-      return false unless granted_access_recording_active?
-      return false if workspace_recording.blank? || workspace_recording.trashed_at.present?
-
-      manager_rank = manager_role_rank
-      granted_rank = granted_role_rank
-      manager_rank.present? && granted_rank.present? && manager_rank >= granted_rank
-    end
-
-    private
-
-    def role_rank(role_name)
-      return if role_name.blank?
-
-      RecordingStudioApi::Configuration::ACCESS_ROLE_RANKS[role_name.to_s.to_sym]
+      RecordingStudioAccessible.authorized?(
+        actor: self,
+        recording: workspace,
+        role: role
+      )
     end
   end
 end

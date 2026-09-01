@@ -10,7 +10,6 @@ class DelegatedOauthTest < ActionDispatch::IntegrationTest
   setup do
     reset_recording_studio_api_configuration!
     reset_recording_studio_capabilities!
-    RecordingStudioApi::DelegatedOauthVoiding.install!
     @user = create_user
     @root_recording, @access_recording = create_access_recording_for(user: @user)
     @pkce = pkce_pair
@@ -211,6 +210,25 @@ class DelegatedOauthTest < ActionDispatch::IntegrationTest
     assert result.success?, result.error
   end
 
+  test "public client token exchange requires a PKCE verifier" do
+    approved = approve_delegated_oauth(
+      oauth_client: @oauth_client,
+      user: @user,
+      access_recording: @access_recording,
+      pkce: @pkce
+    )
+
+    result = RecordingStudioApi::Services::IssueOauthAccessToken.call(
+      grant_type: "authorization_code",
+      client_id: @oauth_client.client_id,
+      code: approved.fetch(:code),
+      redirect_uri: "http://127.0.0.1/callback"
+    )
+
+    assert result.failure?
+    assert_equal "invalid_request", result.error.fetch(:error)
+  end
+
   test "wrong PKCE verifier fails" do
     approved = approve_delegated_oauth(
       oauth_client: @oauth_client,
@@ -272,6 +290,10 @@ class DelegatedOauthTest < ActionDispatch::IntegrationTest
     assert_instance_of RecordingStudioApi::OauthAuthorization, grant_result.value.actor
     assert_equal approved.fetch(:authorization).id, grant_result.value.actor.id
     refute_equal @user, grant_result.value.actor
+
+    granted_access = approved.fetch(:access_recording).recordable
+    assert_equal @access_recording.id, granted_access.depends_on_recording_id
+    assert RecordingStudio::Access.column_names.include?("depends_on_recording_id")
   end
 
   test "insufficient accessible role returns 403" do
@@ -299,34 +321,58 @@ class DelegatedOauthTest < ActionDispatch::IntegrationTest
     assert_response :forbidden
   end
 
-  test "manager removal voids the token and trashes oauth access" do
+  test "manager removal fails the token without an API Recording or Access callback" do
+    refute RecordingStudio::Recording.method_defined?(:recording_studio_api_sync_delegated_oauth)
+    refute RecordingStudio::Access.method_defined?(:recording_studio_api_sync_delegated_oauth)
+
     token, authorization = delegated_access_token(role: "edit")
+    granted_access_recording = authorization.access_recording
 
-    @access_recording.update!(trashed_at: Time.current)
+    RecordingStudioAccessible::VoidDependentAccessesJob.stub(:perform_later, nil) do
+      @access_recording.update!(trashed_at: Time.current)
 
-    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}",
-        headers: { "Authorization" => "Bearer #{token}" }
-
-    assert_response :forbidden
-    assert_not_nil authorization.reload.revoked_at
-    assert_not_nil authorization.access_recording.reload.trashed_at
-  end
-
-  test "manager role drop below the grant voids the token and trashes oauth access" do
-    token, authorization = delegated_access_token(role: "admin")
-
-    RecordingStudioAccessible::AccessCreationContext.allow do
-      RecordingStudio.root_recording_or_self(@access_recording).revise(@access_recording, actor: @user) do |access|
-        access.role = :view
-      end
+      get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}",
+          headers: { "Authorization" => "Bearer #{token}" }
     end
 
-    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}",
-        headers: { "Authorization" => "Bearer #{token}" }
+    assert_response :forbidden
+    assert_nil authorization.reload.revoked_at
+    assert_nil granted_access_recording.reload.trashed_at
+    refute RecordingStudioAccessible.authorized?(
+      actor: authorization,
+      recording: @root_recording,
+      role: authorization.role
+    )
+    refute authorization.active?
+  end
+
+  test "manager role drop below the grant fails the token without an API Recording or Access callback" do
+    refute RecordingStudio::Recording.method_defined?(:recording_studio_api_sync_delegated_oauth)
+    refute RecordingStudio::Access.method_defined?(:recording_studio_api_sync_delegated_oauth)
+
+    token, authorization = delegated_access_token(role: "admin")
+    granted_access_recording = authorization.access_recording
+
+    RecordingStudioAccessible::VoidDependentAccessesJob.stub(:perform_later, nil) do
+      RecordingStudioAccessible::AccessCreationContext.allow do
+        RecordingStudio.root_recording_or_self(@access_recording).revise(@access_recording, actor: @user) do |access|
+          access.role = :view
+        end
+      end
+
+      get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}",
+          headers: { "Authorization" => "Bearer #{token}" }
+    end
 
     assert_response :forbidden
-    assert_not_nil authorization.reload.revoked_at
-    assert_not_nil authorization.access_recording.reload.trashed_at
+    assert_nil authorization.reload.revoked_at
+    assert_nil granted_access_recording.reload.trashed_at
+    refute RecordingStudioAccessible.authorized?(
+      actor: authorization,
+      recording: @root_recording,
+      role: authorization.role
+    )
+    refute authorization.active?
   end
 
   test "refresh token rotation issues a new token and rejects the old refresh token" do

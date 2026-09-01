@@ -52,13 +52,12 @@ module RecordingStudioApi
         return failure(AuthenticationError.new(invalid_token_error_message)) unless authorization.oauth_client&.api_key == api_key
 
         return failure(AuthenticationError.new(inactive_token_error_message)) if token_record.expires_at.blank? || !token_record.expires_at.future?
+        return failure(AuthenticationError.new(inactive_token_error_message)) unless token_record.revoked_at.nil?
+        return failure(AuthenticationError.new(inactive_token_error_message)) if authorization.revoked?
 
-        unless authorization.manager_qualifies?
-          VoidOauthAuthorization.call(authorization: authorization)
+        unless authorization.active?
           return failure(AuthorizationError.new("Delegated API access is no longer valid"))
         end
-
-        return failure(AuthenticationError.new(inactive_token_error_message)) unless token_record.revoked_at.nil?
 
         access_recording = authorization.access_recording
         root_recording = resolve_root_recording(access_recording)

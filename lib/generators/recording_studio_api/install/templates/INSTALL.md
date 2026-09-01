@@ -39,7 +39,8 @@ Next steps:
    ```
 
    For third-party apps, register a `RecordingStudioApi::OauthClient` (not an `ApiClient`) and send
-   users to `GET /recording_studio_api/oauth/authorize` (or the named-API authorize URL). Include
+   users to `GET /recording_studio_api/oauth/authorize` (or the named-API authorize URL). Pin
+   Accessible `~> 0.8`, run Accessible migrations so `depends_on_recording_id` exists, and include
    `RecordingStudioApi::OauthAuthorization` in Accessible `access_actor_types`. The same token
    endpoint also accepts `authorization_code` and `refresh_token`. Discovery documents are served
    from `/.well-known/oauth-authorization-server` and `/.well-known/oauth-protected-resource`.
