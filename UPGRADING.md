@@ -1,5 +1,32 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.5.2
+
+`0.5.2` keeps this gem the resource server. It adds a grant hook so `recording_studio_oauth`
+can plug `authorization_code` and `refresh_token` into the existing token endpoints.
+Update the host dependency to `recording_studio_api`, `~> 0.5.2`.
+
+1. Companion pins are unchanged from `0.5.1`. Recording Studio `~> 4.2` / `v4.2.0`,
+   Accessible `~> 0.9` / `v0.9.0`, Admin `2.0.1`, Moveable `3.0.0`, Root Switchable
+   `v0.5.0`, and FlatPack `v0.1.143`.
+2. `POST /recording_studio_api/oauth/token` and
+   `POST /recording_studio_api/apis/<api-name>/oauth/token` still issue
+   `client_credentials` when the Oauth gem is absent. No host change is required for
+   machine clients.
+3. If another gem registers a grant, call
+   `RecordingStudioApi.register_oauth_grant(grant_type, handler:)` at boot. List
+   registered grants with `RecordingStudioApi.oauth_grants`. You cannot replace
+   `client_credentials` through this hook.
+4. Unknown `grant_type` values now return `invalid_grant` instead of
+   `unsupported_grant_type`. Update clients that matched the old error code.
+5. No new migrations. No OauthClient tables, consent views, or Connect screens in
+   this gem.
+
+If you are still on Accessible 0.7 or Recording Studio 4.1, complete
+[Upgrading to 0.5.1](#upgrading-to-051) first.
+
+---
+
 ## Upgrading to 0.5.1
 
 `0.5.1` keeps Recording Studio `~> 4.2` and raises Accessible to `~> 0.9`. Update the host

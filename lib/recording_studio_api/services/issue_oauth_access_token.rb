@@ -6,20 +6,42 @@ module RecordingStudioApi
       SUPPORTED_GRANT_TYPE = "client_credentials"
       DUMMY_CLIENT_SECRET = "recording-studio-api.oauth.dummy-client-secret"
 
-      def initialize(grant_type:, client_id:, client_secret:, api: :public)
+      def initialize(grant_type:, client_id:, client_secret:, api: :public, params: {})
         @grant_type = grant_type
         @client_id = client_id
         @client_secret = client_secret
+        @params = params.presence || {}
         @api_key = RecordingStudioApi.configuration.fetch_api(api).name
       end
 
       private
 
-      attr_reader :grant_type, :client_id, :client_secret, :api_key
+      attr_reader :grant_type, :client_id, :client_secret, :params, :api_key
 
       def perform
         return oauth_failure("invalid_request", "grant_type is required") if grant_type.blank?
-        return oauth_failure("unsupported_grant_type", "grant_type must be client_credentials") unless grant_type == SUPPORTED_GRANT_TYPE
+        return issue_client_credentials if grant_type == SUPPORTED_GRANT_TYPE
+
+        issue_registered_grant
+      end
+
+      def issue_registered_grant
+        handler = RecordingStudioApi.oauth_grants[grant_type.to_s]
+        return oauth_failure("invalid_grant", "grant_type is invalid") if handler.nil?
+
+        result = handler.call(
+          grant_type: grant_type,
+          params: params,
+          client_id: client_id,
+          client_secret: client_secret,
+          api: api_key
+        )
+        return result if result.respond_to?(:success?)
+
+        oauth_failure("invalid_grant", "grant_type is invalid")
+      end
+
+      def issue_client_credentials
         return oauth_failure("invalid_request", "client_id is required") if client_id.blank?
         return oauth_failure("invalid_request", "client_secret is required") if client_secret.blank?
 

@@ -41,6 +41,7 @@ class ConfigurationTest < Minitest::Test
     assert_equal 30.days, configuration.credential_ttl
     assert_equal 1.hour, configuration.access_token_ttl
     assert_equal [], configuration.token_authenticators
+    assert_equal({}, configuration.oauth_grants)
     assert_equal :view, configuration.access_management_view_role
     assert_equal :admin, configuration.access_management_edit_role
     assert_equal({}, configuration.capability_action_roles)
@@ -193,6 +194,36 @@ class ConfigurationTest < Minitest::Test
     end
 
     assert_includes error.message, "callable"
+  end
+
+  def test_register_oauth_grant_adds_handler_to_configuration
+    handler = ->(**) { :ok }
+
+    RecordingStudioApi.register_oauth_grant("authorization_code", handler: handler)
+
+    assert_equal handler, RecordingStudioApi.oauth_grants.fetch("authorization_code")
+  ensure
+    RecordingStudioApi.instance_variable_set(:@configuration, RecordingStudioApi::Configuration.new)
+  end
+
+  def test_register_oauth_grant_requires_callable
+    error = assert_raises(ArgumentError) do
+      RecordingStudioApi.register_oauth_grant("authorization_code", handler: nil)
+    end
+
+    assert_includes error.message, "callable"
+  ensure
+    RecordingStudioApi.instance_variable_set(:@configuration, RecordingStudioApi::Configuration.new)
+  end
+
+  def test_register_oauth_grant_rejects_built_in_client_credentials
+    error = assert_raises(ArgumentError) do
+      RecordingStudioApi.register_oauth_grant("client_credentials", handler: ->(**) { :ok })
+    end
+
+    assert_includes error.message, "client_credentials"
+  ensure
+    RecordingStudioApi.instance_variable_set(:@configuration, RecordingStudioApi::Configuration.new)
   end
 
   def test_merge_updates_rate_limit_and_logging_settings

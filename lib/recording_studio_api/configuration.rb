@@ -20,6 +20,7 @@ module RecordingStudioApi
                   :credential_ttl,
                   :access_token_ttl,
                   :token_authenticators,
+                  :oauth_grants,
                   :access_management_view_role,
                   :access_management_edit_role,
                   :api_management_authorization_required,
@@ -74,6 +75,7 @@ module RecordingStudioApi
       @credential_ttl = 30.respond_to?(:days) ? 30.days : 30 * 24 * 60 * 60
       @access_token_ttl = 1.respond_to?(:hour) ? 1.hour : 60 * 60
       @token_authenticators = []
+      @oauth_grants = {}
       @access_management_view_role = :view
       @access_management_edit_role = :admin
       @api_management_authorization_required = true
@@ -156,6 +158,7 @@ module RecordingStudioApi
         token_digest_pepper_present: token_digest_pepper.present?,
         token_digest_legacy_verify: token_digest_legacy_verify,
         token_authenticators_count: token_authenticators.count,
+        oauth_grant_types: oauth_grants.keys,
         capability_action_roles: capability_action_roles,
         capability_action_role_resolver: capability_action_role_resolver.respond_to?(:call),
         admin_dashboard_path_resolver: admin_dashboard_path_resolver.respond_to?(:call),

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-09-02
+
+### Added
+- `RecordingStudioApi.register_oauth_grant(grant_type, handler:)` and `RecordingStudioApi.oauth_grants` so another gem can plug `authorization_code` and `refresh_token` into the existing public and named-API token endpoints
+
+### Changed
+- Unknown `grant_type` values on token issuance now return `invalid_grant` instead of `unsupported_grant_type`
+
+See [UPGRADING.md](UPGRADING.md) for the grant hook and the `invalid_grant` error code.
+
 ## [0.5.1] - 2026-09-02
 
 ### Changed
@@ -98,7 +108,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.3.0...v0.4.0

@@ -4,12 +4,13 @@
 
 `RecordingStudioApi` is a mountable Rails engine that provides authenticated, capability-backed JSON APIs for Recording Studio addons.
 
-For the Accessible 0.9 pin in `0.5.1`, the Recording Studio 4.2 pin in `0.5.0`, safer
+For the grant hook in `0.5.2`, the Accessible 0.9 pin in `0.5.1`, the Recording Studio 4.2 pin in `0.5.0`, safer
 defaults in `0.4.0`, and the flat API contract from `0.3.0`, see [UPGRADING.md](UPGRADING.md).
 
 ## Current Scope
 
 - OAuth2 `client_credentials` authentication backed by `RecordingStudioApi::ApiClient`, `ApiCredential`, and issued access tokens
+- pluggable OAuth grant handlers so `recording_studio_oauth` can add `authorization_code` and `refresh_token` on the same token endpoints
 - external bearer-token authenticator support for host application authentication systems
 - API client recordables stored beneath `RecordingStudio::Access` recordings in the Recording Studio tree
 - authenticated API requests resolved into a `RecordingStudioApi::AccessGrant` that is passed to capability handlers
@@ -615,6 +616,21 @@ Token-record contract (if provided):
 
 Both credential and token record must have active, non-trashed RecordingStudio recordables so scope resolution can derive the root recording.
 
+### OAuth resource server
+
+This gem is the resource server. It issues machine tokens with `client_credentials` and turns Bearer tokens into an `AccessGrant`.
+
+`authorization_code` and `refresh_token` live in `recording_studio_oauth` when that gem is installed. That gem registers those grant types on the same token endpoints:
+
+```ruby
+RecordingStudioApi.register_oauth_grant("authorization_code", handler: authorization_code_handler)
+RecordingStudioApi.register_oauth_grant("refresh_token", handler: refresh_token_handler)
+```
+
+`RecordingStudioApi.oauth_grants` lists the registered grant types. A handler must respond to `call` with `grant_type:`, `params:`, `client_id:`, `client_secret:`, and `api:`. It returns a service Result. Success values are the token payload this endpoint already renders. Failure errors are OAuth error hashes.
+
+Unknown grant types return `invalid_grant`. Machine `client_credentials` still works when the Oauth gem is absent. You cannot replace `client_credentials` through this hook.
+
 ### Capability-backed actions
 
 Addon gems register actions once:
@@ -651,8 +667,8 @@ end
 - `GET /api/screens/api_keys` — RecordingStudioAdmin API key screen when the host mounts the API surface
 - `GET /api/screens/api_requests` — RecordingStudioAdmin API request screen when the host mounts the API surface
 - `GET /recording_studio_api/admin_api/logs` — browser admin request-log route
-- `POST /recording_studio_api/oauth/token` — issue OAuth2 bearer access tokens using `client_credentials`
-- `POST /recording_studio_api/apis/<api-name>/oauth/token` — issue OAuth2 bearer access tokens for a named API using `client_credentials`
+- `POST /recording_studio_api/oauth/token` — issue OAuth2 bearer access tokens using `client_credentials`, or a grant type registered with `register_oauth_grant`
+- `POST /recording_studio_api/apis/<api-name>/oauth/token` — issue OAuth2 bearer access tokens for a named API using `client_credentials`, or a registered grant type
 - `GET /recording_studio_api/api/<version>` — list available API resources for the selected public API version
 - `GET /recording_studio_api/api/<version>/:resource` — list recordings of a resource type inside the authenticated root
 - `GET /recording_studio_api/api/<version>/:resource/:id` — show one recording
