@@ -1,5 +1,28 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.5.1
+
+`0.5.1` keeps Recording Studio `~> 4.2` and raises Accessible to `~> 0.9`. Update the host
+dependency to `recording_studio_api`, `~> 0.5.1`, then apply the steps below.
+
+1. Upgrade Accessible to `0.9.0` or newer (`~> 0.9`) before installing this gem. Matching
+   dummy/dev tags are RecordingStudio `v4.2.0`, Accessible `v0.9.0`, Admin `2.0.1`,
+   Moveable `3.0.0`, Root Switchable `v0.5.0`, and FlatPack `v0.1.143`.
+2. If the host is still on Accessible 0.7, run
+   `bin/rails generate recording_studio_accessible:migrations` and `bin/rails db:migrate`
+   so `recording_studio_accesses.depends_on_recording_id` exists (added in Accessible 0.8).
+   This gem has no new migrations of its own.
+3. Independent grants are unchanged. Dependent grants (`depends_on:`) now void when the
+   manager Access recording is moved; they stay at the old node and do not follow the move.
+   Role-weaken via revise, trash, and destroy already voided dependents in Accessible 0.8.
+4. `authorized?` still fail-closes off-root/weaker. No API surface, OAuth, or UI changes
+   in this gem.
+
+If you are still on Recording Studio 4.1 or Accessible 0.6, complete
+[Upgrading to 0.5.0](#upgrading-to-050) first.
+
+---
+
 ## Upgrading to 0.5.0
 
 `0.5.0` pins this engine onto Recording Studio 4.2 and Accessible 0.7. Update the host
