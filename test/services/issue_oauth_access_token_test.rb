@@ -74,7 +74,7 @@ class IssueOauthAccessTokenTest < ActiveSupport::TestCase
     end
   end
 
-  test "rejects unsupported grant types" do
+  test "rejects unknown grant types" do
     result = RecordingStudioApi::Services::IssueOauthAccessToken.call(
       grant_type: "password",
       client_id: @payload.fetch(:credential).oauth_client_id,
@@ -82,7 +82,52 @@ class IssueOauthAccessTokenTest < ActiveSupport::TestCase
     )
 
     assert result.failure?
-    assert_equal "unsupported_grant_type", result.error.fetch(:error)
+    assert_equal "invalid_grant", result.error.fetch(:error)
+  end
+
+  test "rejects authorization_code when no grant handler is registered" do
+    result = RecordingStudioApi::Services::IssueOauthAccessToken.call(
+      grant_type: "authorization_code",
+      client_id: "any-client",
+      client_secret: "any-secret",
+      params: { "code" => "abc" }
+    )
+
+    assert result.failure?
+    assert_equal "invalid_grant", result.error.fetch(:error)
+  end
+
+  test "exchanges a registered grant type through the token service" do
+    captured = nil
+    RecordingStudioApi.register_oauth_grant(
+      "authorization_code",
+      handler: lambda do |**kwargs|
+        captured = kwargs
+        RecordingStudioApi::Services::BaseService::Result.new(
+          success: true,
+          value: {
+            access_token: "rsapi_at_double",
+            token_type: "Bearer",
+            expires_in: 3600
+          }
+        )
+      end
+    )
+
+    result = RecordingStudioApi::Services::IssueOauthAccessToken.call(
+      grant_type: "authorization_code",
+      client_id: "oauth-client",
+      client_secret: "oauth-secret",
+      api: :public,
+      params: { "code" => "abc", "grant_type" => "authorization_code" }
+    )
+
+    assert result.success?, result.error
+    assert_equal "rsapi_at_double", result.value.fetch(:access_token)
+    assert_equal "authorization_code", captured.fetch(:grant_type)
+    assert_equal "abc", captured.fetch(:params).fetch("code")
+    assert_equal "oauth-client", captured.fetch(:client_id)
+    assert_equal "public", captured.fetch(:api)
   end
 
   test "rejects invalid client credentials" do

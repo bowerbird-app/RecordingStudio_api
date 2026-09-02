@@ -255,7 +255,7 @@ class OauthControllerTest < ActionDispatch::IntegrationTest
     assert_equal "client authentication failed", body.fetch("error_description")
   end
 
-  test "falls back to client credentials flow for unsupported grant type" do
+  test "rejects unknown grant types as invalid_grant" do
     post "/recording_studio_api/oauth/token", params: {
       grant_type: "custom_grant",
       client_id: @payload.fetch(:credential).oauth_client_id,
@@ -265,7 +265,104 @@ class OauthControllerTest < ActionDispatch::IntegrationTest
     assert_response :bad_request
     assert_nil response.headers["WWW-Authenticate"]
     body = JSON.parse(response.body)
-    assert_equal "unsupported_grant_type", body.fetch("error")
+    assert_equal "invalid_grant", body.fetch("error")
+  end
+
+  test "rejects authorization_code when no grant handler is registered" do
+    post "/recording_studio_api/oauth/token", params: {
+      grant_type: "authorization_code",
+      code: "abc",
+      client_id: @payload.fetch(:credential).oauth_client_id,
+      client_secret: @payload.fetch(:token)
+    }
+
+    assert_response :bad_request
+    body = JSON.parse(response.body)
+    assert_equal "invalid_grant", body.fetch("error")
+  end
+
+  test "exchanges a registered grant type on the public token endpoint" do
+    RecordingStudioApi.register_oauth_grant(
+      "authorization_code",
+      handler: lambda do |**kwargs|
+        RecordingStudioApi::Services::BaseService::Result.new(
+          success: true,
+          value: {
+            access_token: "rsapi_at_double",
+            token_type: "Bearer",
+            expires_in: 3600,
+            grant_api: kwargs.fetch(:api),
+            code: kwargs.fetch(:params)["code"]
+          }
+        )
+      end
+    )
+
+    post "/recording_studio_api/oauth/token", params: {
+      grant_type: "authorization_code",
+      code: "abc",
+      client_id: "oauth-client",
+      client_secret: "oauth-secret"
+    }
+
+    assert_response :success
+    body = JSON.parse(response.body)
+    assert_equal "rsapi_at_double", body.fetch("access_token")
+    assert_equal "Bearer", body.fetch("token_type")
+    assert_equal "public", body.fetch("grant_api")
+    assert_equal "abc", body.fetch("code")
+  end
+
+  test "exchanges a registered grant type on a named api token endpoint" do
+    RecordingStudioApi.configuration.api(:operations)
+    RecordingStudioApi.register_oauth_grant(
+      "refresh_token",
+      handler: lambda do |**kwargs|
+        RecordingStudioApi::Services::BaseService::Result.new(
+          success: true,
+          value: {
+            access_token: "rsapi_at_refresh",
+            token_type: "Bearer",
+            expires_in: 3600,
+            grant_api: kwargs.fetch(:api)
+          }
+        )
+      end
+    )
+
+    post "/recording_studio_api/apis/operations/oauth/token", params: {
+      grant_type: "refresh_token",
+      refresh_token: "rt-1"
+    }
+
+    assert_response :success
+    body = JSON.parse(response.body)
+    assert_equal "rsapi_at_refresh", body.fetch("access_token")
+    assert_equal "operations", body.fetch("grant_api")
+  end
+
+  test "still issues client_credentials after another grant is registered" do
+    RecordingStudioApi.register_oauth_grant(
+      "authorization_code",
+      handler: lambda do |**|
+        RecordingStudioApi::Services::BaseService::Result.new(
+          success: true,
+          value: { access_token: "rsapi_at_double", token_type: "Bearer", expires_in: 3600 }
+        )
+      end
+    )
+
+    post "/recording_studio_api/oauth/token", params: {
+      grant_type: "client_credentials",
+      client_id: @payload.fetch(:credential).oauth_client_id,
+      client_secret: @payload.fetch(:token)
+    }
+
+    assert_response :success
+    body = JSON.parse(response.body)
+    assert_equal "Bearer", body.fetch("token_type")
+    assert_match(/\Arsapi_at_/, body.fetch("access_token"))
+    refute_equal "rsapi_at_double", body.fetch("access_token")
   end
 
   test "accepts HTTP Basic client credentials for token issuance" do

@@ -6,6 +6,7 @@ This document is retained as an architectural note after the built-in mobile OAu
 
 - RecordingStudioApi now owns API access for machine clients only.
 - Supported token issuance in this gem is `client_credentials` through `/recording_studio_api/oauth/token`.
+- Other grant types (`authorization_code`, `refresh_token`) register through `RecordingStudioApi.register_oauth_grant` when `recording_studio_oauth` is installed.
 - Bearer token authentication in this gem resolves either:
 	- API access tokens issued from `ApiClient` and `ApiCredential`
 	- Tokens authenticated by external gems through `RecordingStudioApi.register_token_authenticator`
@@ -17,6 +18,7 @@ This document is retained as an architectural note after the built-in mobile OAu
 - RecordingStudioApi should remain the shared API/resource authorization core.
 - External auth gems should integrate through the public surface already exposed by RecordingStudioApi:
 	- token authenticators
+	- OAuth grant handlers (`register_oauth_grant`)
 	- authorization-header authentication helpers
 	- access-grant construction
 	- actor access-recording resolution

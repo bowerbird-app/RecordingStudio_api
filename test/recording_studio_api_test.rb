@@ -285,4 +285,15 @@ class RecordingStudioApiTest < Minitest::Test
   def test_dummy_views_no_longer_include_legacy_makeup_artist_namespace
     assert_not Dir.exist?(File.expand_path("dummy/app/views/makeup_artist", __dir__))
   end
+
+  def test_fetch_skills_script_is_tracked_and_fetched_dirs_are_gitignored
+    root = File.expand_path("..", __dir__)
+    script = File.join(root, ".cursor/fetch-skills.sh")
+    gitignore = File.read(File.join(root, ".gitignore"))
+
+    assert File.file?(script)
+    assert_includes gitignore, ".cursor/skills/"
+    assert_includes gitignore, ".cursor/rules/"
+    refute_includes File.read(script), "git clone"
+  end
 end

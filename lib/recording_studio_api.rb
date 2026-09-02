@@ -87,6 +87,20 @@ module RecordingStudioApi
       configuration.token_authenticators
     end
 
+    def register_oauth_grant(grant_type, handler:)
+      key = grant_type.to_s
+      raise ArgumentError, "grant_type is required" if key.blank?
+      raise ArgumentError, "client_credentials is built in" if key == "client_credentials"
+      raise ArgumentError, "A callable handler is required" unless handler.respond_to?(:call)
+
+      configuration.oauth_grants[key] = handler
+      handler
+    end
+
+    def oauth_grants
+      configuration.oauth_grants.dup.freeze
+    end
+
     def authenticate_authorization_header(authorization_header:, api: :public)
       Integration.authenticate_authorization_header(authorization_header: authorization_header, api: api)
     end
