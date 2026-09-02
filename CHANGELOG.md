@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-09-02
+
+### Changed
+- Pins Recording Studio Accessible to `~> 0.9` (tested against `0.9.0`). Recording Studio stays `~> 4.2`
+- Dummy and development Gemfiles pin Accessible `v0.9.0`. Companion pins are unchanged: RecordingStudio `v4.2.0`, Admin `2.0.1`, Moveable `3.0.0`, Root Switchable `v0.5.0`, and FlatPack `v0.1.143`
+- Dummy includes Accessible's `depends_on_recording_id` migration (from Accessible 0.8) so the host schema matches 0.9
+
+See [UPGRADING.md](UPGRADING.md) for the Accessible 0.9 host pin.
+
 ## [0.5.0] - 2026-08-31
 
 ### Changed
@@ -89,7 +98,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.2.0...v0.3.0
