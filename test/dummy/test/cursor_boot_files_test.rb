@@ -16,7 +16,7 @@ class CursorBootFilesTest < Minitest::Test
     assert File.executable?(File.join(root, ".cursor/fetch-skills.sh"))
 
     commands = env.fetch("terminals").map { |terminal| terminal.fetch("command") }
-    assert commands.any? { |command| command.include?("test/dummy") && command.include?("rails server") }
-    assert commands.any? { |command| command.include?("test/dummy") && command.include?("tailwindcss:watch") }
+    assert(commands.any? { |command| command.include?("test/dummy") && command.include?("rails server") })
+    assert(commands.any? { |command| command.include?("test/dummy") && command.include?("tailwindcss:watch") })
   end
 end
