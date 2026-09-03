@@ -24,8 +24,8 @@ tmp/
 *~
 
 # Cursor Cloud Agent skills and plugin rules fetched at Build time by
-# .cursor/fetch-skills.sh. Keep fetch-skills.sh and environment.json tracked;
-# never vendor SKILL.md or *.mdc.
+# .cursor/fetch-skills.sh. Keep fetch-skills.sh, install.sh, start.sh, and
+# environment.json tracked; never vendor SKILL.md or *.mdc.
 .cursor/skills/
 .cursor/rules/
 
