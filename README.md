@@ -4,7 +4,7 @@
 
 `RecordingStudioApi` is a mountable Rails engine that provides authenticated, capability-backed JSON APIs for Recording Studio addons.
 
-For the grant hook in `0.5.2`, the Accessible 0.9 pin in `0.5.1`, the Recording Studio 4.2 pin in `0.5.0`, safer
+For Cloud Agent boot in `0.5.3`, the grant hook in `0.5.2`, the Accessible 0.9 pin in `0.5.1`, the Recording Studio 4.2 pin in `0.5.0`, safer
 defaults in `0.4.0`, and the flat API contract from `0.3.0`, see [UPGRADING.md](UPGRADING.md).
 
 ## Current Scope
@@ -711,6 +711,15 @@ Sign in with:
 
 - Email: `admin@admin.com`
 - Password: `Password`
+
+## Cloud Agent boot
+
+Cloud Agent Builds run `.cursor/install.sh`, then `.cursor/fetch-skills.sh`.
+The install hook provisions a cold image. On a warm snapshot it skips apt,
+ruby-build, db:prepare, and tailwind when Ruby, bundle, and Postgres are
+already usable. Fetch-skills always runs last. `.cursor/start.sh` starts
+PostgreSQL on each boot. Rebuild with Draft off to load a new pack. See
+[Cursor skills in Cloud Agents](docs/cursor-skills.md).
 
 ## Tech Stack
 

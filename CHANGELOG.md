@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-09-03
+
+Cloud Agent Builds for this gem now match Billing 0.9.13. Boot files are
+tracked. A warm snapshot skips provision and still fetches skills. Product
+is unchanged.
+
+### Added
+- `.cursor/install.sh`, `.cursor/start.sh`, and `.cursor/environment.json` so
+  Cloud Agent Builds run `.cursor/fetch-skills.sh`. Install skips apt,
+  ruby-build, db:prepare, and tailwind when Ruby, bundle, and Postgres are
+  already usable. A skippable provision failure does not fail the Build.
+  Fetch-skills always runs last, not `|| true`. Start only brings PostgreSQL
+  up.
+
+### Upgrade notes
+- No host or schema changes. Rebuild the Cloud Agent environment with Draft
+  off so Build loads the pack.
+
 ## [0.5.2] - 2026-09-02
 
 ### Added
@@ -108,7 +126,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.3...HEAD
+[0.5.3]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.4.0...v0.5.0

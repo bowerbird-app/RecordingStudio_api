@@ -1,5 +1,25 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.5.3
+
+`0.5.3` adds Cloud Agent boot files so Builds fetch Cursor skills and plugin
+rules. Product, OAuth Connect, token URLs, and the API surface are unchanged.
+Update the host dependency to `recording_studio_api`, `~> 0.5.3`.
+
+1. Companion pins are unchanged from `0.5.2`. Recording Studio `~> 4.2` /
+   `v4.2.0`, Accessible `~> 0.9` / `v0.9.0`, Admin `2.0.1`, Moveable `3.0.0`,
+   Root Switchable `v0.5.0`, and FlatPack `v0.1.143`.
+2. No new migrations. No Connect screens, token-endpoint, or grant-hook
+   changes in this gem.
+3. Rebuild the Cloud Agent environment with Draft off so Build runs
+   `.cursor/install.sh` and loads the skill pack. See
+   [docs/cursor-skills.md](docs/cursor-skills.md).
+
+If you are still on Accessible 0.7 or Recording Studio 4.1, complete
+[Upgrading to 0.5.2](#upgrading-to-052) first.
+
+---
+
 ## Upgrading to 0.5.2
 
 `0.5.2` keeps this gem the resource server. It adds a grant hook so `recording_studio_oauth`

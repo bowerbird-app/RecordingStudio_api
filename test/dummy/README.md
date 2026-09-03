@@ -34,6 +34,10 @@ Then open the app and sign in with:
 - Email: `admin@admin.com`
 - Password: `Password`
 
+Cloud Agent Builds start those same dummy terminals from
+`.cursor/environment.json` after `.cursor/install.sh` fetches skills. See
+[Cursor skills in Cloud Agents](../../docs/cursor-skills.md).
+
 ## Useful Routes
 
 - `/` - dummy app home page and RecordingStudio API design guidance
