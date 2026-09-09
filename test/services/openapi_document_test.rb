@@ -593,6 +593,25 @@ module RecordingStudioApi
         end
       end
 
+      def test_registered_endpoints_are_tagged_separately_from_recordable_resources
+        document = with_isolated_configuration do
+          RecordingStudioApi.register_endpoint(
+            :ping,
+            http_verb: :get,
+            path: "ping",
+            handler: ->(_context) { { ok: true } }
+          )
+          OpenapiDocument.call
+        end
+
+        ping = document.fetch(:paths).fetch("/recording_studio_api/api/v1/ping").fetch("get")
+        assert_equal ["Endpoints"], ping.fetch(:tags)
+        assert_includes document.fetch(:tags), {
+          name: "Endpoints",
+          description: "Named routes that are not a tree collection."
+        }
+      end
+
       private
 
       def with_isolated_configuration

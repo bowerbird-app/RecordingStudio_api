@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-09-09
+
+Hosts can register JSON endpoints that are not a tree collection. Tree CRUD
+and capability actions are unchanged.
+
+### Added
+- `RecordingStudioApi.register_endpoint` for named routes that sit beside
+  `/pages` and other recordable collections. Bearer auth and named APIs still
+  apply. OpenAPI lists these under the `Endpoints` tag.
+
+### Upgrade notes
+- Call `RecordingStudioApi.register_endpoint` from an initializer when a host
+  needs a path that is not a recordable. Do not add a fake recordable or a
+  one-off API controller.
+- Dummy registers `GET /recording_studio_api/api/v1/ping` as a proof hook.
+  Hosts should register their own endpoints.
+
+See [UPGRADING.md](UPGRADING.md).
+
 ## [0.5.3] - 2026-09-03
 
 Cloud Agent Builds for this gem now match Billing 0.9.13. Boot files are
@@ -126,7 +145,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.3...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.4...HEAD
+[0.5.4]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.0...v0.5.1

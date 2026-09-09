@@ -70,7 +70,7 @@ module RecordingStudioApi
         catalog = documentation_catalog
         resource_endpoints = catalog.fetch(:resources).flat_map { |section| section.fetch(:endpoints) }
 
-        catalog.fetch(:auth_endpoints) + catalog.fetch(:root_endpoints) + resource_endpoints
+        catalog.fetch(:auth_endpoints) + catalog.fetch(:root_endpoints) + catalog.fetch(:endpoints, []) + resource_endpoints
       end
 
       def documentation_catalog
@@ -101,7 +101,8 @@ module RecordingStudioApi
       def shared_tag_descriptions
         {
           "Authentication" => "Authenticate your application with its client credentials to receive a bearer token for API requests.",
-          "resources" => "Discover the resource collections available through this API."
+          "resources" => "Discover the resource collections available through this API.",
+          "Endpoints" => "Named routes that are not a tree collection."
         }
       end
 
@@ -315,6 +316,7 @@ module RecordingStudioApi
 
       def tag_for(endpoint)
         return "auth" if auth_endpoint?(endpoint)
+        return RegisteredEndpoint::DEFAULT_OPENAPI_TAG if endpoint.fetch(:action).to_s == "registered_endpoints#invoke"
 
         "resources"
       end

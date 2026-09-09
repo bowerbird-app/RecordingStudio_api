@@ -18,5 +18,10 @@ class CursorBootFilesTest < Minitest::Test
     commands = env.fetch("terminals").map { |terminal| terminal.fetch("command") }
     assert(commands.any? { |command| command.include?("test/dummy") && command.include?("rails server") })
     assert(commands.any? { |command| command.include?("test/dummy") && command.include?("tailwindcss:watch") })
+
+    initializer = File.read(File.join(root, "test/dummy/config/initializers/recording_studio_api.rb"))
+    assert_includes initializer, "RecordingStudioApi.register_endpoint"
+    refute_includes initializer, "RecordingStudioApi.register_action"
+    assert_includes initializer, 'path: "ping"'
   end
 end

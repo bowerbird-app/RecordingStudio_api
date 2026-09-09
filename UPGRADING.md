@@ -1,5 +1,43 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.5.4
+
+`0.5.4` adds `RecordingStudioApi.register_endpoint` for JSON endpoints that are not
+a recordable. Tree CRUD, capability actions, and OAuth Connect are unchanged.
+Update the host dependency to `recording_studio_api`, `~> 0.5.4`.
+
+1. Companion pins are unchanged from `0.5.3`. Recording Studio `~> 4.2` /
+   `v4.2.0`, Accessible `~> 0.9` / `v0.9.0`, Admin `2.0.1`, Moveable `3.0.0`,
+   Root Switchable `v0.5.0`, and FlatPack `v0.1.143`.
+2. No new migrations. No Connect screens, token-endpoint, or grant-hook
+   changes in this gem.
+3. Register a named endpoint from an initializer when the host needs a path that
+   is not a tree collection. Use the same mount and version prefix as the rest
+   of that API. A public client still cannot call an operations-only endpoint.
+
+   ```ruby
+   RecordingStudioApi.register_endpoint(
+     :ping,
+     api: :public,
+     http_verb: :get,
+     path: "ping",
+     handler: ->(_context) { { ok: true } }
+   )
+   ```
+
+4. Handlers receive `RecordingStudioApi::RegisteredEndpointContext`. That context
+   has the client, credential, access recording, access grant, root, and
+   params. It does not have `recording`. Authorize against the client's access
+   recording inside the handler when you need Accessible. The gem does not
+   require a recording for these endpoints.
+5. OpenAPI and Scalar list these routes under the `Endpoints` tag. They are not
+   documented as a fake recordable type.
+
+If you are still on Accessible 0.7 or Recording Studio 4.1, complete
+[Upgrading to 0.5.3](#upgrading-to-053) first.
+
+---
+
 ## Upgrading to 0.5.3
 
 `0.5.3` adds Cloud Agent boot files so Builds fetch Cursor skills and plugin

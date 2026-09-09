@@ -25,6 +25,7 @@ module RecordingStudioApi
         {
           auth_endpoints: auth_endpoints,
           root_endpoints: root_endpoints,
+          endpoints: registered_endpoint_entries,
           resources: resource_sections
         }
       end
@@ -107,6 +108,57 @@ module RecordingStudioApi
             }
           }
         ]
+      end
+
+      def registered_endpoint_entries
+        registered_endpoints.map do |endpoint|
+          {
+            verb: endpoint.http_verb.to_s.upcase,
+            path: "#{api_root_path}/#{endpoint.path}",
+            action: "registered_endpoints#invoke",
+            action_name: endpoint.name,
+            summary: endpoint.openapi.fetch(:summary, endpoint.name.humanize),
+            description: endpoint.openapi.fetch(:description, endpoint.openapi.fetch(:summary, endpoint.name.humanize)),
+            capability: nil,
+            scope: nil,
+            openapi: registered_endpoint_openapi(endpoint)
+          }
+        end
+      end
+
+      def registered_endpoints
+        definition = if @api_key == "public"
+                       RecordingStudioApi.configuration
+                     else
+                       RecordingStudioApi.configuration.fetch_api(@api_key)
+                     end
+        definition.registered_endpoint_registry.all
+      rescue RecordingStudioApi::ConfigurationError
+        []
+      end
+
+      def registered_endpoint_openapi(endpoint)
+        metadata = endpoint.openapi
+        openapi = {
+          tags: endpoint.openapi_tags,
+          parameters: endpoint.openapi_path_parameters + Array(metadata[:parameters]),
+          request_body: metadata[:request_body],
+          responses: metadata.fetch(:responses, default_registered_endpoint_responses)
+        }
+        openapi.compact.merge(metadata.except(:tags, :parameters, :request_body, :responses, :summary, :description))
+      end
+
+      def default_registered_endpoint_responses
+        {
+          "200" => {
+            description: "Endpoint completed.",
+            content: {
+              "application/json" => {
+                schema: { type: "object" }
+              }
+            }
+          }
+        }
       end
 
       def resource_sections

@@ -11,6 +11,7 @@ require "recording_studio_api/authenticated_client"
 require "recording_studio_api/access_grant"
 require "recording_studio_api/integration"
 require "recording_studio_api/action_context"
+require "recording_studio_api/registered_endpoint_context"
 require "recording_studio_api/resource_operation_context"
 require "recording_studio_api/accessible_recording_scope"
 require "recording_studio_api/access_policy"
@@ -130,6 +131,35 @@ module RecordingStudioApi
 
     def oauth_error_status(error)
       Integration.oauth_error_status(error)
+    end
+
+    def register_endpoint(name, api: :public, http_verb:, path:, handler:, serializer: nil, openapi: nil, input_contract: nil)
+      configuration.api(api).registered_endpoint_registry.register(
+        name,
+        http_verb: http_verb,
+        path: path,
+        handler: handler,
+        serializer: serializer,
+        openapi: openapi,
+        input_contract: input_contract
+      )
+    end
+
+    def registered_endpoint(name, api: :public)
+      configuration.fetch_api(api).registered_endpoint_registry[name]
+    end
+
+    def registered_endpoint_request_match(request)
+      api_key = request.path_parameters[:api_key].presence || "public"
+      path = Array(request.path_parameters[:standalone_path]).join("/")
+      return if path.blank?
+
+      first_segment = path.split("/").first.to_s.sub(/\.json\z/, "")
+      return if recordable_type_for_resource(first_segment, api: api_key)
+
+      configuration.fetch_api(api_key).registered_endpoint_registry.match_path(path)
+    rescue ConfigurationError
+      nil
     end
 
     def register_capability_action(name, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil, api: :public)

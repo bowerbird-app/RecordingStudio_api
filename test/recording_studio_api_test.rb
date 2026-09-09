@@ -11,6 +11,16 @@ class RecordingStudioApiTest < Minitest::Test
     assert_kind_of Class, ::RecordingStudioApi::Engine
   end
 
+  def test_register_action_is_not_an_alias_for_register_endpoint
+    refute RecordingStudioApi.respond_to?(:register_action)
+    refute RecordingStudioApi.respond_to?(:registered_action)
+    refute RecordingStudioApi.respond_to?(:registered_action_request_match)
+    assert RecordingStudioApi.respond_to?(:register_endpoint)
+    assert RecordingStudioApi.respond_to?(:registered_endpoint)
+    assert RecordingStudioApi.respond_to?(:registered_endpoint_request_match)
+    assert RecordingStudioApi.respond_to?(:register_capability_action)
+  end
+
   def test_dummy_app_uses_default_layout
     application_controller_path = File.expand_path("dummy/app/controllers/application_controller.rb", __dir__)
     controller_source = File.read(application_controller_path)
@@ -247,6 +257,9 @@ class RecordingStudioApiTest < Minitest::Test
     assert_includes initializer_source, "config.admin_dashboard_path_resolver"
     assert_includes initializer_source, '"/admin/api"'
     assert_includes initializer_source, "config.api :operations"
+    assert_includes initializer_source, "RecordingStudioApi.register_endpoint"
+    assert_includes initializer_source, 'path: "ping"'
+    assert_not_includes initializer_source, "RecordingStudioApi.register_action"
     assert_not_includes initializer_source, "config.admin_requests_path_resolver"
     assert_not_includes initializer_source, "config.admin_errors_path_resolver"
     assert_not_includes initializer_source, "config.admin_logs_path_resolver"
