@@ -32,14 +32,21 @@
 			  },
 			  handler: PublishRecording
 			)
+			RecordingStudioApi.register_action(
+			  :ping,
+			  http_verb: :get,
+			  path: "ping",
+			  handler: ->(_context) { { ok: true } }
+			)
 			RecordingStudioApi.capability_action(:publish)
 			RecordingStudioApi.resource_action(:show)
+			RecordingStudioApi.registered_action(:ping)
 		CODE
 	) %>
 
 	<%= render FlatPack::SectionTitle::Component.new(
 		title: "Handler context",
-		subtitle: "Methods available to capability and resource handlers at runtime.",
+		subtitle: "Methods available to capability, resource, and named-action handlers at runtime.",
 		anchor_link: true,
 	) %>
 
@@ -52,6 +59,25 @@
 			context.access_grant
 			context.access_grant.actor
 			context.access_grant.authorize!(recording: context.recording, role: :edit)
+		CODE
+	) %>
+
+	<%= render FlatPack::SectionTitle::Component.new(
+		title: "Named action context",
+		subtitle: "RegisteredActionContext has the client grant and params, and does not have recording.",
+		anchor_link: true,
+	) %>
+
+	<%= render FlatPack::CodeBlock::Component.new(
+		language: :ruby,
+		code: <<~'CODE'
+			context.api_client
+			context.credential
+			context.access_recording
+			context.access_grant
+			context.access_grant.actor
+			context.params
+			context.access_grant.authorize!(recording: context.access_recording, role: :view)
 		CODE
 	) %>
 </div>

@@ -40,4 +40,5 @@ Next steps:
 
 9. Mount routes are added at the configured mount path. Adjust auth, layout, and current actor integration to match your host app.
 10. Add addon gems that enable Recording Studio capabilities, then register the related API action once with `RecordingStudioApi.register_capability_action`.
-11. In each custom capability handler, authorize with the passed `context.access_grant` before exposing or mutating Recording Studio data.
+11. Register host endpoints that are not a recordable with `RecordingStudioApi.register_action`. Do not add a fake recordable or a one-off API controller.
+12. In each custom capability handler, authorize with the passed `context.access_grant` before exposing or mutating Recording Studio data.

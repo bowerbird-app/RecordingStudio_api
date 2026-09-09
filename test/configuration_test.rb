@@ -391,6 +391,19 @@ class ConfigurationTest < Minitest::Test
     assert_equal ["1.2.3"], registration.fetch(:versions)
   end
 
+  def test_register_action_tracks_registry_entries
+    @configuration.registered_action_registry.register(
+      :ping,
+      http_verb: :get,
+      path: "ping",
+      handler: ->(_context) { { ok: true } }
+    )
+
+    registration = @configuration.to_h.fetch(:registered_action_registrations).fetch("ping")
+    assert_equal :get, registration.fetch(:http_verb)
+    assert_equal "ping", registration.fetch(:path)
+  end
+
   def test_capability_action_roles_normalizes_and_validates_host_overrides
     @configuration.capability_action_roles = { publish: "admin", "archive" => :view }
 

@@ -68,6 +68,27 @@ module RecordingStudioApi
         assert_equal ["workspace-actions"], action_endpoint.fetch(:openapi).fetch(:tags)
       end
 
+      def test_registered_actions_are_listed_beside_resources
+        original_configuration = RecordingStudioApi.configuration
+        RecordingStudioApi.instance_variable_set(:@configuration, RecordingStudioApi::Configuration.new)
+        RecordingStudioApi.register_action(
+          :ping,
+          http_verb: :get,
+          path: "ping",
+          handler: ->(_context) { { ok: true } }
+        )
+
+        catalog = DocumentationCatalog.call
+        ping = catalog.fetch(:actions).find { |endpoint| endpoint.fetch(:action_name) == "ping" }
+
+        assert_equal "GET", ping.fetch(:verb)
+        assert_equal "/recording_studio_api/api/v1/ping", ping.fetch(:path)
+        assert_equal ["Actions"], ping.fetch(:openapi).fetch(:tags)
+        refute catalog.fetch(:resources).any? { |section| section.fetch(:resource) == "pings" }
+      ensure
+        RecordingStudioApi.instance_variable_set(:@configuration, original_configuration)
+      end
+
       def test_default_action_openapi_groups_actions_under_resource_tag
         catalog = with_catalog_stubs(
           recordable_types: ["Folder"],

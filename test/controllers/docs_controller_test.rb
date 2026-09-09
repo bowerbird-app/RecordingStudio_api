@@ -165,7 +165,9 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_select "h1", text: "Methods"
     assert_includes response.body, "Reference for the public Ruby entrypoints and runtime context used by API handlers."
     assert_includes response.body, "RecordingStudioApi.register_capability_action"
+    assert_includes response.body, "RecordingStudioApi.register_action"
     assert_includes response.body, "context.access_grant.authorize!"
+    assert_includes response.body, "RegisteredActionContext"
   end
 
   test "versions page renders successfully" do
@@ -217,10 +219,12 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
       assert_includes response.body, "to: &quot;resources#index&quot;"
       assert_includes response.body, "match &quot;/:resource/:id/actions/:action_name&quot;"
       assert_includes response.body, "match &quot;/:resource/:id/:action_name&quot;"
+      assert_includes response.body, "match &quot;*standalone_path&quot;"
       assert_includes response.body, "via: %i[post patch put delete]"
       assert_includes response.body, "Define engine routes"
       assert_includes response.body, "Generated endpoint inventory"
-      assert_includes response.body, "Action routes stay grouped under their owning resource"
+      assert_includes response.body, "Capability action routes stay grouped under their owning resource"
+      assert_includes response.body, "Named actions sit beside those collections"
       assert_includes response.body, "Admin browser routes are separate from JSON API routes"
       assert_includes response.body, "/recording_studio_api/api/v1/folders/:id/actions/move"
       assert_includes response.body, "config.version"

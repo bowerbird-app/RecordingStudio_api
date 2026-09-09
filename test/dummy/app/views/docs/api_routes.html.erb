@@ -44,6 +44,10 @@
         namespace :api, defaults: { format: :json } do
           namespace :v1 do
             get "/", to: "resources#index"
+            match "*standalone_path",
+              to: "registered_actions#invoke",
+              via: %i[get post patch put delete],
+              as: :registered_action
             get "/:resource", to: "resources#index", as: :resource_collection
             post "/:resource", to: "resources#create"
             get "/:resource/:id", to: "resources#show", as: :resource
@@ -98,6 +102,14 @@
 
   <%= render FlatPack::Card::Component.new(style: :default) do %>
     <%= render FlatPack::List::Component.new(divider: true, html_options: { id: "generated-endpoint-inventory" }) do %>
+      <% @api_catalog.fetch(:actions, []).each do |endpoint| %>
+        <%= render FlatPack::List::Item.new(icon: :link) do %>
+          <div class="space-y-1">
+            <p class="text-sm font-medium text-(--surface-content-color)"><%= endpoint.fetch(:verb) %> <%= endpoint.fetch(:path) %></p>
+            <p class="text-xs text-(--surface-content-subtle-color)">Action: <%= endpoint[:action_name].presence || "none" %> · Named action</p>
+          </div>
+        <% end %>
+      <% end %>
       <% @api_catalog.fetch(:resources, []).each do |resource| %>
         <% resource.fetch(:endpoints, []).each do |endpoint| %>
           <%= render FlatPack::List::Item.new(icon: :link) do %>
@@ -114,7 +126,7 @@
   <%= render FlatPack::Card::Component.new(style: :default) do %>
     <%= render FlatPack::List::Component.new(divider: true) do %>
       <%= render FlatPack::List::Item.new(icon: :rectangle_group) do %>
-        <span>Action routes stay grouped under their owning resource.</span>
+        <span>Capability action routes stay grouped under their owning resource. Named actions sit beside those collections.</span>
       <% end %>
       <%= render FlatPack::List::Item.new(icon: :shield_check) do %>
         <span>Admin browser routes are separate from JSON API routes and still use the host app's browser authentication.</span>
