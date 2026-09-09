@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module RecordingStudioApi
-  RegisteredActionContext = Data.define(
+  RegisteredEndpointContext = Data.define(
     :api_client,
     :credential,
     :access_recording,

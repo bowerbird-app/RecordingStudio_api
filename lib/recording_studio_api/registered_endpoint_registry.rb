@@ -1,16 +1,16 @@
 # frozen_string_literal: true
 
-require_relative "registered_action"
+require_relative "registered_endpoint"
 require_relative "errors"
 
 module RecordingStudioApi
-  class RegisteredActionRegistry
+  class RegisteredEndpointRegistry
     def initialize
       @registrations = {}
     end
 
     def register(name, http_verb:, path:, handler:, serializer: nil, openapi: nil, input_contract: nil)
-      registration = RegisteredAction.new(
+      registration = RegisteredEndpoint.new(
         name: name,
         http_verb: http_verb,
         path: path,
@@ -22,8 +22,8 @@ module RecordingStudioApi
       registration.validate!
 
       key = registration.name
-      raise ConfigurationError, "API action #{key} is already registered" if @registrations.key?(key)
-      raise ConfigurationError, "API action path #{registration.http_verb.to_s.upcase} #{registration.path} is already registered" if path_taken?(registration)
+      raise ConfigurationError, "API endpoint #{key} is already registered" if @registrations.key?(key)
+      raise ConfigurationError, "API endpoint path #{registration.http_verb.to_s.upcase} #{registration.path} is already registered" if path_taken?(registration)
 
       @registrations[key] = registration
     end

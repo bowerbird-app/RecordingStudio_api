@@ -2,7 +2,7 @@
 
 require_relative "../../../support/api_dummy_helpers"
 
-class ApiV1RegisteredActionsControllerTest < ActionDispatch::IntegrationTest
+class ApiV1RegisteredEndpointsControllerTest < ActionDispatch::IntegrationTest
   include ApiDummyHelpers
 
   setup do
@@ -11,14 +11,14 @@ class ApiV1RegisteredActionsControllerTest < ActionDispatch::IntegrationTest
     @user = create_user
     @root_recording, @access_recording = create_access_recording_for(user: @user)
     @page_recording = create_page_recording(root_recording: @root_recording)
-    @access_token = issue_oauth_access_token_for(access_recording: @access_recording, name: "Registered action token")
+    @access_token = issue_oauth_access_token_for(access_recording: @access_recording, name: "Registered endpoint token")
     RecordingStudioApi.register_recordable_type_api(
       "Page",
       operations: %i[index show],
       serializer: ->(recordable, **) { { title: recordable.title } },
       output_keys: %i[title]
     )
-    RecordingStudioApi.register_action(
+    RecordingStudioApi.register_endpoint(
       :ping,
       http_verb: :get,
       path: "ping",
@@ -30,7 +30,7 @@ class ApiV1RegisteredActionsControllerTest < ActionDispatch::IntegrationTest
         }
       }
     )
-    RecordingStudioApi.register_action(
+    RecordingStudioApi.register_endpoint(
       :echo,
       http_verb: :post,
       path: "echo/:key",
@@ -38,7 +38,7 @@ class ApiV1RegisteredActionsControllerTest < ActionDispatch::IntegrationTest
         { key: context.params[:key], message: context.params[:message], api_key: context.api_key }
       }
     )
-    RecordingStudioApi.register_action(
+    RecordingStudioApi.register_endpoint(
       :shout,
       http_verb: :post,
       path: "shout",
@@ -59,7 +59,7 @@ class ApiV1RegisteredActionsControllerTest < ActionDispatch::IntegrationTest
     Current.actor = nil if defined?(Current)
   end
 
-  test "dispatches a registered get action with no recordable" do
+  test "dispatches a registered get endpoint with no recordable" do
     get "/recording_studio_api/api/v1/ping", headers: authorization_headers
 
     assert_response :success
@@ -70,7 +70,7 @@ class ApiV1RegisteredActionsControllerTest < ActionDispatch::IntegrationTest
     assert_not_equal @page_recording.id, payload.fetch("access_recording_id")
   end
 
-  test "dispatches a registered post action with path params" do
+  test "dispatches a registered post endpoint with path params" do
     post "/recording_studio_api/api/v1/echo/widget",
          params: { message: "hello" },
          as: :json,
@@ -83,7 +83,7 @@ class ApiV1RegisteredActionsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "public", payload.fetch("api_key")
   end
 
-  test "serializes a registered action and rejects invalid input" do
+  test "serializes a registered endpoint and rejects invalid input" do
     post "/recording_studio_api/api/v1/shout",
          params: { message: "hi" },
          as: :json,
@@ -101,14 +101,14 @@ class ApiV1RegisteredActionsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "invalid_input", JSON.parse(response.body).dig("error", "code")
   end
 
-  test "rejects unauthenticated registered actions" do
+  test "rejects unauthenticated registered endpoints" do
     get "/recording_studio_api/api/v1/ping"
 
     assert_response :unauthorized
     assert_equal "authentication_failed", JSON.parse(response.body).dig("error", "code")
   end
 
-  test "rejects a public token on an operations-only action" do
+  test "rejects a public token on an operations-only endpoint" do
     RecordingStudioApi.configuration.api(:operations) { |api| api.default_access = :read_only }
     RecordingStudioApi.register_recordable_type_api(
       "Workspace",
@@ -117,7 +117,7 @@ class ApiV1RegisteredActionsControllerTest < ActionDispatch::IntegrationTest
       serializer: ->(recordable, **) { { name: recordable.name } },
       output_keys: %i[name]
     )
-    RecordingStudioApi.register_action(
+    RecordingStudioApi.register_endpoint(
       :ops_ping,
       api: :operations,
       http_verb: :get,
@@ -142,11 +142,11 @@ class ApiV1RegisteredActionsControllerTest < ActionDispatch::IntegrationTest
     assert_includes records.map { |record| record.fetch("id") }, @page_recording.id
   end
 
-  test "openapi lists the registered action under the actions tag" do
+  test "openapi lists the registered endpoint under the endpoints tag" do
     document = RecordingStudioApi::Services::OpenapiDocument.call
 
     ping = document.fetch(:paths).fetch("/recording_studio_api/api/v1/ping").fetch("get")
-    assert_equal ["Actions"], ping.fetch(:tags)
+    assert_equal ["Endpoints"], ping.fetch(:tags)
     assert document.fetch(:paths).key?("/recording_studio_api/api/v1/pages")
     refute(document.fetch(:tags).any? { |tag| tag.fetch(:name) == "Ping" })
   end
@@ -173,7 +173,7 @@ class ApiV1RegisteredActionsControllerTest < ActionDispatch::IntegrationTest
       access_point_recording: access_point_recording_for(@access_recording),
       manager_actor: access_manager_for(@access_recording),
       role: @access_recording.recordable.role,
-      name: "Operations registered action client",
+      name: "Operations registered endpoint client",
       api: :operations
     )
     raise provision_result.error unless provision_result.success?

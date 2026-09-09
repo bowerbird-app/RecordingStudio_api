@@ -3,13 +3,13 @@
 require_relative "action_input_contract"
 
 module RecordingStudioApi
-  class RegisteredAction
+  class RegisteredEndpoint
     ALLOWED_HTTP_VERBS = %i[get post patch put delete].freeze
-    DEFAULT_OPENAPI_TAG = "Actions"
+    DEFAULT_OPENAPI_TAG = "Endpoints"
     PATH_TOKEN = /\A:[a-z][a-z0-9_]*\z/
     STATIC_SEGMENT = /\A[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?\z/i
 
-    Match = Data.define(:action, :captures)
+    Match = Data.define(:endpoint, :captures)
 
     attr_reader :name, :http_verb, :path, :handler, :serializer, :openapi, :input_contract
 
@@ -24,7 +24,7 @@ module RecordingStudioApi
     end
 
     def validate!
-      raise ConfigurationError, "API action name is required" if name.blank?
+      raise ConfigurationError, "API endpoint name is required" if name.blank?
       raise ConfigurationError, "Handler is required for #{name}" unless handler.respond_to?(:call)
       raise ConfigurationError, "Unsupported HTTP verb #{http_verb} for #{name}" unless ALLOWED_HTTP_VERBS.include?(http_verb)
       raise ConfigurationError, "Serializer must respond to call for #{name}" if serializer && !serializer.respond_to?(:call)
@@ -53,7 +53,7 @@ module RecordingStudioApi
       end
       return unless matched
 
-      Match.new(action: self, captures: captures)
+      Match.new(endpoint: self, captures: captures)
     end
 
     def openapi_path_parameters
@@ -87,17 +87,17 @@ module RecordingStudioApi
 
     def normalize_path(value)
       raw = value.to_s.strip.sub(%r{\A/}, "").sub(%r{/\z}, "")
-      raise ConfigurationError, "API action path is required for #{name}" if raw.blank?
-      raise ConfigurationError, "API action path must be relative for #{name}" if raw.include?("://") || raw.start_with?("\\")
-      raise ConfigurationError, "API action path must not contain .. for #{name}" if raw.split("/").include?("..")
+      raise ConfigurationError, "API endpoint path is required for #{name}" if raw.blank?
+      raise ConfigurationError, "API endpoint path must be relative for #{name}" if raw.include?("://") || raw.start_with?("\\")
+      raise ConfigurationError, "API endpoint path must not contain .. for #{name}" if raw.split("/").include?("..")
 
       segments = raw.split("/")
-      raise ConfigurationError, "API action path must not contain empty segments for #{name}" if segments.any?(&:blank?)
+      raise ConfigurationError, "API endpoint path must not contain empty segments for #{name}" if segments.any?(&:blank?)
 
       segments.each do |segment|
         next if segment.match?(PATH_TOKEN) || segment.match?(STATIC_SEGMENT)
 
-        raise ConfigurationError, "Invalid API action path segment #{segment.inspect} for #{name}"
+        raise ConfigurationError, "Invalid API endpoint path segment #{segment.inspect} for #{name}"
       end
 
       segments.join("/")

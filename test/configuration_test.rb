@@ -391,15 +391,15 @@ class ConfigurationTest < Minitest::Test
     assert_equal ["1.2.3"], registration.fetch(:versions)
   end
 
-  def test_register_action_tracks_registry_entries
-    @configuration.registered_action_registry.register(
+  def test_register_endpoint_tracks_registry_entries
+    @configuration.registered_endpoint_registry.register(
       :ping,
       http_verb: :get,
       path: "ping",
       handler: ->(_context) { { ok: true } }
     )
 
-    registration = @configuration.to_h.fetch(:registered_action_registrations).fetch("ping")
+    registration = @configuration.to_h.fetch(:registered_endpoint_registrations).fetch("ping")
     assert_equal :get, registration.fetch(:http_verb)
     assert_equal "ping", registration.fetch(:path)
   end

@@ -13,16 +13,16 @@ Hosts can register JSON endpoints that are not a tree collection. Tree CRUD
 and capability actions are unchanged.
 
 ### Added
-- `RecordingStudioApi.register_action` for named routes that sit beside
+- `RecordingStudioApi.register_endpoint` for named routes that sit beside
   `/pages` and other recordable collections. Bearer auth and named APIs still
-  apply. OpenAPI lists these under the `Actions` tag.
+  apply. OpenAPI lists these under the `Endpoints` tag.
 
 ### Upgrade notes
-- Call `RecordingStudioApi.register_action` from an initializer when a host
+- Call `RecordingStudioApi.register_endpoint` from an initializer when a host
   needs a path that is not a recordable. Do not add a fake recordable or a
   one-off API controller.
 - Dummy registers `GET /recording_studio_api/api/v1/ping` as a proof hook.
-  Hosts should register their own actions.
+  Hosts should register their own endpoints.
 
 See [UPGRADING.md](UPGRADING.md).
 

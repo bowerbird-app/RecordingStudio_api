@@ -17,7 +17,7 @@ This Rails app exists to validate the RecordingStudio API integration surface an
 - Companion docs pages with in-page documentation links (install, config, Scalar, auth) for the renamed RecordingStudio API install and configuration flow
 - API credential authentication that resolves a `RecordingStudioApi::AccessGrant`
 - Capability-owned authorization examples that use the access grant with Recording Studio Accessible
-- `register_action` proof hook at `GET /recording_studio_api/api/v1/ping` (not a recordable collection)
+- `register_endpoint` proof hook at `GET /recording_studio_api/api/v1/ping` (not a recordable collection)
 
 ## Quick Start
 

@@ -288,7 +288,7 @@ RecordingStudioApi.register_recordable_type_api(
   }
 )
 
-RecordingStudioApi.register_action(
+RecordingStudioApi.register_endpoint(
   :ping,
   http_verb: :get,
   path: "ping",

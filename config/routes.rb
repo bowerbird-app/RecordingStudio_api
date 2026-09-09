@@ -16,8 +16,8 @@ RecordingStudioApi::Engine.routes.draw do
     true
   end
 
-  registered_action_constraint = lambda do |request|
-    RecordingStudioApi.registered_action_request_match(request).present?
+  registered_endpoint_constraint = lambda do |request|
+    RecordingStudioApi.registered_endpoint_request_match(request).present?
   end
 
   get "/admin_api", to: "admin_dashboards#show", as: :admin_dashboard
@@ -45,10 +45,10 @@ RecordingStudioApi::Engine.routes.draw do
     namespace :v1, defaults: { api_version: "v1" } do
       get "/", to: "resources#index"
       match "*standalone_path",
-            to: "registered_actions#invoke",
+            to: "registered_endpoints#invoke",
             via: %i[get post patch put delete],
-            constraints: registered_action_constraint,
-            as: :registered_action
+            constraints: registered_endpoint_constraint,
+            as: :registered_endpoint
       get "/:resource", to: "resources#index", as: :resource_collection
       post "/:resource", to: "resources#create"
       get "/:resource/:id", to: "resources#show", as: :resource
@@ -74,10 +74,10 @@ RecordingStudioApi::Engine.routes.draw do
       namespace api_version.to_sym, defaults: { api_version: api_version } do
         get "/", to: "/recording_studio_api/api/v1/resources#index"
         match "*standalone_path",
-              to: "/recording_studio_api/api/v1/registered_actions#invoke",
+              to: "/recording_studio_api/api/v1/registered_endpoints#invoke",
               via: %i[get post patch put delete],
-              constraints: registered_action_constraint,
-              as: :registered_action
+              constraints: registered_endpoint_constraint,
+              as: :registered_endpoint
         get "/:resource", to: "/recording_studio_api/api/v1/resources#index", as: :resource_collection
         post "/:resource", to: "/recording_studio_api/api/v1/resources#create"
         get "/:resource/:id", to: "/recording_studio_api/api/v1/resources#show", as: :resource
@@ -104,10 +104,10 @@ RecordingStudioApi::Engine.routes.draw do
   scope "/apis/:api_key/:api_version", defaults: { format: :json }, as: :named_api do
     get "/", to: "api/v1/resources#index", as: :root
     match "*standalone_path",
-          to: "api/v1/registered_actions#invoke",
+          to: "api/v1/registered_endpoints#invoke",
           via: %i[get post patch put delete],
-          constraints: registered_action_constraint,
-          as: :registered_action
+          constraints: registered_endpoint_constraint,
+          as: :registered_endpoint
     get "/:resource", to: "api/v1/resources#index", as: :resource_collection
     post "/:resource", to: "api/v1/resources#create"
     get "/:resource/:id", to: "api/v1/resources#show", as: :resource

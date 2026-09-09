@@ -2,12 +2,12 @@
 
 require "test_helper"
 
-class RegisteredActionRegistryTest < Minitest::Test
+class RegisteredEndpointRegistryTest < Minitest::Test
   def setup
-    @registry = RecordingStudioApi::RegisteredActionRegistry.new
+    @registry = RecordingStudioApi::RegisteredEndpointRegistry.new
   end
 
-  def test_register_stores_an_action_without_a_recordable
+  def test_register_stores_an_endpoint_without_a_recordable
     @registry.register(
       :ping,
       http_verb: :get,
@@ -33,7 +33,7 @@ class RegisteredActionRegistryTest < Minitest::Test
 
     match = @registry.match(path: "widgets/button", http_verb: :get)
 
-    assert_equal "describe_widget", match.action.name
+    assert_equal "describe_widget", match.endpoint.name
     assert_equal({ key: "button" }, match.captures)
   end
 
@@ -47,7 +47,7 @@ class RegisteredActionRegistryTest < Minitest::Test
 
     match = @registry.match_path("echo")
 
-    assert_equal "echo", match.action.name
+    assert_equal "echo", match.endpoint.name
     assert_nil @registry.match(path: "echo", http_verb: :get)
   end
 
@@ -58,7 +58,7 @@ class RegisteredActionRegistryTest < Minitest::Test
       @registry.register(:ping, http_verb: :post, path: "pong", handler: ->(_context) { :ok })
     end
 
-    assert_equal "API action ping is already registered", error.message
+    assert_equal "API endpoint ping is already registered", error.message
   end
 
   def test_rejects_duplicate_verb_and_path
@@ -68,7 +68,7 @@ class RegisteredActionRegistryTest < Minitest::Test
       @registry.register(:status, http_verb: :get, path: "status", handler: ->(_context) { :ok })
     end
 
-    assert_equal "API action path GET status is already registered", error.message
+    assert_equal "API endpoint path GET status is already registered", error.message
   end
 
   def test_rejects_missing_handler
@@ -84,19 +84,19 @@ class RegisteredActionRegistryTest < Minitest::Test
       @registry.register(:bad, http_verb: :get, path: "../secret", handler: ->(_context) { :ok })
     end
 
-    assert_equal "API action path must not contain .. for bad", error.message
+    assert_equal "API endpoint path must not contain .. for bad", error.message
   end
 
   def test_rejects_blank_paths_and_unsupported_verbs
     error = assert_raises(RecordingStudioApi::ConfigurationError) do
       @registry.register(:blank, http_verb: :get, path: "/", handler: ->(_context) { :ok })
     end
-    assert_equal "API action path is required for blank", error.message
+    assert_equal "API endpoint path is required for blank", error.message
 
     error = assert_raises(RecordingStudioApi::ConfigurationError) do
       @registry.register(:remote, http_verb: :get, path: "https://example.com/x", handler: ->(_context) { :ok })
     end
-    assert_equal "API action path must be relative for remote", error.message
+    assert_equal "API endpoint path must be relative for remote", error.message
 
     error = assert_raises(RecordingStudioApi::ConfigurationError) do
       @registry.register(:bad_verb, http_verb: :head, path: "status", handler: ->(_context) { :ok })
@@ -109,7 +109,7 @@ class RegisteredActionRegistryTest < Minitest::Test
       @registry.register(:bad, http_verb: :get, path: "not valid", handler: ->(_context) { :ok })
     end
 
-    assert_includes error.message, "Invalid API action path segment"
+    assert_includes error.message, "Invalid API endpoint path segment"
   end
 
   def test_normalizes_a_leading_slash_and_exposes_openapi_path_parameters

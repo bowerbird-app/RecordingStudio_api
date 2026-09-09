@@ -4,7 +4,7 @@
 
 `RecordingStudioApi` is a mountable Rails engine that provides authenticated, capability-backed JSON APIs for Recording Studio addons.
 
-For named actions in `0.5.4`, Cloud Agent boot in `0.5.3`, the grant hook in `0.5.2`, the Accessible 0.9 pin in `0.5.1`, the Recording Studio 4.2 pin in `0.5.0`, safer
+For named endpoints in `0.5.4`, Cloud Agent boot in `0.5.3`, the grant hook in `0.5.2`, the Accessible 0.9 pin in `0.5.1`, the Recording Studio 4.2 pin in `0.5.0`, safer
 defaults in `0.4.0`, and the flat API contract from `0.3.0`, see [UPGRADING.md](UPGRADING.md).
 
 ## Current Scope
@@ -15,10 +15,10 @@ defaults in `0.4.0`, and the flat API contract from `0.3.0`, see [UPGRADING.md](
 - API client recordables stored beneath `RecordingStudio::Access` recordings in the Recording Studio tree
 - authenticated API requests resolved into a `RecordingStudioApi::AccessGrant` that is passed to capability handlers
 - capability-backed action registry with automatic action exposure when a recordable type enables that capability
-- `register_action` for named JSON endpoints that are not a recordable collection
+- `register_endpoint` for named JSON endpoints that are not a recordable collection
 - preserved template reference material in `docs/gem_template/`
 
-The current codebase still ships the template engine mechanics (configuration, hooks, install generator, sample service objects), but the engine now also exposes a real JSON API surface for authenticated resource lookup, capability-backed member actions, and named actions that are not a recordable.
+The current codebase still ships the template engine mechanics (configuration, hooks, install generator, sample service objects), but the engine now also exposes a real JSON API surface for authenticated resource lookup, capability-backed member actions, and named endpoints that are not a recordable.
 
 ## Versioning Model
 
@@ -342,7 +342,7 @@ RecordingStudioApi.register_capability_action(
   },
   handler: PublishRecording
 )
-RecordingStudioApi.register_action(
+RecordingStudioApi.register_endpoint(
   :ping,
   api: :public,
   http_verb: :get,
@@ -656,12 +656,12 @@ RecordingStudioApi.register_capability_action(
 
 If a recordable type enables `:movable`, the API automatically exposes the newest compatible `move` contribution selected for the current public API version.
 
-### Named actions that are not a recordable
+### Named endpoints that are not a recordable
 
-Use `register_action` when the host needs a JSON path that is not a tree collection. Do not invent a fake recordable or a one-off API controller.
+Use `register_endpoint` when the host needs a JSON path that is not a tree collection. Do not invent a fake recordable or a one-off API controller.
 
 ```ruby
-RecordingStudioApi.register_action(
+RecordingStudioApi.register_endpoint(
   :ping,
   api: :public,
   http_verb: :get,
@@ -669,7 +669,7 @@ RecordingStudioApi.register_action(
   handler: ->(_context) { { ok: true } }
 )
 
-RecordingStudioApi.register_action(
+RecordingStudioApi.register_endpoint(
   :echo,
   api: :public,
   http_verb: :post,
@@ -678,11 +678,11 @@ RecordingStudioApi.register_action(
 )
 ```
 
-Routes use the same mount and version prefix as the tree API (`/recording_studio_api/api/v1/ping`, or `/recording_studio_api/apis/<api-name>/<version>/...` for a named API). Bearer auth still applies. A public client cannot call an action registered only on `:operations`.
+Routes use the same mount and version prefix as the tree API (`/recording_studio_api/api/v1/ping`, or `/recording_studio_api/apis/<api-name>/<version>/...` for a named API). Bearer auth still applies. A public client cannot call an endpoint registered only on `:operations`.
 
-Handlers receive `RecordingStudioApi::RegisteredActionContext`. That object has the client, credential, access recording, access grant, root, and params. It does not have `recording`. Check Accessible against the client's access recording inside the handler when you need it. The gem does not require a recording for these actions.
+Handlers receive `RecordingStudioApi::RegisteredEndpointContext`. That object has the client, credential, access recording, access grant, root, and params. It does not have `recording`. Check Accessible against the client's access recording inside the handler when you need it. The gem does not require a recording for these endpoints.
 
-OpenAPI and Scalar list these routes under the `Actions` tag.
+OpenAPI and Scalar list these routes under the `Endpoints` tag.
 
 ### Capability-backed handlers
 
@@ -718,7 +718,7 @@ end
 - `POST /recording_studio_api/api/<version>/:resource/:id/:relationship` and `PATCH|DELETE /.../:relationship/:relationship_id` — mutate a writable `children` relationship
 - `POST|PATCH|PUT|DELETE /recording_studio_api/api/<version>/:resource/:id/actions/:action_name` — execute the newest compatible contribution contract for that public API version
 - `POST|PATCH|PUT|DELETE /recording_studio_api/api/<version>/:resource/:id/:action_name` — compatibility alias for existing clients
-- `GET|POST|PATCH|PUT|DELETE /recording_studio_api/api/<version>/<registered-path>` — execute a `register_action` path that is not a tree collection
+- `GET|POST|PATCH|PUT|DELETE /recording_studio_api/api/<version>/<registered-path>` — execute a `register_endpoint` path that is not a tree collection
 
 Named API resource routes use `/recording_studio_api/apis/<api-name>/<version>` with the same resource and action shapes.
 
@@ -735,8 +735,8 @@ Use `test/dummy/` as the review surface for the completed handoff:
 - `/docs/scalar` renders the generated OpenAPI explorer
 - `/docs/auth` explains token exchange, access-grant resolution, and capability-owned authorization
 - `/docs/add_capability` shows capability action registration patterns
-- `/docs/methods` documents the live Ruby entrypoints, including `register_action`
-- Dummy `GET /recording_studio_api/api/v1/ping` is a proof hook for named actions that are not a recordable
+- `/docs/methods` documents the live Ruby entrypoints, including `register_endpoint`
+- Dummy `GET /recording_studio_api/api/v1/ping` is a proof hook for named endpoints that are not a recordable
 - `/docs/recordable_types`, `/docs/recordings_tree`, and `/docs/gem_views` verify Recording Studio wiring and the current gem view footprint
 
 ### Quick start

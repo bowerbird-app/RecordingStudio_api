@@ -32,7 +32,7 @@
 			  },
 			  handler: PublishRecording
 			)
-			RecordingStudioApi.register_action(
+			RecordingStudioApi.register_endpoint(
 			  :ping,
 			  http_verb: :get,
 			  path: "ping",
@@ -40,13 +40,13 @@
 			)
 			RecordingStudioApi.capability_action(:publish)
 			RecordingStudioApi.resource_action(:show)
-			RecordingStudioApi.registered_action(:ping)
+			RecordingStudioApi.registered_endpoint(:ping)
 		CODE
 	) %>
 
 	<%= render FlatPack::SectionTitle::Component.new(
 		title: "Handler context",
-		subtitle: "Methods available to capability, resource, and named-action handlers at runtime.",
+		subtitle: "Methods available to capability, resource, and named-endpoint handlers at runtime.",
 		anchor_link: true,
 	) %>
 
@@ -63,8 +63,8 @@
 	) %>
 
 	<%= render FlatPack::SectionTitle::Component.new(
-		title: "Named action context",
-		subtitle: "RegisteredActionContext has the client grant and params, and does not have recording.",
+		title: "Named endpoint context",
+		subtitle: "RegisteredEndpointContext has the client grant and params, and does not have recording.",
 		anchor_link: true,
 	) %>
 

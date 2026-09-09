@@ -2,7 +2,7 @@
 
 require_relative "hooks"
 require_relative "action_registry"
-require_relative "registered_action_registry"
+require_relative "registered_endpoint_registry"
 require_relative "api_version_profile"
 require_relative "recordable_registry"
 require_relative "api_definition"
@@ -68,7 +68,7 @@ module RecordingStudioApi
                   :api_request_log_allowed_param_keys,
                   :api_request_log_retention_days,
                   :api_daily_metric_retention_days
-    attr_reader :hooks, :action_registry, :registered_action_registry, :recordable_registry, :default_api_version, :api_version_profiles, :capability_action_roles
+    attr_reader :hooks, :action_registry, :registered_endpoint_registry, :recordable_registry, :default_api_version, :api_version_profiles, :capability_action_roles
 
     # rubocop:disable Metrics/AbcSize
     def initialize
@@ -144,7 +144,7 @@ module RecordingStudioApi
       @api_daily_metric_retention_days = nil
       @hooks = Hooks.new
       @action_registry = ActionRegistry.new
-      @registered_action_registry = RegisteredActionRegistry.new
+      @registered_endpoint_registry = RegisteredEndpointRegistry.new
       @recordable_registry = RecordableRegistry.new
       @apis = {}
     end
@@ -208,7 +208,7 @@ module RecordingStudioApi
         api_request_log_retention_days: api_request_log_retention_days,
         api_daily_metric_retention_days: api_daily_metric_retention_days,
         action_registrations: action_registry.to_h,
-        registered_action_registrations: registered_action_registry.to_h,
+        registered_endpoint_registrations: registered_endpoint_registry.to_h,
         recordable_registrations: recordable_registry.to_h,
         hooks_registered: hooks.instance_variable_get(:@registry).transform_values(&:size)
       }
@@ -271,7 +271,7 @@ module RecordingStudioApi
 
     def validate!
       action_registry.validate!
-      registered_action_registry.validate!
+      registered_endpoint_registry.validate!
       recordable_registry.validate!
       @apis.each_value(&:validate!)
       validate_access_management_roles!

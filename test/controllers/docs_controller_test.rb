@@ -165,9 +165,12 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_select "h1", text: "Methods"
     assert_includes response.body, "Reference for the public Ruby entrypoints and runtime context used by API handlers."
     assert_includes response.body, "RecordingStudioApi.register_capability_action"
-    assert_includes response.body, "RecordingStudioApi.register_action"
+    assert_includes response.body, "RecordingStudioApi.register_endpoint"
     assert_includes response.body, "context.access_grant.authorize!"
-    assert_includes response.body, "RegisteredActionContext"
+    assert_includes response.body, "RegisteredEndpointContext"
+    assert_includes response.body, "Named endpoint context"
+    assert_not_includes response.body, "RecordingStudioApi.register_action"
+    assert_not_includes response.body, "RegisteredActionContext"
   end
 
   test "versions page renders successfully" do
@@ -224,7 +227,7 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
       assert_includes response.body, "Define engine routes"
       assert_includes response.body, "Generated endpoint inventory"
       assert_includes response.body, "Capability action routes stay grouped under their owning resource"
-      assert_includes response.body, "Named actions sit beside those collections"
+      assert_includes response.body, "Named endpoints sit beside those collections"
       assert_includes response.body, "Admin browser routes are separate from JSON API routes"
       assert_includes response.body, "/recording_studio_api/api/v1/folders/:id/actions/move"
       assert_includes response.body, "config.version"
