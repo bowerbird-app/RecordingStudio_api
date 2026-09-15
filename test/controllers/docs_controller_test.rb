@@ -223,7 +223,7 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
       assert_includes response.body, "match &quot;/:resource/:id/actions/:action_name&quot;"
       assert_includes response.body, "match &quot;/:resource/:id/:action_name&quot;"
       assert_includes response.body, "match &quot;*standalone_path&quot;"
-      assert_includes response.body, "via: %i[post patch put delete]"
+      assert_includes response.body, "via: %i[get post patch put delete]"
       assert_includes response.body, "Define engine routes"
       assert_includes response.body, "Generated endpoint inventory"
       assert_includes response.body, "Capability action routes stay grouped under their owning resource"

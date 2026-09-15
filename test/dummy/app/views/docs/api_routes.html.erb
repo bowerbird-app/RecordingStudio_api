@@ -55,11 +55,11 @@
             delete "/:resource/:id", to: "resources#destroy"
             match "/:resource/:id/actions/:action_name",
               to: "member_actions#create",
-              via: %i[post patch put delete],
+              via: %i[get post patch put delete],
               as: :resource_action
             match "/:resource/:id/:action_name",
               to: "member_actions#create",
-              via: %i[post patch put delete],
+              via: %i[get post patch put delete],
               as: :resource_nested_action
           end
 
@@ -71,7 +71,6 @@
               get "/:resource/:id", to: "/recording_studio_api/api/v1/resources#show", as: :resource
               patch "/:resource/:id", to: "/recording_studio_api/api/v1/resources#update"
               delete "/:resource/:id", to: "/recording_studio_api/api/v1/resources#destroy"
-            end
             end
           end
         end

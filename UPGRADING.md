@@ -1,5 +1,27 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.5.5
+
+`0.5.5` routes `GET` member capability actions through the existing
+`…/:id/actions/:action_name` and short `…/:id/:action_name` paths on public
+and named APIs. Update the host dependency to `recording_studio_api`,
+`~> 0.5.5`.
+
+1. Companion pins are unchanged from `0.5.4`. Recording Studio `~> 4.2` /
+   `v4.2.0`, Accessible `~> 0.9` / `v0.9.0`, Admin `2.0.1`, Moveable `3.0.0`,
+   Root Switchable `v0.5.0`, and FlatPack `v0.1.143`.
+2. No new migrations. No new capability registrations in this gem.
+3. Keep `http_verb: :get` on the action registration that owns the read
+   payload. Allowlist the action in `capability_actions` on the recordable
+   type API. Do not add a parallel GET-only controller.
+4. Mutating member actions stay verb-checked. `GET` against a `POST`-only
+   action still returns `unsupported_action`.
+
+If you are still on Accessible 0.7 or Recording Studio 4.1, complete
+[Upgrading to 0.5.4](#upgrading-to-054) first.
+
+---
+
 ## Upgrading to 0.5.4
 
 `0.5.4` adds `RecordingStudioApi.register_endpoint` for JSON endpoints that are not

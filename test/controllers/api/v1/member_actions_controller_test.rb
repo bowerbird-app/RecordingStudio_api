@@ -22,7 +22,7 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
     )
     RecordingStudioApi.register_recordable_type_api(
       "Page",
-      capability_actions: %i[echo echo_access_grant echo_params versioned_echo]
+      capability_actions: %i[echo echo_access_grant echo_params versioned_echo peek]
     )
   end
 
@@ -73,6 +73,64 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_equal @page_recording.id, JSON.parse(response.body).fetch("id")
+  end
+
+  test "dispatches a get member capability action on the actions route and short alias" do
+    RecordingStudioApi.register_capability_action(
+      :peek,
+      capability: :echoable,
+      http_verb: :get,
+      required_role: :view,
+      handler: ->(context) { { peeked_id: context.recording.id } },
+      serializer: ->(result) { result }
+    )
+
+    get "/recording_studio_api/api/v1/pages/#{@page_recording.id}/actions/peek",
+        headers: authorization_headers
+
+    assert_response :success
+    assert_equal @page_recording.id, JSON.parse(response.body).fetch("peeked_id")
+
+    get "/recording_studio_api/api/v1/pages/#{@page_recording.id}/peek",
+        headers: authorization_headers
+
+    assert_response :success
+    assert_equal @page_recording.id, JSON.parse(response.body).fetch("peeked_id")
+  end
+
+  test "rejects get against a post-only member capability action" do
+    get "/recording_studio_api/api/v1/pages/#{@page_recording.id}/actions/echo",
+        headers: authorization_headers
+
+    assert_response :unprocessable_entity
+    assert_equal "echo must be called with POST", JSON.parse(response.body).dig("error", "message")
+  end
+
+  test "dispatches a get member capability action on a named api" do
+    RecordingStudioApi.configuration.api(:operations) { |api| api.default_access = :read_only }
+    RecordingStudioApi.register_recordable_type_api("Workspace", api: :operations)
+    RecordingStudioApi.register_capability_action(
+      :peek,
+      capability: :echoable,
+      http_verb: :get,
+      required_role: :view,
+      handler: ->(context) { { peeked_id: context.recording.id } },
+      serializer: ->(result) { result },
+      api: :operations
+    )
+    RecordingStudioApi.register_recordable_type_api(
+      "Page",
+      api: :operations,
+      capability_actions: %i[peek]
+    )
+
+    operations_token = issue_named_api_token(api: :operations, name: "Operations peek token")
+
+    get "/recording_studio_api/apis/operations/v1/pages/#{@page_recording.id}/actions/peek",
+        headers: { "Authorization" => "Bearer #{operations_token}" }
+
+    assert_response :success
+    assert_equal @page_recording.id, JSON.parse(response.body).fetch("peeked_id")
   end
 
   test "dispatches the contribution version selected by the request api version" do
@@ -250,6 +308,28 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
 
   def authorization_headers
     { "Authorization" => "Bearer #{@access_token}" }
+  end
+
+  def issue_named_api_token(api:, name:)
+    provision_result = RecordingStudioApi::Services::ProvisionApiClient.call(
+      access_point_recording: access_point_recording_for(@access_recording),
+      manager_actor: access_manager_for(@access_recording),
+      role: @access_recording.recordable.role,
+      name: name,
+      api: api
+    )
+    raise provision_result.error unless provision_result.success?
+
+    payload = provision_result.value
+    token_result = RecordingStudioApi::Services::IssueOauthAccessToken.call(
+      grant_type: "client_credentials",
+      client_id: payload.fetch(:credential).oauth_client_id,
+      client_secret: payload.fetch(:token),
+      api: api
+    )
+    raise token_result.error unless token_result.success?
+
+    token_result.value.fetch(:access_token)
   end
 end
 
