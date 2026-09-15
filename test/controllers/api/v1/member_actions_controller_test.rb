@@ -108,13 +108,7 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
 
   test "dispatches a get member capability action on a named api" do
     RecordingStudioApi.configuration.api(:operations) { |api| api.default_access = :read_only }
-    RecordingStudioApi.register_recordable_type_api(
-      "Workspace",
-      api: :operations,
-      operations: %i[show],
-      serializer: ->(recordable, **) { { name: recordable.name } },
-      output_keys: %i[name]
-    )
+    RecordingStudioApi.register_recordable_type_api("Workspace", api: :operations)
     RecordingStudioApi.register_capability_action(
       :peek,
       capability: :echoable,
@@ -127,10 +121,7 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
     RecordingStudioApi.register_recordable_type_api(
       "Page",
       api: :operations,
-      operations: %i[show],
-      capability_actions: %i[peek],
-      serializer: ->(recordable, **) { { title: recordable.title } },
-      output_keys: %i[title]
+      capability_actions: %i[peek]
     )
 
     operations_token = issue_named_api_token(api: :operations, name: "Operations peek token")
