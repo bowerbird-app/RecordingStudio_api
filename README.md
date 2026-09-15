@@ -4,7 +4,7 @@
 
 `RecordingStudioApi` is a mountable Rails engine that provides authenticated, capability-backed JSON APIs for Recording Studio addons.
 
-For named endpoints in `0.5.4`, Cloud Agent boot in `0.5.3`, the grant hook in `0.5.2`, the Accessible 0.9 pin in `0.5.1`, the Recording Studio 4.2 pin in `0.5.0`, safer
+For GET member capability actions in `0.5.5`, named endpoints in `0.5.4`, Cloud Agent boot in `0.5.3`, the grant hook in `0.5.2`, the Accessible 0.9 pin in `0.5.1`, the Recording Studio 4.2 pin in `0.5.0`, safer
 defaults in `0.4.0`, and the flat API contract from `0.3.0`, see [UPGRADING.md](UPGRADING.md).
 
 ## Current Scope
@@ -716,8 +716,8 @@ end
 - `GET /recording_studio_api/api/<version>/:resource/:id/:relationship` — list a registered named relationship
 - `GET /recording_studio_api/api/<version>/:resource/:id/:relationship/:relationship_id` — show a direct child from a registered `children` relationship
 - `POST /recording_studio_api/api/<version>/:resource/:id/:relationship` and `PATCH|DELETE /.../:relationship/:relationship_id` — mutate a writable `children` relationship
-- `POST|PATCH|PUT|DELETE /recording_studio_api/api/<version>/:resource/:id/actions/:action_name` — execute the newest compatible contribution contract for that public API version
-- `POST|PATCH|PUT|DELETE /recording_studio_api/api/<version>/:resource/:id/:action_name` — compatibility alias for existing clients
+- `GET|POST|PATCH|PUT|DELETE /recording_studio_api/api/<version>/:resource/:id/actions/:action_name` — execute the newest compatible contribution contract for that public API version (`GET` only when the action registers `http_verb: :get`)
+- `GET|POST|PATCH|PUT|DELETE /recording_studio_api/api/<version>/:resource/:id/:action_name` — compatibility alias for existing clients
 - `GET|POST|PATCH|PUT|DELETE /recording_studio_api/api/<version>/<registered-path>` — execute a `register_endpoint` path that is not a tree collection
 
 Named API resource routes use `/recording_studio_api/apis/<api-name>/<version>` with the same resource and action shapes.

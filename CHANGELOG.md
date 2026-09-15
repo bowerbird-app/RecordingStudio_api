@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-09-15
+
+Member capability actions registered with `http_verb: :get` are routable on
+the same member-action paths as mutating verbs.
+
+### Fixed
+- Public, version-alias, and named-API member-action routes accept `GET` when
+  the registered action declares `http_verb: :get`. Action routes are declared
+  before relationship catch-alls so `GET …/actions/:name` reaches
+  `MemberActionsController` instead of a relationship show. The short-action
+  constraint skips unknown resources so relationship 404s stay intact.
+- `MemberActionsController` still rejects verb mismatch. `GET` against a
+  `POST`-only action returns `unsupported_action` as before.
+
+### Upgrade notes
+- Update the host pin to `recording_studio_api`, `~> 0.5.5`.
+- No migration or registration changes. Soft-registered GET actions such as
+  Embeddable `:embed` become callable when the host allowlists them in
+  `capability_actions`.
+- Companion pins are unchanged from `0.5.4`.
+
+See [UPGRADING.md](UPGRADING.md).
+
 ## [0.5.4] - 2026-09-09
 
 Hosts can register JSON endpoints that are not a tree collection. Tree CRUD
@@ -145,7 +168,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.4...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.5...HEAD
+[0.5.5]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.1...v0.5.2
