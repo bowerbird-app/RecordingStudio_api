@@ -89,6 +89,39 @@ class AuthenticateOauthAccessTokenTest < ActiveSupport::TestCase
     assert_nil @credential.reload.last_used_at
   end
 
+  test "authenticates a public delegated oauth client on a named api" do
+    RecordingStudioApi.configuration.api(:wp_plugin_demo)
+    token = delegated_oauth_access_token
+    register_delegated_oauth_access_token(credential: @credential, token: token)
+
+    result = RecordingStudioApi::Services::AuthenticateOauthAccessToken.call(
+      authorization_header: "Bearer #{token}",
+      api: :wp_plugin_demo
+    )
+
+    assert result.success?, result.error
+    assert_equal @credential.api_client_id, result.value.api_client.id
+    assert_equal "wp_plugin_demo", result.value.api_key
+  end
+
+  test "rejects a confidential delegated oauth client bound to another api" do
+    RecordingStudioApi.configuration.api(:wp_plugin_demo)
+    token = delegated_oauth_access_token
+    register_delegated_oauth_access_token(
+      credential: @credential,
+      token: token,
+      public_client: false
+    )
+
+    result = RecordingStudioApi::Services::AuthenticateOauthAccessToken.call(
+      authorization_header: "Bearer #{token}",
+      api: :wp_plugin_demo
+    )
+
+    assert result.failure?
+    assert_equal "Bearer access token is invalid", result.error
+  end
+
   test "rejects malformed OAuth access tokens" do
     result = RecordingStudioApi::Services::AuthenticateOauthAccessToken.call(
       authorization_header: "Bearer rsapi_not_oauth_format"

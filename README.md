@@ -4,7 +4,7 @@
 
 `RecordingStudioApi` is a mountable Rails engine that provides authenticated, capability-backed JSON APIs for Recording Studio addons.
 
-For GET member capability actions in `0.5.5`, named endpoints in `0.5.4`, Cloud Agent boot in `0.5.3`, the grant hook in `0.5.2`, the Accessible 0.9 pin in `0.5.1`, the Recording Studio 4.2 pin in `0.5.0`, safer
+For public Oauth clients on named APIs in `0.5.6`, GET member capability actions in `0.5.5`, named endpoints in `0.5.4`, Cloud Agent boot in `0.5.3`, the grant hook in `0.5.2`, the Accessible 0.9 pin in `0.5.1`, the Recording Studio 4.2 pin in `0.5.0`, safer
 defaults in `0.4.0`, and the flat API contract from `0.3.0`, see [UPGRADING.md](UPGRADING.md).
 
 ## Current Scope
@@ -193,8 +193,10 @@ Public routes remain `/recording_studio_api/api/<version>`. Named APIs use
 `/recording_studio_api/apis/<api-name>/<version>` and obtain tokens from
 `/recording_studio_api/apis/<api-name>/oauth/token`.
 
-API clients are bound to exactly one API. Provision and authenticate named clients with `api:`;
-a public token is rejected on every named API and vice versa. The existing site-wide API switch remains a global kill switch, while `ApiSetting.for_api`
+API clients are bound to exactly one API. Provision and authenticate named clients with `api:`.
+A `client_credentials` public token is rejected on every named API and vice versa. A public Oauth
+client that implements `registered_for_api?` (RecordingStudio Oauth 0.2.2) may present its
+delegated bearer on a named resource path. The existing site-wide API switch remains a global kill switch, while `ApiSetting.for_api`
 supports additional per-API switches. Admins can also set runtime overrides for request logging,
 credential/access-token TTLs, retention, and rate-limit enables/thresholds from the Admin API
 settings and rate-limiting pages. Blank override fields fall back to initializer defaults; Redis
