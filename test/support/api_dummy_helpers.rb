@@ -150,6 +150,43 @@ module ApiDummyHelpers # rubocop:disable Metrics/ModuleLength
     token_result.value.fetch(:access_token)
   end
 
+  def register_delegated_oauth_access_token(credential:, token:, public_client: true)
+    client = credential.api_client
+    if public_client
+      def client.registered_for_api?(request_api)
+        return true if api_key == "public"
+
+        api_key == request_api.to_s
+      end
+    else
+      def client.registered_for_api?(request_api)
+        api_key == request_api.to_s
+      end
+    end
+
+    authenticator = Class.new do
+      def initialize(token, credential)
+        @token = token
+        @credential = credential
+      end
+
+      def valid_format?(candidate)
+        candidate.to_s.start_with?("rsoauth_at_")
+      end
+
+      def call(token:)
+        { credential: @credential } if token == @token
+      end
+    end.new(token, credential)
+
+    RecordingStudioApi.register_token_authenticator(authenticator)
+    token
+  end
+
+  def delegated_oauth_access_token
+    "rsoauth_at_#{SecureRandom.urlsafe_base64(32)}"
+  end
+
   def provision_api_client_for(access_recording:, name: "OAuth client")
     provision_result = RecordingStudioApi::Services::ProvisionApiClient.call(
       access_point_recording: access_point_recording_for(access_recording),
