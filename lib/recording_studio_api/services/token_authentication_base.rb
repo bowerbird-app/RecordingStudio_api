@@ -19,7 +19,7 @@ module RecordingStudioApi
 
         credential, token_record = resolve_authenticated_entities(token)
         return failure(AuthenticationError.new(invalid_token_error_message)) if credential.nil?
-        return failure(AuthenticationError.new(invalid_token_error_message)) unless credential.api_client&.api_key == api_key
+        return failure(AuthenticationError.new(invalid_token_error_message)) unless credential_registered_for_api?(credential)
         return failure(AuthenticationError.new(inactive_token_error_message)) unless token_record_active?(token_record)
 
         unless credential.active_for_authentication?
@@ -43,6 +43,17 @@ module RecordingStudioApi
             api_key: api_key
           )
         )
+      end
+
+      def credential_registered_for_api?(credential)
+        client = credential.api_client
+        return false if client.nil?
+
+        if client.respond_to?(:registered_for_api?)
+          client.registered_for_api?(api_key)
+        else
+          client.api_key == api_key
+        end
       end
 
       def parse_bearer_token

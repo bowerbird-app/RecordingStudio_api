@@ -9,6 +9,7 @@ class PublicOauthClientNamedApiTest < ActionDispatch::IntegrationTest
     reset_recording_studio_api_configuration!
     reset_recording_studio_capabilities!
     RecordingStudioApi.configuration.api(:wp_plugin_demo)
+    RecordingStudioApi.register_default_resource_actions!(api: :wp_plugin_demo)
     RecordingStudioApi.register_recordable_type_api(
       "Page",
       api: :wp_plugin_demo,

@@ -1,5 +1,28 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.5.6
+
+`0.5.6` accepts a public Oauth client's delegated bearer on a named API
+resource path. Machine `client_credentials` clients stay bound to one API.
+Update the host dependency to `recording_studio_api`, `~> 0.5.6`.
+
+1. Companion pins are unchanged from `0.5.5`, except Oauth. Recording Studio
+   `~> 4.2` / `v4.2.0`, Accessible `~> 0.9` / `v0.9.0`, Admin `2.0.1`,
+   Moveable `3.0.0`, Root Switchable `v0.5.0`, FlatPack `v0.1.143`, and Oauth
+   `~> 0.2.2` / `v0.2.2` when the host uses Connect.
+2. No new migrations. No new grant hooks or token authenticators in this gem.
+3. Keep public Registered Apps on `api_key=public`. Do not force the client
+   onto the named API key. Oauth `0.2.2` mints the token. This gem accepts
+   that bearer when `api_client.registered_for_api?` says the client is
+   registered for the request API.
+4. Confidential clients and `client_credentials` API-key clients still need
+   an exact `api_key` match.
+
+If you are still on Accessible 0.7 or Recording Studio 4.1, complete
+[Upgrading to 0.5.5](#upgrading-to-055) first.
+
+---
+
 ## Upgrading to 0.5.5
 
 `0.5.5` routes `GET` member capability actions through the existing

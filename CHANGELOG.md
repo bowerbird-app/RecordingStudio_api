@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-09-18
+
+Bearer auth accepts a public Oauth client on a named API resource path.
+Machine `client_credentials` clients stay bound to one API.
+
+### Fixed
+- `TokenAuthenticationBase` asks `api_client.registered_for_api?(api_key)` when
+  that method exists. RecordingStudio Oauth `0.2.2` public clients
+  (`api_key=public`) now pass `GET /recording_studio_api/apis/<name>/v1/...`
+  after a delegated grant. Clients without that method still require an exact
+  `api_key` match.
+- Confidential Oauth clients bound to another API still fail. Public
+  `client_credentials` tokens still fail on named APIs.
+
+### Upgrade notes
+- Update the host pin to `recording_studio_api`, `~> 0.5.6`.
+- Pin `recording_studio_oauth` to `~> 0.2.2` so Connect can mint the token
+  this bearer check now accepts.
+- No migrations. No new grant hooks.
+
+See [UPGRADING.md](UPGRADING.md).
+
 ## [0.5.5] - 2026-09-15
 
 Member capability actions registered with `http_verb: :get` are routable on
@@ -168,7 +190,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.5...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.6...HEAD
+[0.5.6]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.2...v0.5.3
