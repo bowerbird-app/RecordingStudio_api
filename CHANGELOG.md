@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Dummy and development Gemfiles pin RecordingStudio git tag `v4.2.2`
+  (`036686aa4eaf4f945f920cf4b11be4e842de0aac`). Lockfiles resolve the gem as
+  `4.2.1` (that tag's `RecordingStudio::VERSION`). Gemspec stays `~> 4.2`.
+
 ## [0.5.6] - 2026-09-18
 
 Bearer auth accepts a public Oauth client on a named API resource path.
