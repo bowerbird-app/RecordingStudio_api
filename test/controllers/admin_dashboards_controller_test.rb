@@ -244,7 +244,7 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Filter and inspect admin API error volume."
     assert_includes response.body, "admin-api-errors-chart-frame"
     assert_includes response.body, "flat-pack--auto-submit"
-    assert_includes response.body, "Date Range"
+    assert_includes response.body, "Date range"
     assert_includes response.body, "Error type"
     assert_includes response.body, "All error types"
     assert_includes response.body, "No exception captured"

@@ -113,8 +113,10 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
 
     assert_equal(["Create API key", "API keys", "API requests"].sort, section_links.map { |el| el.text.strip }.sort)
     classes = section_links.map { |el| el["class"].to_s }
-    assert classes.any? { |c| c.include?("--button-primary-background-color") }, "expected primary button class in one of: #{classes.inspect}"
-    assert classes.any? { |c| c.include?("--button-default-background-color") }, "expected default button class in one of: #{classes.inspect}"
+    styles = section_links.map { |el| el["data-fp-style"].to_s }
+    assert classes.any? { |c| c.include?("fp-button") }, "expected fp-button class in one of: #{classes.inspect}"
+    assert_includes styles, "primary", "expected primary data-fp-style in one of: #{styles.inspect}"
+    assert_includes styles, "default", "expected default data-fp-style in one of: #{styles.inspect}"
 
     get "/api/sections/api/widgets/widgets.recording_studio_api.requests_last_four_weeks", params: { anchor_url: "/" }
 
@@ -290,8 +292,9 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
 
     api_requests_link = Nokogiri::HTML(response.body).css("a, button").find { |el| el.text.strip == "API requests" }
     assert_not_nil api_requests_link
-    assert_includes api_requests_link["class"].to_s, "--button-default-background-color"
-    assert_not_includes api_requests_link["class"].to_s, "--button-primary-background-color"
+    assert_includes api_requests_link["class"].to_s, "fp-button"
+    assert_equal "default", api_requests_link["data-fp-style"].to_s
+    assert_not_equal "primary", api_requests_link["data-fp-style"].to_s
 
     get "/admin/api/sections/admin_api/widgets/widgets.recording_studio_api.admin.requests_last_four_weeks", params: { anchor_url: "/" }
 
