@@ -12,7 +12,7 @@ module RecordingStudioApi
   ) do
     include ProgressReporting
 
-    def initialize( # rubocop:disable Metrics/ParameterLists
+    def initialize(
       api_client:,
       credential:,
       access_recording:,

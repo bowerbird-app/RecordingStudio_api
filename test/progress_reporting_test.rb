@@ -121,48 +121,45 @@ class ProgressReportingTest < Minitest::Test
 
   def action_context(**overrides)
     RecordingStudioApi::ActionContext.new(
-      **{
-        recording: :recording,
-        api_client: nil,
-        credential: :credential,
-        access_recording: :access_recording,
-        access_grant: :access_grant,
-        root_recording: :root_recording,
-        params: {}
-      }.merge(overrides)
+      recording: :recording,
+      api_client: nil,
+      credential: :credential,
+      access_recording: :access_recording,
+      access_grant: :access_grant,
+      root_recording: :root_recording,
+      params: {},
+      **overrides
     )
   end
 
   def registered_endpoint_context(**overrides)
     RecordingStudioApi::RegisteredEndpointContext.new(
-      **{
-        api_client: nil,
-        credential: :credential,
-        access_recording: :access_recording,
-        access_grant: :access_grant,
-        root_recording: :root_recording,
-        params: {}
-      }.merge(overrides)
+      api_client: nil,
+      credential: :credential,
+      access_recording: :access_recording,
+      access_grant: :access_grant,
+      root_recording: :root_recording,
+      params: {},
+      **overrides
     )
   end
 
   def resource_operation_context(**overrides)
     RecordingStudioApi::ResourceOperationContext.new(
-      **{
-        recording: :recording,
-        recordable_type: "Page",
-        resource_name: "pages",
-        api_client: nil,
-        credential: :credential,
-        access_recording: :access_recording,
-        access_grant: :access_grant,
-        root_recording: :root_recording,
-        api_version: "v1",
-        params: {},
-        request_params: {},
-        scoped_recordings: [],
-        parent_recording: nil
-      }.merge(overrides)
+      recording: :recording,
+      recordable_type: "Page",
+      resource_name: "pages",
+      api_client: nil,
+      credential: :credential,
+      access_recording: :access_recording,
+      access_grant: :access_grant,
+      root_recording: :root_recording,
+      api_version: "v1",
+      params: {},
+      request_params: {},
+      scoped_recordings: [],
+      parent_recording: nil,
+      **overrides
     )
   end
 end
