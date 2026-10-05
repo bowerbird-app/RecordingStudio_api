@@ -35,6 +35,8 @@ Then open the app and sign in with:
 - Email: `admin@admin.com`
 - Password: `Password`
 
+Dummy credentials (`config/credentials.yml.enc`) use the shared RecordingStudio_* development master key. Set `RAILS_MASTER_KEY` or write that key to `config/master.key` (gitignored). Do not generate a per-repo dummy key.
+
 Cloud Agent Builds start those same dummy terminals from
 `.cursor/environment.json` after `.cursor/install.sh` fetches skills. See
 [Cursor skills in Cloud Agents](../../docs/cursor-skills.md).
