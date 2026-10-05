@@ -26,7 +26,10 @@ class ApiV1RegisteredEndpointsControllerTest < ActionDispatch::IntegrationTest
         {
           ok: true,
           has_recording: context.respond_to?(:recording),
-          access_recording_id: context.access_recording&.id
+          access_recording_id: context.access_recording&.id,
+          progress_reporter_nil: context.progress_reporter.nil?,
+          cancelled: context.cancelled?,
+          progress_result: context.progress(current: 1, message: "ping")
         }
       }
     )
@@ -68,6 +71,9 @@ class ApiV1RegisteredEndpointsControllerTest < ActionDispatch::IntegrationTest
     assert_equal false, payload.fetch("has_recording")
     assert_not_nil payload.fetch("access_recording_id")
     assert_not_equal @page_recording.id, payload.fetch("access_recording_id")
+    assert_equal true, payload.fetch("progress_reporter_nil")
+    assert_equal false, payload.fetch("cancelled")
+    assert_nil payload.fetch("progress_result")
   end
 
   test "dispatches a registered post endpoint with path params" do

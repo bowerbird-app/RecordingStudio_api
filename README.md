@@ -4,7 +4,7 @@
 
 `RecordingStudioApi` is a mountable Rails engine that provides authenticated, capability-backed JSON APIs for Recording Studio addons.
 
-For public Oauth clients on named APIs in `0.5.6`, GET member capability actions in `0.5.5`, named endpoints in `0.5.4`, Cloud Agent boot in `0.5.3`, the grant hook in `0.5.2`, the Accessible 0.9 pin in `0.5.1`, the Recording Studio 4.2 pin in `0.5.0`, safer
+For optional handler progress in `0.6.0`, public Oauth clients on named APIs in `0.5.6`, GET member capability actions in `0.5.5`, named endpoints in `0.5.4`, Cloud Agent boot in `0.5.3`, the grant hook in `0.5.2`, the Accessible 0.9 pin in `0.5.1`, the Recording Studio 4.2 pin in `0.5.0`, safer
 defaults in `0.4.0`, and the flat API contract from `0.3.0`, see [UPGRADING.md](UPGRADING.md).
 
 ## Current Scope
@@ -700,6 +700,33 @@ class PublishRecording
   end
 end
 ```
+
+### Progress on handler contexts
+
+`ActionContext`, `ResourceOperationContext`, and `RegisteredEndpointContext`
+accept an optional `progress_reporter`. REST controllers leave it `nil`. A
+non-REST caller (for example RecordingStudio MCP wrapping a handler) can pass
+any object that responds to `progress(current:, total:, message:)` and
+`cancelled?`. This gem only forwards those messages.
+
+```ruby
+class ImportPages
+  def self.call(context)
+    pages.each_with_index do |page, index|
+      break if context.cancelled?
+
+      import_page(page)
+      context.progress(
+        current: index + 1,
+        total: pages.size,
+        message: "Imported #{page.title}"
+      )
+    end
+  end
+end
+```
+
+With no reporter, `progress` returns `nil` and `cancelled?` is `false`.
 
 ### API endpoints
 

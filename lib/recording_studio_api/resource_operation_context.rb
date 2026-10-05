@@ -15,8 +15,11 @@ module RecordingStudioApi
     :request_params,
     :scoped_recordings,
     :parent_recording,
-    :idempotency_key
+    :idempotency_key,
+    :progress_reporter
   ) do
+    include ProgressReporting
+
     def initialize( # rubocop:disable Metrics/ParameterLists
       recording:,
       recordable_type:,
@@ -31,7 +34,8 @@ module RecordingStudioApi
       request_params:,
       scoped_recordings:,
       parent_recording:,
-      idempotency_key: nil
+      idempotency_key: nil,
+      progress_reporter: nil
     )
       super
     end

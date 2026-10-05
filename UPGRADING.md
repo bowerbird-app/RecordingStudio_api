@@ -1,5 +1,30 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.6.0
+
+`0.6.0` adds an optional progress reporter on handler contexts. REST request
+handling is unchanged. Update the host dependency to
+`recording_studio_api`, `~> 0.6.0`.
+
+1. Companion pins are unchanged from `0.5.6`. Recording Studio `~> 4.2` /
+   `v4.2.2`, Accessible `~> 0.9` / `v0.9.0`, Admin `2.0.1`, Moveable `3.0.0`,
+   Root Switchable `v0.5.0`, FlatPack `v0.1.143`, and Oauth `~> 0.2.2` /
+   `v0.2.2` when the host uses Connect.
+2. No new migrations. No new grant hooks or token authenticators in this gem.
+3. Capability, resource, and named-endpoint handlers may call
+   `context.progress(current:, total:, message:)` and `context.cancelled?`.
+   REST still builds contexts with `progress_reporter: nil`, so those calls
+   no-op and `cancelled?` is `false`.
+4. A reporter is any object that responds to `progress(current:, total:,
+   message:)` and `cancelled?`. Do not pass MCP, SSE, or JSON-RPC types into
+   this gem except as that duck type. Callers that construct a context
+   outside REST (for example RecordingStudio MCP) pass the reporter in.
+
+If you are still on Accessible 0.7 or Recording Studio 4.1, complete
+[Upgrading to 0.5.6](#upgrading-to-056) first.
+
+---
+
 ## Upgrading to 0.5.6
 
 `0.5.6` accepts a public Oauth client's delegated bearer on a named API

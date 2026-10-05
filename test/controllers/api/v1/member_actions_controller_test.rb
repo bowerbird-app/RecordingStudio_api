@@ -18,7 +18,22 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
       :echo,
       capability: :echoable,
       http_verb: :post,
-      handler: ->(context) { context.recording }
+      handler: lambda { |context|
+        {
+          recording: context.recording,
+          progress_reporter: context.progress_reporter,
+          cancelled: context.cancelled?,
+          progress_result: context.progress(current: 1, message: "echo")
+        }
+      },
+      serializer: lambda { |result|
+        {
+          id: result.fetch(:recording).id,
+          progress_reporter_nil: result.fetch(:progress_reporter).nil?,
+          cancelled: result.fetch(:cancelled),
+          progress_result: result.fetch(:progress_result)
+        }
+      }
     )
     RecordingStudioApi.register_recordable_type_api(
       "Page",
@@ -64,7 +79,11 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
          headers: authorization_headers
 
     assert_response :success
-    assert_equal @page_recording.id, JSON.parse(response.body).fetch("id")
+    payload = JSON.parse(response.body)
+    assert_equal @page_recording.id, payload.fetch("id")
+    assert_equal true, payload.fetch("progress_reporter_nil")
+    assert_equal false, payload.fetch("cancelled")
+    assert_nil payload.fetch("progress_result")
   end
 
   test "dispatches a registered capability action through the nested child route" do

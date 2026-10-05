@@ -12,6 +12,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`036686aa4eaf4f945f920cf4b11be4e842de0aac`). Lockfiles resolve the gem as
   `4.2.1` (that tag's `RecordingStudio::VERSION`). Gemspec stays `~> 4.2`.
 
+## [0.6.0] - 2026-10-05
+
+Handler contexts accept an optional progress reporter so a caller such as
+RecordingStudio MCP can stream progress from a real API handler. REST
+construction does not pass a reporter.
+
+### Added
+- `progress_reporter` on `ActionContext`, `ResourceOperationContext`, and
+  `RegisteredEndpointContext`. The field defaults to `nil`. Existing
+  constructors keep working without it.
+- `context.progress(current:, total: nil, message: nil)` and
+  `context.cancelled?`. With no reporter, progress is a no-op and
+  `cancelled?` is `false`. With a reporter, both delegate. A reporter is any
+  object that responds to `progress(current:, total:, message:)` and
+  `cancelled?`. This gem does not know about MCP, SSE, JSON-RPC, or progress
+  tokens.
+
+### Upgrade notes
+- Update the host pin to `recording_studio_api`, `~> 0.6.0`.
+- No migrations. No REST, auth, or registration changes. Handlers that never
+  call `progress` or `cancelled?` behave as before.
+- Pass a reporter only from a non-REST caller that builds the context. Do not
+  add one in the mounted API controllers.
+
+See [UPGRADING.md](UPGRADING.md).
+
 ## [0.5.6] - 2026-09-18
 
 Bearer auth accepts a public Oauth client on a named API resource path.
@@ -195,7 +221,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.6...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.6...v0.6.0
 [0.5.6]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.3...v0.5.4

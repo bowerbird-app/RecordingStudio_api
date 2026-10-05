@@ -8,8 +8,24 @@ module RecordingStudioApi
     :access_recording,
     :access_grant,
     :root_recording,
-    :params
+    :params,
+    :progress_reporter
   ) do
+    include ProgressReporting
+
+    def initialize( # rubocop:disable Metrics/ParameterLists
+      recording:,
+      api_client:,
+      credential:,
+      access_recording:,
+      access_grant:,
+      root_recording:,
+      params:,
+      progress_reporter: nil
+    )
+      super
+    end
+
     def api_key
       api_client&.api_key.presence || "public"
     end
