@@ -4,8 +4,15 @@
 
 `RecordingStudioApi` is a mountable Rails engine that provides authenticated, capability-backed JSON APIs for Recording Studio addons.
 
-For Accessible 0.11 role ranking in `0.6.1`, optional handler progress in `0.6.0`, public Oauth clients on named APIs in `0.5.6`, GET member capability actions in `0.5.5`, named endpoints in `0.5.4`, Cloud Agent boot in `0.5.3`, the grant hook in `0.5.2`, the Accessible 0.9 pin in `0.5.1`, the Recording Studio 4.2 pin in `0.5.0`, safer
-defaults in `0.4.0`, and the flat API contract from `0.3.0`, see [UPGRADING.md](UPGRADING.md).
+Companion pins on current main: Admin `v2.0.4`, Moveable `v3.0.3`, Root
+Switchable `v0.5.3`, Accessible `~> 0.11` / `v0.11.1`, RecordingStudio
+`v4.2.2`. For those companion pins in `0.6.2`, Accessible 0.11 role ranking
+in `0.6.1`, optional handler progress in `0.6.0`, public Oauth clients on
+named APIs in `0.5.6`, GET member capability actions in `0.5.5`, named
+endpoints in `0.5.4`, Cloud Agent boot in `0.5.3`, the grant hook in `0.5.2`,
+the Accessible 0.9 pin in `0.5.1`, the Recording Studio 4.2 pin in `0.5.0`,
+safer defaults in `0.4.0`, and the flat API contract from `0.3.0`, see
+[UPGRADING.md](UPGRADING.md).
 
 ## Current Scope
 

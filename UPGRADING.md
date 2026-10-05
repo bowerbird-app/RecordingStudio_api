@@ -1,5 +1,21 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.6.2
+
+`0.6.2` bumps companion RecordingStudio pins only. Update the host dependency
+to `recording_studio_api`, `~> 0.6.2`.
+
+1. Companion pins: Admin `v2.0.4`, Moveable `v3.0.3`, Root Switchable
+   `v0.5.3`. Recording Studio stays `~> 4.2` / `v4.2.2`, Accessible `~> 0.11`
+   / `v0.11.1`, FlatPack `v0.1.143`, and Oauth `~> 0.2.2` / `v0.2.2` when the
+   host uses Connect.
+2. No migrations. No Accessible, auth, or registration changes in this gem.
+
+If you are still on Accessible 0.9 or this gem before `0.6.1`, complete
+[Upgrading to 0.6.1](#upgrading-to-061) first.
+
+---
+
 ## Upgrading to 0.6.1
 
 `0.6.1` ranks Accessible roles with `RecordingStudio::AccessRoles`. It does

@@ -12,6 +12,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`036686aa4eaf4f945f920cf4b11be4e842de0aac`). Lockfiles resolve the gem as
   `4.2.1` (that tag's `RecordingStudio::VERSION`). Gemspec stays `~> 4.2`.
 
+## [0.6.2] - 2026-10-05
+
+Companion pin bumps only. No Accessible or role-ranking changes.
+
+### Changed
+- Dummy and development Gemfiles pin RecordingStudio Admin `v2.0.4`,
+  Moveable `v3.0.3`, and Root Switchable `v0.5.3`. Lockfiles resolve those
+  gems as `2.0.2`, `3.0.1`, and `0.5.1` (each tag's declared VERSION).
+- RecordingStudio, Accessible, Icons, and FlatPack pins are unchanged from
+  `0.6.1`.
+
+### Upgrade notes
+- Update the host pin to `recording_studio_api`, `~> 0.6.2`.
+- Match dummy/dev companion tags: Admin `v2.0.4`, Moveable `v3.0.3`, Root
+  Switchable `v0.5.3`.
+- No migrations. No API or Accessible changes in this gem.
+
+See [UPGRADING.md](UPGRADING.md).
+
 ## [0.6.1] - 2026-10-05
 
 Authorization ranking uses Accessible 0.11's public `AccessRoles` API. This
