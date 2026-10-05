@@ -56,7 +56,7 @@ class CursorInstallTest < Minitest::Test
     assert_includes install, "ruby-build"
     assert_includes install, "db:prepare"
     assert_includes install, "tailwindcss:build"
-    assert_includes install, 'RAILS_MASTER_KEY'
+    assert_includes install, "RAILS_MASTER_KEY"
     assert_includes install, "test/dummy/config/master.key"
     key_at = install.index("Writing dummy master.key from RAILS_MASTER_KEY")
     refute_nil key_at, "install.sh must write dummy master.key from RAILS_MASTER_KEY"
