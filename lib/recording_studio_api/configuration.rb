@@ -11,12 +11,6 @@ module RecordingStudioApi
   class Configuration
     DEFAULT_API_VERSION = "v1"
 
-    ACCESS_ROLE_RANKS = {
-      view: 0,
-      edit: 1,
-      admin: 2
-    }.freeze
-
     attr_accessor :timeout,
                   :credential_ttl,
                   :access_token_ttl,
@@ -390,7 +384,10 @@ module RecordingStudioApi
       validate_access_role!(:access_management_view_role, access_management_view_role)
       validate_access_role!(:access_management_edit_role, access_management_edit_role)
 
-      return unless access_role_rank(access_management_view_role) > access_role_rank(access_management_edit_role)
+      return if RecordingStudio::AccessRoles.satisfies?(
+        role: access_management_edit_role,
+        minimum_role: access_management_view_role
+      )
 
       raise ConfigurationError, "Access management view role must be less than or equal to edit role"
     end
@@ -402,17 +399,13 @@ module RecordingStudioApi
     end
 
     def validate_access_role!(name, role)
-      return if access_role_rank(role).present?
+      return if RecordingStudio::AccessRoles.value_for(role).present?
 
       raise ConfigurationError, "#{name} must be one of: #{valid_access_roles.join(', ')}"
     end
 
-    def access_role_rank(role)
-      ACCESS_ROLE_RANKS[role.to_sym]
-    end
-
     def valid_access_roles
-      ACCESS_ROLE_RANKS.keys
+      RecordingStudio::AccessRoles::ORDER.keys.map(&:to_sym)
     end
 
     def validate_api_versions!

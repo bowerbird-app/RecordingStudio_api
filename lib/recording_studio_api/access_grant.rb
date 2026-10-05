@@ -76,15 +76,7 @@ module RecordingStudioApi
     def role_satisfies?(required_role)
       return false if required_role.blank?
 
-      current_rank = access_role_rank(role)
-      required_rank = access_role_rank(required_role)
-      current_rank.present? && required_rank.present? && current_rank >= required_rank
-    end
-
-    def access_role_rank(role_name)
-      return unless defined?(RecordingStudio::Access) && RecordingStudio::Access.respond_to?(:roles)
-
-      RecordingStudio::Access.roles[role_name.to_s]
+      RecordingStudio::AccessRoles.satisfies?(role: role, minimum_role: required_role)
     end
 
     def recording_for_accessible_check(recording, include_trashed:)

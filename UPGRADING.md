@@ -1,5 +1,39 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.6.1
+
+`0.6.1` ranks Accessible roles with `RecordingStudio::AccessRoles`. It does
+not call `RecordingStudio::Access.roles`. Update the host dependency to
+`recording_studio_api`, `~> 0.6.1`.
+
+1. Upgrade Accessible to `0.11.0` or newer (`~> 0.11`) before this gem.
+   Matching dummy/dev tag is `v0.11.1`. Recording Studio stays `~> 4.2` /
+   `v4.2.2`. Admin `2.0.1`, Moveable `3.0.0`, Root Switchable `v0.5.0`,
+   FlatPack `v0.1.143`, and Oauth `~> 0.2.2` / `v0.2.2` when the host uses
+   Connect.
+2. Run Accessible's migrations, then `bin/rails db:migrate`:
+
+   ```bash
+   bin/rails generate recording_studio_accessible:migrations
+   bin/rails db:migrate
+   ```
+
+   `recording_studio_accesses.role` becomes a string (`view`, `edit`,
+   `admin`, or a custom name). Accessible 0.10 also adds invitations.
+3. Delete any `RecordingStudio::Access.define_singleton_method(:roles)` (or
+   similar) shim. Do not restore `Access.roles` in the host.
+4. If the host ranked roles with `RecordingStudioApi::Configuration::ACCESS_ROLE_RANKS`,
+   switch to `RecordingStudio::AccessRoles::ORDER`, `value_for`,
+   `satisfies?`, and `names_at_or_above`.
+5. No migrations in this gem. REST, auth, and registration are unchanged.
+   This gem's fallback `RecordingStudio::Access` no longer declares
+   `enum :role`. Accessible owns that model in a host app.
+
+If you are still on Accessible 0.9 or Recording Studio 4.1, complete
+[Upgrading to 0.6.0](#upgrading-to-060) first.
+
+---
+
 ## Upgrading to 0.6.0
 
 `0.6.0` adds an optional progress reporter on handler contexts. REST request

@@ -55,10 +55,10 @@ module RecordingStudioApi
     def can_assign_role?(recording, role)
       return false unless can_manage_recording?(recording)
 
-      requested_rank = access_role_rank(role)
-      maximum_rank = access_role_rank(maximum_assignable_role_for(recording))
-
-      requested_rank.present? && maximum_rank.present? && requested_rank <= maximum_rank
+      RecordingStudio::AccessRoles.satisfies?(
+        role: maximum_assignable_role_for(recording),
+        minimum_role: role
+      )
     end
 
     def authorized_for_root_recording?(root_recording, access_management_role:)
@@ -136,12 +136,8 @@ module RecordingStudioApi
       access_recording.parent_recording || access_recording.root_recording
     end
 
-    def access_role_rank(role)
-      RecordingStudioApi::Configuration::ACCESS_ROLE_RANKS[role.to_s.to_sym]
-    end
-
     def valid_access_roles
-      RecordingStudioApi::Configuration::ACCESS_ROLE_RANKS.keys
+      RecordingStudio::AccessRoles::ORDER.keys.map(&:to_sym)
     end
 
     def root_recording_for(recording)

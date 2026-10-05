@@ -19,7 +19,7 @@ module RecordingStudioApi
         return failure("Actor is required") if actor.nil?
         return failure("Access point recording is required") if access_point_recording.nil?
         return failure("Access role is required") if role.blank?
-        return failure("Access role is invalid") unless RecordingStudio::Access.roles.key?(role)
+        return failure("Access role is invalid") unless RecordingStudio::AccessRoles.value_for(role)
 
         payload = nil
         ActiveRecord::Base.transaction do

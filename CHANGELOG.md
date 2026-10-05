@@ -12,6 +12,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`036686aa4eaf4f945f920cf4b11be4e842de0aac`). Lockfiles resolve the gem as
   `4.2.1` (that tag's `RecordingStudio::VERSION`). Gemspec stays `~> 4.2`.
 
+## [0.6.1] - 2026-10-05
+
+Authorization ranking uses Accessible 0.11's public `AccessRoles` API. This
+gem no longer reads `RecordingStudio::Access.roles`.
+
+### Changed
+- Requires Recording Studio Accessible `~> 0.11` (tested against git tag
+  `v0.11.1`). Dummy and development Gemfiles pin that tag.
+- Role checks call `RecordingStudio::AccessRoles.value_for`,
+  `AccessRoles.satisfies?`, `AccessRoles.names_at_or_above`, and
+  `AccessRoles::ORDER`. They do not reconstruct the enum map or patch
+  `RecordingStudio::Access`.
+- Admin client visibility SQL matches string roles with
+  `names_at_or_above` instead of integer `role >=`.
+- Dummy includes Accessible's invitation table and role-column migrations
+  (`0.10` / `0.11`).
+- The engine's fallback `RecordingStudio::Access` model no longer declares an
+  integer `enum :role`. Role ranking is `AccessRoles`, not `Access.roles`.
+
+### Removed
+- `RecordingStudioApi::Configuration::ACCESS_ROLE_RANKS`. Ranked role names
+  come from `RecordingStudio::AccessRoles::ORDER`.
+
+### Upgrade notes
+- Update the host pin to `recording_studio_api`, `~> 0.6.1`.
+- Upgrade Accessible to `0.11.0` or newer (`~> 0.11`) first. Matching dummy
+  tag is `v0.11.1`.
+- Run Accessible's migration generator, then `bin/rails db:migrate`, so
+  `recording_studio_accesses.role` is a string and invitations exist.
+- Delete any host or companion `RecordingStudio::Access.define_singleton_method(:roles)`
+  shim. This gem does not provide one.
+
+See [UPGRADING.md](UPGRADING.md).
+
 ## [0.6.0] - 2026-10-05
 
 Handler contexts accept an optional progress reporter so a caller such as
@@ -221,7 +255,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.6...v0.6.0
 [0.5.6]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.4...v0.5.5

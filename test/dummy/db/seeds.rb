@@ -55,7 +55,7 @@ def stronger_access_role(existing_role:, requested_role:)
   return normalized_requested_role if normalized_existing_role.blank?
 
   [normalized_existing_role, normalized_requested_role].max_by do |value|
-    RecordingStudio::Access.roles.fetch(value)
+    RecordingStudio::AccessRoles.value_for(value)
   end
 end
 
