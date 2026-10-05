@@ -14,7 +14,5 @@ module RecordingStudio
     )
 
     belongs_to :actor, polymorphic: true
-
-    enum :role, { view: 0, edit: 1, admin: 2 }
   end
 end

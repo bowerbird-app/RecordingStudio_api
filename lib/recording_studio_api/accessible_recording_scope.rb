@@ -64,7 +64,7 @@ module RecordingStudioApi
         access = access_recording&.recordable
         return unless access.is_a?(RecordingStudio::Access)
 
-        RecordingStudio::Access.roles[access.role]
+        RecordingStudio::AccessRoles.value_for(access.role)
       end
     end
 

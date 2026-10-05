@@ -150,7 +150,7 @@ module RecordingStudioApi
     end
 
     def valid_access_roles
-      RecordingStudioApi::Configuration::ACCESS_ROLE_RANKS.keys
+      RecordingStudio::AccessRoles::ORDER.keys.map(&:to_sym)
     end
   end
 end

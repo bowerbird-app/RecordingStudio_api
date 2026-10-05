@@ -145,11 +145,12 @@ module RecordingStudioApi
         end
 
         def accessible_access_point_ids_sql
-          return "SELECT NULL::uuid WHERE FALSE" if context.current_actor.nil? || access_management_role_rank.nil?
+          role_names = access_management_role_names
+          return "SELECT NULL::uuid WHERE FALSE" if context.current_actor.nil? || role_names.empty?
 
           actor_type = connection.quote(RecordingStudioAccessible::ActorType.for(context.current_actor))
           actor_id = connection.quote(context.current_actor.id)
-          minimum_role = connection.quote(access_management_role_rank)
+          matching_roles = role_names.map { |name| connection.quote(name) }.join(", ")
 
           <<~SQL.squish
             WITH RECURSIVE access_scope AS (
@@ -162,7 +163,7 @@ module RecordingStudioApi
                 AND #{recordings_table}.trashed_at IS NULL
                 AND #{accesses_table}.actor_type = #{actor_type}
                 AND #{accesses_table}.actor_id = #{actor_id}
-                AND #{accesses_table}.role >= #{minimum_role}
+                AND #{accesses_table}.role IN (#{matching_roles})
 
               UNION
 
@@ -175,10 +176,10 @@ module RecordingStudioApi
           SQL
         end
 
-        def access_management_role_rank
-          @access_management_role_rank ||= RecordingStudio::Access.roles[
-            RecordingStudioApi.configuration.access_management_view_role.to_s
-          ]
+        def access_management_role_names
+          @access_management_role_names ||= RecordingStudio::AccessRoles.names_at_or_above(
+            RecordingStudioApi.configuration.access_management_view_role
+          )
         end
 
         def scoped_root_recording
