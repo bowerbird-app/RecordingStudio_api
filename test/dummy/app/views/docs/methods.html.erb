@@ -59,6 +59,8 @@
 			context.access_grant
 			context.access_grant.actor
 			context.access_grant.authorize!(recording: context.recording, role: :edit)
+			context.progress(current: 1, total: 3, message: "Working")
+			context.cancelled?
 		CODE
 	) %>
 
@@ -78,6 +80,8 @@
 			context.access_grant.actor
 			context.params
 			context.access_grant.authorize!(recording: context.access_recording, role: :view)
+			context.progress(current: 1, total: 3, message: "Working")
+			context.cancelled?
 		CODE
 	) %>
 </div>

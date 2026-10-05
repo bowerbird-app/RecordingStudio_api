@@ -167,6 +167,8 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "RecordingStudioApi.register_capability_action"
     assert_includes response.body, "RecordingStudioApi.register_endpoint"
     assert_includes response.body, "context.access_grant.authorize!"
+    assert_includes response.body, "context.progress"
+    assert_includes response.body, "context.cancelled?"
     assert_includes response.body, "RegisteredEndpointContext"
     assert_includes response.body, "Named endpoint context"
     assert_not_includes response.body, "RecordingStudioApi.register_action"

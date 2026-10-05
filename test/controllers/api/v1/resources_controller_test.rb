@@ -36,6 +36,25 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  test "builds resource operation context without a progress reporter" do
+    captured = nil
+    RecordingStudioApi::Services::ResourceOperations::Index.stub(
+      :call,
+      lambda { |context|
+        captured = context
+        { json: { resource: "pages", records: [] }, status: :ok }
+      }
+    ) do
+      get "/recording_studio_api/api/v1/pages", headers: authorization_headers
+    end
+
+    assert_response :success
+    assert_instance_of RecordingStudioApi::ResourceOperationContext, captured
+    assert_nil captured.progress_reporter
+    assert_equal false, captured.cancelled?
+    assert_nil captured.progress(current: 1, message: "index")
+  end
+
   test "rejects resource requests before rate limiting or authentication when API access is disabled" do
     RecordingStudioApi::ApiSetting.find_or_create_by!(key: "api")
                                   .update!(api_access_enabled: false)
