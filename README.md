@@ -771,7 +771,7 @@ PostgreSQL on each boot. Rebuild with Draft off to load a new pack. See
 | Rails           | ~> 8.1.1 |
 | PostgreSQL      | 16      |
 | TailwindCSS     | 4       |
-| RecordingStudio | v4.2.0 (pinned in `test/dummy/Gemfile`) |
+| RecordingStudio | v4.2.2 (pinned in `test/dummy/Gemfile`) |
 | FlatPack        | v0.1.143 (pinned in `test/dummy/Gemfile`) |
 | Devise          | latest  |
 
