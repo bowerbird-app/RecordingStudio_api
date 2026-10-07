@@ -281,7 +281,7 @@ Recording Studio 3.x requires every configured ActiveRecord recordable to declar
 `recording_studio_recordable(...)`. Host apps must mark real roots with `root: true`, declare
 `allowed_parent_types` for child-capable recordables, and enable `RecordingStudio.enable_capability(:accessible, on: ...)`
 for every recordable that can own direct access grants. Enable `RecordingStudio.enable_capability(:api_access_point, on: ...)`
-for recordables that may act as API key access points. The dummy app marks `Workspace` and `Folder` as root-capable,
+for recordables that may act as API key access points. When an admin root has none for the selected API, the new-key form lists manageable roots that do, and creates the key there. It does not nest that access point under the admin root. A workspace stays on the access points already in its tree. The dummy app marks `Workspace` and `Folder` as root-capable,
 keeps `Page` as a child recordable, and the API engine registers its internal `RecordingStudio::Access`, API client,
 credential, access-token, and admin API recordables with explicit parent rules.
 
