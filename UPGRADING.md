@@ -1,5 +1,21 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.6.4
+
+`0.6.4` lets the new API key form open from an admin root on the public API.
+Update the host dependency to `recording_studio_api`, `~> 0.6.4`.
+
+1. No migrations. The access point must still be a type that API allows, and
+   the person must be allowed to manage it.
+2. When an admin root has no access point for the selected API, the form
+   lists manageable roots that do. A public key opened from an admin root is
+   created on the chosen workspace. It is not nested under the admin root.
+3. A workspace opening the public API, and an admin root opening operations,
+   still use the access point already in that tree.
+
+If you are still on `0.6.1` or older, complete
+[Upgrading to 0.6.2](#upgrading-to-062) first.
+
 ## Upgrading to 0.6.2
 
 `0.6.2` bumps companion RecordingStudio pins only. Update the host dependency

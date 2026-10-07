@@ -12,6 +12,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`036686aa4eaf4f945f920cf4b11be4e842de0aac`). Lockfiles resolve the gem as
   `4.2.1` (that tag's `RecordingStudio::VERSION`). Gemspec stays `~> 4.2`.
 
+## [0.6.4] - 2026-10-07
+
+The new API key form can open from an admin root on the public API.
+
+### Added
+- When an admin root has no access point for the selected API, the form
+  lists manageable roots that do. A public key opened from an admin root asks
+  for a workspace and is created on that workspace. The admin root stays the
+  page's navigation root. The key is not nested under it.
+- A root that already has an access point for that API is unchanged. A
+  workspace keeps the in-tree access point field. Operations on an admin root
+  does not ask for a workspace.
+
+### Upgrade notes
+- Update the host pin to `recording_studio_api`, `~> 0.6.4`.
+- No migrations. No change to provisioning rules: the access point must still
+  be a type that API allows, and the person must be allowed to manage it.
+
+See [UPGRADING.md](UPGRADING.md).
+
 ## [0.6.2] - 2026-10-05
 
 Companion pin bumps only. No Accessible or role-ranking changes.

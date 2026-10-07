@@ -10,6 +10,21 @@
   class: "w-full"
 ) %>
 
+<% if local_assigns[:show_access_point_root_choice] %>
+  <% if access_point_recordings.any? %>
+    <%= render FlatPack::Select::Component.new(
+      name: "api_client[access_point_recording_id]",
+      options: access_point_recordings.map { |recording| [recording_label(recording), recording.id] },
+      value: form_values.fetch(:access_point_recording_id),
+      label: access_point_root_choice_label,
+      help_text: access_point_root_choice_help,
+      class: "w-full"
+    ) %>
+  <% else %>
+    <p><%= access_point_root_choice_empty_message %></p>
+  <% end %>
+<% end %>
+
 <% if api_options.many? %>
   <%= render FlatPack::Select::Component.new(
     name: "api_client[api_key]",
@@ -46,14 +61,16 @@
       class: "w-full"
     ) %>
 
-    <%= render FlatPack::Select::Component.new(
-      name: "api_client[access_point_recording_id]",
-      options: access_point_recordings.map { |recording| [recording_label(recording), recording.id] },
-      value: form_values.fetch(:access_point_recording_id),
-      label: "Access point",
-      help_text: "API access is granted to this item and below",
-      class: "w-full"
-    ) %>
+    <% unless local_assigns[:show_access_point_root_choice] %>
+      <%= render FlatPack::Select::Component.new(
+        name: "api_client[access_point_recording_id]",
+        options: access_point_recordings.map { |recording| [recording_label(recording), recording.id] },
+        value: form_values.fetch(:access_point_recording_id),
+        label: "Access point",
+        help_text: "API access is granted to this item and below",
+        class: "w-full"
+      ) %>
+    <% end %>
   </div>
 <% end %>
 

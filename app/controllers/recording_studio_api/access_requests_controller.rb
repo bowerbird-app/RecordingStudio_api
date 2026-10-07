@@ -2,6 +2,7 @@
 
 module RecordingStudioApi
   class AccessRequestsController < ApplicationController
+    include RecordingStudioApi::AccessRequests::AccessPointRootChoice
     include RecordingStudioApi::AccessRequests::PolicyHelpers
     include RecordingStudioApi::AccessRequests::FormState
     include RecordingStudioApi::AccessRequests::ListLoading
