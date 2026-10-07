@@ -49,6 +49,7 @@ module RecordingStudioApi
       def authorize_access_management_edit_for_new_request!
         access_point_recording = selected_access_point_recording_for_request
         return if access_management_policy.can_manage_recording?(access_point_recording) && authorized_to_manage_selected_api?(access_point_recording)
+        return if opening_access_point_choice?
 
         raise RecordingStudioApi::AuthorizationError, "API access management requires higher access"
       end
@@ -77,11 +78,23 @@ module RecordingStudioApi
       end
 
       def selected_access_point_recording_for_request
-        access_point_recordings = available_access_point_recordings(selected_root_recording)
-        requested_recording = access_point_recordings.find { |recording| recording.id == requested_id } if requested_id.present?
+        candidates = access_point_candidates_for_request
+        requested_recording = candidates.find { |recording| recording.id == requested_id } if requested_id.present?
         return requested_recording if requested_access_point_recording_id.present? || requested_recording.present?
 
-        access_point_recordings.first
+        candidates.first
+      end
+
+      # An admin root can open the new form for an API whose access points live
+      # elsewhere (public keys on a workspace). A workspace that is not an
+      # access point for the selected API stays forbidden.
+      def opening_access_point_choice?
+        return false unless show_access_point_root_choice?
+        return false unless admin_root_recording?(selected_root_recording)
+        return false unless access_management_policy.can_manage_recording?(selected_root_recording)
+        return true if action_name == "new"
+
+        manageable_access_point_roots.empty?
       end
 
       def manageable_root_recording?(recording)

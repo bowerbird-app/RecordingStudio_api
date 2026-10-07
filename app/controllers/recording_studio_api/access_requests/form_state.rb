@@ -9,7 +9,10 @@ module RecordingStudioApi
         helper_method :human_root_type,
                       :allowed_root_types,
                       :recording_label,
-                      :masked_api_key
+                      :masked_api_key,
+                      :access_point_root_choice_label,
+                      :access_point_root_choice_empty_message,
+                      :access_point_root_choice_help
       end
 
       private
@@ -18,7 +21,8 @@ module RecordingStudioApi
         @errors = []
         @root_type = normalized_root_type
         @root_recording = selected_root_recording
-        @access_point_recordings = available_access_point_recordings(@root_recording)
+        @show_access_point_root_choice = show_access_point_root_choice?
+        @access_point_recordings = access_point_candidates_for_request
         @role_options = role_options
         @api_options = RecordingStudioApi.configuration.each_api.map { |api| [api.name.humanize, api.name] }
         access_point_recording = selected_access_point_recording
