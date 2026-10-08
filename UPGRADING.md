@@ -1,9 +1,9 @@
 # Upgrading RecordingStudioApi
 
-## Upgrading to 0.7.0
+## Upgrading to 0.6.5
 
-`0.7.0` dispatches `register_endpoint` routes on path and HTTP verb. Update
-the host dependency to `recording_studio_api`, `~> 0.7.0`.
+`0.6.5` dispatches `register_endpoint` routes on path and HTTP verb. Update
+the host dependency to `recording_studio_api`, `~> 0.6.5`.
 
 1. No migrations. Keep passing `http_verb` on `register_endpoint`. Recordable
    CRUD and capability actions do not change verbs.
