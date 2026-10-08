@@ -18,7 +18,7 @@ RecordingStudioApi::Engine.routes.draw do
   end
 
   registered_endpoint_constraint = lambda do |request|
-    RecordingStudioApi.registered_endpoint_request_match(request).present?
+    RecordingStudioApi.registered_endpoint_path_match(request).present?
   end
 
   get "/admin_api", to: "admin_dashboards#show", as: :admin_dashboard

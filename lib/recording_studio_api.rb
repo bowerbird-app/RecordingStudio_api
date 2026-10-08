@@ -151,16 +151,21 @@ module RecordingStudioApi
     end
 
     def registered_endpoint_request_match(request)
-      api_key = request.path_parameters[:api_key].presence || "public"
-      path = Array(request.path_parameters[:standalone_path]).join("/")
-      return if path.blank?
+      with_registered_endpoint_lookup(request) do |registry, path|
+        registry.match(path: path, http_verb: request.request_method_symbol)
+      end
+    end
 
-      first_segment = path.split("/").first.to_s.sub(/\.json\z/, "")
-      return if recordable_type_for_resource(first_segment, api: api_key)
+    def registered_endpoint_path_match(request)
+      with_registered_endpoint_lookup(request) do |registry, path|
+        registry.match_path(path)
+      end
+    end
 
-      configuration.fetch_api(api_key).registered_endpoint_registry.match_path(path)
-    rescue ConfigurationError
-      nil
+    def registered_endpoint_http_verbs(request)
+      with_registered_endpoint_lookup(request) do |registry, path|
+        registry.http_verbs_for_path(path)
+      end || []
     end
 
     def register_capability_action(name, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil, api: :public)
@@ -496,6 +501,19 @@ module RecordingStudioApi
     def moveable_available?
       defined?(RecordingStudio::Moveable::Capabilities::Moveable) &&
         defined?(RecordingStudioApi::Services::MoveRecording)
+    end
+
+    def with_registered_endpoint_lookup(request)
+      api_key = request.path_parameters[:api_key].presence || "public"
+      path = Array(request.path_parameters[:standalone_path]).join("/")
+      return if path.blank?
+
+      first_segment = path.split("/").first.to_s.sub(/\.json\z/, "")
+      return if recordable_type_for_resource(first_segment, api: api_key)
+
+      yield configuration.fetch_api(api_key).registered_endpoint_registry, path
+    rescue ConfigurationError
+      nil
     end
   end
 end

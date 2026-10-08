@@ -18,6 +18,8 @@ class RecordingStudioApiTest < Minitest::Test
     assert RecordingStudioApi.respond_to?(:register_endpoint)
     assert RecordingStudioApi.respond_to?(:registered_endpoint)
     assert RecordingStudioApi.respond_to?(:registered_endpoint_request_match)
+    assert RecordingStudioApi.respond_to?(:registered_endpoint_path_match)
+    assert RecordingStudioApi.respond_to?(:registered_endpoint_http_verbs)
     assert RecordingStudioApi.respond_to?(:register_capability_action)
   end
 

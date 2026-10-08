@@ -49,6 +49,28 @@ class RegisteredEndpointRegistryTest < Minitest::Test
 
     assert_equal "echo", match.endpoint.name
     assert_nil @registry.match(path: "echo", http_verb: :get)
+    assert_equal [:post], @registry.http_verbs_for_path("echo")
+  end
+
+  def test_match_same_path_with_different_verbs
+    @registry.register(:list_users, http_verb: :get, path: "users", handler: ->(_context) { :list })
+    @registry.register(:create_user, http_verb: :post, path: "users", handler: ->(_context) { :create })
+    @registry.register(:show_user, http_verb: :get, path: "users/:id", handler: ->(_context) { :show })
+    @registry.register(:update_user, http_verb: :patch, path: "users/:id", handler: ->(_context) { :update })
+
+    list = @registry.match(path: "users", http_verb: :get)
+    create = @registry.match(path: "users", http_verb: :POST)
+    show = @registry.match(path: "users/abc", http_verb: :get)
+    update = @registry.match(path: "users/abc", http_verb: :patch)
+
+    assert_equal "list_users", list.endpoint.name
+    assert_equal "create_user", create.endpoint.name
+    assert_equal "show_user", show.endpoint.name
+    assert_equal({ id: "abc" }, update.captures)
+    assert_equal "update_user", update.endpoint.name
+    assert_nil @registry.match(path: "users", http_verb: :delete)
+    assert_equal %i[get post], @registry.http_verbs_for_path("users")
+    assert_equal %i[get patch], @registry.http_verbs_for_path("users/abc")
   end
 
   def test_rejects_duplicate_names

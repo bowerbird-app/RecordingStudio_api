@@ -689,6 +689,8 @@ RecordingStudioApi.register_endpoint(
 
 Routes use the same mount and version prefix as the tree API (`/recording_studio_api/api/v1/ping`, or `/recording_studio_api/apis/<api-name>/<version>/...` for a named API). Bearer auth still applies. A public client cannot call an endpoint registered only on `:operations`.
 
+Dispatch matches **path and HTTP verb**. Register `GET users` and `POST users` (or `GET users/:id` and `PATCH users/:id`) as separate endpoints. A request whose path matches but whose verb does not returns **405 Method Not Allowed** with an `Allow` header. Recordable CRUD stays on its own routes (`GET` index/show, `POST` create, `PATCH` update, `DELETE` destroy). Capability actions keep the verb they registered (`POST` unless declared otherwise).
+
 Handlers receive `RecordingStudioApi::RegisteredEndpointContext`. That object has the client, credential, access recording, access grant, root, and params. It does not have `recording`. Check Accessible against the client's access recording inside the handler when you need it. The gem does not require a recording for these endpoints.
 
 OpenAPI and Scalar list these routes under the `Endpoints` tag.
@@ -754,7 +756,7 @@ With no reporter, `progress` returns `nil` and `cancelled?` is `false`.
 - `POST /recording_studio_api/api/<version>/:resource/:id/:relationship` and `PATCH|DELETE /.../:relationship/:relationship_id` — mutate a writable `children` relationship
 - `GET|POST|PATCH|PUT|DELETE /recording_studio_api/api/<version>/:resource/:id/actions/:action_name` — execute the newest compatible contribution contract for that public API version (`GET` only when the action registers `http_verb: :get`)
 - `GET|POST|PATCH|PUT|DELETE /recording_studio_api/api/<version>/:resource/:id/:action_name` — compatibility alias for existing clients
-- `GET|POST|PATCH|PUT|DELETE /recording_studio_api/api/<version>/<registered-path>` — execute a `register_endpoint` path that is not a tree collection
+- `GET|POST|PATCH|PUT|DELETE /recording_studio_api/api/<version>/<registered-path>` — execute a `register_endpoint` path that is not a tree collection. Matching uses the registered verb. A path with no handler for the request verb returns 405 and `Allow`.
 
 Named API resource routes use `/recording_studio_api/apis/<api-name>/<version>` with the same resource and action shapes.
 

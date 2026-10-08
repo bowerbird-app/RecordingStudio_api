@@ -27,6 +27,11 @@ module RecordingStudioApi
       render_error(code: "unsupported_action", message: error.message, status: :unprocessable_entity)
     end
 
+    rescue_from RecordingStudioApi::MethodNotAllowedError do |error|
+      response.set_header("Allow", error.allow_header) if error.allow_header.present?
+      render_error(code: "method_not_allowed", message: error.message, status: :method_not_allowed)
+    end
+
     rescue_from RecordingStudioApi::InvalidActionInputError do |error|
       render_error(code: "invalid_input", message: error.message, status: :unprocessable_entity, details: error.details)
     end

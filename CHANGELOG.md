@@ -12,6 +12,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`036686aa4eaf4f945f920cf4b11be4e842de0aac`). Lockfiles resolve the gem as
   `4.2.1` (that tag's `RecordingStudio::VERSION`). Gemspec stays `~> 4.2`.
 
+## [0.6.5] - 2026-10-08
+
+Registered endpoints dispatch on path **and** HTTP verb. The same path can
+register `GET` and `POST` (or `GET` and `PATCH`) without one handler stealing
+the other.
+
+### Changed
+- `registered_endpoint_request_match` uses
+  `RegisteredEndpointRegistry#match(path:, http_verb:)`.
+- A registered path with no handler for the request verb returns **405**
+  Method Not Allowed, with an `Allow` header of the verbs that path
+  accepts. Previously the first path match ran, then 422
+  `unsupported_action`.
+- Route constraints still match on path so a wrong-verb request reaches
+  that 405 instead of falling through to recordable CRUD.
+
+### Upgrade notes
+- Update the host pin to `recording_studio_api`, `~> 0.6.5`.
+- No migrations. `register_endpoint` still requires `http_verb`. Recordable
+  CRUD and capability actions keep their existing verbs (index/show `GET`,
+  create `POST`, update `PATCH`, destroy `DELETE`, actions as declared).
+- Clients that treated a wrong verb on a named endpoint as 422 should
+  expect 405 and read `Allow`.
+
+See [UPGRADING.md](UPGRADING.md).
+
 ## [0.6.4] - 2026-10-07
 
 The new API key form can open from an admin root on the public API.

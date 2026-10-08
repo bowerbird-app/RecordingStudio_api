@@ -1,5 +1,24 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.6.5
+
+`0.6.5` dispatches `register_endpoint` routes on path and HTTP verb. Update
+the host dependency to `recording_studio_api`, `~> 0.6.5`.
+
+1. No migrations. Keep passing `http_verb` on `register_endpoint`. Recordable
+   CRUD and capability actions do not change verbs.
+2. `GET` and `POST` on the same collection path (and `GET` and `PATCH` on the
+   same member path) now run the matching handler on the public API and on a
+   named API such as `:operations`.
+3. A registered path with no handler for the request verb returns 405 Method
+   Not Allowed and an `Allow` header. It no longer returns 422
+   `unsupported_action` or the wrong handler.
+4. Hosts that already registered one verb per path keep working. A client that
+   called the wrong verb and expected 422 should handle 405.
+
+If you are still on `0.6.2` or older, complete
+[Upgrading to 0.6.4](#upgrading-to-064) first.
+
 ## Upgrading to 0.6.4
 
 `0.6.4` lets the new API key form open from an admin root on the public API.
