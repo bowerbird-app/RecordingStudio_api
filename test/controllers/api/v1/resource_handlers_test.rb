@@ -205,8 +205,6 @@ class ApiV1ResourceHandlersTest < ActionDispatch::IntegrationTest
         { json: { handled: action.to_s, id: context.id }, status: :ok }
       })
     end
-    RecordingStudio.enable_capability(:movable, on: "Page")
-    RecordingStudioApi.register_recordable_type_api("Page", api: :operations, capability_actions: %i[move])
     RecordingStudioApi.register_resource_handler("Page", :move, api: :operations, handler: lambda { |context|
       seen[:move] = context
       { json: { handled: "move", id: context.id, parent_id: context.params[:parent_id] }, status: :accepted }
@@ -269,10 +267,12 @@ class ApiV1ResourceHandlersTest < ActionDispatch::IntegrationTest
       serializer: ->(recordable, **) { { name: recordable.name } },
       output_keys: %i[name]
     )
+    RecordingStudio.enable_capability(:movable, on: "Page")
     RecordingStudioApi.register_recordable_type_api(
       "Page",
       api: :operations,
       operations: %i[index show create update destroy],
+      capability_actions: %i[move],
       serializer: ->(recordable, **) { { title: recordable.title } },
       output_keys: %i[title],
       writable_attributes: %i[title]

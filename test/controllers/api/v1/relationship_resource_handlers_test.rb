@@ -244,6 +244,7 @@ class ApiV1RelationshipResourceHandlersTest < ActionDispatch::IntegrationTest
           many: true,
           serializer: ->(recordable, **) { { name: recordable.name } },
           output_keys: %i[name],
+          limit: 20,
           endpoints: %i[index show create update destroy]
         },
         pages: {
@@ -252,6 +253,7 @@ class ApiV1RelationshipResourceHandlersTest < ActionDispatch::IntegrationTest
           many: true,
           serializer: ->(recordable, **) { { title: recordable.title } },
           output_keys: %i[title],
+          limit: 20,
           endpoints: %i[index show]
         }
       }
