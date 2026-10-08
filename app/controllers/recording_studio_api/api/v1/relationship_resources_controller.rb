@@ -13,7 +13,6 @@ module RecordingStudioApi
             return
           end
 
-
           assert_nested_operation!(:index, role: :view)
 
           pagination = RecordingStudioApi::Services::PaginateResourceCollection.call(
