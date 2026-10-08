@@ -9,7 +9,9 @@ module RecordingStudioApi
     :access_grant,
     :root_recording,
     :params,
-    :progress_reporter
+    :progress_reporter,
+    :id,
+    :recordable_type
   ) do
     include ProgressReporting
 
@@ -21,13 +23,19 @@ module RecordingStudioApi
       access_grant:,
       root_recording:,
       params:,
-      progress_reporter: nil
+      progress_reporter: nil,
+      id: nil,
+      recordable_type: nil
     )
       super
     end
 
     def api_key
       api_client&.api_key.presence || "public"
+    end
+
+    def actor
+      access_grant&.actor
     end
   end
 end

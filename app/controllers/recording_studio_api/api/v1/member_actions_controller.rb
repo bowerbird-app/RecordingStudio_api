@@ -19,14 +19,17 @@ module RecordingStudioApi
         ].freeze
 
         def create
-          action = resolve_action!
+          action = resolve_action_definition!
           raise UnsupportedActionError, "#{action.name} must be called with #{action.http_verb.to_s.upcase}" unless request.request_method_symbol == action.http_verb
 
-          handler = RecordingStudioApi.resource_handler(resource_recording.recordable_type, action.name, api: current_api_key)
+          recordable_type = resolve_recordable_type!
+          handler = RecordingStudioApi.resource_handler(recordable_type, action.name, api: current_api_key)
           if handler
-            result = handler.call(action_context(action, ignored_keys: ROUTE_PARAM_KEYS))
+            assert_action_enabled!(action, recordable_type)
+            result = handler.call(handler_action_context(action, recordable_type))
             render json: result.fetch(:json), status: result.fetch(:status, :ok)
           else
+            assert_action_enabled!(action, resource_recording.recordable_type)
             context = action_context(action)
             authorize_action!(action, context)
             result = action.handler.call(context)
@@ -35,6 +38,34 @@ module RecordingStudioApi
         end
 
         private
+
+        def resolve_action_definition!
+          action = RecordingStudioApi.capability_action(params[:action_name], version: current_api_version, api: current_api_key)
+          raise UnsupportedActionError, "Unknown API action #{params[:action_name]}" if action.nil?
+
+          action
+        end
+
+        def resolve_recordable_type!
+          recordable_type = RecordingStudioApi.recordable_type_for_resource(params[:resource], api: current_api_key)
+          raise RecordingStudioApi::NotFoundError, "Unknown API resource #{params[:resource]}" if recordable_type.blank?
+
+          recordable_type
+        end
+
+        def handler_action_context(action, recordable_type)
+          RecordingStudioApi::ActionContext.new(
+            recording: nil,
+            api_client: current_api_client,
+            credential: current_api_credential,
+            access_recording: current_access_recording,
+            access_grant: current_access_grant,
+            root_recording: current_root_recording,
+            params: action_params(action, ignored_keys: ROUTE_PARAM_KEYS),
+            id: params[:id],
+            recordable_type: recordable_type
+          )
+        end
 
         def action_context(action, ignored_keys: [])
           RecordingStudioApi::ActionContext.new(
@@ -76,13 +107,9 @@ module RecordingStudioApi
           context.access_grant.authorize!(recording: context.recording, role: required_role)
         end
 
-        def resolve_action!
-          action = RecordingStudioApi.capability_action(params[:action_name], version: current_api_version, api: current_api_key)
-          raise UnsupportedActionError, "Unknown API action #{params[:action_name]}" if action.nil?
-          raise UnsupportedActionError, "#{action.name} is not enabled for #{resource_recording.recordable_type}" unless action.applicable_to?(resource_recording.recordable_type)
-          raise UnsupportedActionError, "#{action.name} is not enabled for #{resource_recording.recordable_type}" unless RecordingStudioApi.capability_action_enabled_for?(action, resource_recording.recordable_type, api: current_api_key)
-
-          action
+        def assert_action_enabled!(action, recordable_type)
+          raise UnsupportedActionError, "#{action.name} is not enabled for #{recordable_type}" unless action.applicable_to?(recordable_type)
+          raise UnsupportedActionError, "#{action.name} is not enabled for #{recordable_type}" unless RecordingStudioApi.capability_action_enabled_for?(action, recordable_type, api: current_api_key)
         end
 
         def resource_recording

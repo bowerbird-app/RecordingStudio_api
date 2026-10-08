@@ -40,7 +40,7 @@ module RecordingStudioApi
 
         def show
           if (handler = nested_resource_handler(:show))
-            render_registered_resource_handler!(handler, nested_handler_context(recording: child_recording))
+            render_registered_resource_handler!(handler, nested_handler_context)
             return
           end
 
@@ -70,7 +70,7 @@ module RecordingStudioApi
         def update
           if (handler = nested_resource_handler(:update))
             reject_nested_parent_input!
-            render_registered_resource_handler!(handler, nested_handler_context(recording: child_recording))
+            render_registered_resource_handler!(handler, nested_handler_context)
             return
           end
 
@@ -87,7 +87,7 @@ module RecordingStudioApi
 
         def destroy
           if (handler = nested_resource_handler(:destroy))
-            render_registered_resource_handler!(handler, nested_handler_context(recording: child_recording(include_trashed: true)))
+            render_registered_resource_handler!(handler, nested_handler_context)
             return
           end
 
@@ -209,7 +209,8 @@ module RecordingStudioApi
         end
 
         def nested_resource_handler(operation_name)
-          return unless relationship.source == :children && relationship.many
+          relationship = declared_parent_relationship
+          return unless relationship&.source == :children && relationship.many
           return unless relationship.endpoints.include?(operation_name.to_sym)
 
           registration = RecordingStudioApi.recordable_registration_for(relationship.child_type, api: current_api_key)
@@ -218,11 +219,31 @@ module RecordingStudioApi
           RecordingStudioApi.resource_handler(relationship.child_type, operation_name, api: current_api_key)
         end
 
-        def nested_handler_context(recording: nil)
-          relationship_operation_context(recordable_type: relationship.child_type, recording: recording)
+        def declared_parent_relationship
+          parent_type = resolve_recordable_type!
+          RecordingStudioApi.recordable_registration_for(parent_type, api: current_api_key)
+                            &.relationships
+                            &.[](relationship_name)
+        end
+
+        def nested_handler_context
+          relationship = declared_parent_relationship
+          build_relationship_operation_context(
+            recordable_type: relationship.child_type,
+            recording: nil,
+            parent_recording: nil
+          )
         end
 
         def relationship_operation_context(recordable_type:, recording: nil)
+          build_relationship_operation_context(
+            recordable_type: recordable_type,
+            recording: recording,
+            parent_recording: parent_recording
+          )
+        end
+
+        def build_relationship_operation_context(recordable_type:, recording:, parent_recording:)
           RecordingStudioApi::ResourceOperationContext.new(
             recording: recording,
             recordable_type: recordable_type,
@@ -237,7 +258,10 @@ module RecordingStudioApi
             request_params: request.request_parameters,
             scoped_recordings: scoped_recordings,
             parent_recording: parent_recording,
-            idempotency_key: request.headers["Idempotency-Key"].presence
+            idempotency_key: request.headers["Idempotency-Key"].presence,
+            id: params[:id],
+            parent_id: params[:parent_id],
+            relationship_id: params[:relationship_id]
           )
         end
       end

@@ -11,7 +11,7 @@ module RecordingStudioApi
         end
 
         def show
-          render_dispatched_resource_action!(:show, recording: resource_recording)
+          render_dispatched_resource_action!(:show)
         end
 
         def create
@@ -19,11 +19,11 @@ module RecordingStudioApi
         end
 
         def update
-          render_dispatched_resource_action!(:update, recording: resource_recording)
+          render_dispatched_resource_action!(:update)
         end
 
         def destroy
-          render_dispatched_resource_action!(:destroy, recording: resource_recording(include_trashed: true))
+          render_dispatched_resource_action!(:destroy)
         end
 
         private
@@ -98,16 +98,21 @@ module RecordingStudioApi
           )
         end
 
-        def render_dispatched_resource_action!(operation_name, recording: nil)
+        def render_dispatched_resource_action!(operation_name)
           operation = resolve_resource_action!(operation_name)
-          recordable_type = recordable_type_for_dispatched_action(recording)
+          recordable_type = resolve_recordable_type!
           handler = RecordingStudioApi.resource_handler(recordable_type, operation_name, api: current_api_key)
           if handler
-            render_registered_resource_handler!(handler, resource_operation_context_for(handler, recording))
+            render_registered_resource_handler!(
+              handler,
+              resource_operation_context(recording: nil, recordable_type: recordable_type)
+            )
             return
           end
 
-          result = operation.handler.call(resource_operation_context(recording: recording))
+          result = operation.handler.call(
+            resource_operation_context(recording: builtin_member_recording_for(operation_name))
+          )
           render json: result.fetch(:json), status: result.fetch(:status, :ok)
         end
 
@@ -116,14 +121,13 @@ module RecordingStudioApi
           render json: result.fetch(:json), status: result.fetch(:status, :ok)
         end
 
-        def recordable_type_for_dispatched_action(recording)
-          recording ? recording.recordable_type : resolve_recordable_type!
-        end
-
-        def resource_operation_context_for(handler, recording)
-          return resource_operation_context(recording: recording) unless handler && recording
-
-          resource_operation_context(recording: recording, recordable_type: recording.recordable_type)
+        def builtin_member_recording_for(operation_name)
+          case operation_name
+          when :show, :update
+            resource_recording
+          when :destroy
+            resource_recording(include_trashed: true)
+          end
         end
 
         def render_dispatched_capability_action!(action_name, recording:)
@@ -183,7 +187,10 @@ module RecordingStudioApi
             request_params: request.request_parameters,
             scoped_recordings: scoped_recordings,
             parent_recording: nil,
-            idempotency_key: request.headers["Idempotency-Key"].presence
+            idempotency_key: request.headers["Idempotency-Key"].presence,
+            id: params[:id],
+            parent_id: params[:parent_id],
+            relationship_id: params[:relationship_id]
           )
         end
 
