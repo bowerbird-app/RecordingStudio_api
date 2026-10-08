@@ -100,18 +100,20 @@ module RecordingStudioApi
 
         def render_dispatched_resource_action!(operation_name, recording: nil)
           operation = resolve_resource_action!(operation_name)
-          handler = registered_resource_handler(operation_name, recording)
-          context = resource_operation_context_for(handler, recording)
-          result = (handler || operation.handler).call(context)
+          recordable_type = recordable_type_for_dispatched_action(recording)
+          handler = RecordingStudioApi.resource_handler(recordable_type, operation_name, api: current_api_key)
+          if handler
+            render_registered_resource_handler!(handler, resource_operation_context_for(handler, recording))
+            return
+          end
+
+          result = operation.handler.call(resource_operation_context(recording: recording))
           render json: result.fetch(:json), status: result.fetch(:status, :ok)
         end
 
-        def registered_resource_handler(operation_name, recording)
-          RecordingStudioApi.resource_handler(
-            recordable_type_for_dispatched_action(recording),
-            operation_name,
-            api: current_api_key
-          )
+        def render_registered_resource_handler!(handler, context)
+          result = handler.call(context)
+          render json: result.fetch(:json), status: result.fetch(:status, :ok)
         end
 
         def recordable_type_for_dispatched_action(recording)

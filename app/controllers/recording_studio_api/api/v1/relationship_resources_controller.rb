@@ -8,6 +8,11 @@ module RecordingStudioApi
       # Generic endpoints for configured, direct child collections.
       class RelationshipResourcesController < ResourcesController
         def index
+          if (handler = nested_resource_handler(:index))
+            render_registered_resource_handler!(handler, nested_handler_context)
+            return
+          end
+
           assert_nested_operation!(:index, role: :view)
 
           pagination = RecordingStudioApi::Services::PaginateResourceCollection.call(
@@ -34,6 +39,11 @@ module RecordingStudioApi
         end
 
         def show
+          if (handler = nested_resource_handler(:show))
+            render_registered_resource_handler!(handler, nested_handler_context(recording: child_recording))
+            return
+          end
+
           assert_nested_operation!(:show, role: :view)
           child = child_recording
           authorize_child!(child)
@@ -42,6 +52,12 @@ module RecordingStudioApi
         end
 
         def create
+          if (handler = nested_resource_handler(:create))
+            reject_nested_type_or_parent_input!
+            render_registered_resource_handler!(handler, nested_handler_context)
+            return
+          end
+
           assert_nested_operation!(:create, role: :edit)
           reject_nested_type_or_parent_input!
 
@@ -52,6 +68,12 @@ module RecordingStudioApi
         end
 
         def update
+          if (handler = nested_resource_handler(:update))
+            reject_nested_parent_input!
+            render_registered_resource_handler!(handler, nested_handler_context(recording: child_recording))
+            return
+          end
+
           assert_nested_operation!(:update, role: :edit)
           reject_nested_parent_input!
           child = child_recording
@@ -64,6 +86,11 @@ module RecordingStudioApi
         end
 
         def destroy
+          if (handler = nested_resource_handler(:destroy))
+            render_registered_resource_handler!(handler, nested_handler_context(recording: child_recording(include_trashed: true)))
+            return
+          end
+
           assert_nested_operation!(:destroy, role: :edit, include_trashed: true)
           child = child_recording(include_trashed: true)
           authorize_child!(child)
@@ -179,6 +206,20 @@ module RecordingStudioApi
           return if registration&.supports_operation?(operation)
 
           raise RecordingStudioApi::UnsupportedActionError, "#{operation} is not enabled for #{recordable_type}"
+        end
+
+        def nested_resource_handler(operation_name)
+          return unless relationship.source == :children && relationship.many
+          return unless relationship.endpoints.include?(operation_name.to_sym)
+
+          registration = RecordingStudioApi.recordable_registration_for(relationship.child_type, api: current_api_key)
+          return unless registration&.supports_operation?(operation_name)
+
+          RecordingStudioApi.resource_handler(relationship.child_type, operation_name, api: current_api_key)
+        end
+
+        def nested_handler_context(recording: nil)
+          relationship_operation_context(recordable_type: relationship.child_type, recording: recording)
         end
 
         def relationship_operation_context(recordable_type:, recording: nil)
