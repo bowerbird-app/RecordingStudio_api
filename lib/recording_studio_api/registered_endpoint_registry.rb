@@ -50,7 +50,7 @@ module RecordingStudioApi
     end
 
     def match(path:, http_verb:)
-      verb = http_verb.to_sym
+      verb = normalize_http_verb(http_verb)
       @registrations.each_value do |registration|
         next unless registration.http_verb == verb
 
@@ -59,6 +59,13 @@ module RecordingStudioApi
       end
 
       nil
+    end
+
+    def http_verbs_for_path(path)
+      verbs = @registrations.each_value.filter_map do |registration|
+        registration.http_verb if registration.match(path)
+      end
+      RegisteredEndpoint::ALLOWED_HTTP_VERBS & verbs
     end
 
     def to_h
@@ -75,6 +82,10 @@ module RecordingStudioApi
       @registrations.each_value.any? do |existing|
         existing.http_verb == registration.http_verb && existing.path == registration.path
       end
+    end
+
+    def normalize_http_verb(http_verb)
+      http_verb.to_s.downcase.to_sym
     end
   end
 end

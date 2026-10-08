@@ -160,8 +160,120 @@ class ApiV1RegisteredEndpointsControllerTest < ActionDispatch::IntegrationTest
   test "wrong verb is rejected for a registered path" do
     get "/recording_studio_api/api/v1/echo/widget", headers: authorization_headers
 
-    assert_response :unprocessable_entity
-    assert_equal "echo must be called with POST", JSON.parse(response.body).dig("error", "message")
+    assert_response :method_not_allowed
+    assert_equal "POST", response.headers["Allow"]
+    payload = JSON.parse(response.body)
+    assert_equal "method_not_allowed", payload.dig("error", "code")
+    assert_equal "GET is not allowed. Allowed: POST", payload.dig("error", "message")
+  end
+
+  test "get and post on the same collection path dispatch separately" do
+    RecordingStudioApi.register_endpoint(
+      :list_people,
+      http_verb: :get,
+      path: "people",
+      handler: ->(_context) { { operation: "list" } }
+    )
+    RecordingStudioApi.register_endpoint(
+      :create_person,
+      http_verb: :post,
+      path: "people",
+      handler: ->(context) { { operation: "create", name: context.params[:name] } }
+    )
+
+    get "/recording_studio_api/api/v1/people", headers: authorization_headers
+    assert_response :success
+    assert_equal "list", JSON.parse(response.body).fetch("operation")
+
+    post "/recording_studio_api/api/v1/people",
+         params: { name: "Ada" },
+         as: :json,
+         headers: authorization_headers
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert_equal "create", payload.fetch("operation")
+    assert_equal "Ada", payload.fetch("name")
+
+    delete "/recording_studio_api/api/v1/people", headers: authorization_headers
+    assert_response :method_not_allowed
+    assert_equal "GET, POST", response.headers["Allow"]
+    assert_equal "method_not_allowed", JSON.parse(response.body).dig("error", "code")
+  end
+
+  test "get and patch on the same member path dispatch separately" do
+    RecordingStudioApi.register_endpoint(
+      :show_person,
+      http_verb: :get,
+      path: "people/:id",
+      handler: ->(context) { { operation: "show", id: context.params[:id] } }
+    )
+    RecordingStudioApi.register_endpoint(
+      :update_person,
+      http_verb: :patch,
+      path: "people/:id",
+      handler: ->(context) { { operation: "update", id: context.params[:id], name: context.params[:name] } }
+    )
+
+    get "/recording_studio_api/api/v1/people/person-1", headers: authorization_headers
+    assert_response :success
+    assert_equal({ "operation" => "show", "id" => "person-1" }, JSON.parse(response.body))
+
+    patch "/recording_studio_api/api/v1/people/person-1",
+          params: { name: "Ada" },
+          as: :json,
+          headers: authorization_headers
+    assert_response :success
+    assert_equal(
+      { "operation" => "update", "id" => "person-1", "name" => "Ada" },
+      JSON.parse(response.body)
+    )
+
+    put "/recording_studio_api/api/v1/people/person-1",
+        params: { name: "Ada" },
+        as: :json,
+        headers: authorization_headers
+    assert_response :method_not_allowed
+    assert_equal "GET, PATCH", response.headers["Allow"]
+  end
+
+  test "operations api dispatches the same path by verb" do
+    RecordingStudioApi.configuration.api(:operations) { |api| api.default_access = :read_only }
+    RecordingStudioApi.register_recordable_type_api(
+      "Workspace",
+      api: :operations,
+      operations: %i[index show],
+      serializer: ->(recordable, **) { { name: recordable.name } },
+      output_keys: %i[name]
+    )
+    RecordingStudioApi.register_endpoint(
+      :ops_list_people,
+      api: :operations,
+      http_verb: :get,
+      path: "people",
+      handler: ->(_context) { { operation: "list", api: "operations" } }
+    )
+    RecordingStudioApi.register_endpoint(
+      :ops_create_person,
+      api: :operations,
+      http_verb: :post,
+      path: "people",
+      handler: ->(_context) { { operation: "create", api: "operations" } }
+    )
+
+    operations_token = issue_operations_token
+    headers = bearer_headers(operations_token)
+
+    get "/recording_studio_api/apis/operations/v1/people", headers: headers
+    assert_response :success
+    assert_equal({ "operation" => "list", "api" => "operations" }, JSON.parse(response.body))
+
+    post "/recording_studio_api/apis/operations/v1/people", headers: headers, as: :json
+    assert_response :success
+    assert_equal({ "operation" => "create", "api" => "operations" }, JSON.parse(response.body))
+
+    patch "/recording_studio_api/apis/operations/v1/people", headers: headers, as: :json
+    assert_response :method_not_allowed
+    assert_equal "GET, POST", response.headers["Allow"]
   end
 
   private

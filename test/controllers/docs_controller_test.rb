@@ -171,6 +171,7 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "context.cancelled?"
     assert_includes response.body, "RegisteredEndpointContext"
     assert_includes response.body, "Named endpoint context"
+    assert_includes response.body, "Dispatch matches path and HTTP verb"
     assert_not_includes response.body, "RecordingStudioApi.register_action"
     assert_not_includes response.body, "RegisteredActionContext"
   end

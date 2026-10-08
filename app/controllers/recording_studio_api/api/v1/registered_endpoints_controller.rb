@@ -17,8 +17,6 @@ module RecordingStudioApi
         def invoke
           match = resolve_match!
           endpoint = match.endpoint
-          raise UnsupportedActionError, "#{endpoint.name} must be called with #{endpoint.http_verb.to_s.upcase}" unless request.request_method_symbol == endpoint.http_verb
-
           result = endpoint.handler.call(endpoint_context(endpoint, match.captures))
           render json: serialize_result(endpoint, result)
         end
@@ -27,9 +25,15 @@ module RecordingStudioApi
 
         def resolve_match!
           match = RecordingStudioApi.registered_endpoint_request_match(request)
-          raise RecordingStudioApi::NotFoundError, "Unknown API endpoint" if match.nil?
+          return match if match
 
-          match
+          raise RecordingStudioApi::NotFoundError, "Unknown API endpoint" if RecordingStudioApi.registered_endpoint_path_match(request).nil?
+
+          allowed = RecordingStudioApi.registered_endpoint_http_verbs(request)
+          raise RecordingStudioApi::MethodNotAllowedError.new(
+            "#{request.request_method} is not allowed. Allowed: #{allowed.map { |verb| verb.to_s.upcase }.join(', ')}",
+            allowed_http_verbs: allowed
+          )
         end
 
         def endpoint_context(endpoint, captures)
