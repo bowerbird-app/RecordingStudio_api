@@ -168,6 +168,14 @@ module RecordingStudioApi
       end || []
     end
 
+    def register_resource_handler(recordable_type, action, api: :public, handler:)
+      configuration.api(api).resource_handler_registry.register(recordable_type, action, handler: handler)
+    end
+
+    def resource_handler(recordable_type, action, api: :public)
+      configuration.fetch_api(api).resource_handler_registry.fetch(recordable_type, action)
+    end
+
     def register_capability_action(name, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil, api: :public)
       configuration.api(api).action_registry.register(
         name,

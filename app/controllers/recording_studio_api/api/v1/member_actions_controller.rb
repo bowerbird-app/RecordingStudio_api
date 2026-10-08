@@ -12,20 +12,31 @@ module RecordingStudioApi
           id
           resource
         ].freeze
+        ROUTE_PARAM_KEYS = %w[
+          api_key
+          api_version
+          member_action
+        ].freeze
 
         def create
           action = resolve_action!
           raise UnsupportedActionError, "#{action.name} must be called with #{action.http_verb.to_s.upcase}" unless request.request_method_symbol == action.http_verb
 
-          context = action_context(action)
-          authorize_action!(action, context)
-          result = action.handler.call(context)
-          render json: serialize_result(action, result)
+          handler = RecordingStudioApi.resource_handler(resource_recording.recordable_type, action.name, api: current_api_key)
+          if handler
+            result = handler.call(action_context(action, ignored_keys: ROUTE_PARAM_KEYS))
+            render json: result.fetch(:json), status: result.fetch(:status, :ok)
+          else
+            context = action_context(action)
+            authorize_action!(action, context)
+            result = action.handler.call(context)
+            render json: serialize_result(action, result)
+          end
         end
 
         private
 
-        def action_context(action)
+        def action_context(action, ignored_keys: [])
           RecordingStudioApi::ActionContext.new(
             recording: resource_recording,
             api_client: current_api_client,
@@ -33,13 +44,13 @@ module RecordingStudioApi
             access_recording: current_access_recording,
             access_grant: current_access_grant,
             root_recording: current_root_recording,
-            params: action_params(action)
+            params: action_params(action, ignored_keys: ignored_keys)
           )
         end
 
-        def action_params(action)
+        def action_params(action, ignored_keys: [])
           raw_params = params.respond_to?(:to_unsafe_h) ? params.to_unsafe_h : {}
-          filtered_params = raw_params.except(*RESERVED_ACTION_PARAM_KEYS)
+          filtered_params = raw_params.except(*RESERVED_ACTION_PARAM_KEYS, *ignored_keys)
           normalized_params = filtered_params.respond_to?(:deep_symbolize_keys) ? filtered_params.deep_symbolize_keys : {}
 
           return normalized_params if action.input_contract.nil?

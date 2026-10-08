@@ -4,6 +4,7 @@ require_relative "action_registry"
 require_relative "registered_endpoint_registry"
 require_relative "api_version_profile"
 require_relative "recordable_registry"
+require_relative "resource_handler_registry"
 
 module RecordingStudioApi
   class ApiDefinition
@@ -36,7 +37,7 @@ module RecordingStudioApi
                   :api_request_logging_enabled,
                   :api_request_logging_payload_mode,
                   :api_request_log_allowed_param_keys
-    attr_reader :name, :action_registry, :registered_endpoint_registry, :recordable_registry, :default_api_version, :api_version_profiles
+    attr_reader :name, :action_registry, :registered_endpoint_registry, :recordable_registry, :resource_handler_registry, :default_api_version, :api_version_profiles
 
     def initialize(name, defaults: nil)
       @name = name.to_s.freeze
@@ -56,6 +57,7 @@ module RecordingStudioApi
       @action_registry = ActionRegistry.new
       @registered_endpoint_registry = RegisteredEndpointRegistry.new
       @recordable_registry = RecordableRegistry.new
+      @resource_handler_registry = ResourceHandlerRegistry.new
     end
 
     def api_versions
@@ -92,6 +94,7 @@ module RecordingStudioApi
       action_registry.validate!
       registered_endpoint_registry.validate!
       recordable_registry.validate!
+      resource_handler_registry.validate!
       raise ConfigurationError, "authentication must be oauth for #{name}" unless authentication == :oauth
       raise ConfigurationError, "default_access must be read_only or read_write for #{name}" unless %i[read_only read_write].include?(default_access)
 
@@ -120,7 +123,8 @@ module RecordingStudioApi
         access_token_ttl: access_token_ttl,
         action_registrations: action_registry.to_h,
         registered_endpoint_registrations: registered_endpoint_registry.to_h,
-        recordable_registrations: recordable_registry.to_h
+        recordable_registrations: recordable_registry.to_h,
+        resource_handlers: resource_handler_registry.to_h
       }
     end
 

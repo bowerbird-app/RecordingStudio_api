@@ -1,5 +1,51 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.6.6
+
+`0.6.6` lets a gem register a handler for one recordable type and action.
+Types without a handler keep today's shared handlers. Update the host
+dependency to `recording_studio_api`, `~> 0.6.6`.
+
+1. No migrations. Paths, tokens, OpenAPI for unregistered types, and the
+   built-in resource and move handlers stay as they are.
+2. Register the handler next to the capability action. Pass the recordable
+   type, the action, the API, and a callable:
+
+   ```ruby
+   RecordingStudioApi.register_resource_handler(
+     "SupportPage",
+     :create,
+     api: :operations,
+     handler: SupportPages::Api::Create
+   )
+
+   RecordingStudioApi.register_resource_handler(
+     "SupportPage",
+     :move,
+     api: :operations,
+     handler: SupportPages::Api::Move
+   )
+   ```
+
+   Actions are `index`, `show`, `create`, `update`, `destroy`, or a
+   capability action such as `move`. `api:` defaults to `:public`.
+3. The handler receives the same context the shared handler receives.
+   Resource actions get a `ResourceOperationContext`. Capability actions get
+   an `ActionContext`. Return `{ json:, status: }`. Route keys (`api_key`,
+   `api_version`, `member_action`) are left out of that context's params
+   before the action's input contract runs, so the handler sees the action
+   input.
+4. The handler owns access checks for that type and action. This gem does
+   not run the shared member-action role check first, and it does not add
+   permission, search, or other business rules. The action must still be
+   enabled on that type, the same way it is today.
+5. A handler registered for one type or API does not run for another type
+   or API. Lookup returns `nil` when nothing is registered, and dispatch
+   uses the shared handler.
+
+If you are still on `0.6.5` or older, complete
+[Upgrading to 0.6.5](#upgrading-to-065) first.
+
 ## Upgrading to 0.6.5
 
 `0.6.5` dispatches `register_endpoint` routes on path and HTTP verb. Update

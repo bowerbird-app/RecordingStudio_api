@@ -371,6 +371,34 @@ end
 `writable_attributes` is an explicit allowlist for API create and update operations. OpenAPI
 field metadata describes response data only and never grants write access.
 
+### Per-type handlers
+
+Register a handler for one recordable type and action when that gem already
+owns the behavior. Other types keep the shared handler.
+
+```ruby
+RecordingStudioApi.register_resource_handler(
+  "SupportPage",
+  :create,
+  api: :operations,
+  handler: SupportPages::Api::Create
+)
+
+RecordingStudioApi.register_resource_handler(
+  "SupportPage",
+  :move,
+  api: :operations,
+  handler: SupportPages::Api::Move
+)
+```
+
+`index` and `create` take the recordable type from the resource name. `show`,
+`update`, `destroy`, and capability actions such as `move` take it from the
+recording. The handler receives the same context object the shared handler
+receives and returns `{ json:, status: }`. Route keys are omitted from a
+capability handler's params before the input contract runs. The handler owns
+access checks for that type and action. This gem only routes the call.
+
 ### Fields, relationships, and includes
 
 Resource registration declares the flat fields and named relationships an API may expose.
