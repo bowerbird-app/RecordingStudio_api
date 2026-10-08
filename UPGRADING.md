@@ -1,5 +1,46 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.6.8
+
+`0.6.8` runs a registered per-type resource handler on nested relationship
+routes as well as collection and member routes. Update the host dependency
+to `recording_studio_api`, `~> 0.6.8`.
+
+1. No migrations. Nested routes without a handler keep today's shared
+   `ResourceOperations` path and inline nested index/show.
+2. The same registration covers nested children:
+
+   ```ruby
+   RecordingStudioApi.register_resource_handler(
+     "SupportPage",
+     :create,
+     api: :operations,
+     handler: SupportPages::Api::Create
+   )
+   ```
+
+   Nested `POST /sections/:parent_id/pages` calls that handler with
+   `context.parent_recording` set. `index`, `show`, `update`, and
+   `destroy` on the nested route do the same.
+3. The handler owns access checks. This gem does not run the nested
+   parent role check first. The nested relationship must still list the
+   action in `endpoints`, and the child type must still enable the
+   operation.
+4. Collection and member dispatch is unchanged from `0.6.7`.
+
+If you are still on `0.6.7` or older, complete
+[Upgrading to 0.6.7](#upgrading-to-067) first.
+
+## Upgrading to 0.6.7
+
+`0.6.7` lets a gem register a handler for one recordable type and action.
+Types without a handler keep the shared handlers. Nested relationship
+routes were not included until `0.6.8`. Update the host dependency to
+`recording_studio_api`, `~> 0.6.7`.
+
+If you are still on `0.6.5` or older, complete
+[Upgrading to 0.6.5](#upgrading-to-065) first.
+
 ## Upgrading to 0.6.6
 
 `0.6.6` lets a gem register a handler for one recordable type and action.

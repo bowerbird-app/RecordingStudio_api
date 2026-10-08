@@ -394,10 +394,13 @@ RecordingStudioApi.register_resource_handler(
 
 `index` and `create` take the recordable type from the resource name. `show`,
 `update`, `destroy`, and capability actions such as `move` take it from the
-recording. The handler receives the same context object the shared handler
-receives and returns `{ json:, status: }`. Route keys are omitted from a
-capability handler's params before the input contract runs. The handler owns
-access checks for that type and action. This gem only routes the call.
+recording. Nested relationship routes use the relationship's child type and
+pass `parent_recording` on the same `ResourceOperationContext`. The handler
+receives the same context object the shared handler receives and returns
+`{ json:, status: }`. Route keys are omitted from a capability handler's
+params before the input contract runs. The handler owns access checks for
+that type and action. This gem only routes the call. Nested routes without
+a handler keep the shared resource operations.
 
 ### Fields, relationships, and includes
 

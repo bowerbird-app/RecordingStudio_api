@@ -12,6 +12,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`036686aa4eaf4f945f920cf4b11be4e842de0aac`). Lockfiles resolve the gem as
   `4.2.1` (that tag's `RecordingStudio::VERSION`). Gemspec stays `~> 4.2`.
 
+## [0.6.8] - 2026-10-08
+
+Per-type resource handlers also run on nested relationship routes.
+
+### Added
+- `RelationshipResourcesController` looks up
+  `RecordingStudioApi.resource_handler(relationship.child_type, action, api:)`
+  for nested `index`, `show`, `create`, `update`, and `destroy`.
+- A registered handler receives the relationship operation context with
+  `parent_recording` set and returns `{ json:, status: }`. It owns access
+  checks. The nested role check is skipped, matching collection and member
+  dispatch.
+- Nested routes without a handler keep the shared `ResourceOperations` and
+  inline index/show path.
+
+### Upgrade notes
+- Update the host pin to `recording_studio_api`, `~> 0.6.8`.
+- No migrations. Types and nested routes without a handler are unchanged.
+- Register the same handler you already use for collection/member routes.
+  Nested create, update, and destroy call it too.
+
+See [UPGRADING.md](UPGRADING.md).
+
 ## [0.6.7] - 2026-10-08
 
 A gem can register its own handler for one recordable type and action. Types
