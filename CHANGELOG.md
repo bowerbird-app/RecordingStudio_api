@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`036686aa4eaf4f945f920cf4b11be4e842de0aac`). Lockfiles resolve the gem as
   `4.2.1` (that tag's `RecordingStudio::VERSION`). Gemspec stays `~> 4.2`.
 
-## [0.6.6] - 2026-10-08
+## [0.6.7] - 2026-10-08
 
 A gem can register its own handler for one recordable type and action. Types
 without a handler keep the shared resource and capability handlers.
@@ -29,12 +29,24 @@ without a handler keep the shared resource and capability handlers.
   `{ json:, status: }`.
 
 ### Upgrade notes
-- Update the host pin to `recording_studio_api`, `~> 0.6.6`.
+- Update the host pin to `recording_studio_api`, `~> 0.6.7`.
 - No migrations. Unregistered types, built-in handlers, auth, and response
   shapes are unchanged.
 - A registered handler owns access checks for that type and action.
 
 See [UPGRADING.md](UPGRADING.md).
+
+## [0.6.6] - 2026-10-08
+
+Companion pin bumps for dummy and development Gemfiles (#25).
+
+### Changed
+- RecordingStudio Admin `v2.0.6` and FlatPack `v0.1.207`.
+
+### Upgrade notes
+- Update companion pins to Admin `v2.0.6` and FlatPack `v0.1.207` when
+  matching the dummy or development Gemfiles.
+- No API or behavior changes in this gem.
 
 ## [0.6.5] - 2026-10-08
 
