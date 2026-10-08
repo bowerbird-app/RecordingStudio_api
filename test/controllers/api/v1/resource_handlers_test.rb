@@ -196,17 +196,108 @@ class ApiV1ResourceHandlersTest < ActionDispatch::IntegrationTest
     assert_equal "Page", JSON.parse(response.body).fetch("type")
   end
 
+  test "a registered member handler reaches a record outside the client's tree" do
+    operations_headers, page_recording, folder_recording = operations_client_and_workspace_records
+    seen = {}
+    %i[show update destroy].each do |action|
+      RecordingStudioApi.register_resource_handler("Page", action, api: :operations, handler: lambda { |context|
+        seen[action] = context
+        { json: { handled: action.to_s, id: context.id }, status: :ok }
+      })
+    end
+    RecordingStudio.enable_capability(:movable, on: "Page")
+    RecordingStudioApi.register_recordable_type_api("Page", api: :operations, capability_actions: %i[move])
+    RecordingStudioApi.register_resource_handler("Page", :move, api: :operations, handler: lambda { |context|
+      seen[:move] = context
+      { json: { handled: "move", id: context.id, parent_id: context.params[:parent_id] }, status: :accepted }
+    })
+
+    get "/recording_studio_api/apis/operations/v1/pages/#{page_recording.id}", headers: operations_headers
+    assert_response :success
+    assert_equal "show", JSON.parse(response.body).fetch("handled")
+    assert_equal page_recording.id.to_s, JSON.parse(response.body).fetch("id")
+    assert_nil seen.fetch(:show).recording
+    assert_equal page_recording.id.to_s, seen.fetch(:show).id
+    assert_equal seen.fetch(:show).access_grant.actor, seen.fetch(:show).actor
+
+    patch "/recording_studio_api/apis/operations/v1/pages/#{page_recording.id}",
+          params: { title: "Should not write" },
+          headers: operations_headers
+    assert_response :success
+    assert_equal "update", JSON.parse(response.body).fetch("handled")
+
+    delete "/recording_studio_api/apis/operations/v1/pages/#{page_recording.id}", headers: operations_headers
+    assert_response :success
+    assert_equal "destroy", JSON.parse(response.body).fetch("handled")
+    assert RecordingStudio::Recording.exists?(page_recording.id)
+
+    post "/recording_studio_api/apis/operations/v1/pages/#{page_recording.id}/actions/move",
+         params: { parent_id: folder_recording.id },
+         headers: operations_headers
+    assert_response :accepted
+    assert_equal "move", JSON.parse(response.body).fetch("handled")
+    assert_nil seen.fetch(:move).recording
+    assert_equal page_recording.id.to_s, seen.fetch(:move).id
+    assert_equal "Page", seen.fetch(:move).recordable_type
+    assert_equal folder_recording.id, seen.fetch(:move).params[:parent_id]
+
+    get "/recording_studio_api/apis/operations/v1/folders/#{folder_recording.id}", headers: operations_headers
+    assert_response :not_found
+    assert_equal "Resource was not found in this API scope", JSON.parse(response.body).dig("error", "message")
+
+    post "/recording_studio_api/apis/operations/v1/folders/#{folder_recording.id}/actions/move",
+         params: { parent_id: page_recording.root_recording_id },
+         headers: operations_headers
+    assert_response :not_found
+    assert_equal "Resource was not found in this API scope", JSON.parse(response.body).dig("error", "message")
+  end
+
   private
 
   def authorization_headers
     { "Authorization" => "Bearer #{@access_token}" }
   end
 
-  def issue_named_api_token(api:, name:)
+  def operations_client_and_workspace_records
+    RecordingStudioApi.configuration.api(:operations) { |api| api.default_access = :read_only }
+    RecordingStudioApi.register_default_resource_actions!(api: :operations)
+    RecordingStudioApi.register_default_capability_actions!(api: :operations)
+    RecordingStudioApi.register_recordable_type_api(
+      "AdminRoot",
+      api: :operations,
+      operations: %i[index show],
+      serializer: ->(recordable, **) { { name: recordable.name } },
+      output_keys: %i[name]
+    )
+    RecordingStudioApi.register_recordable_type_api(
+      "Page",
+      api: :operations,
+      operations: %i[index show create update destroy],
+      serializer: ->(recordable, **) { { title: recordable.title } },
+      output_keys: %i[title],
+      writable_attributes: %i[title]
+    )
+    RecordingStudioApi.register_recordable_type_api(
+      "Folder",
+      api: :operations,
+      operations: %i[index show],
+      capability_actions: %i[move],
+      serializer: ->(recordable, **) { { name: recordable.name } },
+      output_keys: %i[name]
+    )
+    _admin_root, admin_root_recording = create_admin_root_recording(name: "Ops admin #{SecureRandom.hex(4)}")
+    admin_access = grant_or_bootstrap_access!(recording: admin_root_recording, actor: @user, role: :admin)
+    token = issue_named_api_token(api: :operations, name: "Ops out-of-tree token", access_recording: admin_access)
+    workspace_root, = create_access_recording_for(user: create_user, workspace_name: "Support #{SecureRandom.hex(4)}")
+    page_recording = create_page_recording(root_recording: workspace_root)
+    [{ "Authorization" => "Bearer #{token}" }, page_recording, page_recording.parent_recording]
+  end
+
+  def issue_named_api_token(api:, name:, access_recording: @access_recording)
     provision_result = RecordingStudioApi::Services::ProvisionApiClient.call(
-      access_point_recording: access_point_recording_for(@access_recording),
-      manager_actor: access_manager_for(@access_recording),
-      role: @access_recording.recordable.role,
+      access_point_recording: access_point_recording_for(access_recording),
+      manager_actor: access_manager_for(access_recording),
+      role: access_recording.recordable.role,
       name: name,
       api: api
     )
@@ -224,3 +315,4 @@ class ApiV1ResourceHandlersTest < ActionDispatch::IntegrationTest
     token_result.value.fetch(:access_token)
   end
 end
+

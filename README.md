@@ -392,15 +392,33 @@ RecordingStudioApi.register_resource_handler(
 )
 ```
 
-`index` and `create` take the recordable type from the resource name. `show`,
-`update`, `destroy`, and capability actions such as `move` take it from the
-recording. Nested relationship routes use the relationship's child type and
-pass `parent_recording` on the same `ResourceOperationContext`. The handler
-receives the same context object the shared handler receives and returns
-`{ json:, status: }`. Route keys are omitted from a capability handler's
-params before the input contract runs. The handler owns access checks for
-that type and action. This gem only routes the call. Nested routes without
-a handler keep the shared resource operations.
+Collection actions take the recordable type from the resource name. Nested
+relationship routes use the relationship's child type. When a handler is
+registered, this gem does not load the recording or authorize the parent.
+The handler receives the same context class plus the raw ids from the
+route, and returns `{ json:, status: }`.
+
+Resource and nested handlers get a `ResourceOperationContext` with:
+
+- `id`, `parent_id`, `relationship_id` — raw route ids (`id` on member
+  routes, `parent_id` / `relationship_id` on nested routes)
+- `params`, `request_params`, `api_client`, `access_grant`, `actor`
+- `recordable_type`, `resource_name`, `credential`, `access_recording`,
+  `root_recording`, `api_version`, `scoped_recordings`, `idempotency_key`
+
+`recording` and `parent_recording` stay `nil` on that path. Look the
+record up yourself.
+
+Member-action handlers (for example `move`) get an `ActionContext` with:
+
+- `id`, `recordable_type`
+- `params`, `api_client`, `access_grant`, `actor`
+- `credential`, `access_recording`, `root_recording`
+
+`recording` stays `nil`. Route keys are omitted from a capability
+handler's params before the input contract runs. The handler owns access
+checks for that type and action. This gem only routes the call. Routes
+without a handler keep the shared lookup and operations.
 
 ### Fields, relationships, and includes
 

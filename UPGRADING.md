@@ -1,5 +1,25 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.6.9
+
+`0.6.9` skips this gem's scoped record lookup when a per-type handler is
+registered. Update the host dependency to `recording_studio_api`, `~> 0.6.9`.
+
+1. No migrations. Types and routes without a handler keep today's lookup
+   and still 404 outside the client's tree.
+2. A registered handler must find the record and check access. Member
+   routes pass `context.id`. Nested routes pass `context.parent_id` and
+   `context.relationship_id`. Member actions such as `move` pass
+   `context.id` and `context.recordable_type` on `ActionContext`.
+   `context.recording` and `context.parent_recording` are unset.
+3. Use `context.api_client`, `context.access_grant`, and `context.actor`
+   with the owning gem's existing access checks.
+4. Do not expect this gem to authorize the parent on a nested handler
+   route.
+
+If you are still on `0.6.8` or older, complete
+[Upgrading to 0.6.8](#upgrading-to-068) first.
+
 ## Upgrading to 0.6.8
 
 `0.6.8` runs a registered per-type resource handler on nested relationship
@@ -19,9 +39,10 @@ to `recording_studio_api`, `~> 0.6.8`.
    )
    ```
 
-   Nested `POST /sections/:parent_id/pages` calls that handler with
-   `context.parent_recording` set. `index`, `show`, `update`, and
-   `destroy` on the nested route do the same.
+   Nested `POST /sections/:parent_id/pages` calls that handler. From
+   `0.6.9` the nested route passes raw ids instead of a preloaded
+   `parent_recording`. `index`, `show`, `update`, and `destroy` on the
+   nested route do the same.
 3. The handler owns access checks. This gem does not run the nested
    parent role check first. The nested relationship must still list the
    action in `endpoints`, and the child type must still enable the

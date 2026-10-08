@@ -12,6 +12,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`036686aa4eaf4f945f920cf4b11be4e842de0aac`). Lockfiles resolve the gem as
   `4.2.1` (that tag's `RecordingStudio::VERSION`). Gemspec stays `~> 4.2`.
 
+## [0.6.9] - 2026-10-08
+
+Registered per-type handlers skip this gem's scoped record lookup.
+
+### Changed
+- Member `show` / `update` / `destroy`, member actions such as `move`, and
+  nested relationship routes call a registered handler without loading the
+  recording from the API client's tree or authorizing the parent first.
+- Handler context includes the raw route ids (`id`, `parent_id`,
+  `relationship_id`) plus `params`, `api_client`, `access_grant`, and
+  `actor`. `recording` and `parent_recording` are unset on that path.
+- Types and routes without a handler keep the existing scoped lookup and
+  404 with "not found in this API scope".
+
+### Upgrade notes
+- Update the host pin to `recording_studio_api`, `~> 0.6.9`.
+- No migrations. Unregistered types are unchanged.
+- A handler must load the record from `context.id` (member),
+  `context.parent_id` / `context.relationship_id` (nested), or
+  `context.id` (member actions) and check access itself.
+
+See [UPGRADING.md](UPGRADING.md).
+
 ## [0.6.8] - 2026-10-08
 
 Per-type resource handlers also run on nested relationship routes.

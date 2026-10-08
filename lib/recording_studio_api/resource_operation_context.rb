@@ -16,7 +16,10 @@ module RecordingStudioApi
     :scoped_recordings,
     :parent_recording,
     :idempotency_key,
-    :progress_reporter
+    :progress_reporter,
+    :id,
+    :parent_id,
+    :relationship_id
   ) do
     include ProgressReporting
 
@@ -35,13 +38,20 @@ module RecordingStudioApi
       scoped_recordings:,
       parent_recording:,
       idempotency_key: nil,
-      progress_reporter: nil
+      progress_reporter: nil,
+      id: nil,
+      parent_id: nil,
+      relationship_id: nil
     )
       super
     end
 
     def api_key
       api_client&.api_key.presence || "public"
+    end
+
+    def actor
+      access_grant&.actor
     end
   end
 end
