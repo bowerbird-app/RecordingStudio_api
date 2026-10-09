@@ -24,6 +24,7 @@ safer defaults in `0.4.0`, and the flat API contract from `0.3.0`, see
 - capability-backed action registry with automatic action exposure when a recordable type enables that capability
 - `register_endpoint` for named JSON endpoints that are not a recordable collection
 - optional `ui:` widget id on those registrations, plus `ui_for` / `actions_for_ui` lookups
+- site-wide API usage metrics on the operations API via Recording Studio Metrics
 - preserved template reference material in `docs/gem_template/`
 
 The current codebase still ships the template engine mechanics (configuration, hooks, install generator, sample service objects), but the engine now also exposes a real JSON API surface for authenticated resource lookup, capability-backed member actions, and named endpoints that are not a recordable.
@@ -257,6 +258,19 @@ bin/rails recording_studio_api:api_metrics:maintain
 # Or enqueue for an ActiveJob backend (Solid Queue, Sidekiq, etc.)
 bin/rails recording_studio_api:api_metrics:enqueue_maintain
 ```
+
+The engine also registers `:api_requests` and `:api_keys` with Recording Studio
+Metrics (`blast_radius: :site`, operations only). `api_authorize` reuses
+`RecordingStudioApi::Admin::ApiAuthorization`. This gem does not call
+`RecordingStudioMetrics::Api.register!`. The host registers Metrics endpoints
+once:
+
+```ruby
+RecordingStudioMetrics::Api.register!(api: :operations)
+```
+
+Paths on the operations API: `GET /metrics` and
+`GET /metrics/:resource/:name`.
 
 Solid Queue recurring example:
 

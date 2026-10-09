@@ -12,6 +12,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`036686aa4eaf4f945f920cf4b11be4e842de0aac`). Lockfiles resolve the gem as
   `4.2.1` (that tag's `RecordingStudio::VERSION`). Gemspec stays `~> 4.2`.
 
+## [0.6.14] - 2026-10-09
+
+Site-wide API usage metrics register with Recording Studio Metrics for the
+operations API.
+
+### Added
+- `RecordingStudioApi::Metrics.register!` registers `:api_requests` on
+  `ApiDailyMetric` and `:api_keys` on `ApiCredential` (`blast_radius: :site`).
+  Metrics: `api_requests.over_time` (sum of `request_count` by
+  `metric_date`), `api_requests.errors_over_time` (client plus server
+  errors), `api_requests.by_status_class` (sum of `request_count`),
+  `api_requests.rate_limited` (sum of `rate_limited_count`), and
+  `api_keys.active` (`ApiCredential.active`). Each is exposed on
+  `:operations` only. `api_authorize` reuses
+  `RecordingStudioApi::Admin::ApiAuthorization.authorized?` with the
+  access-management view role.
+- Runtime dependency `recording_studio_metrics` `~> 0.2` (GitHub tag `v0.2.0`).
+
+### Upgrade notes
+- Bump to `0.6.14`. No migration.
+- Add `recording_studio_metrics` at tag `v0.2.0`.
+- This gem does not call `RecordingStudioMetrics::Api.register!`. The host
+  registers Metrics endpoints once:
+
+```ruby
+RecordingStudioMetrics::Api.register!(api: :operations)
+```
+
 ## [0.6.11] - 2026-10-09
 
 Optional `ui:` widget id on existing API registrations.

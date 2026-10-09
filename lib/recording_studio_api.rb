@@ -60,6 +60,7 @@ require "recording_studio_api/services/resource_operations/create"
 require "recording_studio_api/services/resource_operations/update"
 require "recording_studio_api/services/resource_operations/destroy"
 require "recording_studio_api/admin"
+require "recording_studio_api/metrics"
 
 # rubocop:disable Metrics/ModuleLength
 module RecordingStudioApi
