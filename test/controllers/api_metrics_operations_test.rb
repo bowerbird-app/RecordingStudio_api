@@ -22,7 +22,7 @@ class ApiMetricsOperationsTest < ActionDispatch::IntegrationTest
     RecordingStudioMetrics::Api.register!(api: :operations)
 
     @manager = create_user
-    _admin_root, @admin_recording = create_admin_root_recording(name: "Metrics admin #{SecureRandom.hex(4)}")
+    _admin_root, @admin_recording = create_admin_root_recording(name: "Admin")
     create_access_recording(parent_recording: @admin_recording, user: @manager, role: :admin)
     RecordingStudioApi::Admin::ApiAuthorization.recording_for(
       api: :operations,

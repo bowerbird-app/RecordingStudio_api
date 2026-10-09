@@ -260,10 +260,10 @@ bin/rails recording_studio_api:api_metrics:enqueue_maintain
 ```
 
 The engine also registers `:api_requests` and `:api_keys` with Recording Studio
-Metrics (`blast_radius: :site`, operations only). `api_authorize` reuses
-`RecordingStudioApi::Admin::ApiAuthorization`. This gem does not call
-`RecordingStudioMetrics::Api.register!`. The host registers Metrics endpoints
-once:
+Metrics (`blast_radius: :site`, operations only). `api_authorize` allows an
+actor with the access-management view role on the site admin root. This gem
+does not call `RecordingStudioMetrics::Api.register!`. The host registers
+Metrics endpoints once:
 
 ```ruby
 RecordingStudioMetrics::Api.register!(api: :operations)
