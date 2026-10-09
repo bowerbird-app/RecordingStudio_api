@@ -533,24 +533,50 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
   test "docs pages include documentation links" do
     get docs_install_path
 
-    assert_select %(a[href="#{docs_install_path}"]), text: /Install/
-    assert_select %(a[href="#{docs_config_path}"]), text: /Config/
-    assert_select %(a[href="#{docs_recordable_types_path}"]), text: /Recordable types/
-    assert_select %(a[href="#{docs_recordings_tree_path}"]), text: /Recordings tree/
-    assert_select %(a[href="#{docs_gem_views_path}"]), text: /Gem Views/
-    assert_select %(a[href="#{docs_api_routes_path}"]), text: /API routes/
-    assert_select %(a[href="#{public_api_scalar_docs_path}"]), text: /Scalar/
-    assert_select %(a[href="#{docs_add_capability_path}"]), text: /Add API capability/
-    assert_select %(a[href="#{docs_auth_path}"]), text: /Auth/
-    assert_select %(a[href="#{docs_methods_path}"]), text: /Methods/
-    assert_select %(a[href="#{docs_versions_path}"]), text: /Versions/
-    assert_select %(a[href="#{docs_api_hierarchy_path}"]), text: /API hierarchy/
+    assert_response :success
+    assert_select "h1", text: "Install"
     assert_select %(a[href="/docs/global_allow_list"]), false
 
-    methods_link_index = response.body.index(%(href="#{docs_methods_path}"))
-    versions_link_index = response.body.index(%(href="#{docs_versions_path}"))
-    api_hierarchy_link_index = response.body.index(%(href="#{docs_api_hierarchy_path}"))
-    recordings_tree_link_index = response.body.index(%(href="#{docs_recordings_tree_path}"))
+    # Docs screens use recording_studio/default_layout (no host sidebar). The
+    # documentation link catalog lives in the dummy nav partial and sidebar.
+    nav_source = File.read(Rails.root.join("app/views/docs/_nav.html.erb"))
+    sidebar_source = File.read(Rails.root.join("app/views/layouts/flat_pack/_sidebar.html.erb"))
+
+    [
+      ["Install", "docs_install_path"],
+      ["Config", "docs_config_path"],
+      ["Add API capability", "docs_add_capability_path"],
+      ["Gem Views", "docs_gem_views_path"],
+      ["API routes", "docs_api_routes_path"],
+      ["Scalar", "public_api_scalar_docs_path"],
+      ["Auth", "docs_auth_path"],
+      ["Methods", "docs_methods_path"],
+      ["Versions", "docs_versions_path"],
+      ["API hierarchy", "docs_api_hierarchy_path"],
+      ["Recordings tree", "docs_recordings_tree_path"],
+      ["Recordable types", "docs_recordable_types_path"]
+    ].each do |label, path_helper|
+      assert_includes nav_source, %(text: "#{label}")
+      assert_includes nav_source, path_helper
+    end
+
+    assert_includes sidebar_source, 'text: "Install"'
+    assert_includes sidebar_source, "main_app.docs_install_path"
+    assert_includes sidebar_source, 'text: "Methods"'
+    assert_includes sidebar_source, "main_app.docs_methods_path"
+    assert_includes sidebar_source, 'text: "Versions"'
+    assert_includes sidebar_source, "main_app.docs_versions_path"
+    assert_includes sidebar_source, 'text: "API hierarchy"'
+    assert_includes sidebar_source, "main_app.docs_api_hierarchy_path"
+    assert_includes sidebar_source, 'text: "Recordings tree"'
+    assert_includes sidebar_source, "main_app.docs_recordings_tree_path"
+    assert_not_includes nav_source, "global_allow_list"
+    assert_not_includes sidebar_source, "global_allow_list"
+
+    methods_link_index = nav_source.index("docs_methods_path")
+    versions_link_index = nav_source.index("docs_versions_path")
+    api_hierarchy_link_index = nav_source.index("docs_api_hierarchy_path")
+    recordings_tree_link_index = nav_source.index("docs_recordings_tree_path")
 
     assert_not_nil methods_link_index
     assert_not_nil versions_link_index
