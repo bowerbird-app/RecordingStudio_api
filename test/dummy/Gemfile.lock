@@ -34,10 +34,10 @@ GIT
 
 GIT
   remote: https://github.com/bowerbird-app/RecordingStudio_moveable.git
-  revision: 0291e76b00f3c8d8065a0cea06daac206ef44cec
-  tag: v3.0.3
+  revision: d0e2663c7791fdd234347f9ffafa57af83b17250
+  tag: v3.3.0
   specs:
-    recording_studio_moveable (3.0.1)
+    recording_studio_moveable (3.3.0)
       rails (>= 8.1.0, < 9.0)
       recording_studio (~> 4.2)
       recording_studio_accessible (~> 0.6)
@@ -565,7 +565,7 @@ CHECKSUMS
   recording_studio_admin (2.1.0)
   recording_studio_api (0.6.11)
   recording_studio_icons (0.1.0)
-  recording_studio_moveable (3.0.1)
+  recording_studio_moveable (3.3.0)
   recording_studio_root_switchable (0.6.0)
   redis (5.4.1) sha256=b5e675b57ad22b15c9bcc765d5ac26f60b675408af916d31527af9bd5a81faae
   redis-client (0.29.0) sha256=0c65bf1f8f6dca22063ddb085c0bb2054feef6f03a84869f4161b18a9a15bea3
