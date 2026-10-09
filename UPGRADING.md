@@ -1,5 +1,22 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.6.15
+
+`0.6.15` lets site admins read operations API usage metrics before the
+Admin API record exists. Update the host dependency to
+`recording_studio_api`, `~> 0.6.15`.
+
+1. No migrations.
+2. `:api_requests` and `:api_keys` authorize
+   `access_management_view_role` on the site admin root. Set
+   `RecordingStudioAdmin.configuration.site_admin_recording_resolver`
+   (or `access_recording_resolver`) to that root. A resolver that raises
+   hides the metrics.
+3. Workspace admins do not receive these site-wide metrics.
+
+If you are still on `0.6.14` or older, complete
+[Upgrading to 0.6.14](#upgrading-to-0614) first.
+
 ## Upgrading to 0.6.14
 
 `0.6.14` registers API usage metrics for the operations API. Update the

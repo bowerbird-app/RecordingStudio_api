@@ -6,16 +6,33 @@ module RecordingStudioApi
   module Metrics
     API = :operations
     EXPOSE = { api: [API] }.freeze
+    ResolverContext = Struct.new(:controller)
     AUTHORIZE = lambda { |context|
-      RecordingStudioApi::Admin::ApiAuthorization.authorized?(
-        actor: context.access_grant.actor,
-        api: context.api_key,
-        root_recording: context.root_recording,
+      actor = context&.access_grant&.actor
+      recording = site_admin_recording
+      return false if actor.blank? || recording.blank?
+
+      RecordingStudioAccessible.authorized?(
+        actor: actor,
+        recording: recording,
         role: RecordingStudioApi.configuration.access_management_view_role
       )
     }
 
     module_function
+
+    def site_admin_recording
+      return unless defined?(RecordingStudioAdmin)
+
+      config = RecordingStudioAdmin.configuration
+      resolver = config.site_admin_recording_resolver || config.access_recording_resolver
+      return unless resolver
+
+      resolver.call(ResolverContext.new(nil))
+    rescue StandardError
+      nil
+    end
+    private_class_method :site_admin_recording
 
     def register!
       register_api_requests!

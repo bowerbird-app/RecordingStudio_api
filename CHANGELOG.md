@@ -12,6 +12,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`036686aa4eaf4f945f920cf4b11be4e842de0aac`). Lockfiles resolve the gem as
   `4.2.1` (that tag's `RecordingStudio::VERSION`). Gemspec stays `~> 4.2`.
 
+## [0.6.15] - 2026-10-09
+
+Site admins can read operations API usage metrics before the Admin API
+record exists.
+
+### Fixed
+- `:api_requests` and `:api_keys` `api_authorize` checks
+  `access_management_view_role` on the site admin root recording.
+  The check uses `site_admin_recording_resolver`, then
+  `access_recording_resolver`, with a nil controller. A resolver that
+  raises, or a blank actor or recording, denies the metric. Workspace
+  admins do not receive these site-wide metrics, and the metrics GET
+  does not create an Admin API record.
+
+### Upgrade notes
+- Bump to `0.6.15`. No migration.
+- Point `RecordingStudioAdmin` `site_admin_recording_resolver` (or
+  `access_recording_resolver`) at the site admin root.
+
+See [UPGRADING.md](UPGRADING.md).
+
 ## [0.6.14] - 2026-10-09
 
 Site-wide API usage metrics register with Recording Studio Metrics for the
