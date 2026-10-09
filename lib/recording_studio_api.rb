@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "recording_studio_api/version"
+require "recording_studio_api/ui_widget_id"
 require "recording_studio_accessible"
 require "recording_studio_api/engine"
 require "recording_studio_api/errors"
@@ -134,7 +135,7 @@ module RecordingStudioApi
       Integration.oauth_error_status(error)
     end
 
-    def register_endpoint(name, api: :public, http_verb:, path:, handler:, serializer: nil, openapi: nil, input_contract: nil)
+    def register_endpoint(name, api: :public, http_verb:, path:, handler:, serializer: nil, openapi: nil, input_contract: nil, ui: nil)
       configuration.api(api).registered_endpoint_registry.register(
         name,
         http_verb: http_verb,
@@ -142,7 +143,8 @@ module RecordingStudioApi
         handler: handler,
         serializer: serializer,
         openapi: openapi,
-        input_contract: input_contract
+        input_contract: input_contract,
+        ui: ui
       )
     end
 
@@ -176,7 +178,7 @@ module RecordingStudioApi
       configuration.fetch_api(api).resource_handler_registry.fetch(recordable_type, action)
     end
 
-    def register_capability_action(name, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil, api: :public)
+    def register_capability_action(name, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil, ui: nil, api: :public)
       configuration.api(api).action_registry.register(
         name,
         capability: capability,
@@ -189,7 +191,8 @@ module RecordingStudioApi
         scope: scope,
         openapi: openapi,
         input_contract: input_contract,
-        required_role: required_role
+        required_role: required_role,
+        ui: ui
       )
     end
 
@@ -218,6 +221,21 @@ module RecordingStudioApi
 
     def register_recording_studio_admin!
       Admin.register!
+    end
+
+    def ui_for(action_name, api: :public, version: nil)
+      resolved_action_for_ui(action_name, api: api, version: version)&.ui
+    end
+
+    def actions_for_ui(widget_id, api: :public, version: nil)
+      id = UiWidgetId.normalize(widget_id, name: "ui")
+      return [] if id.blank?
+
+      definition = configuration.fetch_api(api)
+      profile = api_version_profile_for(version, api: api)
+
+      definition.action_registry.all(profile: profile).select { |action| action.ui == id } +
+        definition.registered_endpoint_registry.all.select { |endpoint| endpoint.ui == id }
     end
 
     def capability_action(name, version: nil, api: :public)
@@ -484,6 +502,10 @@ module RecordingStudioApi
     end
 
     private
+
+    def resolved_action_for_ui(action_name, api:, version:)
+      capability_action(action_name, version: version, api: api) || registered_endpoint(action_name, api: api)
+    end
 
     def normalize_documentation_mount_path(value, allow_root: true)
       path = value.to_s.strip

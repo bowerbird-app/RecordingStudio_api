@@ -23,6 +23,7 @@ safer defaults in `0.4.0`, and the flat API contract from `0.3.0`, see
 - authenticated API requests resolved into a `RecordingStudioApi::AccessGrant` that is passed to capability handlers
 - capability-backed action registry with automatic action exposure when a recordable type enables that capability
 - `register_endpoint` for named JSON endpoints that are not a recordable collection
+- optional `ui:` widget id on those registrations, plus `ui_for` / `actions_for_ui` lookups
 - preserved template reference material in `docs/gem_template/`
 
 The current codebase still ships the template engine mechanics (configuration, hooks, install generator, sample service objects), but the engine now also exposes a real JSON API surface for authenticated resource lookup, capability-backed member actions, and named endpoints that are not a recordable.
@@ -735,6 +736,35 @@ RecordingStudioApi.register_endpoint(
   handler: ->(context) { { key: context.params[:key], message: context.params[:message] } }
 )
 ```
+
+Pass optional `ui:` with a string widget id when an MCP App should open a
+widget for that action. The API stores the string only.
+
+```ruby
+RecordingStudioApi.register_endpoint(
+  "presskits.edit",
+  http_verb: :patch,
+  path: "presskits/:id",
+  handler: Presskits::Edit,
+  ui: "presskits.editor"
+)
+
+RecordingStudioApi.register_capability_action(
+  :update_presskit,
+  capability: :presskits,
+  handler: Presskits::Update,
+  ui: "presskits.editor"
+)
+
+RecordingStudioApi.ui_for("presskits.edit", api: :public, version: "v1")
+# => "presskits.editor"
+
+RecordingStudioApi.actions_for_ui("presskits.editor", api: :public, version: "v1")
+# => matching endpoint and capability-action objects for that API and version
+```
+
+Omit `ui:` and lookups return `nil` or an empty list. Widget HTML lives in
+MCP UI, not here.
 
 Routes use the same mount and version prefix as the tree API (`/recording_studio_api/api/v1/ping`, or `/recording_studio_api/apis/<api-name>/<version>/...` for a named API). Bearer auth still applies. A public client cannot call an endpoint registered only on `:operations`.
 

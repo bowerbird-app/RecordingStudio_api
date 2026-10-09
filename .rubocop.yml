@@ -59,6 +59,21 @@ Naming/VariableNumber:
   Exclude:
     - 'test/**/*'
 
+Naming/MethodParameterName:
+  AllowedNames:
+    - as
+    - at
+    - by
+    - cc
+    - db
+    - id
+    - ip
+    - io
+    - os
+    - pp
+    - to
+    - ui
+
 # Don't require super in service initialize methods
 Lint/MissingSuper:
   Exclude:

@@ -1,5 +1,43 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.6.11
+
+`0.6.11` lets an endpoint or capability action name a widget id. Update the
+host dependency to `recording_studio_api`, `~> 0.6.11`.
+
+1. No migrations. Existing registrations stay the same when you omit `ui:`.
+2. Pass a string widget id if MCP Apps should find the action:
+
+   ```ruby
+   RecordingStudioApi.register_endpoint(
+     "presskits.edit",
+     http_verb: :patch,
+     path: "presskits/:id",
+     handler: Presskits::Edit,
+     ui: "presskits.editor"
+   )
+
+   RecordingStudioApi.register_capability_action(
+     :update_presskit,
+     capability: :presskits,
+     handler: Presskits::Update,
+     ui: "presskits.editor"
+   )
+   ```
+
+3. Look the string up with the same named API and version profile as other
+   action lookups:
+
+   ```ruby
+   RecordingStudioApi.ui_for("presskits.edit", api: :public, version: "v1")
+   RecordingStudioApi.actions_for_ui("presskits.editor", api: :public, version: "v1")
+   ```
+
+4. Do not put widget HTML or component classes in this gem.
+
+If you are still on `0.6.9` or older, complete
+[Upgrading to 0.6.9](#upgrading-to-069) first.
+
 ## Upgrading to 0.6.9
 
 `0.6.9` skips this gem's scoped record lookup when a per-type handler is

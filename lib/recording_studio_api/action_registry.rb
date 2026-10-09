@@ -9,7 +9,7 @@ module RecordingStudioApi
       @registrations = {}
     end
 
-    def register(name, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil)
+    def register(name, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil, ui: nil)
       registration = ActionRegistration.new(
         name: name,
         capability: capability,
@@ -22,7 +22,8 @@ module RecordingStudioApi
         scope: scope,
         openapi: openapi,
         input_contract: input_contract,
-        required_role: required_role
+        required_role: required_role,
+        ui: ui
       )
       registration.validate!
 
@@ -46,6 +47,10 @@ module RecordingStudioApi
 
     def resolve(name, profile: nil)
       selected_registration(@registrations[name.to_s], profile: profile)
+    end
+
+    def all(profile: nil)
+      selected_registrations(profile: profile)
     end
 
     def available_for(recordable_type, scope: nil, profile: nil)
