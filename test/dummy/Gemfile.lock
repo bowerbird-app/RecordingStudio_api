@@ -45,10 +45,10 @@ GIT
 
 GIT
   remote: https://github.com/bowerbird-app/RecordingStudio_root_switchable.git
-  revision: daca2dc88f9c3365db21c2004fcfd1cffdff8844
-  tag: v0.5.3
+  revision: 78ea1ad2b7705260fb07144ac32e7604b77090ab
+  tag: v0.6.0
   specs:
-    recording_studio_root_switchable (0.5.1)
+    recording_studio_root_switchable (0.6.0)
       flat_pack
       rails (~> 8.1.0)
       recording_studio (~> 4.1)
@@ -566,7 +566,7 @@ CHECKSUMS
   recording_studio_api (0.6.11)
   recording_studio_icons (0.1.0)
   recording_studio_moveable (3.0.1)
-  recording_studio_root_switchable (0.5.1)
+  recording_studio_root_switchable (0.6.0)
   redis (5.4.1) sha256=b5e675b57ad22b15c9bcc765d5ac26f60b675408af916d31527af9bd5a81faae
   redis-client (0.29.0) sha256=0c65bf1f8f6dca22063ddb085c0bb2054feef6f03a84869f4161b18a9a15bea3
   regexp_parser (2.11.3) sha256=ca13f381a173b7a93450e53459075c9b76a10433caadcb2f1180f2c741fc55a4
