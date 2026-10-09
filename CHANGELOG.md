@@ -12,6 +12,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`036686aa4eaf4f945f920cf4b11be4e842de0aac`). Lockfiles resolve the gem as
   `4.2.1` (that tag's `RecordingStudio::VERSION`). Gemspec stays `~> 4.2`.
 
+## [0.6.11] - 2026-10-09
+
+Optional `ui:` widget id on existing API registrations.
+
+### Added
+- `register_endpoint` and `register_capability_action` accept optional
+  `ui:` and store it as a string widget id on the existing registration.
+- `RecordingStudioApi.ui_for(action_name, api:, version:)` returns that
+  string or `nil`.
+- `RecordingStudioApi.actions_for_ui(widget_id, api:, version:)` returns
+  the matching capability actions and named endpoints for that widget id.
+  Both lookups reuse named API surfaces and version profiles.
+
+### Upgrade notes
+- Update the host pin to `recording_studio_api`, `~> 0.6.11`.
+- No migrations. Omit `ui:` and current registrations stay the same.
+- This gem stores a string only. Widget HTML stays in MCP UI.
+
+See [UPGRADING.md](UPGRADING.md).
+
 ## [0.6.9] - 2026-10-08
 
 Registered per-type handlers skip this gem's scoped record lookup.

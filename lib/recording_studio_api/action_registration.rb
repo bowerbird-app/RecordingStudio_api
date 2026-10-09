@@ -4,15 +4,16 @@ require "date"
 require "rubygems/version"
 
 require_relative "action_input_contract"
+require_relative "ui_widget_id"
 
 module RecordingStudioApi
   class ActionRegistration
     ALLOWED_HTTP_VERBS = %i[get post patch put delete].freeze
     ALLOWED_SCOPES = %i[collection resource member].freeze
 
-    attr_reader :name, :capability, :version, :version_notes, :deprecation, :http_verb, :handler, :serializer, :scope, :openapi, :input_contract, :required_role
+    attr_reader :name, :capability, :version, :version_notes, :deprecation, :http_verb, :handler, :serializer, :scope, :openapi, :input_contract, :required_role, :ui
 
-    def initialize(name:, capability:, http_verb:, handler:, version: nil, version_notes: nil, deprecation: nil, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil)
+    def initialize(name:, capability:, http_verb:, handler:, version: nil, version_notes: nil, deprecation: nil, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil, ui: nil)
       @name = name.to_s
       @capability = capability&.to_sym
       @version = normalize_version(version)
@@ -25,6 +26,7 @@ module RecordingStudioApi
       @openapi = normalize_openapi(openapi)
       @input_contract = normalize_input_contract(input_contract)
       @required_role = normalize_required_role(required_role)
+      @ui = UiWidgetId.normalize(ui, name: name)
     end
 
     # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
@@ -65,7 +67,8 @@ module RecordingStudioApi
         scope: scope,
         required_role: required_role,
         openapi: openapi,
-        input_contract: input_contract&.as_json
+        input_contract: input_contract&.as_json,
+        ui: ui
       }
     end
 

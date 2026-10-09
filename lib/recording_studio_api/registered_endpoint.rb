@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "action_input_contract"
+require_relative "ui_widget_id"
 
 module RecordingStudioApi
   class RegisteredEndpoint
@@ -11,9 +12,9 @@ module RecordingStudioApi
 
     Match = Data.define(:endpoint, :captures)
 
-    attr_reader :name, :http_verb, :path, :handler, :serializer, :openapi, :input_contract
+    attr_reader :name, :http_verb, :path, :handler, :serializer, :openapi, :input_contract, :ui
 
-    def initialize(name:, http_verb:, path:, handler:, serializer: nil, openapi: nil, input_contract: nil)
+    def initialize(name:, http_verb:, path:, handler:, serializer: nil, openapi: nil, input_contract: nil, ui: nil)
       @name = name.to_s
       @http_verb = http_verb.to_sym
       @path = normalize_path(path)
@@ -21,6 +22,7 @@ module RecordingStudioApi
       @serializer = serializer
       @openapi = normalize_openapi(openapi)
       @input_contract = normalize_input_contract(input_contract)
+      @ui = UiWidgetId.normalize(ui, name: name)
     end
 
     def validate!
@@ -79,7 +81,8 @@ module RecordingStudioApi
         http_verb: http_verb,
         path: path,
         openapi: openapi,
-        input_contract: input_contract&.as_json
+        input_contract: input_contract&.as_json,
+        ui: ui
       }
     end
 
