@@ -1,5 +1,26 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.6.14
+
+`0.6.14` registers API usage metrics for the operations API. Update the
+host dependency to `recording_studio_api`, `~> 0.6.14`.
+
+1. No migrations. Existing request logging and daily metric tables stay
+   the same.
+2. Add `recording_studio_metrics` at tag `v0.2.0`.
+3. This gem only registers metric definitions. The host registers the
+   Metrics endpoints once:
+
+   ```ruby
+   RecordingStudioMetrics::Api.register!(api: :operations)
+   ```
+
+4. Authorization reuses `RecordingStudioApi::Admin::ApiAuthorization`
+   with the access-management view role. Do not add a second ACL.
+
+If you are still on `0.6.13` or older, complete
+[Upgrading to 0.6.11](#upgrading-to-0611) first.
+
 ## Upgrading to 0.6.11
 
 `0.6.11` lets an endpoint or capability action name a widget id. Update the

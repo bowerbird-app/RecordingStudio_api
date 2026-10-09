@@ -186,6 +186,10 @@ module RecordingStudioApi
       end
     end
 
+    initializer "recording_studio_api.metrics" do
+      config.to_prepare { RecordingStudioApi::Metrics.register! }
+    end
+
     initializer "recording_studio_api.prepend_recording_studio_admin_views", after: "recording_studio_api.register_recording_studio_admin" do
       config.to_prepare do
         require_dependency "recording_studio_admin/screens_controller"

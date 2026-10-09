@@ -1,5 +1,5 @@
 # frozen_string_literal: true
 
 module RecordingStudioApi
-  VERSION = "0.6.11"
+  VERSION = "0.6.14"
 end

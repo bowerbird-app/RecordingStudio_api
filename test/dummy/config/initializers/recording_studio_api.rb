@@ -294,3 +294,5 @@ RecordingStudioApi.register_endpoint(
   path: "ping",
   handler: ->(_context) { { ok: true } }
 )
+
+RecordingStudioMetrics::Api.register!(api: :operations)
