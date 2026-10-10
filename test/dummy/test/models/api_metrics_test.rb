@@ -64,7 +64,7 @@ class ApiMetricsTest < ActionDispatch::IntegrationTest
     assert_equal 12, values["2026-04-01"]
     assert_equal 7, values["2026-04-02"]
 
-    errors = execute("api_requests.errors_over_time")
+    errors = execute("api_requests.errors_over_time", interval: :day, start_at: Time.utc(2026, 4, 1), end_at: Time.utc(2026, 4, 4))
     error_values = errors.data.to_h { |row| [row[:date], row[:value]] }
     assert_equal 2, error_values["2026-04-01"]
     assert_equal 2, error_values["2026-04-02"]

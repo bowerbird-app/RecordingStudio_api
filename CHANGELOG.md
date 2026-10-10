@@ -12,6 +12,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`036686aa4eaf4f945f920cf4b11be4e842de0aac`). Lockfiles resolve the gem as
   `4.2.1` (that tag's `RecordingStudio::VERSION`). Gemspec stays `~> 4.2`.
 
+## [0.6.16] - 2026-10-10
+
+`api_requests.errors_over_time` uses the same date window as
+`api_requests.over_time`.
+
+### Fixed
+- `api_requests.errors_over_time` is a standard time series on
+  `metric_date`. It sums `client_error_count + server_error_count` and
+  follows the requested window, interval, timezone, and zero-fill.
+  Days with no rows are `0`. Rows outside the window are left out.
+  An empty table returns the window's buckets, including today on the
+  default window.
+
+### Upgrade notes
+- Bump to `0.6.16`. No migration.
+- Require `recording_studio_metrics` `>= 0.2.2` (GitHub tag `v0.2.2`).
+  That release keeps a `date` column on its own calendar day and includes
+  the day that contains `end_at`, so the default window includes today.
+- Callers that omitted `start_at` and `end_at` now receive the default
+  day window (about the last 30 days), not every stored day.
+
+See [UPGRADING.md](UPGRADING.md).
+
 ## [0.6.15] - 2026-10-09
 
 Site admins can read operations API usage metrics before the Admin API

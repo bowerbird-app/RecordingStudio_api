@@ -69,11 +69,12 @@ module RecordingStudioApi
                      measurement: :sum,
                      value_field: :request_count,
                      expose: EXPOSE
-      dsl.custom :errors_over_time,
-                 result_type: :timeseries,
-                 title: "API errors over time",
-                 expose: EXPOSE,
-                 &errors_over_time_calculator
+      dsl.timeseries :errors_over_time,
+                     title: "API errors over time",
+                     field: :metric_date,
+                     measurement: :sum,
+                     value_field: Arel.sql("client_error_count + server_error_count"),
+                     expose: EXPOSE
       dsl.breakdown :by_status_class,
                     title: "API requests by status class",
                     field: :status_class,
@@ -84,14 +85,6 @@ module RecordingStudioApi
               title: "Rate limited API requests",
               field: :rate_limited_count,
               expose: EXPOSE
-    end
-
-    def errors_over_time_calculator
-      lambda do |relation, _context|
-        relation.group(:metric_date).sum(Arel.sql("client_error_count + server_error_count")).map do |metric_date, value|
-          { date: metric_date.iso8601, value: value }
-        end
-      end
     end
   end
 end

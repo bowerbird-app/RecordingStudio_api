@@ -1,5 +1,24 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.6.16
+
+`0.6.16` makes `api_requests.errors_over_time` follow the same window as
+`api_requests.over_time`. Update the host dependency to
+`recording_studio_api`, `~> 0.6.16`.
+
+1. No migrations.
+2. Require `recording_studio_metrics` `>= 0.2.2` (GitHub tag `v0.2.2`).
+   Development and dummy Gemfiles pin that tag.
+3. `api_requests.errors_over_time` sums `client_error_count +
+   server_error_count` on `metric_date`. It uses the requested interval,
+   timezone, and window, and fills missing days with `0`. The default
+   window is about the last 30 days and includes today.
+4. A caller that previously received every stored day, including days
+   outside that window, should pass `start_at` and `end_at`.
+
+If you are still on `0.6.15` or older, complete
+[Upgrading to 0.6.15](#upgrading-to-0615) first.
+
 ## Upgrading to 0.6.15
 
 `0.6.15` lets site admins read operations API usage metrics before the
