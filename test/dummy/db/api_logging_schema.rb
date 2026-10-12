@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_02_000012) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_12_030251) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -290,5 +290,5 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_02_000012) do
   add_foreign_key "recording_studio_events", "recording_studio_recordings", column: "recording_id"
   add_foreign_key "recording_studio_recordings", "recording_studio_recordings", column: "parent_recording_id"
   add_foreign_key "recording_studio_recordings", "recording_studio_recordings", column: "root_recording_id"
-  add_foreign_key "recording_studio_root_switchable_selections", "recording_studio_recordings", column: "root_recording_id"
+  add_foreign_key "recording_studio_root_switchable_selections", "recording_studio_recordings", column: "root_recording_id", on_delete: :cascade
 end
