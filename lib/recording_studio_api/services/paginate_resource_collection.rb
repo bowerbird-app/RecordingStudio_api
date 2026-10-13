@@ -6,11 +6,25 @@ require "bigdecimal"
 module RecordingStudioApi
   module Services
     class PaginateResourceCollection < BaseService
+      Page = Data.define(:rows, :meta) do
+        def response_body
+          yield rows, meta
+        end
+      end
+
+      TotalCount = Data.define(:total_count) do
+        def response_body
+          { total_count: total_count }
+        end
+      end
+
       SUPPORTED_ORDERS = %w[asc desc].freeze
       PAGINATION_TOKEN_VERSION = 2
       PAGINATION_TOKEN_PURPOSE = "recording_studio_api.pagination.v2"
+      COUNT_TRUE = ["true", "1", true].freeze
+      COUNT_FALSE = ["false", "0", "", nil, false].freeze
 
-      def initialize(relation:, resource:, recordable_type:, limit:, pagination_token:, sort:, order:, api: :public, scope_key: nil)
+      def initialize(relation:, resource:, recordable_type:, limit:, pagination_token:, sort:, order:, api: :public, scope_key: nil, count: nil)
         @relation = relation
         @resource = resource.to_s
         @recordable_type = recordable_type.to_s
@@ -20,13 +34,16 @@ module RecordingStudioApi
         @order = order
         @api_key = RecordingStudioApi.configuration.fetch_api(api).name
         @scope_key = scope_key.to_s.presence || "anonymous"
+        @count = count
       end
 
       private
 
-      attr_reader :relation, :resource, :recordable_type, :limit, :pagination_token, :sort, :order, :api_key, :scope_key
+      attr_reader :relation, :resource, :recordable_type, :limit, :pagination_token, :sort, :order, :api_key, :scope_key, :count
 
       def perform
+        return success(TotalCount.new(total_count: total_count)) if count_only?
+
         sortable_context = resolve_sortable_context
         normalized_order = normalize_order
         normalized_sort = normalize_sort(sortable_context)
@@ -43,19 +60,33 @@ module RecordingStudioApi
         items = has_more ? rows.first(normalized_limit) : rows
 
         success(
-          {
+          Page.new(
             rows: items,
             meta: {
               limit: normalized_limit,
               sort: normalized_sort,
               order: normalized_order,
               has_more: has_more,
-              next_pagination_token: next_pagination_token_for(items, normalized_sort, normalized_order, has_more, sortable_context)
+              next_pagination_token: next_pagination_token_for(items, normalized_sort, normalized_order, has_more, sortable_context),
+              total_count: total_count
             }
-          }
+          )
         )
       rescue ActiveSupport::MessageVerifier::InvalidSignature, ArgumentError, TypeError
         failure(RecordingStudioApi::InvalidPaginationTokenError.new("Invalid pagination token"))
+      end
+
+      def count_only?
+        value = count.is_a?(String) ? count.strip.downcase : count
+        return true if COUNT_TRUE.include?(value)
+        return false if COUNT_FALSE.include?(value)
+
+        raise RecordingStudioApi::InvalidActionInputError, "count must be true or false"
+      end
+
+      # A filter join can repeat a recording. COUNT(*) would count those repeats.
+      def total_count
+        @total_count ||= relation.unscope(:order).distinct.count(relation.klass.arel_table[relation.klass.primary_key])
       end
 
       def ordered_relation(normalized_sort, normalized_order, sortable_context)
@@ -168,7 +199,8 @@ module RecordingStudioApi
           pagination_token_present: pagination_token.present?,
           sort: sort,
           limit: limit,
-          order: order
+          order: order,
+          count: count
         }
       end
 
