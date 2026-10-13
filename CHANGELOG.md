@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Dummy and development Gemfiles pin RecordingStudio git tag `v4.2.2`
+  (`036686aa4eaf4f945f920cf4b11be4e842de0aac`). Lockfiles resolve the gem as
+  `4.2.1` (that tag's `RecordingStudio::VERSION`). Gemspec stays `~> 4.2`.
+
 ## [0.7.0] - 2026-10-13
 
 Trash keep/trash checks go through Recording Studio Trashable's query-only
@@ -521,7 +526,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.6.18...v0.7.0
 [0.6.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.6...v0.6.0
 [0.5.6]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.5...v0.5.6

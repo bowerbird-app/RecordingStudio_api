@@ -165,7 +165,133 @@ class TrashableSiblingApiParityTest < ActiveSupport::TestCase
     assert_equal root_recording.id, access_recording.root_recording_id
   end
 
+  test "form_state available access points omit trashed access-point recordings" do
+    root_recording, = create_access_recording_for(user: @user, role: :admin)
+    kept_folder = RecordingStudio::Recording.create!(
+      recordable: Folder.create!(name: "Kept access point"),
+      parent_recording: root_recording
+    )
+    trashed_folder = RecordingStudio::Recording.create!(
+      recordable: Folder.create!(name: "Trashed access point"),
+      parent_recording: root_recording
+    )
+    trashed_folder.update_column(:trashed_at, Time.current)
+
+    host = form_state_host(manageable_roots: [root_recording])
+    ids = host.send(:available_access_point_recordings, root_recording).map(&:id)
+
+    assert_includes ids, root_recording.id
+    assert_includes ids, kept_folder.id
+    refute_includes ids, trashed_folder.id
+  end
+
+  test "admin clients query omits trashed client access and trashed actor access points" do
+    root_recording, access_recording = create_access_recording_for(user: @user, role: :admin)
+    provision = RecordingStudioApi::Services::ProvisionApiClient.call(
+      access_recording: access_recording,
+      name: "Visible client"
+    )
+    assert provision.success?, provision.error
+    payload = provision.value
+    api_client = payload.fetch(:api_client)
+    client_access = api_client.access_recording
+
+    context = admin_clients_context(actor: @user, root_recording: root_recording)
+    query = RecordingStudioApi::Admin::Queries::ApiAccessClientsQuery.new(context)
+
+    visible_ids = query.send(:visible_api_client_access_recordings).pluck(:id)
+    assert_includes visible_ids, client_access.id
+    assert_includes query.call.map { |row| row.api_client.id }, api_client.id
+
+    # form_state.rb sibling: accessible_access_point_ids_sql kept filter (:164)
+    access_recording.update_column(:trashed_at, Time.current)
+    query = RecordingStudioApi::Admin::Queries::ApiAccessClientsQuery.new(context)
+    assert_empty query.send(:accessible_access_point_recordings).pluck(:id)
+    assert_empty query.send(:visible_api_client_access_recordings).pluck(:id)
+    assert_empty query.call
+
+    # Restore actor access, trash only the client Access recording (:135)
+    access_recording.update_column(:trashed_at, nil)
+    client_access.update_column(:trashed_at, Time.current)
+    query = RecordingStudioApi::Admin::Queries::ApiAccessClientsQuery.new(context)
+    refute_includes query.send(:visible_api_client_access_recordings).pluck(:id), client_access.id
+    refute_includes query.call.map { |row| row.api_client.id }, api_client.id
+  end
+
+  test "token authentication rejects when access recording is trashed even if credential stays active" do
+    root_recording, access_recording = create_access_recording_for(user: @user, role: :admin)
+    payload = RecordingStudioApi::Services::ProvisionApiClient.call(
+      access_recording: access_recording,
+      name: "Token auth client"
+    ).value
+    credential = payload.fetch(:credential)
+    client_access = credential.effective_access_recording
+    client_access.update_column(:trashed_at, Time.current)
+    credential.instance_variable_set(:@effective_access_recording, nil)
+    credential.define_singleton_method(:active_for_authentication?) { true }
+
+    result = RecordingStudioApi::Services::AuthenticateBearerToken.call(
+      authorization_header: "Bearer #{payload.fetch(:token)}"
+    )
+
+    assert result.failure?
+    assert_equal "Bearer token is inactive", result.error
+    assert_equal root_recording.id, access_recording.root_recording_id
+  end
+
+  test "access grant include_trashed authorizes trashed recordings via parent kept check" do
+    root_recording, access_recording = create_access_recording_for(user: @user, role: :admin)
+    page_recording = create_page_recording(root_recording: root_recording)
+    page_recording.update_column(:trashed_at, Time.current)
+
+    grant = RecordingStudioApi::AccessGrant.new(
+      api_client: nil,
+      credential: nil,
+      access_recording: access_recording,
+      root_recording: root_recording
+    )
+
+    refute grant.authorized?(recording: page_recording, role: :view, include_trashed: false)
+    assert grant.authorized?(recording: page_recording, role: :view, include_trashed: true)
+
+    duck = Struct.new(:trashed_at, :parent_recording).new(Time.current, root_recording)
+    checked = grant.send(:recording_for_accessible_check, duck, include_trashed: true)
+    assert_equal root_recording, checked
+  end
+
   private
+
+  def form_state_host(manageable_roots:)
+    Class.new do
+      def self.helper_method(*); end
+
+      include RecordingStudioApi::AccessRequests::FormState
+
+      def initialize(roots)
+        @roots = roots
+      end
+
+      def manageable_root_recordings
+        @roots
+      end
+
+      def selected_api
+        RecordingStudioApi.configuration.fetch_api(:public)
+      end
+
+      def params
+        ActionController::Parameters.new({})
+      end
+    end.new(manageable_roots)
+  end
+
+  def admin_clients_context(actor:, root_recording:)
+    context = Object.new
+    context.define_singleton_method(:current_actor) { actor }
+    context.define_singleton_method(:params) { {} }
+    context.define_singleton_method(:root_recording) { root_recording }
+    context
+  end
 
   def install_hostile_recording_default_scope!
     recording_class = RecordingStudio::Recording
