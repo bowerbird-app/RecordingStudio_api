@@ -67,8 +67,6 @@ module RecordingStudioApi
 
     private
 
-    # Literal segments outrank tokens from the left. Negate each score so min_by prefers the higher one.
-    # Equal scores keep registration order.
     def best_match(path, registrations)
       matches = registrations.each_with_index.filter_map do |registration, index|
         matched = registration.match(path)

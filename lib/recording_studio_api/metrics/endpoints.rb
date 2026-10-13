@@ -10,7 +10,6 @@ module RecordingStudioApi
 
       module_function
 
-      # Drop from and to. A later ExecuteHandler must not see a second window beside start and end.
       def fold(params)
         folded = params.except(:from, :to)
         NAMES.each do |canonical, names|

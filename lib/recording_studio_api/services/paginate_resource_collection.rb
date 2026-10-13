@@ -84,7 +84,6 @@ module RecordingStudioApi
         raise RecordingStudioApi::InvalidActionInputError, "count must be true or false"
       end
 
-      # A filter join can repeat a recording. COUNT(*) would count those repeats.
       def total_count
         @total_count ||= relation.unscope(:order).distinct.count(relation.klass.arel_table[relation.klass.primary_key])
       end
