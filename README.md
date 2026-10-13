@@ -4,11 +4,12 @@
 
 `RecordingStudioApi` is a mountable Rails engine that provides authenticated, capability-backed JSON APIs for Recording Studio addons.
 
-Companion pins on current main: Trashable `~> 0.9` / `v0.9.0`, Admin
-`v2.2.0`, Moveable `v3.3.0`, Root Switchable `v0.8.0`, Accessible
-`~> 0.11` / `v0.15.0`, RecordingStudio `v4.5.0`, Metrics `v0.2.2`. For
-Trashable sibling keep/trash helpers in `0.7.0`, metrics window fixes in
-`0.6.16`, and earlier companion pins, see [UPGRADING.md](UPGRADING.md).
+Companion pins on current main: Trashable `~> 0.10` / `v0.10.0`
+(query-only), Admin `v2.2.0`, Moveable `v3.3.0`, Root Switchable
+`v0.8.0`, Accessible `~> 0.11` / `v0.15.0`, RecordingStudio `v4.5.0`,
+Metrics `v0.2.2`. For Trashable query-only keep/trash helpers in
+`0.7.0`, metrics window fixes in `0.6.16`, and earlier companion pins,
+see [UPGRADING.md](UPGRADING.md).
 
 ## Current Scope
 
@@ -694,7 +695,7 @@ Token-record contract (if provided):
 - `active_for_authentication?`
 - writable `last_used_at` column (updated with `update_column`)
 
-Both credential and token record must have active, non-trashed RecordingStudio recordables so scope resolution can derive the root recording. Kept/trashed predicates use Recording Studio Trashable (`recording_studio_trashable_kept?` / `recording_studio_trashable_trashed?`); relation filters keep additive `where(trashed_at: nil)` for default-scope parity. Pin `recording_studio_trashable` `~> 0.9`.
+Both credential and token record must have active, non-trashed RecordingStudio recordables so scope resolution can derive the root recording. Kept/trashed predicates use Recording Studio Trashable (`recording_studio_trashable_kept?` / `recording_studio_trashable_trashed?`); relation filters use additive `where(recording_studio_trashable_kept_sql)`. Pin `recording_studio_trashable` `~> 0.10` and load `recording_studio_trashable/query` only.
 
 ### OAuth resource server
 

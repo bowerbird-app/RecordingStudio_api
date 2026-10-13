@@ -3,7 +3,7 @@
 require "recording_studio_api/version"
 require "recording_studio_api/ui_widget_id"
 require "recording_studio_accessible"
-require "recording_studio_trashable"
+require "recording_studio_trashable/query"
 require "recording_studio_api/engine"
 require "recording_studio_api/errors"
 require "recording_studio_api/configuration"

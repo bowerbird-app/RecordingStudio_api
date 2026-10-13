@@ -36,11 +36,9 @@ module RecordingStudioApi
       access_ids = RecordingStudio::Access.where(actor: actor).pluck(:id)
       return [] if access_ids.empty?
 
-      # Keep main's additive `trashed_at: nil` filter. Do not use
-      # `recording_studio_trashable_active` here: that scope unscopes
-      # `trashed_at` first and can diverge under a host default_scope.
       RecordingStudio::Recording.unscoped
-                                .where(recordable_type: "RecordingStudio::Access", recordable_id: access_ids, trashed_at: nil)
+                                .where(recordable_type: "RecordingStudio::Access", recordable_id: access_ids)
+                                .where(RecordingStudio::Recording.recording_studio_trashable_kept_sql)
                                 .order(:created_at, :id)
                                 .to_a
     end

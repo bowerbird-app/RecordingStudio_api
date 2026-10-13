@@ -55,7 +55,8 @@ class ScalarTestCredentialsController < ApplicationController
     RecordingStudio::Recording.unscoped
       .includes(:recordable)
       .where(recordable_type: RecordingStudioApi.api_recordable_types(api: scalar_test_auth_api))
-      .find_by(id: recording_id, trashed_at: nil)
+      .where(RecordingStudio::Recording.recording_studio_trashable_kept_sql)
+      .find_by(id: recording_id)
   end
 
   def revoke_scalar_test_auth_session!

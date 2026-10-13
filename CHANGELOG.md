@@ -9,30 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.7.0] - 2026-10-13
 
-Trash and keep checks go through Recording Studio Trashable's shared
-sibling API instead of raw `trashed_at` column access.
+Trash keep/trash checks go through Recording Studio Trashable's query-only
+sibling API instead of raw `trashed_at` column access, without loading the
+Trashable engine.
 
 ### Changed
-- Runtime dependency `recording_studio_trashable` `~> 0.9` (GitHub tag
-  `v0.9.0`, commit `20275de`). Predicates use
+- Runtime dependency `recording_studio_trashable` `~> 0.10` (GitHub tag
+  `v0.10.0`, commit `6f590d0`). The library loads
+  `require "recording_studio_trashable/query"` only (Gemfile pins use
+  `require: false`). Predicates use
   `recording_studio_trashable_kept?` / `recording_studio_trashable_trashed?`.
-  Raw CTE/SQL fragments use `recording_studio_trashable_kept_sql(table)`.
-  ActiveRecord relation filters keep main's additive `where(trashed_at: nil)`
-  instead of `recording_studio_trashable_active`, because that scope
-  unscopes `trashed_at` first and can diverge on hosts with a
-  `trashed_at` default_scope. Behavior matches main: same filters,
-  return values, and soft-void semantics where this gem already
-  soft-checked rows. This gem does not call
-  `RecordingStudioTrashable.void_recording!` (no local soft-void write
-  path to replace).
+  Relation filters and CTE fragments that used `where(trashed_at: nil)` /
+  `trashed_at IS NULL` now use additive
+  `where(recording_studio_trashable_kept_sql(...))` / `kept_sql` so hosts
+  with a `trashed_at` default_scope keep main's filter semantics. This gem
+  does not call `recording_studio_trashable_active` (that scope unscopes
+  first) and does not call `void_recording!` (no local soft-void write
+  path). Full-engine side effects stay unloaded: no importmap pin /
+  modulepreload, no `:trashable` capability, no trash lifecycle methods,
+  no CopyHelper, no `trash.*` metrics.
 
 ### Upgrade notes
 - Bump to `0.7.0`. No migration in this gem.
-- Add `recording_studio_trashable` at tag `v0.9.0`. Hosts still need the
-  Trashable migrations that own `trashed_at` / `trash_root` when they
-  install Trashable.
-- Prefer the Trashable helpers over raw `trashed_at` in host code that
-  mirrors this gem's auth and access lookups.
+- Add `recording_studio_trashable` at tag `v0.10.0`. Prefer
+  `require "recording_studio_trashable/query"` (or Gemfile `require: false`
+  plus that require) when you only need keep/trash helpers.
+- Prefer Trashable predicates / `kept_sql` over raw `trashed_at` next to
+  this gem's auth and access lookups.
 
 See [UPGRADING.md](UPGRADING.md).
 

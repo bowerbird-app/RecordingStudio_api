@@ -15,39 +15,29 @@ class TrashableSiblingApiParityTest < ActiveSupport::TestCase
     reset_recording_studio_api_configuration!
     reset_recording_studio_capabilities!
     Current.actor = nil if defined?(Current)
+    remove_recording_default_scope!
   end
 
-  test "Recording exposes Trashable sibling keep and trash helpers" do
+  test "query helpers expose kept sql and predicates without lifecycle methods" do
     assert defined?(RecordingStudioTrashable)
-    assert_equal RecordingStudioTrashable::VERSION, "0.9.0"
+    assert_equal "0.10.0", RecordingStudioTrashable::VERSION
+    refute defined?(RecordingStudioTrashable::Engine)
 
     recording = RecordingStudio::Recording
-    assert_respond_to recording, :recording_studio_trashable_active
     assert_respond_to recording, :recording_studio_trashable_kept_sql
-    assert_respond_to recording, :recording_studio_trashable_trashed_sql
+    assert_respond_to recording, :recording_studio_trashable_active
 
     connection = recording.connection
     child_kept = "#{connection.quote_table_name('child')}.#{connection.quote_column_name('trashed_at')} IS NULL"
-    child_trashed = "#{connection.quote_table_name('child')}.#{connection.quote_column_name('trashed_at')} IS NOT NULL"
-
     assert_equal child_kept, recording.recording_studio_trashable_kept_sql("child")
-    assert_equal child_trashed, recording.recording_studio_trashable_trashed_sql("child")
-  end
 
-  test "kept and trashed predicates match raw trashed_at presence" do
     root_recording, = create_access_recording_for(user: @user, role: :edit)
-    page_recording = create_page_recording(root_recording: root_recording)
+    page = create_page_recording(root_recording: root_recording)
+    assert_predicate page, :recording_studio_trashable_kept?
 
-    assert page_recording.recording_studio_trashable_kept?
-    refute page_recording.recording_studio_trashable_trashed?
-
-    page_recording.update_column(:trashed_at, Time.current)
-    page_recording.reload
-
-    refute page_recording.recording_studio_trashable_kept?
-    assert page_recording.recording_studio_trashable_trashed?
-    assert_equal page_recording.trashed_at.present?, page_recording.recording_studio_trashable_trashed?
-    assert_equal page_recording.trashed_at.nil?, page_recording.recording_studio_trashable_kept?
+    refute_respond_to page, :recording_studio_trashable_trash!
+    refute_respond_to page, :recording_studio_trashable_restore!
+    refute_respond_to page, :recording_studio_trashable_purge!
   end
 
   test "accessible recording scope SQL uses kept_sql for child filter" do
@@ -64,20 +54,38 @@ class TrashableSiblingApiParityTest < ActiveSupport::TestCase
     refute_includes sql, "WHERE child.trashed_at IS NULL"
   end
 
-  test "actor access lookup excludes trashed recordings with additive kept filter" do
-    root_recording, access_recording = create_access_recording_for(user: @user, role: :edit)
-    kept = RecordingStudioApi.actor_access_recordings(actor: @user)
-    assert_includes kept.map(&:id), access_recording.id
+  test "actor access lookup and oauth exists use kept_sql under hostile default_scope" do
+    root_recording, access_recording = create_access_recording_for(user: @user, role: :admin)
+    install_hostile_recording_default_scope!
+
+    kept_ids = RecordingStudioApi.actor_access_recordings(actor: @user).map(&:id).sort
+    main_ids = RecordingStudio::Recording.unscoped
+                                         .where(
+                                           recordable_type: "RecordingStudio::Access",
+                                           recordable_id: RecordingStudio::Access.where(actor: @user).select(:id)
+                                         )
+                                         .where(RecordingStudio::Recording.recording_studio_trashable_kept_sql)
+                                         .pluck(:id)
+                                         .sort
+    assert_equal main_ids, kept_ids
+    assert_includes kept_ids, access_recording.id
 
     access_recording.update_column(:trashed_at, Time.current)
-    trashed = RecordingStudioApi.actor_access_recordings(actor: @user)
+    after_trash = RecordingStudioApi.actor_access_recordings(actor: @user).map(&:id)
+    refute_includes after_trash, access_recording.id
 
-    refute_includes trashed.map(&:id), access_recording.id
+    oauth = RecordingStudioApi::Services::AuthenticateOauthAccessToken
+            .new(authorization_header: "Bearer unused", api: :public)
+    refute oauth.send(
+      :active_recording_exists_for?,
+      access_recording.recordable_type,
+      access_recording.recordable_id
+    )
     assert_equal root_recording.id, access_recording.root_recording_id
   end
 
-  test "additive kept filter matches main under a trashed_at default_scope" do
-    root_recording, access_recording = create_access_recording_for(user: @user, role: :edit)
+  test "production call sites keep additive kept_sql under where.not default_scope" do
+    root_recording, access_recording = create_access_recording_for(user: @user, role: :admin)
     folder = Folder.create!(name: "Parity folder")
     folder_recording = RecordingStudio::Recording.create!(recordable: folder, parent_recording: root_recording)
     kept_page = RecordingStudio::Recording.create!(
@@ -90,54 +98,51 @@ class TrashableSiblingApiParityTest < ActiveSupport::TestCase
     )
     trashed_page.update_column(:trashed_at, Time.current)
 
-    recording_class = RecordingStudio::Recording
-    previous_default_scopes = recording_class.default_scopes.dup
-    recording_class.class_eval do
-      default_scope { where(trashed_at: nil) }
-    end
+    install_hostile_recording_default_scope!
 
-    begin
-      only_trashed = recording_class
-                     .unscope(where: :trashed_at)
-                     .where(parent_recording_id: folder_recording.id)
-                     .where.not(trashed_at: nil)
+    # Prior only-trashed relation: active would unscope and return kept siblings;
+    # kept_sql (and main's where(trashed_at: nil)) stay empty.
+    only_trashed = RecordingStudio::Recording
+                   .unscope(where: :trashed_at)
+                   .where(parent_recording_id: folder_recording.id)
+                   .where.not(trashed_at: nil)
+    main_style = only_trashed.where(trashed_at: nil).pluck(:id).sort
+    kept_sql_style = only_trashed.where(RecordingStudio::Recording.recording_studio_trashable_kept_sql).pluck(:id).sort
+    active_style = only_trashed.recording_studio_trashable_active.pluck(:id).sort
 
-      main_style_ids = only_trashed.where(trashed_at: nil).pluck(:id).sort
-      active_scope_ids = only_trashed.recording_studio_trashable_active.pluck(:id).sort
+    assert_equal main_style, kept_sql_style
+    assert_empty kept_sql_style
+    refute_equal main_style, active_style
+    assert_includes active_style, kept_page.id
 
-      # active unscopes first, so it returns kept siblings main would exclude.
-      assert_empty main_style_ids
-      refute_equal main_style_ids, active_scope_ids
-      assert_includes active_scope_ids, kept_page.id
-      refute_includes active_scope_ids, trashed_page.id
+    # Integration actor lookup (real call site) matches additive kept_sql.
+    access_recording.update_column(:trashed_at, Time.current)
+    actor_ids = RecordingStudioApi.actor_access_recordings(actor: @user).map(&:id).sort
+    expected = RecordingStudio::Recording.unscoped
+                                         .where(
+                                           recordable_type: "RecordingStudio::Access",
+                                           recordable_id: RecordingStudio::Access.where(actor: @user).select(:id)
+                                         )
+                                         .where(RecordingStudio::Recording.recording_studio_trashable_kept_sql)
+                                         .pluck(:id)
+                                         .sort
+    assert_equal expected, actor_ids
+    refute_includes actor_ids, access_recording.id
 
-      # Production actor lookup stays on main's additive filter under the default_scope.
-      access_recording.update_column(:trashed_at, Time.current)
-      actor_ids = RecordingStudioApi.actor_access_recordings(actor: @user).map(&:id).sort
-      main_actor_ids = recording_class.unscoped
-                                      .where(
-                                        recordable_type: "RecordingStudio::Access",
-                                        recordable_id: RecordingStudio::Access.where(actor: @user).select(:id),
-                                        trashed_at: nil
-                                      )
-                                      .pluck(:id)
-                                      .sort
+    # Access-management policy access recordings (real call site).
+    policy = RecordingStudioApi::AccessManagementPolicy.new(actor: @user)
+    policy_ids = policy.send(:access_recordings).map(&:id).sort
+    assert_equal expected, policy_ids
 
-      assert_equal main_actor_ids, actor_ids
-      refute_includes actor_ids, access_recording.id
-
-      oauth_exists = RecordingStudioApi::Services::AuthenticateOauthAccessToken
-                     .new(authorization_header: "Bearer unused", api: :public)
-                     .send(
-                       :active_recording_exists_for?,
-                       trashed_page.recordable_type,
-                       trashed_page.recordable_id
-                     )
-      refute oauth_exists
-      refute recording_class.unscoped.exists?(id: trashed_page.id, trashed_at: nil)
-    ensure
-      recording_class.default_scopes = previous_default_scopes
-    end
+    # Admin clients query root type filter (real call site shape).
+    context = Object.new
+    context.define_singleton_method(:current_actor) { @user }
+    context.define_singleton_method(:params) { { "root_type" => "Workspace" } }
+    context.define_singleton_method(:root_recording) { root_recording }
+    query = RecordingStudioApi::Admin::Queries::ApiAccessClientsQuery.new(context)
+    root_scope = query.send(:root_recordings_for_type)
+    refute_includes root_scope.pluck(:id), trashed_page.id
+    assert_includes root_scope.to_sql, RecordingStudio::Recording.recording_studio_trashable_kept_sql
   end
 
   test "credential authentication rejects trashed access via kept predicate" do
@@ -160,40 +165,20 @@ class TrashableSiblingApiParityTest < ActiveSupport::TestCase
     assert_equal root_recording.id, access_recording.root_recording_id
   end
 
-  test "admin client query SQL uses kept_sql fragments" do
-    recordings_table = RecordingStudio::Recording.table_name
-    kept_for_table = RecordingStudio::Recording.recording_studio_trashable_kept_sql(recordings_table)
-    kept_for_child = RecordingStudio::Recording.recording_studio_trashable_kept_sql("child")
-    actor = @user
+  private
 
-    context = Object.new
-    context.define_singleton_method(:current_actor) { actor }
-    context.define_singleton_method(:params) { {} }
-    query = RecordingStudioApi::Admin::Queries::ApiAccessClientsQuery.new(context)
-
-    access_point_sql = query.send(:accessible_access_point_ids_sql)
-    assert_includes access_point_sql, kept_for_table
-    assert_includes access_point_sql, kept_for_child
-    refute_includes access_point_sql, "#{recordings_table}.trashed_at IS NULL"
-    refute_includes access_point_sql, "child.trashed_at IS NULL"
-
-    root_recording, = create_access_recording_for(user: @user)
-    scoped_sql = query.send(:scoped_recording_ids_sql, root_recording)
-    assert_includes scoped_sql, kept_for_child
-    refute_includes scoped_sql, "child.trashed_at IS NULL"
+  def install_hostile_recording_default_scope!
+    recording_class = RecordingStudio::Recording
+    @previous_default_scopes = recording_class.default_scopes.dup
+    recording_class.class_eval do
+      default_scope { where.not(trashed_at: nil) }
+    end
   end
 
-  test "void_recording soft-voids a single row without trash_root" do
-    root_recording, = create_access_recording_for(user: @user, role: :edit)
-    page_recording = create_page_recording(root_recording: root_recording)
-    time = Time.zone.parse("2026-10-13 12:00:00 UTC")
+  def remove_recording_default_scope!
+    return if @previous_default_scopes.nil?
 
-    result = RecordingStudioTrashable.void_recording!(page_recording, time: time)
-    page_recording.reload
-
-    assert_same page_recording, result
-    assert page_recording.recording_studio_trashable_trashed?
-    assert_in_delta time.to_i, page_recording.trashed_at.to_i, 1
-    assert_equal false, page_recording.read_attribute(:trash_root) if page_recording.has_attribute?(:trash_root)
+    RecordingStudio::Recording.default_scopes = @previous_default_scopes
+    @previous_default_scopes = nil
   end
 end
