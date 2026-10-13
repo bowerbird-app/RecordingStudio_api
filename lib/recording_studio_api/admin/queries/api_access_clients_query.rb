@@ -129,10 +129,10 @@ module RecordingStudioApi
 
         def visible_api_client_access_recordings
           @visible_api_client_access_recordings ||= begin
+            # Additive `trashed_at: nil` matches main. Avoid active scope unscope.
             scope = RecordingStudio::Recording.unscoped
-                                              .recording_studio_trashable_active
                                               .where(id: RecordingStudioApi::ApiClient.select(:access_recording_id))
-                                              .where(recordable_type: "RecordingStudio::Access")
+                                              .where(recordable_type: "RecordingStudio::Access", trashed_at: nil)
                                               .where(parent_recording_id: accessible_access_point_recordings.select(:id))
             scope = scope.where(root_recording_id: scoped_root_recording.id) if scoped_root_recording
             scope = scope.where(root_recording_id: root_recordings_for_type.select(:id)) if root_type_filter.present?
@@ -242,9 +242,7 @@ module RecordingStudioApi
         end
 
         def root_recordings_for_type
-          RecordingStudio::Recording.unscoped
-                                    .recording_studio_trashable_active
-                                    .where(parent_recording_id: nil, recordable_type: root_type_filter)
+          RecordingStudio::Recording.unscoped.where(parent_recording_id: nil, recordable_type: root_type_filter, trashed_at: nil)
         end
 
         def recordings_table

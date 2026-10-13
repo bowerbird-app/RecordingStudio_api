@@ -89,10 +89,11 @@ module RecordingStudioApi
 
         roots = root_recording.present? ? [root_recording] : manageable_root_recordings
         recordings = roots.flat_map do |available_root_recording|
+          # Additive `trashed_at: nil` on the same base as main. Do not chain
+          # `recording_studio_trashable_active` (unscopes `trashed_at` first).
           available_root_recording.subtree_recordings(include_self: true)
-            .recording_studio_trashable_active
             .includes(:recordable)
-            .where(recordable_type: access_point_types)
+            .where(recordable_type: access_point_types, trashed_at: nil)
             .reorder(:created_at, :id)
             .to_a
         end

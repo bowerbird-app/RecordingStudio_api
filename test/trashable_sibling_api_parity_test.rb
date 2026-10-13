@@ -64,7 +64,7 @@ class TrashableSiblingApiParityTest < ActiveSupport::TestCase
     refute_includes sql, "WHERE child.trashed_at IS NULL"
   end
 
-  test "active scope excludes trashed access recordings for actor lookup" do
+  test "actor access lookup excludes trashed recordings with additive kept filter" do
     root_recording, access_recording = create_access_recording_for(user: @user, role: :edit)
     kept = RecordingStudioApi.actor_access_recordings(actor: @user)
     assert_includes kept.map(&:id), access_recording.id
@@ -74,6 +74,70 @@ class TrashableSiblingApiParityTest < ActiveSupport::TestCase
 
     refute_includes trashed.map(&:id), access_recording.id
     assert_equal root_recording.id, access_recording.root_recording_id
+  end
+
+  test "additive kept filter matches main under a trashed_at default_scope" do
+    root_recording, access_recording = create_access_recording_for(user: @user, role: :edit)
+    folder = Folder.create!(name: "Parity folder")
+    folder_recording = RecordingStudio::Recording.create!(recordable: folder, parent_recording: root_recording)
+    kept_page = RecordingStudio::Recording.create!(
+      recordable: Page.create!(title: "Kept page"),
+      parent_recording: folder_recording
+    )
+    trashed_page = RecordingStudio::Recording.create!(
+      recordable: Page.create!(title: "Trashed page"),
+      parent_recording: folder_recording
+    )
+    trashed_page.update_column(:trashed_at, Time.current)
+
+    recording_class = RecordingStudio::Recording
+    previous_default_scopes = recording_class.default_scopes.dup
+    recording_class.class_eval do
+      default_scope { where(trashed_at: nil) }
+    end
+
+    begin
+      only_trashed = recording_class
+                     .unscope(where: :trashed_at)
+                     .where(parent_recording_id: folder_recording.id)
+                     .where.not(trashed_at: nil)
+
+      main_style_ids = only_trashed.where(trashed_at: nil).pluck(:id).sort
+      active_scope_ids = only_trashed.recording_studio_trashable_active.pluck(:id).sort
+
+      # active unscopes first, so it returns kept siblings main would exclude.
+      assert_empty main_style_ids
+      refute_equal main_style_ids, active_scope_ids
+      assert_includes active_scope_ids, kept_page.id
+      refute_includes active_scope_ids, trashed_page.id
+
+      # Production actor lookup stays on main's additive filter under the default_scope.
+      access_recording.update_column(:trashed_at, Time.current)
+      actor_ids = RecordingStudioApi.actor_access_recordings(actor: @user).map(&:id).sort
+      main_actor_ids = recording_class.unscoped
+                                      .where(
+                                        recordable_type: "RecordingStudio::Access",
+                                        recordable_id: RecordingStudio::Access.where(actor: @user).select(:id),
+                                        trashed_at: nil
+                                      )
+                                      .pluck(:id)
+                                      .sort
+
+      assert_equal main_actor_ids, actor_ids
+      refute_includes actor_ids, access_recording.id
+
+      oauth_exists = RecordingStudioApi::Services::AuthenticateOauthAccessToken
+                     .new(authorization_header: "Bearer unused", api: :public)
+                     .send(
+                       :active_recording_exists_for?,
+                       trashed_page.recordable_type,
+                       trashed_page.recordable_id
+                     )
+      refute oauth_exists
+      refute recording_class.unscoped.exists?(id: trashed_page.id, trashed_at: nil)
+    ensure
+      recording_class.default_scopes = previous_default_scopes
+    end
   end
 
   test "credential authentication rejects trashed access via kept predicate" do

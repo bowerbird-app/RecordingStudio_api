@@ -14,17 +14,17 @@ sibling API instead of raw `trashed_at` column access.
 
 ### Changed
 - Runtime dependency `recording_studio_trashable` `~> 0.9` (GitHub tag
-  `v0.9.0`, commit `20275de`). Authentication, access grants, admin
-  client queries, and related scopes use
-  `recording_studio_trashable_kept?` / `recording_studio_trashable_trashed?`,
-  `recording_studio_trashable_active`, and
-  `recording_studio_trashable_kept_sql(table)`. Behavior matches main:
-  same filters, return values, and soft-void semantics where this gem
-  already soft-checked rows. This gem does not call
+  `v0.9.0`, commit `20275de`). Predicates use
+  `recording_studio_trashable_kept?` / `recording_studio_trashable_trashed?`.
+  Raw CTE/SQL fragments use `recording_studio_trashable_kept_sql(table)`.
+  ActiveRecord relation filters keep main's additive `where(trashed_at: nil)`
+  instead of `recording_studio_trashable_active`, because that scope
+  unscopes `trashed_at` first and can diverge on hosts with a
+  `trashed_at` default_scope. Behavior matches main: same filters,
+  return values, and soft-void semantics where this gem already
+  soft-checked rows. This gem does not call
   `RecordingStudioTrashable.void_recording!` (no local soft-void write
   path to replace).
-- Dummy and generator Scalar test-auth helpers chain the active scope
-  the same way.
 
 ### Upgrade notes
 - Bump to `0.7.0`. No migration in this gem.

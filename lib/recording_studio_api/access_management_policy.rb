@@ -151,19 +151,19 @@ module RecordingStudioApi
         access_ids = RecordingStudio::Access.where(actor: actor).pluck(:id)
         return [] if access_ids.empty?
 
+        # Additive `trashed_at: nil` matches main. Avoid
+        # `recording_studio_trashable_active` (unscopes `trashed_at` first).
         RecordingStudio::Recording.unscoped
-                                  .recording_studio_trashable_active
                                   .includes(:recordable)
-                                  .where(recordable_type: "RecordingStudio::Access", recordable_id: access_ids)
+                                  .where(recordable_type: "RecordingStudio::Access", recordable_id: access_ids, trashed_at: nil)
                                   .to_a
       end
     end
 
     def api_client_access_recordings
       @api_client_access_recordings ||= RecordingStudio::Recording.unscoped
-                                                                  .recording_studio_trashable_active
                                                                   .includes(:recordable)
-                                                                  .where(id: RecordingStudioApi::ApiClient.select(:access_recording_id), recordable_type: "RecordingStudio::Access")
+                                                                  .where(id: RecordingStudioApi::ApiClient.select(:access_recording_id), recordable_type: "RecordingStudio::Access", trashed_at: nil)
                                                                   .to_a
     end
   end

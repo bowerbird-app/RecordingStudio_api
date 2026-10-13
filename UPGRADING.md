@@ -8,18 +8,20 @@ shared sibling API. Update the host dependency to
 
 1. No migrations in this gem.
 2. Add `recording_studio_trashable` `~> 0.9` (GitHub tag `v0.9.0`).
-3. Auth, access-grant, integration, access-management, and admin client
-   queries use `recording_studio_trashable_kept?` /
-   `recording_studio_trashable_trashed?`,
-   `recording_studio_trashable_active`, and
-   `recording_studio_trashable_kept_sql(table)` instead of raw
-   `trashed_at` filters. Filters and outcomes match `0.6.16`.
+3. Predicates use `recording_studio_trashable_kept?` /
+   `recording_studio_trashable_trashed?`. CTE/SQL fragments use
+   `recording_studio_trashable_kept_sql(table)`. Relation filters keep
+   additive `where(trashed_at: nil)` like `0.6.16` and do **not** chain
+   `recording_studio_trashable_active` (that scope unscopes `trashed_at`
+   first and can diverge under a host default_scope). Outcomes match
+   `0.6.16`.
 4. This gem does not soft-void recordings with
    `RecordingStudioTrashable.void_recording!`. Keep using Oauth (or
    Trashable trash) for grant voids and user-facing trash.
 5. Hosts that already call Trashable helpers can keep doing so. Prefer
-   those helpers over new raw `trashed_at` checks next to this gem's
-   paths.
+   predicates / `kept_sql` for new checks; keep additive
+   `where(trashed_at: nil)` when you need main-identical scope chaining
+   under a default_scope.
 
 If you are still on `0.6.16` or older, complete
 [Upgrading to 0.6.16](#upgrading-to-0616) first.
