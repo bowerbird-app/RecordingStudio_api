@@ -6,6 +6,14 @@ module RecordingStudioApi
       DEFAULT_MOUNT_PATH = "/recording_studio_api"
       DEFAULT_API_MOUNT_PATH = "/api"
       BASE_PATH = DEFAULT_MOUNT_PATH
+      COUNT_PARAMETER = {
+        name: "count",
+        in: "query",
+        required: false,
+        description: "Set to true to get only { total_count } for the same filters. Records are not loaded; " \
+                     "limit, sort, order, and pagination_token are ignored.",
+        schema: { type: "boolean", default: false }
+      }.freeze
 
       class << self
         def call(version: nil, mount_path: nil, api_mount_path: nil, api: :public)
@@ -200,7 +208,8 @@ module RecordingStudioApi
                   resource_name,
                   recordable_type,
                   docs_resource_name,
-                  relationship_examples: relationship_response_examples(recordable_type, collection: true)
+                  relationship_examples: relationship_response_examples(recordable_type, collection: true),
+                  filter_meta: true
                 )
               },
               openapi_overrides.fetch(:index, {}),
@@ -317,7 +326,7 @@ module RecordingStudioApi
             scope: :resource,
             openapi: {
               tags: [openapi_tag_for(resource_name, recordable_type)],
-              parameters: [id_parameter],
+              parameters: [id_parameter] + pagination_parameters(relationship.child_type),
               responses: relationship_collection_responses(relationship)
             }
           }
@@ -601,49 +610,77 @@ module RecordingStudioApi
           "Recording Studio API hard-deletes the recording and recordable; it does not soft-delete or move to trash."
       end
 
-      def resource_list_responses(resource_name, recordable_type, docs_resource_name, item_schema: nil, relationship_examples: {})
+      def resource_list_responses(resource_name, recordable_type, docs_resource_name, item_schema: nil,
+                                  relationship_examples: {}, filter_meta: false)
         resource_type = resource_name.to_s.singularize
+        meta_properties = {
+          limit: { type: "integer", minimum: 1 },
+          sort: { type: "string", example: "created_at" },
+          order: { type: "string", enum: %w[asc desc] },
+          has_more: { type: "boolean" },
+          next_pagination_token: {
+            type: "string",
+            nullable: true,
+            description: "Use this as the pagination_token query parameter on your next request. Null means there are no more results."
+          },
+          total_count: {
+            type: "integer",
+            minimum: 0,
+            description: "Records matching this list's filters across all pages."
+          }
+        }
+        meta_example = {
+          limit: 50,
+          sort: "created_at",
+          order: "asc",
+          has_more: false,
+          next_pagination_token: nil,
+          total_count: 2
+        }
+        if filter_meta
+          meta_properties[:filter] = { type: "object", additionalProperties: true }
+          meta_properties[:q] = { type: "string" }
+          meta_example[:filter] = {}
+        end
+
+        list_schema = {
+          title: "Resource list",
+          type: "object",
+          properties: {
+            resource: { type: "string" },
+            type: { type: "string", example: resource_type },
+            records: {
+              type: "array",
+              items: item_schema || recording_schema(recordable_type)
+            },
+            meta: {
+              type: "object",
+              properties: meta_properties,
+              example: meta_example,
+              required: %w[limit sort order has_more next_pagination_token total_count]
+            }
+          },
+          required: %w[resource type records meta]
+        }
+        count_schema = {
+          title: "Count",
+          type: "object",
+          properties: {
+            total_count: { type: "integer", minimum: 0 }
+          },
+          required: ["total_count"],
+          additionalProperties: false
+        }
 
         {
           "200" => {
             description: "List #{docs_resource_name} visible in scope.",
             content: {
               "application/json" => {
-                schema: {
-                  type: "object",
-                  properties: {
-                    resource: { type: "string" },
-                    type: { type: "string", example: resource_type },
-                    records: {
-                      type: "array",
-                      items: item_schema || recording_schema(recordable_type)
-                    },
-                    meta: {
-                      type: "object",
-                      properties: {
-                        limit: { type: "integer", minimum: 1 },
-                        sort: { type: "string", example: "created_at" },
-                        order: { type: "string", enum: %w[asc desc] },
-                        has_more: { type: "boolean" },
-                        next_pagination_token: {
-                          type: "string",
-                          nullable: true,
-                          description: "Use this as the pagination_token query parameter on your next request. Null means there are no more results."
-                        }
-                      },
-                      example: {
-                        limit: 50,
-                        sort: "created_at",
-                        order: "asc",
-                        has_more: false,
-                        next_pagination_token: nil
-                      },
-                      required: %w[limit sort order has_more next_pagination_token]
-                    }
-                  },
-                  required: %w[resource type records meta]
-                },
-                examples: relationship_examples
+                schema: { oneOf: [list_schema, count_schema] },
+                examples: relationship_examples.merge(
+                  count: { summary: "count=true", value: { total_count: 2 } }
+                )
               }
             }
           }
@@ -696,7 +733,8 @@ module RecordingStudioApi
               enum: %w[asc desc],
               default: "asc"
             }
-          }
+          },
+          COUNT_PARAMETER
         ]
       end
 
@@ -1247,7 +1285,8 @@ module RecordingStudioApi
             sort: "created_at",
             order: "asc",
             has_more: false,
-            next_pagination_token: nil
+            next_pagination_token: nil,
+            total_count: 1
           }
         }
       end

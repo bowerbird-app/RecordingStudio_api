@@ -269,8 +269,14 @@ The host registers Metrics endpoints once:
 RecordingStudioMetrics::Api.register!(api: :operations)
 ```
 
-Paths on the operations API: `GET /metrics` and
-`GET /metrics/:resource/:name`.
+Paths on the operations API are `GET /metrics`,
+`GET /metrics?resource=api_requests`, `GET /:resource/metrics`,
+`GET /metrics/:resource/:name`, and `GET /:resource/metrics/:name`.
+`start`, `start_at`, and `from` set the window start. The first present
+name wins, in that order. `end`, `end_at`, and `to` do the same for the
+end. `group_by` stays on the request params. `recording_studio_metrics`
+0.2.2 ignores it. A resource-first path is served only when that first
+segment is not a recordable on the API.
 
 Solid Queue recurring example:
 
@@ -482,7 +488,9 @@ or arbitrary-name form.
 Responses are flat. A record always includes `id`, `type`, `root_id`, `parent_id`, `created_at`,
 and `updated_at`; serializer output keys, always-included fields, and expanded relationship names
 sit beside those keys. There are no `data`, `attributes`, or `relationships` wrappers. Collections
-use `records` plus `meta`; a record's `_meta` reports `limit` and `has_more` for emitted collection
+use `records` plus `meta`. `meta.total_count` is the number of matching
+recordings across every page. `count=true` returns only `{ "total_count": N }`
+and does not load records. A record's `_meta` reports `limit` and `has_more` for emitted collection
 relationships.
 
 Write bodies use the same flat field layout. Send registered writable fields at the request body

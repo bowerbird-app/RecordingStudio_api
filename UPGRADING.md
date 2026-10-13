@@ -1,5 +1,55 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.8.0
+
+`0.8.0` adds list counts and resource-first metrics paths. Update the host
+dependency to `recording_studio_api`, `~> 0.8.0`.
+
+1. No migrations. Keep calling `RecordingStudioMetrics::Api.register!(api:)`.
+   That call also registers `<api>_metrics_index_for_resource` at
+   `:resource/metrics` and `<api>_metrics_show_for_resource` at
+   `:resource/metrics/:name`. Those names and paths are reserved.
+2. Each paginated list runs one extra count of distinct recording ids on
+   the same relation, the same authorization scope, and the same filters,
+   before the pagination token and before `limit + 1`.
+3. Custom `:index` handlers, including custom nested index handlers, do
+   not gain `total_count` or `count=true`. To opt in, call
+   `PaginateResourceCollection` with `count:` and build the JSON inside
+   `response_body`.
+4. `PaginateResourceCollection` returns `Page` or `TotalCount` instead of
+   `{ rows:, meta: }`. `after_service` hooks receive that object.
+   `Page#response_body` yields the rows and meta. `TotalCount#response_body`
+   returns `{ total_count: }` and does not yield, so count mode cannot
+   serialize records.
+5. `true`, `"true"`, and `"1"` are count mode. String comparison ignores
+   case and surrounding spaces. `false`, `"false"`, `"0"`, a blank string,
+   and `nil` return the list. Any other value raises
+   `RecordingStudioApi::InvalidActionInputError` with the message
+   `count must be true or false`, which the API renders as `422`
+   `invalid_input`.
+6. Nested `total_count` counts `child_scope` before per-child authorize
+   hooks. Count mode does not call those hooks. Parent authorization still
+   runs.
+7. When two registered templates match one path, the template whose first
+   differing segment is a literal wins. A host path `foo/metrics` beats
+   `:resource/metrics` regardless of registration order. Equal specificity
+   keeps registration order. Before `0.8.0`, the first registered template
+   won.
+8. A resource-first metrics URL is served only when the first segment is
+   not a recordable on that API. `GET /folders/metrics` stays on the folder
+   routes when `folders` is a recordable. `GET /api_requests/metrics` is
+   the metrics catalog when `api_requests` is not a recordable.
+9. `from` folds to `start` and `to` folds to `end`. For the start of the
+   window, the first present name wins among `start`, `start_at`, and
+   `from`. For the end, the order is `end`, `end_at`, then `to`. `from`
+   and `to` are dropped before the metrics handler runs, so they are not
+   passed into `RecordingStudioMetrics.execute`.
+10. `group_by` stays on the params hash. `recording_studio_metrics` 0.2.2
+    `ExecuteHandler` ignores it and does not pass it to `execute`.
+    Undeclared `filters` are still `422`. When that handler starts passing
+    `group_by` into `execute`, bump this gem's pin on
+    `recording_studio_metrics`.
+
 ## Upgrading to 0.7.0
 
 `0.7.0` routes trash and keep checks through Recording Studio Trashable's
