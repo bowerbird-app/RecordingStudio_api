@@ -52,10 +52,11 @@ module OperationsApi
       recording_id = params[:access_point_recording_id].presence
       return if recording_id.blank?
 
-      RecordingStudio::Recording.unscoped
+        RecordingStudio::Recording.unscoped
+        .recording_studio_trashable_active
         .includes(:recordable)
         .where(recordable_type: RecordingStudioApi.api_recordable_types(api: scalar_test_auth_api))
-        .find_by(id: recording_id, trashed_at: nil)
+        .find_by(id: recording_id)
     end
 
     def revoke_scalar_test_auth_session!

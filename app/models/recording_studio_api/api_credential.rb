@@ -63,9 +63,9 @@ module RecordingStudioApi
       revoked_at.nil? &&
         !expired? &&
         effective_access_recording.present? &&
-        effective_access_recording.trashed_at.nil? &&
+        effective_access_recording.recording_studio_trashable_kept? &&
         api_client.recording.present? &&
-        api_client.recording.trashed_at.nil?
+        api_client.recording.recording_studio_trashable_kept?
     end
 
     def expired?

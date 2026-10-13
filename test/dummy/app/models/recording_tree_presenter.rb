@@ -43,7 +43,7 @@ class RecordingTreePresenter
   end
 
   def node_label(recording)
-    trashed_label = include_trashed && recording.trashed_at.present? ? " [trashed]" : ""
+    trashed_label = include_trashed && recording.recording_studio_trashable_trashed? ? " [trashed]" : ""
     "#{type_label_for(recording)}: #{identifier_for(safe_recordable(recording))}#{trashed_label}"
   end
 

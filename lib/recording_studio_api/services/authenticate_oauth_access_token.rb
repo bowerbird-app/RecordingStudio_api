@@ -46,10 +46,9 @@ module RecordingStudioApi
       end
 
       def active_recording_exists_for?(recordable_type, recordable_id)
-        RecordingStudio::Recording.unscoped.exists?(
+        RecordingStudio::Recording.unscoped.recording_studio_trashable_active.exists?(
           recordable_type: recordable_type,
-          recordable_id: recordable_id,
-          trashed_at: nil
+          recordable_id: recordable_id
         )
       end
 

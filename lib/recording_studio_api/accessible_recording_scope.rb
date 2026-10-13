@@ -37,7 +37,11 @@ module RecordingStudioApi
       @accessible_recording_ids_sql ||= begin
         recordings_table = RecordingStudio::Recording.table_name
         root_id = connection.quote(scope_recording.id)
-        trashed_filter = include_trashed ? "" : "WHERE child.trashed_at IS NULL"
+        trashed_filter = if include_trashed
+                           ""
+                         else
+                           "WHERE #{RecordingStudio::Recording.recording_studio_trashable_kept_sql('child')}"
+                         end
 
         <<~SQL.squish
           WITH RECURSIVE

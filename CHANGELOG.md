@@ -7,10 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-13
+
+Trash and keep checks go through Recording Studio Trashable's shared
+sibling API instead of raw `trashed_at` column access.
+
 ### Changed
-- Dummy and development Gemfiles pin RecordingStudio git tag `v4.2.2`
-  (`036686aa4eaf4f945f920cf4b11be4e842de0aac`). Lockfiles resolve the gem as
-  `4.2.1` (that tag's `RecordingStudio::VERSION`). Gemspec stays `~> 4.2`.
+- Runtime dependency `recording_studio_trashable` `~> 0.9` (GitHub tag
+  `v0.9.0`, commit `20275de`). Authentication, access grants, admin
+  client queries, and related scopes use
+  `recording_studio_trashable_kept?` / `recording_studio_trashable_trashed?`,
+  `recording_studio_trashable_active`, and
+  `recording_studio_trashable_kept_sql(table)`. Behavior matches main:
+  same filters, return values, and soft-void semantics where this gem
+  already soft-checked rows. This gem does not call
+  `RecordingStudioTrashable.void_recording!` (no local soft-void write
+  path to replace).
+- Dummy and generator Scalar test-auth helpers chain the active scope
+  the same way.
+
+### Upgrade notes
+- Bump to `0.7.0`. No migration in this gem.
+- Add `recording_studio_trashable` at tag `v0.9.0`. Hosts still need the
+  Trashable migrations that own `trashed_at` / `trash_root` when they
+  install Trashable.
+- Prefer the Trashable helpers over raw `trashed_at` in host code that
+  mirrors this gem's auth and access lookups.
+
+See [UPGRADING.md](UPGRADING.md).
 
 ## [0.6.16] - 2026-10-10
 

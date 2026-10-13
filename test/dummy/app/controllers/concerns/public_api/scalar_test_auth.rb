@@ -48,8 +48,9 @@ module PublicApi::ScalarTestAuth
     allowed_types = RecordingStudioApi.api_recordable_types(api: scalar_test_auth_api) - ["RecordingStudio::Access"]
     scalar_test_auth_policy.manageable_root_recordings.flat_map do |root_recording|
       root_recording.subtree_recordings(include_self: true)
+        .recording_studio_trashable_active
         .includes(:recordable)
-        .where(recordable_type: allowed_types, trashed_at: nil)
+        .where(recordable_type: allowed_types)
         .reorder(:created_at, :id)
         .map { |recording| { id: recording.id, label: scalar_test_auth_recording_label(recording) } }
     end.uniq { |entry| entry.fetch(:id) }
