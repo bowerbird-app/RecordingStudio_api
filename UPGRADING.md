@@ -1,5 +1,35 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.7.0
+
+`0.7.0` routes trash and keep checks through Recording Studio Trashable's
+query-only sibling API. Update the host dependency to
+`recording_studio_api`, `~> 0.7.0`.
+
+1. No migrations in this gem.
+2. Add `recording_studio_trashable` `~> 0.10` (GitHub tag `v0.10.0`).
+   Prefer `require "recording_studio_trashable/query"` (Gemfile
+   `require: false` plus that require) so the Trashable engine,
+   importmap, capability, CopyHelper, and `trash.*` metrics stay out of
+   this gem's boot path.
+3. Predicates use `recording_studio_trashable_kept?` /
+   `recording_studio_trashable_trashed?`. Relation filters and CTE/SQL
+   fragments that used `where(trashed_at: nil)` /
+   `trashed_at IS NULL` use additive
+   `where(recording_studio_trashable_kept_sql(...))` /
+   `kept_sql(table)`. This gem does **not** chain
+   `recording_studio_trashable_active` (that scope unscopes `trashed_at`
+   first). Outcomes match `0.6.16`.
+4. This gem does not soft-void recordings with
+   `RecordingStudioTrashable.void_recording!`. Keep using Oauth (or
+   Trashable trash) for grant voids and user-facing trash.
+5. Hosts that want the full trash UI keep requiring the Trashable
+   engine as before. Prefer predicates / `kept_sql` for new checks next
+   to this gem's paths.
+
+If you are still on `0.6.16` or older, complete
+[Upgrading to 0.6.16](#upgrading-to-0616) first.
+
 ## Upgrading to 0.6.16
 
 `0.6.16` makes `api_requests.errors_over_time` follow the same window as

@@ -37,7 +37,8 @@ module RecordingStudioApi
       return [] if access_ids.empty?
 
       RecordingStudio::Recording.unscoped
-                                .where(recordable_type: "RecordingStudio::Access", recordable_id: access_ids, trashed_at: nil)
+                                .where(recordable_type: "RecordingStudio::Access", recordable_id: access_ids)
+                                .where(RecordingStudio::Recording.recording_studio_trashable_kept_sql)
                                 .order(:created_at, :id)
                                 .to_a
     end

@@ -12,6 +12,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`036686aa4eaf4f945f920cf4b11be4e842de0aac`). Lockfiles resolve the gem as
   `4.2.1` (that tag's `RecordingStudio::VERSION`). Gemspec stays `~> 4.2`.
 
+## [0.7.0] - 2026-10-13
+
+Trash keep/trash checks go through Recording Studio Trashable's query-only
+sibling API instead of raw `trashed_at` column access, without loading the
+Trashable engine.
+
+### Changed
+- Runtime dependency `recording_studio_trashable` `~> 0.10` (GitHub tag
+  `v0.10.0`, commit `6f590d0`). The library loads
+  `require "recording_studio_trashable/query"` only (Gemfile pins use
+  `require: false`). Predicates use
+  `recording_studio_trashable_kept?` / `recording_studio_trashable_trashed?`.
+  Relation filters and CTE fragments that used `where(trashed_at: nil)` /
+  `trashed_at IS NULL` now use additive
+  `where(recording_studio_trashable_kept_sql(...))` / `kept_sql` so hosts
+  with a `trashed_at` default_scope keep main's filter semantics. This gem
+  does not call `recording_studio_trashable_active` (that scope unscopes
+  first) and does not call `void_recording!` (no local soft-void write
+  path). Full-engine side effects stay unloaded: no importmap pin /
+  modulepreload, no `:trashable` capability, no trash lifecycle methods,
+  no CopyHelper, no `trash.*` metrics.
+
+### Upgrade notes
+- Bump to `0.7.0`. No migration in this gem.
+- Add `recording_studio_trashable` at tag `v0.10.0`. Prefer
+  `require "recording_studio_trashable/query"` (or Gemfile `require: false`
+  plus that require) when you only need keep/trash helpers.
+- Prefer Trashable predicates / `kept_sql` over raw `trashed_at` next to
+  this gem's auth and access lookups.
+
+See [UPGRADING.md](UPGRADING.md).
+
 ## [0.6.16] - 2026-10-10
 
 `api_requests.errors_over_time` uses the same date window as
@@ -494,7 +526,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.6.18...v0.7.0
 [0.6.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.6...v0.6.0
 [0.5.6]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.5...v0.5.6

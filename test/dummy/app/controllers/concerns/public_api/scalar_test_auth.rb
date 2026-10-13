@@ -49,7 +49,8 @@ module PublicApi::ScalarTestAuth
     scalar_test_auth_policy.manageable_root_recordings.flat_map do |root_recording|
       root_recording.subtree_recordings(include_self: true)
         .includes(:recordable)
-        .where(recordable_type: allowed_types, trashed_at: nil)
+        .where(recordable_type: allowed_types)
+        .where(RecordingStudio::Recording.recording_studio_trashable_kept_sql)
         .reorder(:created_at, :id)
         .map { |recording| { id: recording.id, label: scalar_test_auth_recording_label(recording) } }
     end.uniq { |entry| entry.fetch(:id) }

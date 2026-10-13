@@ -80,7 +80,14 @@ module RecordingStudioApi
     end
 
     def recording_for_accessible_check(recording, include_trashed:)
-      return recording unless include_trashed && recording.respond_to?(:trashed_at) && recording.trashed_at.present?
+      return recording unless include_trashed && recording.respond_to?(:trashed_at)
+
+      kept = if recording.respond_to?(:recording_studio_trashable_kept?)
+               recording.recording_studio_trashable_kept?
+             else
+               recording.trashed_at.nil?
+             end
+      return recording if kept
 
       recording.parent_recording || scope_recording
     end

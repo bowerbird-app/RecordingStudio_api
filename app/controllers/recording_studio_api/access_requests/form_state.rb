@@ -91,7 +91,8 @@ module RecordingStudioApi
         recordings = roots.flat_map do |available_root_recording|
           available_root_recording.subtree_recordings(include_self: true)
             .includes(:recordable)
-            .where(recordable_type: access_point_types, trashed_at: nil)
+            .where(recordable_type: access_point_types)
+            .where(RecordingStudio::Recording.recording_studio_trashable_kept_sql)
             .reorder(:created_at, :id)
             .to_a
         end
