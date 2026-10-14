@@ -269,6 +269,11 @@ and IP fields are never grouping keys. Raw request logs are not read.
 `api_requests.rate_limited_over_time` (unit `count`) sums `rate_limited_count`
 per day from the same rollup, with the same window, buckets, and
 `group_by=route_name` / `group_by=request_method`.
+`api_keys.expiring_soon` (unit `count`) counts active keys whose
+`expires_at` is within the next 30 days. `api_keys.stale` (unit `count`)
+counts active keys with `last_used_at` over 90 days ago, or never used and
+created over 90 days ago. Both are point-in-time (no window, no `group_by`,
+no filters, since the admin credentials list has none) and are not cached.
 `api_authorize` allows an actor with the access-management view role on the
 site admin root. This gem does not call `RecordingStudioMetrics::Api.register!`.
 The host registers Metrics endpoints once:

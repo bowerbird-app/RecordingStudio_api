@@ -234,7 +234,7 @@ class ApiMetricsOperationsTest < ActionDispatch::IntegrationTest
     get "#{operations_root}/metrics", params: { resource: "api_keys" }, headers: headers
     assert_response :success
     keys_body = response.body
-    assert_equal(["api_keys.active"], JSON.parse(keys_body).fetch("metrics").map { |row| row.fetch("identifier") })
+    assert_equal(%w[api_keys.active api_keys.expiring_soon api_keys.stale], JSON.parse(keys_body).fetch("metrics").map { |row| row.fetch("identifier") })
 
     get "#{operations_root}/api_keys/metrics", headers: headers
     assert_equal keys_body, response.body

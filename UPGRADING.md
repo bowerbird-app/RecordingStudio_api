@@ -1,5 +1,11 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.11.0
+
+`0.11.0` adds `api_keys.expiring_soon` and `api_keys.stale`. No migrations.
+MCP and Oauth allow `recording_studio_api < 0.11`, so a host needs widened
+releases of both before taking 0.11.0.
+
 ## Upgrading to 0.10.0
 
 `0.10.0` adds `api_requests.rate_limited_over_time`. No migrations. Gems that

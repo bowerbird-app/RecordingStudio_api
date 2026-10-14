@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-14
+
+### Added
+- `api_keys.expiring_soon` (count): active API keys whose `expires_at` falls
+  within the next 30 days.
+- `api_keys.stale` (count): active API keys not used in 90 days, or never
+  used and created over 90 days ago.
+- Both are point-in-time counts with a unit, title and description. No window,
+  `group_by` or filters. Not cached. Same `api_authorize` as `api_keys.active`.
+  No migration.
+
 ## [0.10.0] - 2026-10-14
 
 ### Added

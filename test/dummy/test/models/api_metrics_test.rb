@@ -48,7 +48,7 @@ class ApiMetricsTest < ActionDispatch::IntegrationTest
       api_requests.rate_limited_over_time
       api_requests.server_errors_over_time
     ], request_ids.sort
-    assert_equal ["api_keys.active"], key_ids
+    assert_equal %w[api_keys.active api_keys.expiring_soon api_keys.stale], key_ids.sort
 
     RecordingStudioMetrics.for_resource(:api_requests).each do |definition|
       assert_equal [:operations], definition.exposed_apis
@@ -118,6 +118,38 @@ class ApiMetricsTest < ActionDispatch::IntegrationTest
 
     get "#{operations_root}/metrics/api_requests/over_time", headers: bearer(@public_token)
     assert_response :unauthorized
+  end
+
+  test "api key health counts active keys expiring soon and stale keys" do
+    freeze_time do
+      base_expiring = execute("api_keys.expiring_soon").value
+      base_stale = execute("api_keys.stale").value
+      credentials = RecordingStudioApi::ApiCredential.active.order(:created_at).last(2)
+      soon, stale = credentials
+      soon.update_columns(expires_at: 10.days.from_now)
+      stale.update_columns(last_used_at: 120.days.ago, expires_at: nil)
+      revoked = RecordingStudioApi::ApiCredential.where.not(revoked_at: nil).first
+      revoked&.update_columns(expires_at: 5.days.from_now, last_used_at: 200.days.ago)
+
+      assert_equal base_expiring + 1, execute("api_keys.expiring_soon").value
+      assert_equal base_stale + 1, execute("api_keys.stale").value
+
+      soon.update_columns(expires_at: 45.days.from_now)
+      assert_equal base_expiring, execute("api_keys.expiring_soon").value
+      stale.update_columns(last_used_at: 1.day.ago)
+      assert_equal base_stale, execute("api_keys.stale").value
+    end
+  end
+
+  test "api key health catalog fields" do
+    %w[api_keys.expiring_soon api_keys.stale].each do |identifier|
+      metadata = RecordingStudioMetrics.find(identifier).catalog_metadata
+      assert_equal "count", metadata[:unit], identifier
+      assert metadata[:title].present?, identifier
+      assert metadata[:description].present?, identifier
+      assert_equal [], metadata[:group_by], identifier
+      assert_equal [:operations], metadata[:exposed_apis], identifier
+    end
   end
 
   private
