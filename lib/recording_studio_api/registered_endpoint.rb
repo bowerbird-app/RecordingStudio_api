@@ -38,6 +38,10 @@ module RecordingStudioApi
       @path_segments ||= path.split("/")
     end
 
+    def specificity
+      path_segments.map { |segment| segment.start_with?(":") ? 0 : 1 }
+    end
+
     def match(path)
       incoming = normalize_request_path(path)
       incoming_segments = incoming.split("/")

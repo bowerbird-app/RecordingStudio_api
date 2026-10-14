@@ -23,18 +23,20 @@ module RecordingStudioApi
             pagination_token: params[:pagination_token],
             sort: params[:sort],
             order: params[:order],
+            count: params[:count],
             api: current_api_key,
             scope_key: "client:#{current_api_client.id}"
           )
           raise RecordingStudioApi::InvalidPaginationTokenError, pagination.error if pagination.failure?
 
-          payload = pagination.value
-          children = authorized_children(payload.fetch(:rows))
-          render json: {
-            resource: child_resource_name,
-            type: relationship.child_type.demodulize,
-            records: children.map { |child| serialize_recording(child, context: relationship_context.nested) },
-            meta: payload.fetch(:meta)
+          render json: pagination.value.response_body { |rows, meta|
+            children = authorized_children(rows)
+            {
+              resource: child_resource_name,
+              type: relationship.child_type.demodulize,
+              records: children.map { |child| serialize_recording(child, context: relationship_context.nested) },
+              meta: meta
+            }
           }
         end
 

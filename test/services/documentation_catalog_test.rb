@@ -151,28 +151,22 @@ module RecordingStudioApi
           endpoint.fetch(:path) == "/recording_studio_api/api/v1/pages"
         end
 
-        item_schema = index_endpoint
+        list_branch = index_endpoint
           .fetch(:openapi)
           .fetch(:responses)
           .fetch("200")
           .fetch(:content)
           .fetch("application/json")
           .fetch(:schema)
-          .fetch(:properties)
-          .fetch(:records)
-          .fetch(:items)
+          .fetch(:oneOf)
+          .find { |branch| branch.fetch(:title) == "Resource list" }
+        item_schema = list_branch.fetch(:properties).fetch(:records).fetch(:items)
 
         assert_equal "object", item_schema.fetch(:type)
-        assert item_schema.fetch(:properties).key?(:id)
-        assert index_endpoint
-          .fetch(:openapi)
-          .fetch(:responses)
-          .fetch("200")
-          .fetch(:content)
-          .fetch("application/json")
-          .fetch(:schema)
-          .fetch(:properties)
-          .key?(:type)
+        assert_equal true, item_schema.fetch(:properties).key?(:id)
+        assert_equal true, list_branch.fetch(:properties).key?(:type)
+        assert_equal %w[limit sort order has_more next_pagination_token total_count],
+                     list_branch.fetch(:properties).fetch(:meta).fetch(:required)
       end
 
       def test_recordable_openapi_endpoint_overrides_are_merged

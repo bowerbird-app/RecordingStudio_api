@@ -281,10 +281,26 @@ module RecordingStudioApi
           .fetch("content")
           .fetch("application/json")
           .fetch("schema")
+        list_branch = schema_branch(list_schema, "Resource list")
+        count_branch = schema_branch(list_schema, "Count")
 
-        assert_equal %w[resource type records meta], list_schema.fetch("required")
-        assert_equal %w[limit sort order has_more next_pagination_token],
-                     list_schema.fetch("properties").fetch("meta").fetch("required")
+        assert_equal %w[resource type records meta], list_branch.fetch("required")
+        assert_equal %w[limit sort order has_more next_pagination_token total_count],
+                     list_branch.fetch("properties").fetch("meta").fetch("required")
+        assert_equal ["total_count"], count_branch.fetch("required")
+        assert_equal false, count_branch.fetch("additionalProperties")
+        assert_equal ["total_count"], count_branch.fetch("properties").keys
+        assert_equal(
+          {
+            "name" => "count",
+            "in" => "query",
+            "required" => false,
+            "description" => "Set to true to get only { total_count } for the same filters. Records are not loaded; " \
+                             "limit, sort, order, and pagination_token are ignored.",
+            "schema" => { "type" => "boolean", "default" => false }
+          },
+          list_operation.fetch(:parameters).find { |parameter| parameter.fetch("name") == "count" }
+        )
       end
 
       def test_capability_actions_generate_nested_resource_paths
@@ -467,12 +483,30 @@ module RecordingStudioApi
           with_recordable_registration("Folder", openapi: {}) do
             document = with_recordable_types(%w[Workspace Folder]) { OpenapiDocument.call }
             normal_schema = document.dig(:paths, "/recording_studio_api/api/v1/folders", "get", :responses, "200", "content", "application/json", "schema")
-            nested_schema = document.dig(:paths, "/recording_studio_api/api/v1/workspaces/{id}/folders", "get", :responses, "200", "content", "application/json", "schema")
+            nested_operation = document.dig(:paths, "/recording_studio_api/api/v1/workspaces/{id}/folders", "get")
+            nested_schema = nested_operation.dig(:responses, "200", "content", "application/json", "schema")
+            normal_list = schema_branch(normal_schema, "Resource list")
+            nested_list = schema_branch(nested_schema, "Resource list")
+            normal_count = schema_branch(normal_schema, "Count")
+            nested_count = schema_branch(nested_schema, "Count")
 
-            assert_equal normal_schema.fetch("required"), nested_schema.fetch("required")
-            assert_equal normal_schema.fetch("properties").keys.sort, nested_schema.fetch("properties").keys.sort
-            refute nested_schema.fetch("properties").key?("relationship")
-            assert_equal "string", nested_schema.fetch("properties").fetch("records").fetch("items").fetch("properties").fetch("name").fetch("type")
+            assert_equal normal_list.fetch("required"), nested_list.fetch("required")
+            assert_equal normal_list.fetch("properties").keys.sort, nested_list.fetch("properties").keys.sort
+            assert_equal normal_list.fetch("properties").fetch("meta").fetch("required"),
+                         nested_list.fetch("properties").fetch("meta").fetch("required")
+            assert_equal normal_count.fetch("required"), nested_count.fetch("required")
+            refute nested_list.fetch("properties").key?("relationship")
+            assert_equal false, nested_list.fetch("properties").fetch("meta").fetch("properties").key?("filter")
+            assert_equal true, nested_list.fetch("properties").fetch("meta").fetch("properties").key?("total_count")
+            assert_equal true, normal_list.fetch("properties").fetch("meta").fetch("properties").key?("filter")
+            assert_equal "string", nested_list.fetch("properties").fetch("records").fetch("items").fetch("properties").fetch("name").fetch("type")
+
+            count_parameter = document.dig(:paths, "/recording_studio_api/api/v1/folders", "get", :parameters)
+                                      .find { |parameter| parameter.fetch("name") == "count" }
+            nested_count_parameter = nested_operation.fetch(:parameters).find { |parameter| parameter.fetch("name") == "count" }
+            assert_equal count_parameter, nested_count_parameter
+            assert_includes nested_operation.fetch(:parameters).map { |parameter| parameter.fetch("name") }, "limit"
+            assert_includes nested_operation.fetch(:parameters).map { |parameter| parameter.fetch("name") }, "pagination_token"
           end
         end
       end
@@ -553,20 +587,22 @@ module RecordingStudioApi
 
       def test_resource_list_meta_example_is_coherent
         document = with_recordable_types(["Workspace"]) { OpenapiDocument.call }
-        meta_schema = document
-          .fetch(:paths)
-          .fetch("/recording_studio_api/api/v1/workspaces")
-          .fetch("get")
-          .fetch(:responses)
-          .fetch("200")
-          .fetch("content")
-          .fetch("application/json")
-          .fetch("schema")
-          .fetch("properties")
-          .fetch("meta")
+        meta_schema = schema_branch(
+          document
+            .fetch(:paths)
+            .fetch("/recording_studio_api/api/v1/workspaces")
+            .fetch("get")
+            .fetch(:responses)
+            .fetch("200")
+            .fetch("content")
+            .fetch("application/json")
+            .fetch("schema"),
+          "Resource list"
+        ).fetch("properties").fetch("meta")
 
         assert_equal false, meta_schema.fetch("example").fetch("has_more")
         assert_nil meta_schema.fetch("example").fetch("next_pagination_token")
+        assert_equal 2, meta_schema.fetch("example").fetch("total_count")
       end
 
       def test_unregistered_page_schema_has_no_attributes_wrapper
@@ -612,7 +648,50 @@ module RecordingStudioApi
         }
       end
 
+      def test_metrics_openapi_documents_period_aliases_group_by_and_resource
+        document = with_isolated_configuration do
+          RecordingStudioMetrics::Api.register!(api: :operations)
+          OpenapiDocument.call(api: :operations)
+        end
+        root = "/recording_studio_api/apis/operations/v1"
+        catalog = document.fetch(:paths).fetch("#{root}/metrics").fetch("get")
+        show = document.fetch(:paths).fetch("#{root}/metrics/{resource}/{name}").fetch("get")
+        alias_catalog = document.fetch(:paths).fetch("#{root}/{resource}/metrics").fetch("get")
+        alias_show = document.fetch(:paths).fetch("#{root}/{resource}/metrics/{name}").fetch("get")
+
+        show_query = query_parameter_names(show)
+        %w[start end start_at end_at from to group_by].each do |name|
+          assert_equal 1, show_query.count(name), name
+        end
+        from_parameter = show.fetch(:parameters).find { |parameter| parameter.fetch("name") == "from" }
+        assert_equal "Same as start. ISO-8601.", from_parameter.fetch("description")
+        assert_equal "date-time", from_parameter.fetch("schema").fetch("format")
+        assert_equal "query", from_parameter.fetch("in")
+        refute_includes show_query, "resource"
+        refute_includes query_parameter_names(alias_show), "resource"
+        assert_equal %w[resource name], path_parameter_names(alias_show)
+
+        assert_equal 1, query_parameter_names(catalog).count("resource")
+        resource_parameter = catalog.fetch(:parameters).find { |parameter| parameter.fetch("name") == "resource" }
+        assert_equal "query", resource_parameter.fetch("in")
+        assert_equal "Only list metrics for this resource.", resource_parameter.fetch("description")
+        refute_includes query_parameter_names(alias_catalog), "resource"
+        assert_equal ["resource"], path_parameter_names(alias_catalog)
+      end
+
       private
+
+      def schema_branch(schema, title)
+        schema.fetch("oneOf").find { |branch| branch.fetch("title") == title }
+      end
+
+      def query_parameter_names(operation)
+        operation.fetch(:parameters).select { |parameter| parameter.fetch("in") == "query" }.map { |parameter| parameter.fetch("name") }
+      end
+
+      def path_parameter_names(operation)
+        operation.fetch(:parameters).select { |parameter| parameter.fetch("in") == "path" }.map { |parameter| parameter.fetch("name") }
+      end
 
       def with_isolated_configuration
         original_configuration_defined = RecordingStudioApi.instance_variable_defined?(:@configuration)

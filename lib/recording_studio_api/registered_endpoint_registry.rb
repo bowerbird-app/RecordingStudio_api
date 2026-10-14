@@ -42,24 +42,12 @@ module RecordingStudioApi
     end
 
     def match_path(path)
-      @registrations.each_value do |registration|
-        matched = registration.match(path)
-        return matched if matched
-      end
-
-      nil
+      best_match(path, @registrations.each_value)
     end
 
     def match(path:, http_verb:)
       verb = normalize_http_verb(http_verb)
-      @registrations.each_value do |registration|
-        next unless registration.http_verb == verb
-
-        matched = registration.match(path)
-        return matched if matched
-      end
-
-      nil
+      best_match(path, @registrations.each_value.select { |registration| registration.http_verb == verb })
     end
 
     def http_verbs_for_path(path)
@@ -78,6 +66,16 @@ module RecordingStudioApi
     end
 
     private
+
+    def best_match(path, registrations)
+      matches = registrations.each_with_index.filter_map do |registration, index|
+        matched = registration.match(path)
+        next unless matched
+
+        [matched, registration.specificity, index]
+      end
+      matches.min_by { |_matched, specificity, index| [specificity.map(&:-@), index] }&.first
+    end
 
     def path_taken?(registration)
       @registrations.each_value.any? do |existing|

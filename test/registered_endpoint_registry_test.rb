@@ -158,4 +158,44 @@ class RegisteredEndpointRegistryTest < Minitest::Test
     @registry.validate!
     assert_equal "describe_widget", @registry.to_h.fetch("describe_widget").fetch(:name)
   end
+
+  def test_literal_template_beats_a_resource_token_regardless_of_order
+    @registry.register(:token, http_verb: :get, path: ":resource/metrics", handler: ->(_) { :token })
+    @registry.register(:literal, http_verb: :get, path: "foo/metrics", handler: ->(_) { :literal })
+
+    token_first = @registry.match(path: "foo/metrics", http_verb: :get)
+    assert_equal "literal", token_first.endpoint.name
+    assert_equal({}, token_first.captures)
+    assert_equal "literal", @registry.match_path("foo/metrics").endpoint.name
+
+    reversed = RecordingStudioApi::RegisteredEndpointRegistry.new
+    reversed.register(:literal, http_verb: :get, path: "foo/metrics", handler: ->(_) { :literal })
+    reversed.register(:token, http_verb: :get, path: ":resource/metrics", handler: ->(_) { :token })
+
+    assert_equal "literal", reversed.match(path: "foo/metrics", http_verb: :get).endpoint.name
+    assert_equal({ resource: "other" }, reversed.match(path: "other/metrics", http_verb: :get).captures)
+  end
+
+  def test_metrics_show_template_beats_the_resource_alias_and_keeps_captures
+    @registry.register(:alias_show, http_verb: :get, path: ":resource/metrics/:name", handler: ->(_) { :alias })
+    @registry.register(:show, http_verb: :get, path: "metrics/:resource/:name", handler: ->(_) { :show })
+
+    canonical = @registry.match(path: "metrics/api_requests/over_time", http_verb: :get)
+    assert_equal "show", canonical.endpoint.name
+    assert_equal({ resource: "api_requests", name: "over_time" }, canonical.captures)
+
+    alias_match = @registry.match(path: "api_requests/metrics/over_time", http_verb: :get)
+    assert_equal "alias_show", alias_match.endpoint.name
+    assert_equal({ resource: "api_requests", name: "over_time" }, alias_match.captures)
+  end
+
+  def test_equal_specificity_keeps_registration_order
+    @registry.register(:first, http_verb: :get, path: "widgets/:id", handler: ->(_) { :first })
+    @registry.register(:second, http_verb: :get, path: "widgets/:key", handler: ->(_) { :second })
+
+    match = @registry.match(path: "widgets/button", http_verb: :get)
+
+    assert_equal "first", match.endpoint.name
+    assert_equal({ id: "button" }, match.captures)
+  end
 end

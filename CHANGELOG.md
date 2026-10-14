@@ -12,6 +12,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`036686aa4eaf4f945f920cf4b11be4e842de0aac`). Lockfiles resolve the gem as
   `4.2.1` (that tag's `RecordingStudio::VERSION`). Gemspec stays `~> 4.2`.
 
+## [0.8.0] - 2026-10-13
+
+Paginated lists include `total_count`. Metrics accept `from` / `to`,
+`group_by`, and resource-first paths.
+
+### Added
+- List `meta.total_count` is the number of recordings that match the same
+  relation, authorization scope, and filters as the page. The count runs
+  before the pagination token and before `limit + 1`. A filter join that
+  repeats a recording counts distinct recording ids.
+- `count=true`, `count=1`, and `count=TRUE` return `{ "total_count": N }`
+  and do not serialize records. `count=false`, `count=0`, a blank value,
+  and an omitted `count` still return the list. Any other value is `422`
+  `invalid_input` with the message `count must be true or false`.
+- `from` and `to` fold into `start` and `end`. `start` wins over
+  `start_at`, which wins over `from`. `end` wins over `end_at`, which
+  wins over `to`.
+- `GET /metrics?resource=` and `GET /:resource/metrics` list one resource.
+  An unknown resource is `200` `{ "metrics": [] }`.
+  `GET /:resource/metrics/:name` matches `GET /metrics/:resource/:name`.
+- When two registered templates match one path, the earliest literal
+  segment wins. Ties keep registration order.
+- OpenAPI list `200` responses are `oneOf` titled `Resource list` and
+  `Count`. Meta requires `total_count`. The `count` query parameter is
+  defined once and used by top-level and nested index.
+
+### Upgrade notes
+- Bump to `0.8.0`. No migration. Hosts still call
+  `RecordingStudioMetrics::Api.register!`.
+- Custom index handlers do not gain `total_count` or `count=true`.
+- Nested metrics URLs are served only when the first segment is not a
+  recordable on that API.
+- `group_by` stays on the params hash. `recording_studio_metrics` 0.2.2
+  `ExecuteHandler` ignores it. When that handler passes `group_by` into
+  `execute`, bump the pin.
+- `PaginateResourceCollection` returns `Page` or `TotalCount`.
+- Nested `total_count` counts `child_scope` before per-child authorize
+  hooks.
+
 ## [0.7.0] - 2026-10-13
 
 Trash keep/trash checks go through Recording Studio Trashable's query-only
@@ -526,7 +565,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.6.18...v0.7.0
 [0.6.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.5.6...v0.6.0

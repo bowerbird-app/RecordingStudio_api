@@ -62,6 +62,7 @@ require "recording_studio_api/services/resource_operations/update"
 require "recording_studio_api/services/resource_operations/destroy"
 require "recording_studio_api/admin"
 require "recording_studio_api/metrics"
+require "recording_studio_api/metrics/endpoints"
 
 # rubocop:disable Metrics/ModuleLength
 module RecordingStudioApi
@@ -138,16 +139,19 @@ module RecordingStudioApi
     end
 
     def register_endpoint(name, api: :public, http_verb:, path:, handler:, serializer: nil, openapi: nil, input_contract: nil, ui: nil)
-      configuration.api(api).registered_endpoint_registry.register(
-        name,
-        http_verb: http_verb,
-        path: path,
-        handler: handler,
-        serializer: serializer,
-        openapi: openapi,
-        input_contract: input_contract,
-        ui: ui
-      )
+      registry = configuration.api(api).registered_endpoint_registry
+      Metrics::Endpoints.expand(
+        name:,
+        http_verb:,
+        path:,
+        handler:,
+        serializer:,
+        openapi:,
+        input_contract:,
+        ui:
+      ).map do |registration|
+        registry.register(registration.fetch(:name), **registration.except(:name))
+      end.first
     end
 
     def registered_endpoint(name, api: :public)
