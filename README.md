@@ -6,7 +6,7 @@
 
 Companion pins on current main: Trashable `~> 0.10` / `v0.10.0`
 (query-only), Admin `v2.2.0`, Moveable `v3.3.0`, Root Switchable
-`v0.8.0`, Accessible `~> 0.11` / `v0.15.0`, RecordingStudio `v4.5.0`,
+`v0.8.0`, Accessible `~> 0.11` / `v0.15.0`, RecordingStudio `v4.6.0`,
 Metrics `v0.2.2`. For Trashable query-only keep/trash helpers in
 `0.7.0`, metrics window fixes in `0.6.16`, and earlier companion pins,
 see [UPGRADING.md](UPGRADING.md).
@@ -904,7 +904,7 @@ with Draft off to load a new pack. See
 | Rails           | ~> 8.1.1 |
 | PostgreSQL      | 16      |
 | TailwindCSS     | 4       |
-| RecordingStudio | v4.2.2 (pinned in `test/dummy/Gemfile`) |
+| RecordingStudio | v4.6.0 (pinned in `test/dummy/Gemfile`) |
 | FlatPack        | v0.1.143 (pinned in `test/dummy/Gemfile`) |
 | Devise          | latest  |
 
