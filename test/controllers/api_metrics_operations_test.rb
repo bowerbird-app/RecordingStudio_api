@@ -220,7 +220,7 @@ class ApiMetricsOperationsTest < ActionDispatch::IntegrationTest
     requests_body = response.body
     assert_equal(
       %w[api_requests.by_status_class api_requests.errors_over_time api_requests.over_time api_requests.rate_limited
-         api_requests.server_errors_over_time],
+         api_requests.rate_limited_over_time api_requests.server_errors_over_time],
       JSON.parse(requests_body).fetch("metrics").map { |row| row.fetch("identifier") }.sort
     )
     refute_includes JSON.parse(requests_body).fetch("metrics").map { |row| row.fetch("identifier") }, "api_keys.active"

@@ -45,6 +45,7 @@ class ApiMetricsTest < ActionDispatch::IntegrationTest
       api_requests.errors_over_time
       api_requests.over_time
       api_requests.rate_limited
+      api_requests.rate_limited_over_time
       api_requests.server_errors_over_time
     ], request_ids.sort
     assert_equal ["api_keys.active"], key_ids
