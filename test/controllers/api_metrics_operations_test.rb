@@ -178,42 +178,26 @@ class ApiMetricsOperationsTest < ActionDispatch::IntegrationTest
     assert_equal "2026-04-01T00:00:00Z", JSON.parse(response.body).fetch("period").fetch("start")
   end
 
-  test "group_by is ignored and does not reach execute" do
+  test "group_by on a metric without group_by is rejected" do
     path = "#{operations_root}/metrics/api_requests/over_time"
-    headers = bearer_headers(@authorized_token)
     window = { start: "2026-04-01T00:00:00Z", end: "2026-04-03T00:00:00Z", interval: "day" }
 
-    travel_to Time.utc(2026, 6, 1, 12, 0, 0) do
-      get path, params: window, headers: headers
-      assert_response :success
-      without_group = response.body
+    get path, params: window.merge(group_by: "status_class"), headers: bearer_headers(@authorized_token)
 
-      get path, params: window.merge(group_by: "status_class"), headers: headers
-      assert_response :success
-      assert_equal without_group, response.body
-    end
+    assert_response :unprocessable_entity
+    assert_equal "invalid_input", JSON.parse(response.body).dig("error", "code")
+  end
 
-    calls = []
-    original = RecordingStudioMetrics.method(:execute)
-    RecordingStudioMetrics.stub(:execute, lambda { |identifier, **kwargs|
-      calls << [identifier, kwargs]
-      original.call(identifier, **kwargs)
-    }) do
-      get path, params: {
-        from: "2026-04-01T00:00:00Z",
-        to: "2026-04-03T00:00:00Z",
-        interval: "day",
-        group_by: "status_class"
-      }, headers: headers
-    end
+  test "server errors over time accepts route_name and rejects other group_by" do
+    path = "#{operations_root}/metrics/api_requests/server_errors_over_time"
+    headers = bearer_headers(@authorized_token)
+    window = { from: "2026-04-01T00:00:00Z", to: "2026-04-03T00:00:00Z", interval: "day" }
 
+    get path, params: window.merge(group_by: "route_name"), headers: headers
     assert_response :success
-    identifier, kwargs = calls.fetch(0)
-    assert_equal "api_requests.over_time", identifier
-    assert_equal %i[context interval start_at end_at filters], kwargs.keys
-    assert_equal "2026-04-01T00:00:00Z", kwargs.fetch(:start_at)
-    assert_equal "2026-04-03T00:00:00Z", kwargs.fetch(:end_at)
-    assert_equal({}, kwargs.fetch(:filters))
+
+    get path, params: window.merge(group_by: "status_class"), headers: headers
+    assert_response :unprocessable_entity
   end
 
   test "undeclared metric filters are rejected" do
@@ -235,7 +219,8 @@ class ApiMetricsOperationsTest < ActionDispatch::IntegrationTest
     assert_response :success
     requests_body = response.body
     assert_equal(
-      %w[api_requests.by_status_class api_requests.errors_over_time api_requests.over_time api_requests.rate_limited],
+      %w[api_requests.by_status_class api_requests.errors_over_time api_requests.over_time api_requests.rate_limited
+         api_requests.server_errors_over_time],
       JSON.parse(requests_body).fetch("metrics").map { |row| row.fetch("identifier") }.sort
     )
     refute_includes JSON.parse(requests_body).fetch("metrics").map { |row| row.fetch("identifier") }, "api_keys.active"
@@ -343,7 +328,7 @@ class ApiMetricsOperationsTest < ActionDispatch::IntegrationTest
     assert_same show.handler, alias_show.handler
     resource_query = index.openapi.fetch(:parameters).find { |parameter| parameter.fetch(:name) == "resource" }
     assert_equal "query", resource_query.fetch(:in)
-    assert_nil alias_index.openapi[:parameters]
+    assert_equal(["filters"], Array(alias_index.openapi[:parameters]).map { |parameter| parameter.fetch(:name) })
     assert_equal(
       [{ name: "resource", in: "path", required: true, schema: { type: "string" } }],
       alias_index.openapi_path_parameters

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-14
+
+Adds `api_requests.server_errors_over_time` and moves to Recording Studio
+Metrics `~> 0.3`.
+
+### Added
+- `api_requests.server_errors_over_time`: a daily timeseries of 5xx responses
+  (`server_error_count` from `ApiDailyMetric`), unit `count`, with a title and
+  description. It supports `from` / `to` / `interval` and `group_by` on
+  `route_name` or `request_method`. 4xx responses are not counted.
+
+### Changed
+- Requires `recording_studio_metrics` `~> 0.3`. Development and dummy Gemfiles
+  pin tag `v0.3.1`.
+- Metrics 0.3 rejects `group_by` on metrics that do not declare it (`422`
+  `invalid_input`). Before, the API ignored it.
+
 ### Changed
 - Dummy and development Gemfiles pin RecordingStudio git tag `v4.2.2`
   (`036686aa4eaf4f945f920cf4b11be4e842de0aac`). Lockfiles resolve the gem as

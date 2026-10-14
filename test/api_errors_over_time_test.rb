@@ -70,6 +70,36 @@ class ApiErrorsOverTimeTest < ActiveSupport::TestCase
     end
   end
 
+  test "server errors over time counts 5xx only and groups by route" do
+    travel_to Time.utc(2026, 10, 10, 15, 0, 0) do
+      RecordingStudioApi::ApiDailyMetric.delete_all
+      create_daily_metric(metric_date: Date.new(2026, 10, 10), status_class: 4, request_count: 10, client_error_count: 9, server_error_count: 0)
+      create_daily_metric(metric_date: Date.new(2026, 10, 10), status_class: 5, request_count: 6, client_error_count: 0, server_error_count: 6, route_name: "folders")
+      create_daily_metric(metric_date: Date.new(2026, 10, 9), status_class: 5, request_count: 2, client_error_count: 0, server_error_count: 2)
+      create_daily_metric(metric_date: Date.new(2026, 9, 9), status_class: 5, request_count: 50, client_error_count: 0, server_error_count: 50)
+
+      result = execute("api_requests.server_errors_over_time")
+      values = result.data.to_h { |row| [row[:date], row[:value]] }
+
+      assert_equal execute("api_requests.over_time").data.map { |row| row[:date] }, values.keys
+      assert_equal 6, values["2026-10-10"]
+      assert_equal 2, values["2026-10-09"]
+      assert_not_includes values.keys, "2026-09-09"
+
+      grouped = execute("api_requests.server_errors_over_time", group_by: "route_name")
+      assert_predicate grouped.data, :present?
+    end
+  end
+
+  test "server errors over time catalog fields and allowed group_by" do
+    definition = RecordingStudioMetrics.registry.fetch("api_requests.server_errors_over_time")
+
+    assert_equal "count", definition.unit
+    assert_equal "API server errors over time", definition.title
+    assert_match(/5xx/, definition.description)
+    assert_equal %i[route_name request_method], Array(definition.group_by).map(&:to_sym)
+  end
+
   private
 
   def execute(identifier, **params)
