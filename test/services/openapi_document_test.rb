@@ -664,7 +664,7 @@ module RecordingStudioApi
           assert_equal 1, show_query.count(name), name
         end
         from_parameter = show.fetch(:parameters).find { |parameter| parameter.fetch("name") == "from" }
-        assert_equal "Same as start. ISO-8601.", from_parameter.fetch("description")
+        assert_equal "Alias for start. Must match start when both are provided.", from_parameter.fetch("description")
         assert_equal "date-time", from_parameter.fetch("schema").fetch("format")
         assert_equal "query", from_parameter.fetch("in")
         refute_includes show_query, "resource"

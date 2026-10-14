@@ -7,6 +7,9 @@ module RecordingStudioApi
     API = :operations
     EXPOSE = { api: [API] }.freeze
     ResolverContext = Struct.new(:controller)
+    SERVER_ERRORS_DESCRIPTION = "API responses with a 5xx status per day, from the daily request rollup. " \
+                                "Client (4xx) errors are not counted."
+    SERVER_ERROR_GROUP_BY = %i[route_name request_method].freeze
     AUTHORIZE = lambda { |context|
       actor = context&.access_grant&.actor
       recording = site_admin_recording
@@ -74,6 +77,15 @@ module RecordingStudioApi
                      field: :metric_date,
                      measurement: :sum,
                      value_field: Arel.sql("client_error_count + server_error_count"),
+                     expose: EXPOSE
+      dsl.timeseries :server_errors_over_time,
+                     title: "API server errors over time",
+                     description: SERVER_ERRORS_DESCRIPTION,
+                     unit: "count",
+                     field: :metric_date,
+                     measurement: :sum,
+                     value_field: :server_error_count,
+                     group_by: SERVER_ERROR_GROUP_BY,
                      expose: EXPOSE
       dsl.breakdown :by_status_class,
                     title: "API requests by status class",

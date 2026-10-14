@@ -7,7 +7,7 @@
 Companion pins on current main: Trashable `~> 0.10` / `v0.10.0`
 (query-only), Admin `v2.2.0`, Moveable `v3.3.0`, Root Switchable
 `v0.8.0`, Accessible `~> 0.11` / `v0.18.0`, RecordingStudio `v4.6.0`,
-Metrics `v0.2.2`. For Trashable query-only keep/trash helpers in
+Metrics `v0.3.1`. For Trashable query-only keep/trash helpers in
 `0.7.0`, metrics window fixes in `0.6.16`, and earlier companion pins,
 see [UPGRADING.md](UPGRADING.md).
 
@@ -261,6 +261,11 @@ Metrics (`blast_radius: :site`, operations only). `api_requests.over_time`
 sums `request_count` on `metric_date`. `api_requests.errors_over_time` sums
 `client_error_count + server_error_count` on that same date column, with the
 same window, interval, timezone, and zero-filled buckets.
+`api_requests.server_errors_over_time` (unit `count`) sums only
+`server_error_count` (5xx responses) from the daily rollup, with the same
+window and buckets. It accepts `group_by=route_name` or
+`group_by=request_method`; any other `group_by` is `422`. Client, credential
+and IP fields are never grouping keys. Raw request logs are not read.
 `api_authorize` allows an actor with the access-management view role on the
 site admin root. This gem does not call `RecordingStudioMetrics::Api.register!`.
 The host registers Metrics endpoints once:

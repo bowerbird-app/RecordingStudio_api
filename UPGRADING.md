@@ -1,5 +1,15 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.9.0
+
+`0.9.0` adds `api_requests.server_errors_over_time` and requires
+`recording_studio_metrics` `~> 0.3` (GitHub tag `v0.3.1`).
+
+1. No migrations. The new metric reads the existing daily rollup.
+2. Update the host's `recording_studio_metrics` pin to `v0.3.1`.
+3. Clients that sent `group_by` to a metric without it now get `422` instead
+   of an ungrouped result. Drop that param.
+
 ## Upgrading to 0.8.0
 
 `0.8.0` adds list counts and resource-first metrics paths. Update the host
