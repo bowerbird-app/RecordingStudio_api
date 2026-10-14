@@ -100,6 +100,36 @@ class ApiErrorsOverTimeTest < ActiveSupport::TestCase
     assert_equal %i[route_name request_method], Array(definition.group_by).map(&:to_sym)
   end
 
+  test "rate limited over time sums rate_limited_count per day and groups by route" do
+    travel_to Time.utc(2026, 10, 10, 15, 0, 0) do
+      RecordingStudioApi::ApiDailyMetric.delete_all
+      create_daily_metric(metric_date: Date.new(2026, 10, 10), status_class: 4, request_count: 10, client_error_count: 10, server_error_count: 0, rate_limited_count: 7)
+      create_daily_metric(metric_date: Date.new(2026, 10, 10), status_class: 2, request_count: 5, client_error_count: 0, server_error_count: 0, rate_limited_count: 0, route_name: "folders")
+      create_daily_metric(metric_date: Date.new(2026, 10, 9), status_class: 4, request_count: 3, client_error_count: 3, server_error_count: 0, rate_limited_count: 3)
+      create_daily_metric(metric_date: Date.new(2026, 9, 9), status_class: 4, request_count: 50, client_error_count: 50, server_error_count: 0, rate_limited_count: 50)
+
+      values = execute("api_requests.rate_limited_over_time").data.to_h { |row| [row[:date], row[:value]] }
+      assert_equal execute("api_requests.over_time").data.map { |row| row[:date] }, values.keys
+      assert_equal 7, values["2026-10-10"]
+      assert_equal 3, values["2026-10-09"]
+      assert_not_includes values.keys, "2026-09-09"
+
+      assert_predicate execute("api_requests.rate_limited_over_time", group_by: "request_method").data, :present?
+      assert_raises(RecordingStudioMetrics::Errors::InvalidGroupBy) do
+        execute("api_requests.rate_limited_over_time", group_by: "status_class")
+      end
+    end
+  end
+
+  test "rate limited over time catalog fields" do
+    definition = RecordingStudioMetrics.registry.fetch("api_requests.rate_limited_over_time")
+
+    assert_equal "count", definition.unit
+    assert_equal "Rate limited API requests over time", definition.title
+    assert_match(/rate limiter/, definition.description)
+    assert_equal %i[route_name request_method], Array(definition.group_by).map(&:to_sym)
+  end
+
   private
 
   def execute(identifier, **params)
@@ -115,7 +145,7 @@ class ApiErrorsOverTimeTest < ActiveSupport::TestCase
     )
   end
 
-  def create_daily_metric(metric_date:, status_class:, request_count:, client_error_count:, server_error_count:, route_name: "pages")
+  def create_daily_metric(metric_date:, status_class:, request_count:, client_error_count:, server_error_count:, rate_limited_count: 0, route_name: "pages")
     RecordingStudioApi::ApiDailyMetric.create!(
       api_key: "public",
       metric_date: metric_date,
@@ -125,7 +155,7 @@ class ApiErrorsOverTimeTest < ActiveSupport::TestCase
       request_method: "GET",
       status_class: status_class,
       request_count: request_count,
-      rate_limited_count: 0,
+      rate_limited_count: rate_limited_count,
       client_error_count: client_error_count,
       server_error_count: server_error_count,
       duration_count: request_count,

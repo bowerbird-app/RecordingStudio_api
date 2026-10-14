@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-14
+
+### Added
+- `api_requests.rate_limited_over_time`: daily timeseries of requests rejected
+  by the rate limiter (`rate_limited_count` from `ApiDailyMetric`), unit
+  `count`, with a title and description. Takes `from` / `to` / `interval`
+  and `group_by` on `route_name` or `request_method` (groups under
+  `min_group_size` 5 fold into `other`). No migration.
+
 ## [0.9.0] - 2026-10-14
 
 Adds `api_requests.server_errors_over_time` and moves to Recording Studio

@@ -266,6 +266,9 @@ same window, interval, timezone, and zero-filled buckets.
 window and buckets. It accepts `group_by=route_name` or
 `group_by=request_method`; any other `group_by` is `422`. Client, credential
 and IP fields are never grouping keys. Raw request logs are not read.
+`api_requests.rate_limited_over_time` (unit `count`) sums `rate_limited_count`
+per day from the same rollup, with the same window, buckets, and
+`group_by=route_name` / `group_by=request_method`.
 `api_authorize` allows an actor with the access-management view role on the
 site admin root. This gem does not call `RecordingStudioMetrics::Api.register!`.
 The host registers Metrics endpoints once:

@@ -1,5 +1,11 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.10.0
+
+`0.10.0` adds `api_requests.rate_limited_over_time`. No migrations. Gems that
+cap `recording_studio_api` below `0.10` (MCP `< 0.10`, Oauth `< 0.10`) need a
+widened release before a host can take 0.10.0.
+
 ## Upgrading to 0.9.0
 
 `0.9.0` adds `api_requests.server_errors_over_time` and requires
