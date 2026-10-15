@@ -132,6 +132,7 @@ module RecordingStudioApi
       RecordingStudioApi::Engine.register_recordable_types!
 
       config.to_prepare do
+        RecordingStudioApi.prepare_recordable_registries_for_reload!
         RecordingStudioApi::Engine.register_recordable_types!
         RecordingStudio::DelegatedTypeRegistrar.apply! if defined?(RecordingStudio::DelegatedTypeRegistrar)
       end

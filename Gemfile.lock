@@ -90,11 +90,11 @@ GIT
 PATH
   remote: .
   specs:
-    recording_studio_api (0.11.0)
+    recording_studio_api (0.11.1)
       rails (~> 8.1.0)
       recording_studio (~> 4.2)
       recording_studio_accessible (~> 0.11)
-      recording_studio_metrics (~> 0.3)
+      recording_studio_metrics (>= 0.3.0, < 0.4)
       recording_studio_trashable (~> 0.10)
       redis (~> 5.3)
 
@@ -517,7 +517,7 @@ CHECKSUMS
   recording_studio (4.6.0)
   recording_studio_accessible (0.18.0)
   recording_studio_admin (2.2.0)
-  recording_studio_api (0.11.0)
+  recording_studio_api (0.11.1)
   recording_studio_icons (0.1.0)
   recording_studio_metrics (0.3.0)
   recording_studio_moveable (3.3.0)

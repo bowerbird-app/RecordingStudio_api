@@ -271,6 +271,7 @@ module RecordingStudioApi
       registered_endpoint_registry.validate!
       recordable_registry.validate!
       resource_handler_registry.validate!
+      MetricCatalog.validate_configured!(recordable_registry, api: "public")
       @apis.each_value(&:validate!)
       validate_access_management_roles!
       validate_capability_action_role_resolver!

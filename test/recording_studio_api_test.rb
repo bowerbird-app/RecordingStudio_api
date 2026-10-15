@@ -8,13 +8,13 @@ class RecordingStudioApiTest < Minitest::Test
   end
 
   def test_version_pin
-    assert_equal "0.11.0", ::RecordingStudioApi::VERSION
+    assert_equal "0.11.1", ::RecordingStudioApi::VERSION
   end
 
   def test_metrics_dependency_pins
     root = File.expand_path("..", __dir__)
     gemspec = File.read(File.join(root, "recording_studio_api.gemspec"))
-    assert_includes gemspec, '"recording_studio_metrics", "~> 0.3"'
+    assert_includes gemspec, '"recording_studio_metrics", ">= 0.3.0", "< 0.4"'
     %w[Gemfile test/dummy/Gemfile].each do |path|
       assert_includes File.read(File.join(root, path)), 'RecordingStudio_metrics", tag: "v0.3.1"', path
     end

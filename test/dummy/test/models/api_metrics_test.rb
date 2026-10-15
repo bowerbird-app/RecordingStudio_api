@@ -96,6 +96,8 @@ class ApiMetricsTest < ActionDispatch::IntegrationTest
     assert_includes identifiers, "api_requests.by_status_class"
     assert_includes identifiers, "api_requests.rate_limited"
     assert_includes identifiers, "api_keys.active"
+    assert_includes identifiers, "api_keys.expiring_soon"
+    assert_includes identifiers, "api_keys.stale"
   end
 
   test "authorized management operations token can execute metrics" do
@@ -103,6 +105,14 @@ class ApiMetricsTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_equal RecordingStudioApi::ApiCredential.active.count, JSON.parse(response.body).fetch("value")
+
+    get "#{operations_root}/metrics/api_keys/expiring_soon", headers: bearer(@authorized_token)
+    assert_response :success
+    assert JSON.parse(response.body).key?("value")
+
+    get "#{operations_root}/metrics/api_keys/stale", headers: bearer(@authorized_token)
+    assert_response :success
+    assert JSON.parse(response.body).key?("value")
   end
 
   test "unauthorized operations token and public token are denied" do
@@ -111,6 +121,12 @@ class ApiMetricsTest < ActionDispatch::IntegrationTest
     assert_empty JSON.parse(response.body).fetch("metrics")
 
     get "#{operations_root}/metrics/api_keys/active", headers: bearer(@unauthorized_token)
+    assert_response :forbidden
+
+    get "#{operations_root}/metrics/api_keys/expiring_soon", headers: bearer(@unauthorized_token)
+    assert_response :forbidden
+
+    get "#{operations_root}/metrics/api_keys/stale", headers: bearer(@unauthorized_token)
     assert_response :forbidden
 
     get "#{operations_root}/metrics", headers: bearer(@public_token)
@@ -142,13 +158,66 @@ class ApiMetricsTest < ActionDispatch::IntegrationTest
   end
 
   test "api key health catalog fields" do
-    %w[api_keys.expiring_soon api_keys.stale].each do |identifier|
+    expected = {
+      "api_keys.expiring_soon" => {
+        title: "API keys expiring soon",
+        description: RecordingStudioApi::Metrics::EXPIRING_SOON_DESCRIPTION
+      },
+      "api_keys.stale" => {
+        title: "Stale API keys",
+        description: RecordingStudioApi::Metrics::STALE_DESCRIPTION
+      }
+    }
+
+    expected.each do |identifier, fields|
       metadata = RecordingStudioMetrics.find(identifier).catalog_metadata
+      assert_equal fields[:title], metadata[:title], identifier
+      assert_equal fields[:description], metadata[:description], identifier
       assert_equal "count", metadata[:unit], identifier
-      assert metadata[:title].present?, identifier
-      assert metadata[:description].present?, identifier
       assert_equal [], metadata[:group_by], identifier
       assert_equal [:operations], metadata[:exposed_apis], identifier
+      assert_equal({ supported: false }, metadata[:date_range], identifier)
+      assert metadata[:timezone].present?, identifier
+      assert_equal({ cached: false }, metadata[:freshness], identifier)
+    end
+  end
+
+  test "api key health execute and discovery allow a site admin and deny an outsider" do
+    %w[expiring_soon stale].each do |name|
+      identifier = "api_keys.#{name}"
+      allowed = RecordingStudioMetrics::Api::ExecuteHandler.call(
+        build_api_context(@actor, resource: "api_keys", name: name)
+      )
+      assert_equal identifier, allowed[:metric]
+      assert allowed.key?(:value)
+
+      error = assert_raises(RecordingStudioApi::AuthorizationError) do
+        RecordingStudioMetrics::Api::ExecuteHandler.call(
+          build_api_context(@outsider, resource: "api_keys", name: name)
+        )
+      end
+      assert_match(/not authorized/i, error.message)
+    end
+
+    denied_ids = RecordingStudioMetrics::Api::DiscoveryHandler.call(
+      build_api_context(@outsider, resource: "api_keys")
+    ).fetch(:metrics).map { |row| row[:identifier] }
+    refute_includes denied_ids, "api_keys.expiring_soon"
+    refute_includes denied_ids, "api_keys.stale"
+
+    allowed_rows = RecordingStudioMetrics::Api::DiscoveryHandler.call(
+      build_api_context(@actor, resource: "api_keys")
+    ).fetch(:metrics)
+    allowed_ids = allowed_rows.map { |row| row[:identifier] }
+    assert_includes allowed_ids, "api_keys.expiring_soon"
+    assert_includes allowed_ids, "api_keys.stale"
+
+    %w[api_keys.expiring_soon api_keys.stale].each do |identifier|
+      entry = allowed_rows.find { |row| row[:identifier] == identifier }
+      assert_equal "count", entry[:unit], identifier
+      assert_equal({ supported: false }, entry[:date_range], identifier)
+      assert entry[:timezone].present?, identifier
+      assert_equal({ cached: false }, entry[:freshness], identifier)
     end
   end
 
@@ -165,6 +234,24 @@ class ApiMetricsTest < ActionDispatch::IntegrationTest
       ),
       **params
     )
+  end
+
+  def build_api_context(actor, resource:, name: nil)
+    grant = Struct.new(:actor).new(actor)
+    params = {
+      resource: resource,
+      name: name,
+      filters: { resource: resource },
+      timezone: "UTC"
+    }
+    context = Object.new
+    context.define_singleton_method(:access_grant) { grant }
+    context.define_singleton_method(:api_client) { actor }
+    context.define_singleton_method(:access_recording) { nil }
+    context.define_singleton_method(:root_recording) { nil }
+    context.define_singleton_method(:api_key) { :operations }
+    context.define_singleton_method(:params) { params }
+    context
   end
 
   def operations_root

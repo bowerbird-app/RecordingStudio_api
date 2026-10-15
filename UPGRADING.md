@@ -1,10 +1,59 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.11.1
+
+`0.11.1` adds `api_keys.expiring_soon` and `api_keys.stale`. No migrations.
+The gemspec pin for `recording_studio_metrics` is now `>= 0.3.0, < 0.4`.
+Recording Studio MCP `v0.17.0` allows `recording_studio_api` `>= 0.11.0, < 0.12`,
+so a host on that MCP release can take 0.11.1.
+
 ## Upgrading to 0.11.0
 
-`0.11.0` adds `api_keys.expiring_soon` and `api_keys.stale`. No migrations.
-MCP and Oauth allow `recording_studio_api < 0.11`, so a host needs widened
-releases of both before taking 0.11.0.
+`0.11.0` adds recordable metrics. No migrations.
+
+1. Register the calculation with `RecordingStudioMetrics`, then pass
+   `metrics:` to `register_recordable_type_api`. Each name is
+   `<resource>.<short_name>`. `<resource>` is
+   `RecordingStudioApi.resource_name_for` for that type, so a `Folder` metric
+   is `folders.total`.
+2. `blast_radius` must be `:root`. The definition model must be that
+   recordable class, or one of the two classes must inherit from the other.
+   A metric already exposed on a configured API, a metric that declares
+   filters, and a type with a custom index handler are rejected when the
+   definition can be found. A name the metrics gem does not have yet is
+   skipped at boot and raises `ConfigurationError` when `metrics_for` reads
+   it.
+3. `GET /<resource>/metrics` returns `{ "metrics" => [...] }` with name,
+   description, unit, title, timezone, freshness, and parameters.
+   `timezone` is the metrics engine default and is not a query parameter.
+   `freshness.cached` is false. `GET /<resource>/metrics/<name>` returns the
+   `RecordingStudioMetrics` result. Both require the same view grant as the
+   list, and `index` must be enabled. A disabled index is `422`
+   `unsupported_action`. A denied view is 403. An unknown name is 404.
+4. A time series accepts `from`, `to`, `interval`, and `group_by` when the
+   definition lists columns. `start` must match `from` when both are sent.
+   `start_at` is the fallback when `start` and `from` are absent. `end`,
+   `to`, and `end_at` follow the same rule. A conflict is `422`. A scalar
+   count with no field rejects `from`, `to`, `interval`, and `group_by`.
+   A scalar count with `field` accepts `from` and `to` and applies them on
+   that column before `execute`. It rejects `interval`. `q` and
+   `filter[attribute]` limit rows the same way the list does. Filter values
+   must be scalars. Unknown filter keys are `422`. The metrics engine
+   `filters` object is not accepted. There is no `timezone` query parameter.
+5. A definition `scope` proc is a configuration error
+   (`Metric <name> declares a scope`). The metric count matches the list
+   count for the same grant and filters.
+6. Owning gems must not allowlist a `group_by` column that holds personal
+   data. Groups under `min_group_size` fold into `other`. That is the only
+   guard.
+7. A type with an empty or missing allowlist is unchanged.
+   `GET /folders/metrics` stays the folder show route when Folder has no
+   allowlist. Once an allowlist exists, `metrics` is a reserved path
+   segment. The four operations metrics endpoints are unchanged.
+8. Recording Studio MCP `v0.14.4` still caps `recording_studio_api` at
+   `>= 0.6.11, < 0.11`. A host that uses MCP needs a widened MCP release
+   before it can take 0.11.0. Recording Studio Oauth `v0.12.2` allows
+   `>= 0.5.2, < 0.12`, so it can take 0.11.0.
 
 ## Upgrading to 0.10.0
 

@@ -56,6 +56,8 @@ class ApiMetricsOperationsTest < ActionDispatch::IntegrationTest
     assert_includes identifiers, "api_requests.by_status_class"
     assert_includes identifiers, "api_requests.rate_limited"
     assert_includes identifiers, "api_keys.active"
+    assert_includes identifiers, "api_keys.expiring_soon"
+    assert_includes identifiers, "api_keys.stale"
   end
 
   test "authorized management operations token reads seeded metric values" do
@@ -66,6 +68,14 @@ class ApiMetricsOperationsTest < ActionDispatch::IntegrationTest
     get "#{operations_root}/metrics/api_keys/active", headers: bearer_headers(@authorized_token)
     assert_response :success
     assert_equal RecordingStudioApi::ApiCredential.active.count, JSON.parse(response.body).fetch("value")
+
+    get "#{operations_root}/metrics/api_keys/expiring_soon", headers: bearer_headers(@authorized_token)
+    assert_response :success
+    assert JSON.parse(response.body).key?("value")
+
+    get "#{operations_root}/metrics/api_keys/stale", headers: bearer_headers(@authorized_token)
+    assert_response :success
+    assert JSON.parse(response.body).key?("value")
 
     get "#{operations_root}/metrics/api_requests/by_status_class", headers: bearer_headers(@authorized_token)
     assert_response :success
@@ -88,6 +98,12 @@ class ApiMetricsOperationsTest < ActionDispatch::IntegrationTest
     assert_response :forbidden
 
     get "#{operations_root}/api_keys/metrics/active", headers: bearer_headers(@unauthorized_token)
+    assert_response :forbidden
+
+    get "#{operations_root}/metrics/api_keys/expiring_soon", headers: bearer_headers(@unauthorized_token)
+    assert_response :forbidden
+
+    get "#{operations_root}/metrics/api_keys/stale", headers: bearer_headers(@unauthorized_token)
     assert_response :forbidden
 
     get "#{operations_root}/metrics", headers: bearer_headers(@public_token)
