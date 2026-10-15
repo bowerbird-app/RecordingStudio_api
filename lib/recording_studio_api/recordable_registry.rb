@@ -11,13 +11,14 @@ module RecordingStudioApi
 
     def register(recordable_type, serializer: nil, output_keys: nil, fields: nil, openapi: nil,
                  sortable_attributes: nil, writable_attributes: nil, immutable_fields: nil,
-                 relationships: nil, immutable_relationships: nil, operations: nil, capability_actions: nil)
+                 relationships: nil, immutable_relationships: nil, operations: nil, capability_actions: nil,
+                 metrics: nil)
       incoming = RecordableRegistration.new(
         recordable_type: recordable_type, serializer: serializer, output_keys: output_keys, fields: fields,
         openapi: openapi, sortable_attributes: sortable_attributes, writable_attributes: writable_attributes,
         immutable_fields: immutable_fields, relationships: relationships,
         immutable_relationships: immutable_relationships, operations: operations,
-        capability_actions: capability_actions
+        capability_actions: capability_actions, metrics: metrics
       )
       key = incoming.recordable_type
       @registrations[key] = merge_registrations(@registrations[key], incoming)
@@ -59,8 +60,11 @@ module RecordingStudioApi
                                        existing.operations_supplied?, incoming.operations_supplied?),
         capability_actions: merge_explicit_set("capability actions", existing.capability_actions, incoming.capability_actions,
                                                existing.capability_actions_supplied?, incoming.capability_actions_supplied?),
+        metrics: merge_explicit_set("metrics", existing.metric_names, incoming.metric_names,
+                                    existing.metrics_supplied?, incoming.metrics_supplied?),
         operations_supplied: existing.operations_supplied? || incoming.operations_supplied?,
-        capability_actions_supplied: existing.capability_actions_supplied? || incoming.capability_actions_supplied?
+        capability_actions_supplied: existing.capability_actions_supplied? || incoming.capability_actions_supplied?,
+        metrics_supplied: existing.metrics_supplied? || incoming.metrics_supplied?
       )
     end
 

@@ -284,7 +284,10 @@ Paths on the operations API are `GET /metrics`,
 name wins, in that order. `end`, `end_at`, and `to` do the same for the
 end. `group_by` stays on the request params. `recording_studio_metrics`
 0.2.2 ignores it. A resource-first path is served only when that first
-segment is not a recordable on the API.
+segment is not a recordable on the API. Recordable metrics are a separate
+allowlist, described under Recordable metrics. Those routes do not replace
+`GET /metrics` or `GET /:resource/metrics` for a first segment that is not a
+recordable.
 
 Solid Queue recurring example:
 
@@ -399,6 +402,37 @@ end
 
 `writable_attributes` is an explicit allowlist for API create and update operations. OpenAPI
 field metadata describes response data only and never grants write access.
+
+### Recordable metrics
+
+An owning gem registers the calculation with Recording Studio Metrics, then
+names those metrics on the recordable. `metrics:` is the allowlist.
+`RecordingStudioApi.metrics_for` reads name, description, and parameters from
+the live definition. Description and parameters are not stored on the
+registration.
+
+```ruby
+RecordingStudioMetrics.register(:folders, model: Folder, blast_radius: :root) do
+  count :total, title: "Folders", description: "How many folders are in this scope."
+end
+
+RecordingStudioApi.register_recordable_type_api(
+  "Folder",
+  serializer: ->(folder, **) { { name: folder.name } },
+  output_keys: %i[name],
+  sortable_attributes: %i[name],
+  writable_attributes: %i[name],
+  metrics: %w[folders.total]
+)
+```
+
+`GET /recording_studio_api/api/v1/folders/metrics` returns
+`{ "metrics" => [{ "name" => "folders.total", "description" => "...", "parameters" => [...] }] }`.
+`GET /recording_studio_api/api/v1/folders/metrics/folders.total` runs that
+metric. Both calls use the list view grant. `from`, `to`, `interval`,
+`group_by`, `q`, and `filter[attribute]` are the query parameters. A type
+with no allowlist keeps its show route, so `GET /folders/metrics` is still
+the folder with id `metrics` until Folder lists metrics.
 
 ### Per-type handlers
 

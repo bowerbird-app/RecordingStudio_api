@@ -1,5 +1,34 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.11.0
+
+`0.11.0` adds recordable metrics. No migrations.
+
+1. Register the calculation with `RecordingStudioMetrics`, then pass
+   `metrics:` to `register_recordable_type_api`. Each name is
+   `<resource>.<short_name>`. `<resource>` is
+   `RecordingStudioApi.resource_name_for` for that type, so a `Folder` metric
+   is `folders.total`.
+2. `blast_radius` must be `:root`. The definition model must be that
+   recordable class, or one of the two classes must inherit from the other.
+   A metric already exposed on a configured API, a metric that declares
+   filters, and a type with a custom index handler are rejected when the
+   definition can be found. A name the metrics gem does not have yet is
+   skipped at boot and raises `ConfigurationError` when `metrics_for` reads
+   it.
+3. `GET /<resource>/metrics` returns `{ "metrics" => [...] }` with name,
+   description, and parameters. `GET /<resource>/metrics/<name>` returns the
+   `RecordingStudioMetrics` result. Both require the same view grant as the
+   list. A denied view is 403. An unknown name is 404.
+4. Query parameters are `from`, `to`, `interval`, `group_by`, `q`, and
+   `filter[attribute]`. `q` and `filter[attribute]` limit the rows the same
+   way the list does. The metrics engine `filters` object is not accepted.
+5. A definition `scope` proc still runs. A proc that returns a wider relation
+   than it was given can include rows the list would hide.
+6. A type with an empty or missing allowlist is unchanged.
+   `GET /folders/metrics` stays the folder show route when Folder has no
+   allowlist. The four operations metrics endpoints are unchanged.
+
 ## Upgrading to 0.10.0
 
 `0.10.0` adds `api_requests.rate_limited_over_time`. No migrations. Gems that

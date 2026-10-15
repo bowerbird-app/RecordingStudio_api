@@ -17,6 +17,23 @@ RecordingStudioApi::Engine.routes.draw do
     true
   end
 
+  resource_metrics_constraint = lambda do |request|
+    params = request.path_parameters
+    path_segments = request.path.split("/").reject(&:blank?)
+    api_index = path_segments.rindex("apis")
+    api_key = (params[:api_key] || params["api_key"] || (api_index && path_segments[api_index + 1])).presence || "public"
+    resource = params[:resource] || params["resource"]
+    return false if resource.blank?
+
+    recordable_type = RecordingStudioApi.recordable_type_for_resource(resource, api: api_key)
+    return false if recordable_type.blank?
+
+    registration = RecordingStudioApi.recordable_registration_for(recordable_type, api: api_key)
+    registration&.metric_names&.any? || false
+  rescue RecordingStudioApi::ConfigurationError
+    false
+  end
+
   registered_endpoint_constraint = lambda do |request|
     RecordingStudioApi.registered_endpoint_path_match(request).present?
   end
@@ -52,6 +69,9 @@ RecordingStudioApi::Engine.routes.draw do
             as: :registered_endpoint
       get "/:resource", to: "resources#index", as: :resource_collection
       post "/:resource", to: "resources#create"
+      get "/:resource/metrics", to: "resource_metrics#index", constraints: resource_metrics_constraint, as: :resource_metrics
+      # format: false only drops the optional suffix. Journey still treats "." as a separator unless :name has a regexp.
+      get "/:resource/metrics/:name", to: "resource_metrics#show", constraints: resource_metrics_constraint, name: %r{[^/]+}, format: false, as: :resource_metric
       get "/:resource/:id", to: "resources#show", as: :resource
       patch "/:resource/:id", to: "resources#update"
       delete "/:resource/:id", to: "resources#destroy"
@@ -81,6 +101,8 @@ RecordingStudioApi::Engine.routes.draw do
               as: :registered_endpoint
         get "/:resource", to: "/recording_studio_api/api/v1/resources#index", as: :resource_collection
         post "/:resource", to: "/recording_studio_api/api/v1/resources#create"
+        get "/:resource/metrics", to: "/recording_studio_api/api/v1/resource_metrics#index", constraints: resource_metrics_constraint, as: :resource_metrics
+        get "/:resource/metrics/:name", to: "/recording_studio_api/api/v1/resource_metrics#show", constraints: resource_metrics_constraint, name: %r{[^/]+}, format: false, as: :resource_metric
         get "/:resource/:id", to: "/recording_studio_api/api/v1/resources#show", as: :resource
         patch "/:resource/:id", to: "/recording_studio_api/api/v1/resources#update"
         delete "/:resource/:id", to: "/recording_studio_api/api/v1/resources#destroy"
@@ -111,6 +133,8 @@ RecordingStudioApi::Engine.routes.draw do
           as: :registered_endpoint
     get "/:resource", to: "api/v1/resources#index", as: :resource_collection
     post "/:resource", to: "api/v1/resources#create"
+    get "/:resource/metrics", to: "api/v1/resource_metrics#index", constraints: resource_metrics_constraint, as: :resource_metrics
+    get "/:resource/metrics/:name", to: "api/v1/resource_metrics#show", constraints: resource_metrics_constraint, name: %r{[^/]+}, format: false, as: :resource_metric
     get "/:resource/:id", to: "api/v1/resources#show", as: :resource
     patch "/:resource/:id", to: "api/v1/resources#update"
     delete "/:resource/:id", to: "api/v1/resources#destroy"

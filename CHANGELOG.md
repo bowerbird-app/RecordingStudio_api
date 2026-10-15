@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-15
+
+### Added
+- Recordable metrics. An owning gem passes `metrics:` to
+  `register_recordable_type_api`. `RecordingStudioApi.metrics_for` returns
+  each allowlisted metric's name, description, and parameters from the live
+  `RecordingStudioMetrics` definition. `GET /<resource>/metrics` lists them.
+  `GET /<resource>/metrics/<name>` runs one. Types with no allowlist are
+  unchanged, and the operations metrics endpoints are unchanged.
+
 ## [0.10.0] - 2026-10-14
 
 ### Added
