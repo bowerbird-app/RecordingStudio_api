@@ -95,6 +95,7 @@ module RecordingStudioApi
       registered_endpoint_registry.validate!
       recordable_registry.validate!
       resource_handler_registry.validate!
+      MetricCatalog.validate_configured!(recordable_registry, api: name)
       raise ConfigurationError, "authentication must be oauth for #{name}" unless authentication == :oauth
       raise ConfigurationError, "default_access must be read_only or read_write for #{name}" unless %i[read_only read_write].include?(default_access)
 

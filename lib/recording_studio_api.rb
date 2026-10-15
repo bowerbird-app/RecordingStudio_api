@@ -54,12 +54,18 @@ require "recording_studio_api/services/aggregate_api_request_log_metrics"
 require "recording_studio_api/services/prune_api_request_logs"
 require "recording_studio_api/services/prune_api_daily_metrics"
 require "recording_studio_api/services/maintain_api_metrics"
+require "recording_studio_api/client_text"
+require "recording_studio_api/metric_entry"
+require "recording_studio_api/metric_catalog"
+require "recording_studio_api/services/resource_operations/collection_filter"
 require "recording_studio_api/services/resource_operations/base"
 require "recording_studio_api/services/resource_operations/index"
 require "recording_studio_api/services/resource_operations/show"
 require "recording_studio_api/services/resource_operations/create"
 require "recording_studio_api/services/resource_operations/update"
 require "recording_studio_api/services/resource_operations/destroy"
+require "recording_studio_api/services/resource_metrics/index"
+require "recording_studio_api/services/resource_metrics/show"
 require "recording_studio_api/admin"
 require "recording_studio_api/metrics"
 require "recording_studio_api/metrics/endpoints"
@@ -205,7 +211,7 @@ module RecordingStudioApi
     def register_recordable_type_api(recordable_type, serializer: nil, output_keys: nil, fields: nil, openapi: nil,
                                      sortable_attributes: nil, writable_attributes: nil, immutable_fields: nil,
                                      relationships: nil, immutable_relationships: nil, operations: nil,
-                                     capability_actions: nil, api: :public)
+                                     capability_actions: nil, metrics: nil, api: :public)
       definition = configuration.api(api)
       resolved_operations = operations
       resolved_operations = %i[index show] if resolved_operations.nil? && definition.respond_to?(:default_access) && definition.default_access == :read_only
@@ -221,8 +227,17 @@ module RecordingStudioApi
         relationships: relationships,
         immutable_relationships: immutable_relationships,
         operations: resolved_operations,
-        capability_actions: capability_actions
+        capability_actions: capability_actions,
+        metrics: metrics
       )
+    end
+
+    def metrics_for(recordable_type, api: :public)
+      MetricCatalog.entries(recordable_type, api: api)
+    end
+
+    def prepare_recordable_registries_for_reload!
+      configuration.each_api { |api| api.recordable_registry.prepare_for_reload! }
     end
 
     def register_recording_studio_admin!

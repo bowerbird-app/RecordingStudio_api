@@ -19,6 +19,35 @@ module RecordingStudioApi
         def call(version: nil, mount_path: nil, api_mount_path: nil, api: :public)
           new(version: version, mount_path: mount_path, api_mount_path: api_mount_path, api: api).call
         end
+
+        def filter_query_parameters(attributes)
+          parameters = [
+            {
+              name: "q",
+              in: "query",
+              required: false,
+              description: "Case-insensitive substring search across filterable attributes for this resource.",
+              schema: {
+                type: "string"
+              }
+            }
+          ]
+          return parameters if attributes.empty?
+
+          parameters + attributes.map { |attribute| filter_attribute_parameter(attribute) }
+        end
+
+        def filter_attribute_parameter(attribute)
+          {
+            name: "filter[#{attribute}]",
+            in: "query",
+            required: false,
+            description: "Exact match filter on #{attribute}.",
+            schema: {
+              type: "string"
+            }
+          }
+        end
       end
 
       def initialize(version: nil, mount_path: nil, api_mount_path: nil, api: :public)
@@ -178,6 +207,7 @@ module RecordingStudioApi
               resource: resource_name,
               recordable_type: recordable_type,
               endpoints: default_resource_endpoints(resource_name, recordable_type) +
+                recordable_metric_endpoints(resource_name, recordable_type) +
                 relationship_resource_endpoints(resource_name, recordable_type) +
                 action_endpoints(resource_name, recordable_type)
             }
@@ -300,6 +330,114 @@ module RecordingStudioApi
           registration.nil? || registration.supports_operation?(endpoint.fetch(:action).split("#").last)
         end
       end # rubocop:enable Metrics/MethodLength
+
+      def recordable_metric_endpoints(resource_name, recordable_type)
+        registration = recordable_registration_for(recordable_type)
+        return [] if registration.nil? || registration.metric_names.empty?
+
+        entries = RecordingStudioApi.metrics_for(recordable_type, api: @api_key)
+        query_parameters = merged_metric_parameters(entries)
+        tag = openapi_tag_for(resource_name, recordable_type)
+        docs_name = docs_resource_name_for(resource_name, recordable_type)
+        [
+          metric_catalog_endpoint(resource_name, tag, docs_name),
+          metric_show_endpoint(resource_name, tag, docs_name, query_parameters)
+        ]
+      end
+
+      def metric_catalog_endpoint(resource_name, tag, docs_name)
+        {
+          verb: "GET",
+          path: "#{api_root_path}/#{resource_name}/metrics",
+          action: "resource_metrics#index",
+          summary: "List #{docs_name} metrics",
+          description: "List metrics registered for #{docs_name}.",
+          capability: nil,
+          scope: nil,
+          openapi: {
+            tags: [tag],
+            responses: metric_catalog_responses
+          }
+        }
+      end
+
+      def metric_show_endpoint(resource_name, tag, docs_name, query_parameters)
+        {
+          verb: "GET",
+          path: "#{api_root_path}/#{resource_name}/metrics/:name",
+          action: "resource_metrics#show",
+          summary: "Read a #{docs_name} metric",
+          description: "Run one allowlisted metric for #{docs_name}.",
+          capability: nil,
+          scope: nil,
+          openapi: {
+            tags: [tag],
+            parameters: [metric_name_parameter] + query_parameters,
+            responses: {
+              "200" => {
+                description: "Metric result.",
+                content: {
+                  "application/json" => {
+                    schema: { type: "object" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      end
+
+      def merged_metric_parameters(entries)
+        return [] if entries.empty?
+
+        names = entries.flat_map { |entry| entry.parameters.map { |parameter| parameter[:name] } }.uniq
+        names.filter_map do |name|
+          parameter = entries.lazy.filter_map { |entry| entry.parameters.find { |candidate| candidate[:name] == name } }.first
+          next if parameter.nil?
+
+          parameter.merge(schema: parameter.fetch(:schema).except(:enum))
+        end
+      end
+
+      def metric_name_parameter
+        {
+          name: "name",
+          in: "path",
+          required: true,
+          description: "Metric name.",
+          schema: { type: "string" }
+        }
+      end
+
+      def metric_catalog_responses
+        {
+          "200" => {
+            description: "Allowlisted metrics.",
+            content: {
+              "application/json" => {
+                schema: {
+                  type: "object",
+                  properties: {
+                    metrics: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          name: { type: "string" },
+                          description: { type: "string" },
+                          parameters: { type: "array", items: { type: "object" } }
+                        },
+                        required: %w[name description parameters]
+                      }
+                    }
+                  },
+                  required: ["metrics"]
+                }
+              }
+            }
+          }
+        }
+      end
 
       def relationship_resource_endpoints(resource_name, recordable_type)
         registration = recordable_registration_for(recordable_type)
@@ -739,38 +877,14 @@ module RecordingStudioApi
       end
 
       def collection_filter_parameters(recordable_type)
-        filterable = filterable_attributes_for(recordable_type)
-        parameters = [
-          {
-            name: "q",
-            in: "query",
-            required: false,
-            description: "Case-insensitive substring search across filterable attributes for this resource.",
-            schema: {
-              type: "string"
-            }
-          }
-        ]
-        return parameters if filterable.empty?
-
-        parameters + filterable.map do |attribute|
-          {
-            name: "filter[#{attribute}]",
-            in: "query",
-            required: false,
-            description: "Exact match filter on #{attribute}.",
-            schema: {
-              type: "string"
-            }
-          }
-        end
+        self.class.filter_query_parameters(filterable_attributes_for(recordable_type))
       end
 
       def filterable_attributes_for(recordable_type)
         registration = recordable_registration_for(recordable_type)
         return [] if registration.nil?
 
-        (registration.sortable_attributes | registration.writable_attributes).map(&:to_s)
+        registration.filterable_attributes
       end
 
       def idempotency_key_parameter
