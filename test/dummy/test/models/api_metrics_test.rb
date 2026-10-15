@@ -186,27 +186,27 @@ class ApiMetricsTest < ActionDispatch::IntegrationTest
     %w[expiring_soon stale].each do |name|
       identifier = "api_keys.#{name}"
       allowed = RecordingStudioMetrics::Api::ExecuteHandler.call(
-        build_api_context(@actor, resource: "api_keys", name: name)
+        build_api_context(@actor, resource: "api_keys", name: name, filters: {})
       )
       assert_equal identifier, allowed[:metric]
       assert allowed.key?(:value)
 
       error = assert_raises(RecordingStudioApi::AuthorizationError) do
         RecordingStudioMetrics::Api::ExecuteHandler.call(
-          build_api_context(@outsider, resource: "api_keys", name: name)
+          build_api_context(@outsider, resource: "api_keys", name: name, filters: {})
         )
       end
       assert_match(/not authorized/i, error.message)
     end
 
     denied_ids = RecordingStudioMetrics::Api::DiscoveryHandler.call(
-      build_api_context(@outsider, resource: "api_keys")
+      build_api_context(@outsider, resource: "api_keys", filters: { resource: "api_keys" })
     ).fetch(:metrics).map { |row| row[:identifier] }
     refute_includes denied_ids, "api_keys.expiring_soon"
     refute_includes denied_ids, "api_keys.stale"
 
     allowed_rows = RecordingStudioMetrics::Api::DiscoveryHandler.call(
-      build_api_context(@actor, resource: "api_keys")
+      build_api_context(@actor, resource: "api_keys", filters: { resource: "api_keys" })
     ).fetch(:metrics)
     allowed_ids = allowed_rows.map { |row| row[:identifier] }
     assert_includes allowed_ids, "api_keys.expiring_soon"
@@ -236,12 +236,12 @@ class ApiMetricsTest < ActionDispatch::IntegrationTest
     )
   end
 
-  def build_api_context(actor, resource:, name: nil)
+  def build_api_context(actor, resource:, name: nil, filters: {})
     grant = Struct.new(:actor).new(actor)
     params = {
       resource: resource,
       name: name,
-      filters: { resource: resource },
+      filters: filters,
       timezone: "UTC"
     }
     context = Object.new
@@ -268,11 +268,33 @@ class ApiMetricsTest < ActionDispatch::IntegrationTest
 
   def grant_admin!(actor, recording)
     Current.actor = actor
-    result = RecordingStudioAccessible.bootstrap_owner_access!(recording: recording, actor: actor)
+    existing = RecordingStudioAccessible.access_recordings_for_actor(recording: recording, actor: actor).first
+    return existing if existing.present?
+
+    result = RecordingStudioAccessible.grant_access(
+      recording: recording,
+      actor: actor,
+      role: :admin,
+      manager_actor: actor
+    )
     return result.value if result.respond_to?(:success?) && result.success?
 
-    access = RecordingStudio::Access.create!(actor: actor, role: :admin)
-    RecordingStudio::Recording.create!(recordable: access, parent_recording: recording)
+    bootstrap = RecordingStudioAccessible.bootstrap_owner_access!(recording: recording, actor: actor)
+    return bootstrap.value if bootstrap.respond_to?(:success?) && bootstrap.success?
+
+    manager = User.find_by(email: "admin@admin.com")
+    raise result.error if manager.blank?
+
+    Current.actor = manager
+    granted = RecordingStudioAccessible.grant_access(
+      recording: recording,
+      actor: actor,
+      role: :admin,
+      manager_actor: manager
+    )
+    raise granted.error unless granted.respond_to?(:success?) && granted.success?
+
+    granted.value
   end
 
   def seed_daily_metrics!
