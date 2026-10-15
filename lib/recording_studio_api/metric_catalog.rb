@@ -31,18 +31,48 @@ module RecordingStudioApi
       MetricEntry.new(
         name: definition.identifier,
         description: definition.description.presence || definition.title,
-        parameters: parameters_for(registration, definition)
+        parameters: parameters_for(registration, definition),
+        unit: definition.unit,
+        title: definition.title.presence || definition.name.to_s,
+        timezone: RecordingStudioMetrics.configuration.default_timezone,
+        freshness: { cached: false }
       )
     end
 
     def parameters_for(registration, definition)
       [
-        period_parameter("from", "Inclusive period start, as an ISO-8601 date-time. start and start_at are aliases.", format: "date-time"),
-        period_parameter("to", "Exclusive period end, as an ISO-8601 date-time. end and end_at are aliases.", format: "date-time"),
-        choice_parameter("interval", "Time-series bucket size.", definition.intervals),
-        choice_parameter("group_by", "Grouping column for this metric.", definition.group_by),
+        *window_parameters(definition),
+        *group_parameters(definition),
         *Services::DocumentationCatalog.filter_query_parameters(registration.filterable_attributes)
       ]
+    end
+
+    def window_parameters(definition)
+      return timeseries_window_parameters(definition) if definition.result_type == :timeseries
+      return scalar_window_parameters(definition) if definition.field.present?
+
+      []
+    end
+
+    def timeseries_window_parameters(definition)
+      [
+        period_parameter("from", "Inclusive period start, as an ISO-8601 date-time. start must match from when both are sent. start_at is the fallback.", format: "date-time"),
+        period_parameter("to", "Exclusive period end, as an ISO-8601 date-time. end must match to when both are sent. end_at is the fallback.", format: "date-time"),
+        choice_parameter("interval", "Time-series bucket size.", definition.intervals)
+      ]
+    end
+
+    def scalar_window_parameters(_definition)
+      [
+        period_parameter("from", "Inclusive start for this count, applied on the metric field before execute. There is no timezone query parameter.", format: "date-time"),
+        period_parameter("to", "Exclusive end for this count, applied on the metric field before execute.", format: "date-time")
+      ]
+    end
+
+    def group_parameters(definition)
+      return [] if definition.group_by.empty?
+
+      [choice_parameter("group_by", "Grouping column for this metric. Do not allowlist a column that holds personal data. Groups under min_group_size fold into other.", definition.group_by)]
     end
 
     def period_parameter(name, description, format:)
@@ -69,6 +99,7 @@ module RecordingStudioApi
 
     def assert_eligible!(registration, name, definition, api:)
       raise ConfigurationError, "Metric #{name} must use root blast radius" unless definition.blast_radius == :root
+      raise ConfigurationError, "Metric #{name} declares a scope" if definition.scope
       raise ConfigurationError, "Metric #{name} is already exposed on an API" if exposed_on_configured_api?(definition)
       raise ConfigurationError, "Metric #{name} declares metric filters" if definition.filters.any?
 
@@ -89,7 +120,8 @@ module RecordingStudioApi
       model <= recordable_klass || recordable_klass <= model
     end
 
-    private_class_method :build, :parameters_for, :period_parameter, :choice_parameter,
+    private_class_method :build, :parameters_for, :window_parameters, :timeseries_window_parameters,
+                         :scalar_window_parameters, :group_parameters, :period_parameter, :choice_parameter,
                          :assert_eligible!, :exposed_on_configured_api?, :model_matches?
   end
   private_constant :MetricCatalog

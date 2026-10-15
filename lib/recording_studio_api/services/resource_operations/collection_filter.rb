@@ -25,13 +25,27 @@ module RecordingStudioApi
             end
 
           allowed = filterable_attributes(recordable_type, api)
+          unknown = filter_hash.keys.map(&:to_s) - allowed
+          if unknown.any?
+            raise RecordingStudioApi::InvalidActionInputError,
+                  "Unknown filters: #{unknown.map { |key| ClientText.cap(key) }.join(', ')}"
+          end
+
           filter_hash.each_with_object({}) do |(key, value), filters|
             attribute = key.to_s
-            next unless allowed.include?(attribute)
-            next if value.nil? || value.to_s.strip.empty?
+            next if value.nil? || (value.is_a?(String) && value.strip.empty?)
+
+            unless scalar_filter_value?(value)
+              raise RecordingStudioApi::InvalidActionInputError,
+                    "filter[#{ClientText.cap(attribute)}] must be a single value"
+            end
 
             filters[attribute] = value
           end
+        end
+
+        def scalar_filter_value?(value)
+          value.is_a?(String) || value.is_a?(Numeric) || value == true || value == false
         end
 
         def apply_attribute_filters(relation, recordable_type:, params:, api:)
@@ -91,7 +105,7 @@ module RecordingStudioApi
         end
 
         private_class_method :apply_attribute_filters, :apply_search_query, :filterable_attributes,
-                             :with_recordable_join, :recordable_join_sql
+                             :with_recordable_join, :recordable_join_sql, :scalar_filter_value?
       end
       private_constant :CollectionFilter
 

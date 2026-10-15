@@ -7,7 +7,10 @@
 Companion pins on current main: Trashable `~> 0.10` / `v0.10.0`
 (query-only), Admin `v2.2.0`, Moveable `v3.3.0`, Root Switchable
 `v0.8.0`, Accessible `~> 0.11` / `v0.18.0`, RecordingStudio `v4.6.0`,
-Metrics `v0.3.1`. For Trashable query-only keep/trash helpers in
+Metrics `v0.3.1`. Recording Studio MCP `v0.14.4` still caps this gem at
+`>= 0.6.11, < 0.11`, so a host that uses MCP needs a widened MCP release
+before it can take `0.11.0`. Recording Studio Oauth `v0.12.2` allows
+`>= 0.5.2, < 0.12`. For Trashable query-only keep/trash helpers in
 `0.7.0`, metrics window fixes in `0.6.16`, and earlier companion pins,
 see [UPGRADING.md](UPGRADING.md).
 
@@ -280,11 +283,10 @@ RecordingStudioMetrics::Api.register!(api: :operations)
 Paths on the operations API are `GET /metrics`,
 `GET /metrics?resource=api_requests`, `GET /:resource/metrics`,
 `GET /metrics/:resource/:name`, and `GET /:resource/metrics/:name`.
-`start`, `start_at`, and `from` set the window start. The first present
-name wins, in that order. `end`, `end_at`, and `to` do the same for the
-end. `group_by` stays on the request params. `recording_studio_metrics`
-0.2.2 ignores it. A resource-first path is served only when that first
-segment is not a recordable on the API. Recordable metrics are a separate
+`start`, `start_at`, and `from` set the window start. `start` and `from`
+must match when both are sent. `start_at` is the fallback when neither is
+sent. `end`, `end_at`, and `to` follow the same rule. `group_by` is passed through when the metric declares it. A resource-first
+path is served only when that first segment is not a recordable on the API. Recordable metrics are a separate
 allowlist, described under Recordable metrics. Those routes do not replace
 `GET /metrics` or `GET /:resource/metrics` for a first segment that is not a
 recordable.
@@ -427,12 +429,42 @@ RecordingStudioApi.register_recordable_type_api(
 ```
 
 `GET /recording_studio_api/api/v1/folders/metrics` returns
-`{ "metrics" => [{ "name" => "folders.total", "description" => "...", "parameters" => [...] }] }`.
+`{ "metrics" => [{ "name" => "folders.total", "description" => "...", "unit" => "count", "title" => "Folders", "timezone" => "UTC", "freshness" => { "cached" => false }, "parameters" => [...] }] }`.
+`timezone` is the metrics engine default (UTC unless the host changed it).
+There is no `timezone` query parameter. `freshness.cached` is false because
+these calls run with `cache: false`.
 `GET /recording_studio_api/api/v1/folders/metrics/folders.total` runs that
-metric. Both calls use the list view grant. `from`, `to`, `interval`,
-`group_by`, `q`, and `filter[attribute]` are the query parameters. A type
-with no allowlist keeps its show route, so `GET /folders/metrics` is still
-the folder with id `metrics` until Folder lists metrics.
+metric. Both calls require the same view grant as the list, and the
+recordable must allow `index`. A disabled index is `422`
+`unsupported_action` with `index is not enabled for Folder`.
+
+A scalar count with no field accepts `q` and `filter[attribute]` only.
+`from`, `to`, `interval`, and `group_by` are `422` `invalid_input`. A
+scalar count that declares `field` also accepts `from` and `to`. Those
+bounds limit that column on the authorized relation before `execute`
+(inclusive start, exclusive end) and are not passed into the metrics
+engine. `interval` is still `422`. A time series accepts `from`, `to`,
+`interval`, and `group_by` when the definition lists columns. `start` must
+match `from` when both are sent. `start_at` is used only when `start` and
+`from` are absent. `end`, `to`, and `end_at` follow the same rule. A
+conflict is `422`. OpenAPI on the shared show operation lists the union of
+parameter names and omits enums. Each catalog entry carries that metric's
+own enums.
+
+`filter[attribute]` must be one scalar value. An array or a hash is `422`.
+An unknown filter key is `422`. The same rules apply to the list. `q` is
+the list search.
+
+`group_by` is optional and only appears when the definition allowlists
+columns. Owning gems must not allowlist a column that holds personal data.
+Groups smaller than `min_group_size` (5) fold into `other`. That fold is
+the only guard.
+
+Once an allowlist exists, the path segment `metrics` is reserved.
+`GET /folders/metrics` is the catalog, not the folder whose id is
+`metrics`. `GET /folders/metrics.json.json` returns the API error body.
+A type with no allowlist keeps its show route, so `GET /folders/metrics`
+is still the folder with id `metrics` until Folder lists metrics.
 
 ### Per-type handlers
 
@@ -890,6 +922,8 @@ With no reporter, `progress` returns `nil` and `cancelled?` is `false`.
 - `POST /recording_studio_api/apis/<api-name>/oauth/token` — issue OAuth2 bearer access tokens for a named API using `client_credentials`, or a registered grant type
 - `GET /recording_studio_api/api/<version>` — list available API resources for the selected public API version
 - `GET /recording_studio_api/api/<version>/:resource` — list recordings of a resource type inside the authenticated root
+- `GET /recording_studio_api/api/<version>/:resource/metrics` — list allowlisted metrics for that resource. `metrics` is reserved once the allowlist exists
+- `GET /recording_studio_api/api/<version>/:resource/metrics/:name` — run one allowlisted metric. `:name` is the full identifier, such as `folders.total`
 - `GET /recording_studio_api/api/<version>/:resource/:id` — show one recording
 - `POST /recording_studio_api/api/<version>/:resource` — create a recording when the resource permits `:create`
 - `PATCH /recording_studio_api/api/<version>/:resource/:id` — update a recording when the resource permits `:update`

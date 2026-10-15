@@ -54,6 +54,7 @@ require "recording_studio_api/services/aggregate_api_request_log_metrics"
 require "recording_studio_api/services/prune_api_request_logs"
 require "recording_studio_api/services/prune_api_daily_metrics"
 require "recording_studio_api/services/maintain_api_metrics"
+require "recording_studio_api/client_text"
 require "recording_studio_api/metric_entry"
 require "recording_studio_api/metric_catalog"
 require "recording_studio_api/services/resource_operations/collection_filter"
@@ -233,6 +234,10 @@ module RecordingStudioApi
 
     def metrics_for(recordable_type, api: :public)
       MetricCatalog.entries(recordable_type, api: api)
+    end
+
+    def prepare_recordable_registries_for_reload!
+      configuration.each_api { |api| api.recordable_registry.prepare_for_reload! }
     end
 
     def register_recording_studio_admin!

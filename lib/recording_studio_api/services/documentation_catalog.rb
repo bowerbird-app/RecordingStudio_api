@@ -390,16 +390,12 @@ module RecordingStudioApi
       def merged_metric_parameters(entries)
         return [] if entries.empty?
 
-        entries.first.parameters.map do |parameter|
-          enums = entries.filter_map do |entry|
-            entry.parameters.find { |candidate| candidate[:name] == parameter[:name] }&.dig(:schema, :enum)
-          end
-          next parameter if enums.empty?
+        names = entries.flat_map { |entry| entry.parameters.map { |parameter| parameter[:name] } }.uniq
+        names.filter_map do |name|
+          parameter = entries.lazy.filter_map { |entry| entry.parameters.find { |candidate| candidate[:name] == name } }.first
+          next if parameter.nil?
 
-          merged_enum = enums.flatten.uniq
-          next parameter if merged_enum == parameter.dig(:schema, :enum)
-
-          parameter.merge(schema: parameter.fetch(:schema).merge(enum: merged_enum))
+          parameter.merge(schema: parameter.fetch(:schema).except(:enum))
         end
       end
 

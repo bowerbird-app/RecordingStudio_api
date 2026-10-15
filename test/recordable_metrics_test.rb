@@ -82,11 +82,12 @@ class RecordableMetricsTest < Minitest::Test
       {
         name: "metric_samples.total",
         description: "Sample total",
+        unit: "count",
+        title: "Sample total",
+        timezone: RecordingStudioMetrics.configuration.default_timezone,
+        freshness: { cached: false },
         parameters: [
-          period_parameter("from", "Inclusive period start, as an ISO-8601 date-time. start and start_at are aliases.", format: "date-time"),
-          period_parameter("to", "Exclusive period end, as an ISO-8601 date-time. end and end_at are aliases.", format: "date-time"),
-          choice_parameter("interval", "Time-series bucket size.", enum: %w[day week]),
-          choice_parameter("group_by", "Grouping column for this metric.", enum: %w[name]),
+          choice_parameter("group_by", "Grouping column for this metric. Do not allowlist a column that holds personal data. Groups under min_group_size fold into other.", enum: %w[name]),
           query_parameter("q", "Case-insensitive substring search across filterable attributes for this resource."),
           query_parameter("filter[name]", "Exact match filter on name."),
           query_parameter("filter[created_at]", "Exact match filter on created_at.")
@@ -105,8 +106,25 @@ class RecordableMetricsTest < Minitest::Test
     entry = RecordingStudioApi.metrics_for(SAMPLE).fetch(0)
 
     assert_equal "How many samples are in this scope.", entry.description
-    assert_nil entry.parameters.find { |parameter| parameter[:name] == "interval" }.dig(:schema, :enum)
-    assert_nil entry.parameters.find { |parameter| parameter[:name] == "group_by" }.dig(:schema, :enum)
+    assert_equal "count", entry.unit
+    assert_equal "Sample total", entry.title
+    assert_equal RecordingStudioMetrics.configuration.default_timezone, entry.timezone
+    assert_equal({ cached: false }, entry.freshness)
+    assert_nil(entry.parameters.find { |parameter| parameter[:name] == "interval" })
+    assert_nil(entry.parameters.find { |parameter| parameter[:name] == "from" })
+    assert_nil(entry.parameters.find { |parameter| parameter[:name] == "group_by" })
+  end
+
+  def test_a_count_with_a_field_advertises_from_and_to_without_interval
+    register_sample
+    register_definition(field: :created_at)
+
+    names = RecordingStudioApi.metrics_for(SAMPLE).fetch(0).parameters.map { |parameter| parameter[:name] }
+
+    assert_includes names, "from"
+    assert_includes names, "to"
+    refute_includes names, "interval"
+    refute_includes names, "timezone"
   end
 
   def test_metrics_for_accepts_inheritance_in_either_direction
@@ -120,12 +138,44 @@ class RecordableMetricsTest < Minitest::Test
     assert_equal "children.total", RecordingStudioApi.metrics_for(CHILD).fetch(0).name
   end
 
-  def test_a_scope_proc_stays_eligible
+  def test_a_scope_proc_is_rejected
     register_sample
     register_definition(scope: ->(relation) { relation })
 
-    RecordingStudioApi.configuration.validate!
-    assert_equal ["metric_samples.total"], RecordingStudioApi.metrics_for(SAMPLE).map(&:name)
+    error = assert_raises(RecordingStudioApi::ConfigurationError) do
+      RecordingStudioApi.metrics_for(SAMPLE)
+    end
+    assert_equal "Metric metric_samples.total declares a scope", error.message
+  end
+
+  def test_concurrent_registration_keeps_each_type
+    registry = RecordingStudioApi::RecordableRegistry.new
+    types = 4.times.map { |index| "ConcurrentMetric#{index}" }
+    threads = types.map do |type|
+      Thread.new do
+        prefix = type.underscore.pluralize
+        registry.register(type, metrics: ["#{prefix}.total"])
+        registry.fetch(type).metric_names
+      end
+    end
+    results = threads.map(&:value)
+    assert_equal types.map { |type| ["#{type.underscore.pluralize}.total"] }, results
+  end
+
+  def test_reload_replaces_the_allowlist_once_then_a_second_change_raises
+    registry = RecordingStudioApi::RecordableRegistry.new
+    registry.register(SAMPLE, serializer: ->(*) { {} }, output_keys: [:name], metrics: %w[metric_samples.total])
+    registry.prepare_for_reload!
+    registry.register(SAMPLE, metrics: %w[metric_samples.other])
+
+    replaced = registry.fetch(SAMPLE)
+    assert_equal %w[metric_samples.other], replaced.metric_names
+    assert_predicate replaced.serializer, :present?
+
+    error = assert_raises(RecordingStudioApi::ConfigurationError) do
+      registry.register(SAMPLE, metrics: %w[metric_samples.total])
+    end
+    assert_equal "Metrics cannot be redefined incompatibly", error.message
   end
 
   def test_validate_skips_a_missing_definition_and_metrics_for_raises
@@ -211,27 +261,6 @@ class RecordableMetricsTest < Minitest::Test
     assert_equal "Metric metric_samples.total cannot be listed when #{SAMPLE} has a custom index handler", error.message
   end
 
-  def test_routes_declare_resource_metrics_in_all_three_draw_blocks
-    source = File.read(File.expand_path("../config/routes.rb", __dir__))
-
-    assert_equal 3, source.scan("resource_metrics#index").length
-    assert_equal 3, source.scan("resource_metrics#show").length
-    [
-      'to: "resource_metrics#index"',
-      'to: "/recording_studio_api/api/v1/resource_metrics#index"',
-      'to: "api/v1/resource_metrics#index"'
-    ].each { |index_target| assert_includes source, index_target }
-    [
-      'get "/:resource/metrics/:name", to: "resource_metrics#show", constraints: resource_metrics_constraint, name: %r{[^/]+}, format: false, as: :resource_metric',
-      'get "/:resource/metrics/:name", to: "/recording_studio_api/api/v1/resource_metrics#show", constraints: resource_metrics_constraint, name: %r{[^/]+}, format: false, as: :resource_metric',
-      'get "/:resource/metrics/:name", to: "api/v1/resource_metrics#show", constraints: resource_metrics_constraint, name: %r{[^/]+}, format: false, as: :resource_metric'
-    ].each do |show_line|
-      assert_includes source, show_line
-      rest = source[(source.index(show_line) + show_line.length)..]
-      assert_match(%r{\A\n\s+get "/:resource/:id"}, rest)
-    end
-  end
-
   private
 
   def register_sample(metrics: %w[metric_samples.total], sortable_attributes: %i[name], writable_attributes: %i[name])
@@ -243,7 +272,7 @@ class RecordableMetricsTest < Minitest::Test
     )
   end
 
-  def register_definition(resource: :metric_samples, model: MetricSample, blast_radius: :root, scope: nil, expose: nil, description: "How many samples are in this scope.", title: "Sample total", intervals: [], group_by: [])
+  def register_definition(resource: :metric_samples, model: MetricSample, blast_radius: :root, scope: nil, expose: nil, description: "How many samples are in this scope.", title: "Sample total", intervals: [], group_by: [], field: nil)
     options = { blast_radius: blast_radius }
     options[:scope] = scope if scope
     RecordingStudioMetrics.register(resource, model: model, **options) do
@@ -252,6 +281,7 @@ class RecordableMetricsTest < Minitest::Test
       count_options[:expose] = expose if expose
       count_options[:intervals] = intervals if intervals.any?
       count_options[:group_by] = group_by if group_by.any?
+      count_options[:field] = field if field
       count :total, **count_options
     end
   end

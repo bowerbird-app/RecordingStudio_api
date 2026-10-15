@@ -7,6 +7,9 @@ module RecordingStudioApi
   class RecordableRegistry
     def initialize
       @registrations = {}
+      @seen_since_reload = {}
+      @reload_pending = false
+      @mutex = Mutex.new
     end
 
     def register(recordable_type, serializer: nil, output_keys: nil, fields: nil, openapi: nil,
@@ -21,30 +24,45 @@ module RecordingStudioApi
         capability_actions: capability_actions, metrics: metrics
       )
       key = incoming.recordable_type
-      @registrations[key] = merge_registrations(@registrations[key], incoming)
+      @mutex.synchronize do
+        replace_metrics = @reload_pending && !@seen_since_reload[key]
+        @registrations[key] = merge_registrations(@registrations[key], incoming, replace_metrics: replace_metrics)
+        @seen_since_reload[key] = true
+      end
+    end
+
+    # The next registration of each type may replace its metric allowlist.
+    # Development reload runs host registration again against the same registry.
+    def prepare_for_reload!
+      @mutex.synchronize do
+        @reload_pending = true
+        @seen_since_reload = {}
+      end
     end
 
     def fetch(recordable_type)
-      @registrations.fetch(recordable_type.to_s)
+      @mutex.synchronize { @registrations.fetch(recordable_type.to_s) }
     end
 
     def [](recordable_type)
-      @registrations[recordable_type.to_s]
+      @mutex.synchronize { @registrations[recordable_type.to_s] }
     end
 
     def to_h
-      @registrations.transform_values(&:as_json)
+      @mutex.synchronize { @registrations.transform_values(&:as_json) }
     end
 
     def validate!
-      @registrations.each_value(&:validate!)
+      registrations = @mutex.synchronize { @registrations.values }
+      registrations.each(&:validate!)
     end
 
     private
 
-    def merge_registrations(existing, incoming)
+    def merge_registrations(existing, incoming, replace_metrics: false)
       return incoming unless existing
 
+      @replace_metrics = replace_metrics
       RecordableRegistration.new(
         recordable_type: incoming.recordable_type,
         serializer: merge_value("serializer", existing.serializer, incoming.serializer),
@@ -61,7 +79,7 @@ module RecordingStudioApi
         capability_actions: merge_explicit_set("capability actions", existing.capability_actions, incoming.capability_actions,
                                                existing.capability_actions_supplied?, incoming.capability_actions_supplied?),
         metrics: merge_explicit_set("metrics", existing.metric_names, incoming.metric_names,
-                                    existing.metrics_supplied?, incoming.metrics_supplied?),
+                                    existing.metrics_supplied?, incoming.metrics_supplied?, replace: @replace_metrics),
         operations_supplied: existing.operations_supplied? || incoming.operations_supplied?,
         capability_actions_supplied: existing.capability_actions_supplied? || incoming.capability_actions_supplied?,
         metrics_supplied: existing.metrics_supplied? || incoming.metrics_supplied?
@@ -84,11 +102,12 @@ module RecordingStudioApi
       raise ConfigurationError, "#{name.capitalize} cannot be redefined incompatibly"
     end
 
-    def merge_explicit_set(name, established, replacement, established_supplied, replacement_supplied)
+    def merge_explicit_set(name, established, replacement, established_supplied, replacement_supplied, replace: false)
       return replacement if replacement_supplied && !established_supplied
       return established if established_supplied && !replacement_supplied
       return established unless established_supplied || replacement_supplied
       return established if established == replacement
+      return replacement if replace && replacement_supplied
 
       raise ConfigurationError, "#{name.capitalize} cannot be redefined incompatibly"
     end

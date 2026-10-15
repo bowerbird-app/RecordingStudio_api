@@ -69,9 +69,12 @@ RecordingStudioApi::Engine.routes.draw do
             as: :registered_endpoint
       get "/:resource", to: "resources#index", as: :resource_collection
       post "/:resource", to: "resources#create"
+      # "metrics" is reserved once this recordable has a metric allowlist. A stacked
+      # .json suffix stays on this controller so it cannot fall through to a recording id.
       get "/:resource/metrics", to: "resource_metrics#index", constraints: resource_metrics_constraint, as: :resource_metrics
       # format: false only drops the optional suffix. Journey still treats "." as a separator unless :name has a regexp.
       get "/:resource/metrics/:name", to: "resource_metrics#show", constraints: resource_metrics_constraint, name: %r{[^/]+}, format: false, as: :resource_metric
+      get "/:resource/:metrics_catalog", to: "resource_metrics#index", constraints: resource_metrics_constraint, metrics_catalog: /metrics(?:\.json)+/, format: false
       get "/:resource/:id", to: "resources#show", as: :resource
       patch "/:resource/:id", to: "resources#update"
       delete "/:resource/:id", to: "resources#destroy"
@@ -101,8 +104,10 @@ RecordingStudioApi::Engine.routes.draw do
               as: :registered_endpoint
         get "/:resource", to: "/recording_studio_api/api/v1/resources#index", as: :resource_collection
         post "/:resource", to: "/recording_studio_api/api/v1/resources#create"
+        # "metrics" is reserved once this recordable has a metric allowlist.
         get "/:resource/metrics", to: "/recording_studio_api/api/v1/resource_metrics#index", constraints: resource_metrics_constraint, as: :resource_metrics
         get "/:resource/metrics/:name", to: "/recording_studio_api/api/v1/resource_metrics#show", constraints: resource_metrics_constraint, name: %r{[^/]+}, format: false, as: :resource_metric
+        get "/:resource/:metrics_catalog", to: "/recording_studio_api/api/v1/resource_metrics#index", constraints: resource_metrics_constraint, metrics_catalog: /metrics(?:\.json)+/, format: false
         get "/:resource/:id", to: "/recording_studio_api/api/v1/resources#show", as: :resource
         patch "/:resource/:id", to: "/recording_studio_api/api/v1/resources#update"
         delete "/:resource/:id", to: "/recording_studio_api/api/v1/resources#destroy"
@@ -133,8 +138,10 @@ RecordingStudioApi::Engine.routes.draw do
           as: :registered_endpoint
     get "/:resource", to: "api/v1/resources#index", as: :resource_collection
     post "/:resource", to: "api/v1/resources#create"
+    # "metrics" is reserved once this recordable has a metric allowlist.
     get "/:resource/metrics", to: "api/v1/resource_metrics#index", constraints: resource_metrics_constraint, as: :resource_metrics
     get "/:resource/metrics/:name", to: "api/v1/resource_metrics#show", constraints: resource_metrics_constraint, name: %r{[^/]+}, format: false, as: :resource_metric
+    get "/:resource/:metrics_catalog", to: "api/v1/resource_metrics#index", constraints: resource_metrics_constraint, metrics_catalog: /metrics(?:\.json)+/, format: false
     get "/:resource/:id", to: "api/v1/resources#show", as: :resource
     patch "/:resource/:id", to: "api/v1/resources#update"
     delete "/:resource/:id", to: "api/v1/resources#destroy"

@@ -17,17 +17,36 @@
    skipped at boot and raises `ConfigurationError` when `metrics_for` reads
    it.
 3. `GET /<resource>/metrics` returns `{ "metrics" => [...] }` with name,
-   description, and parameters. `GET /<resource>/metrics/<name>` returns the
+   description, unit, title, timezone, freshness, and parameters.
+   `timezone` is the metrics engine default and is not a query parameter.
+   `freshness.cached` is false. `GET /<resource>/metrics/<name>` returns the
    `RecordingStudioMetrics` result. Both require the same view grant as the
-   list. A denied view is 403. An unknown name is 404.
-4. Query parameters are `from`, `to`, `interval`, `group_by`, `q`, and
-   `filter[attribute]`. `q` and `filter[attribute]` limit the rows the same
-   way the list does. The metrics engine `filters` object is not accepted.
-5. A definition `scope` proc still runs. A proc that returns a wider relation
-   than it was given can include rows the list would hide.
-6. A type with an empty or missing allowlist is unchanged.
+   list, and `index` must be enabled. A disabled index is `422`
+   `unsupported_action`. A denied view is 403. An unknown name is 404.
+4. A time series accepts `from`, `to`, `interval`, and `group_by` when the
+   definition lists columns. `start` must match `from` when both are sent.
+   `start_at` is the fallback when `start` and `from` are absent. `end`,
+   `to`, and `end_at` follow the same rule. A conflict is `422`. A scalar
+   count with no field rejects `from`, `to`, `interval`, and `group_by`.
+   A scalar count with `field` accepts `from` and `to` and applies them on
+   that column before `execute`. It rejects `interval`. `q` and
+   `filter[attribute]` limit rows the same way the list does. Filter values
+   must be scalars. Unknown filter keys are `422`. The metrics engine
+   `filters` object is not accepted. There is no `timezone` query parameter.
+5. A definition `scope` proc is a configuration error
+   (`Metric <name> declares a scope`). The metric count matches the list
+   count for the same grant and filters.
+6. Owning gems must not allowlist a `group_by` column that holds personal
+   data. Groups under `min_group_size` fold into `other`. That is the only
+   guard.
+7. A type with an empty or missing allowlist is unchanged.
    `GET /folders/metrics` stays the folder show route when Folder has no
-   allowlist. The four operations metrics endpoints are unchanged.
+   allowlist. Once an allowlist exists, `metrics` is a reserved path
+   segment. The four operations metrics endpoints are unchanged.
+8. Recording Studio MCP `v0.14.4` still caps `recording_studio_api` at
+   `>= 0.6.11, < 0.11`. A host that uses MCP needs a widened MCP release
+   before it can take 0.11.0. Recording Studio Oauth `v0.12.2` allows
+   `>= 0.5.2, < 0.12`, so it can take 0.11.0.
 
 ## Upgrading to 0.10.0
 
