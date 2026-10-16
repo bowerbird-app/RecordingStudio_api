@@ -63,9 +63,7 @@ module RecordingStudioApi
           resource = api_context.params[:resource].to_s.presence
           return catalog unless resource
 
-          if RecordingStudioMetrics.for_resource(resource).empty?
-            raise RecordingStudioApi::NotFoundError, "Unknown API resource #{ClientText.cap(resource)}"
-          end
+          raise RecordingStudioApi::NotFoundError, "Unknown API resource #{ClientText.cap(resource)}" if RecordingStudioMetrics.for_resource(resource).empty?
 
           catalog.merge(metrics: catalog.fetch(:metrics).select { |row| row[:resource].to_s == resource })
         end
