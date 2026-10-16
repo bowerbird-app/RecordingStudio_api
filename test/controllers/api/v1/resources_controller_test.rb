@@ -1045,6 +1045,40 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     ], payload.dig("error", "details")
   end
 
+  test "repeats a create with the same Idempotency-Key without Redis and returns the first folder" do
+    previous_cache = Rails.cache
+    Rails.cache = ActiveSupport::Cache::MemoryStore.new
+    key = "folder-create-#{SecureRandom.hex(8)}"
+    headers = authorization_headers.merge("Idempotency-Key" => key)
+
+    begin
+      RecordingStudioApi::IdempotencyStore.stub(:redis, nil) do
+        assert_difference("Folder.count", 1) do
+          post "/recording_studio_api/api/v1/folders", params: {
+            parent_id: @root_recording.id,
+            name: "First idempotent folder"
+          }, headers: headers
+        end
+        assert_response :created
+        first = JSON.parse(response.body)
+
+        assert_no_difference("Folder.count") do
+          post "/recording_studio_api/api/v1/folders", params: {
+            parent_id: @root_recording.id,
+            name: "Second idempotent folder"
+          }, headers: headers
+        end
+        assert_response :created
+        second = JSON.parse(response.body)
+
+        assert_equal first.fetch("id"), second.fetch("id")
+        assert_equal "First idempotent folder", second.fetch("name")
+      end
+    ensure
+      Rails.cache = previous_cache
+    end
+  end
+
   test "ignores update attributes for unregistered page resources" do
     page_recording = create_page_recording(root_recording: @root_recording)
     original_title = page_recording.recordable.title
