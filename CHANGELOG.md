@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.3] - 2026-10-16
+
+### Fixed
+- Create `Idempotency-Key` retries no longer duplicate when Redis is down.
+  `IdempotencyStore` keeps the first response with Redis `SET NX`, or with
+  `Rails.cache` `unless_exist` when Redis is missing or raises
+  `Redis::BaseError`. It logs one warning when it uses the cache.
+
 ## [0.11.2] - 2026-10-16
 
 ### Fixed
@@ -640,7 +648,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.2...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.3...HEAD
+[0.11.3]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.2...v0.11.3
 [0.11.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.1...v0.11.2
 [0.8.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.6.18...v0.7.0

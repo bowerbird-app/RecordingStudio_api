@@ -896,7 +896,7 @@ module RecordingStudioApi
           name: "Idempotency-Key",
           in: "header",
           required: false,
-          description: "Optional client-supplied key. When Redis is available, identical create requests from the same API client reuse the first successful response for 24 hours.",
+          description: "Optional client-supplied key. Identical create requests from the same API client reuse the first successful response for 24 hours. Redis stores the key when it is reachable. Rails.cache is used when Redis is missing or errors.",
           schema: {
             type: "string",
             maxLength: 255
