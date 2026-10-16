@@ -37,8 +37,6 @@ RecordingStudioApi.configure do |config|
 
   # OAuth, API pre-auth, and authenticated API buckets are rate-limited by default
   # and fail closed when Redis is unavailable for those buckets.
-  # Create Idempotency-Key storage uses this Redis client when it is reachable.
-  # When Redis is missing or errors, IdempotencyStore uses Rails.cache instead.
   config.rate_limit_redis_url = ENV.fetch("RECORDING_STUDIO_API_RATE_LIMIT_REDIS_URL", nil)
   config.rate_limit_redis_namespace = "recording_studio_api"
   # config.rate_limit_oauth_enabled = true

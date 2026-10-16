@@ -4,11 +4,7 @@ require "digest"
 require "json"
 
 module RecordingStudioApi
-  # Request idempotency for mutating resource operations.
-  # Redis is the store when it is reachable. Rails.cache is the fallback when
-  # Redis is missing or raises Redis::BaseError. Keys are scoped to API + client
-  # so one client cannot replay another's response. Writes use Redis SET NX
-  # or Rails.cache unless_exist so the first stored response wins.
+  # Keys include API and client so one client cannot replay another's response.
   class IdempotencyStore
     DEFAULT_TTL_SECONDS = 24 * 60 * 60
 
