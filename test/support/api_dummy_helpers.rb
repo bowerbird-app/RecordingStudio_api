@@ -26,6 +26,7 @@ module ApiDummyHelpers # rubocop:disable Metrics/ModuleLength
     configuration.api_management_authorization_required = false
     RecordingStudioApi.instance_variable_set(:@configuration, configuration)
     RecordingStudioApi::Concerns::RateLimiting.reset_redis_client!
+    RecordingStudioApi::IdempotencyStore.reset_fallback_notice!
     RecordingStudioApi::Admin::Queries::AdminApiCredentialsQuery.clear_cache!
     RecordingStudioApi::ApiRequestLogBatch.clear!
     RecordingStudioApi.register_default_capability_actions!

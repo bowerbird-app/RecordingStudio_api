@@ -8,7 +8,7 @@ class RecordingStudioApiTest < Minitest::Test
   end
 
   def test_version_pin
-    assert_equal "0.11.2", ::RecordingStudioApi::VERSION
+    assert_equal "0.11.3", ::RecordingStudioApi::VERSION
   end
 
   def test_metrics_dependency_pins

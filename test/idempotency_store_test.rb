@@ -28,7 +28,7 @@ class IdempotencyStoreTest < ActiveSupport::TestCase
       @mutex.synchronize { @store[key] }
     end
 
-    def set(key, value, nx: false, ex: nil) # rubocop:disable Naming/MethodParameterName
+    def set(key, value, nx: false, **) # rubocop:disable Naming/MethodParameterName
       @mutex.synchronize do
         return nil if nx && @store.key?(key)
 
@@ -52,6 +52,7 @@ class IdempotencyStoreTest < ActiveSupport::TestCase
     reset_recording_studio_api_configuration!
     @previous_cache = Rails.cache
     Rails.cache = ActiveSupport::Cache::MemoryStore.new
+    RecordingStudioApi::IdempotencyStore.reset_fallback_notice!
   end
 
   teardown do

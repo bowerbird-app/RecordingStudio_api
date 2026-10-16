@@ -215,6 +215,14 @@ from the public configuration when declared. Each definition can then override t
 changing another API. Redis connectivity, namespaces, and telemetry retention remain shared
 infrastructure.
 
+Create idempotency uses that same Redis client
+(`rate_limit_redis_url` and `rate_limit_redis_namespace`). When Redis is missing or raises
+`Redis::BaseError`, `IdempotencyStore` writes the first response to
+`Rails.cache` with `unless_exist` and logs one warning. Redis uses `SET NX`.
+A later create with the same `Idempotency-Key` from the same API client
+returns that stored JSON for 24 hours. `null_store` cannot replay. A
+`register_resource_handler` for `create` does not use this store.
+
 Set `api_management_authorization_required` for trusted APIs. Credential creation then requires both
 the requested RecordingStudioAccessible data grant and management access to that API's `AdminApi`
 recording beneath the configured admin root. Public and unprotected named APIs retain the existing

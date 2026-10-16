@@ -1,5 +1,22 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.11.3
+
+`0.11.3` stores create idempotency in Redis when Redis answers, and in
+`Rails.cache` when it does not. No migrations. `fetch` and `write` keep the
+same arguments.
+
+1. A second create with the same `Idempotency-Key` from the same API client
+   returns the first JSON for 24 hours even when Redis is down, as long as
+   `Rails.cache` keeps values (`memory_store`, Redis cache, Memcached).
+   `null_store` still cannot replay.
+2. The first stored response wins. A later write with the same key does not
+   replace it.
+3. One process-wide warning is logged when the store uses `Rails.cache`
+   because Redis is missing or raises `Redis::BaseError`.
+4. `register_resource_handler` for `create` still skips this store. Call
+   `IdempotencyStore` from that handler if you need the same replay.
+
 ## Upgrading to 0.11.2
 
 `0.11.2` rejects a bad `limit` and tightens recordable metric JSON. No

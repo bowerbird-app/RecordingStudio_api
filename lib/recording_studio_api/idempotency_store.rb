@@ -4,8 +4,11 @@ require "digest"
 require "json"
 
 module RecordingStudioApi
-  # Redis-backed request idempotency for mutating resource operations.
-  # Keys are scoped to API + client so one client cannot replay another's response.
+  # Request idempotency for mutating resource operations.
+  # Redis is the store when it is reachable. Rails.cache is the fallback when
+  # Redis is missing or raises Redis::BaseError. Keys are scoped to API + client
+  # so one client cannot replay another's response. Writes use Redis SET NX
+  # or Rails.cache unless_exist so the first stored response wins.
   class IdempotencyStore
     DEFAULT_TTL_SECONDS = 24 * 60 * 60
 
@@ -13,16 +16,11 @@ module RecordingStudioApi
       def fetch(api:, client_id:, key:)
         return nil if key.blank? || client_id.blank?
 
-        raw = redis&.get(redis_key(api: api, client_id: client_id, key: key))
+        raw = read_raw(storage_key(api: api, client_id: client_id, key: key))
         return nil if raw.blank?
 
         JSON.parse(raw)
       rescue JSON::ParserError => e
-        Rails.logger.warn("[RecordingStudioApi] idempotency fetch failed: #{e.class}: #{e.message}")
-        nil
-      rescue StandardError => e
-        raise unless redis_error?(e)
-
         Rails.logger.warn("[RecordingStudioApi] idempotency fetch failed: #{e.class}: #{e.message}")
         nil
       end
@@ -30,21 +28,15 @@ module RecordingStudioApi
       def write(api:, client_id:, key:, payload:, status:, ttl: DEFAULT_TTL_SECONDS)
         return if key.blank? || client_id.blank?
 
-        redis&.set(
-          redis_key(api: api, client_id: client_id, key: key),
+        write_raw(
+          storage_key(api: api, client_id: client_id, key: key),
           JSON.generate("json" => payload, "status" => status),
-          ex: ttl.to_i
+          ttl.to_i
         )
-      rescue StandardError => e
-        raise unless redis_error?(e)
-
-        Rails.logger.warn("[RecordingStudioApi] idempotency write failed: #{e.class}: #{e.message}")
-        nil
       end
 
       def redis_key(api:, client_id:, key:)
-        namespace = RecordingStudioApi.configuration.rate_limit_redis_namespace.presence || "recording_studio_api"
-        "#{namespace}:idempotency:#{api}:#{client_id}:#{Digest::SHA256.hexdigest(key.to_s)}"
+        storage_key(api: api, client_id: client_id, key: key)
       end
 
       def redis
@@ -53,6 +45,68 @@ module RecordingStudioApi
 
       def redis_error?(error)
         defined?(Redis) && error.is_a?(Redis::BaseError)
+      end
+
+      def reset_fallback_notice!
+        fallback_mutex.synchronize { @fallback_warned = false }
+      end
+
+      private
+
+      def storage_key(api:, client_id:, key:)
+        namespace = RecordingStudioApi.configuration.rate_limit_redis_namespace.presence || "recording_studio_api"
+        "#{namespace}:idempotency:#{api}:#{client_id}:#{Digest::SHA256.hexdigest(key.to_s)}"
+      end
+
+      def read_raw(key)
+        client = redis
+        if client
+          begin
+            return client.get(key)
+          rescue StandardError => e
+            raise unless redis_error?(e)
+
+            warn_fallback(e)
+          end
+        else
+          warn_fallback(nil)
+        end
+
+        Rails.cache.read(key)
+      end
+
+      def write_raw(key, blob, ttl)
+        client = redis
+        if client
+          begin
+            client.set(key, blob, nx: true, ex: ttl)
+            return
+          rescue StandardError => e
+            raise unless redis_error?(e)
+
+            warn_fallback(e)
+          end
+        else
+          warn_fallback(nil)
+        end
+
+        Rails.cache.write(key, blob, expires_in: ttl, unless_exist: true)
+      end
+
+      def warn_fallback(error)
+        fallback_mutex.synchronize do
+          return if @fallback_warned
+
+          @fallback_warned = true
+          detail = error ? "#{error.class}: #{error.message}" : "Redis client is missing"
+          Rails.logger.warn(
+            "[RecordingStudioApi] idempotency is using Rails.cache because Redis is unavailable (#{detail})"
+          )
+        end
+      end
+
+      def fallback_mutex
+        @fallback_mutex ||= Mutex.new
       end
     end
   end
