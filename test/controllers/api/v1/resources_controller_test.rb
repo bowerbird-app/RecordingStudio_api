@@ -150,6 +150,26 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_empty(first_page_ids & second_page_ids)
   end
 
+  test "rejects a limit that is not a positive whole number" do
+    get "/recording_studio_api/api/v1/pages", headers: authorization_headers
+    assert_response :success
+    assert_equal 50, JSON.parse(response.body).dig("meta", "limit")
+
+    [
+      { limit: -1 },
+      { limit: 0 },
+      { limit: "foo" },
+      { limit: "1.5" },
+      { limit: [2] }
+    ].each do |params|
+      get "/recording_studio_api/api/v1/pages", params: params, headers: authorization_headers
+      assert_response :unprocessable_entity, params.inspect
+      body = JSON.parse(response.body)
+      assert_equal "invalid_input", body.dig("error", "code"), params.inspect
+      assert_equal "limit must be a whole number from 1 to 100", body.dig("error", "message"), params.inspect
+    end
+  end
+
   test "returns unprocessable entity for invalid pagination token" do
     get "/recording_studio_api/api/v1/pages", params: { pagination_token: "not-a-valid-token" }, headers: authorization_headers
 

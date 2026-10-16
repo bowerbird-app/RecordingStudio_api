@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.2] - 2026-10-16
+
+### Fixed
+- A `limit` that is present and is not a whole number from 1 through the
+  configured maximum is `422` `invalid_input`. An omitted or blank `limit`
+  still uses the default. A value above the maximum is still capped.
+- Recordable metric JSON omits `filters`. That key was always `{}` because
+  execute does not take the metrics engine `filters` object. Sending
+  `filters[...]` is `422` `invalid_input`.
+- OpenAPI catalog items include `unit`, `title`, `timezone`, and `freshness`.
+- Stacked `metrics.json.json` still 404s. The check matches two or more
+  `.json` suffixes on the catalog segment.
+- `GET /metrics?resource=` and `GET /:resource/metrics` return `404`
+  `not_found` when no metric is registered for that resource. A known
+  resource with no authorized metrics is still `200` `{ "metrics": [] }`.
+
+### Changed
+- List `filter` values that are unknown or not a single scalar have been
+  `422` since 0.11.0. That belongs in these notes as well as the README.
+
 ## [0.11.1] - 2026-10-15
 
 ### Added
@@ -620,7 +640,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.2...HEAD
+[0.11.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.1...v0.11.2
 [0.8.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.6.18...v0.7.0
 [0.6.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.6.0...v0.6.1

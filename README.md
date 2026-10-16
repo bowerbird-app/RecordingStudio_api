@@ -287,6 +287,8 @@ RecordingStudioMetrics::Api.register!(api: :operations)
 Paths on the operations API are `GET /metrics`,
 `GET /metrics?resource=api_requests`, `GET /:resource/metrics`,
 `GET /metrics/:resource/:name`, and `GET /:resource/metrics/:name`.
+A resource with no registered metrics is `404` `not_found`. A known
+resource with no authorized metrics is `{ "metrics": [] }`.
 `start`, `start_at`, and `from` set the window start. `start` and `from`
 must match when both are sent. `start_at` is the fallback when neither is
 sent. `end`, `end_at`, and `to` follow the same rule. `group_by` is passed through when the metric declares it. A resource-first
@@ -413,9 +415,9 @@ field metadata describes response data only and never grants write access.
 
 An owning gem registers the calculation with Recording Studio Metrics, then
 names those metrics on the recordable. `metrics:` is the allowlist.
-`RecordingStudioApi.metrics_for` reads name, description, and parameters from
-the live definition. Description and parameters are not stored on the
-registration.
+`RecordingStudioApi.metrics_for` reads name, description, unit, title,
+timezone, freshness, and parameters from the live definition. Description and
+parameters are not stored on the registration.
 
 ```ruby
 RecordingStudioMetrics.register(:folders, model: Folder, blast_radius: :root) do

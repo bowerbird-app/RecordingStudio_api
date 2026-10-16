@@ -14,20 +14,13 @@ module RecordingStudioApi
           entry = RecordingStudioApi.metrics_for(recordable_type, api: api_key).find { |candidate| candidate.name == params[:name].to_s }
           query = metric_query(entry)
           result = execute_metric(entry, query)
-          { json: result.as_json }
+          { json: metric_payload(result) }
         rescue RecordingStudioMetrics::Errors::Error => e
           mapped = RecordingStudioMetrics::Api.map_to_api_error(e)
           raise mapped.class, ClientText.cap(mapped.message)
         end
 
         private
-
-        def assert_index_enabled!
-          registration = RecordingStudioApi.recordable_registration_for(recordable_type, api: api_key)
-          return if registration&.supports_operation?(:index)
-
-          raise RecordingStudioApi::UnsupportedActionError, "index is not enabled for #{recordable_type}"
-        end
 
         def execute_metric(entry, query)
           definition = RecordingStudioMetrics.find(entry.name)
@@ -71,9 +64,17 @@ module RecordingStudioApi
           relation
         end
 
+        def metric_payload(result)
+          payload = result.as_json
+          payload.delete(:filters)
+          payload.delete("filters")
+          payload
+        end
+
         def metric_query(entry)
           accepted = entry.parameters.map { |parameter| parameter[:name].to_s }
           raw = query_params
+          reject_engine_filters!(raw)
           reject_structured_query!(raw)
           reject_unaccepted_window!(raw, accepted)
           {
@@ -87,6 +88,12 @@ module RecordingStudioApi
         def query_params
           raw = params.respond_to?(:to_unsafe_h) ? params.to_unsafe_h : params.to_h
           raw.to_h.transform_keys(&:to_sym)
+        end
+
+        def reject_engine_filters!(raw)
+          return unless raw.key?(:filters)
+
+          raise RecordingStudioApi::InvalidActionInputError, "filters is not accepted for this metric"
         end
 
         def reject_structured_query!(raw)
