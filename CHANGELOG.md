@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - OpenAPI catalog items include `unit`, `title`, `timezone`, and `freshness`.
 - Stacked `metrics.json.json` still 404s. The check matches two or more
   `.json` suffixes on the catalog segment.
+- `GET /metrics?resource=` and `GET /:resource/metrics` return `404`
+  `not_found` when no metric is registered for that resource. A known
+  resource with no authorized metrics is still `200` `{ "metrics": [] }`.
 
 ### Changed
 - List `filter` values that are unknown or not a single scalar have been

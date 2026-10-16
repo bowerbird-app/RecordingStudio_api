@@ -256,8 +256,18 @@ class ApiMetricsOperationsTest < ActionDispatch::IntegrationTest
     assert_equal keys_body, response.body
 
     get "#{operations_root}/typo/metrics", headers: headers
-    assert_response :success
-    assert_equal({ "metrics" => [] }, JSON.parse(response.body))
+    assert_response :not_found
+    assert_equal(
+      { "error" => { "code" => "not_found", "message" => "Unknown API resource typo" } },
+      JSON.parse(response.body)
+    )
+
+    get "#{operations_root}/metrics", params: { resource: "typo" }, headers: headers
+    assert_response :not_found
+    assert_equal(
+      { "error" => { "code" => "not_found", "message" => "Unknown API resource typo" } },
+      JSON.parse(response.body)
+    )
   end
 
   test "resource-first metric show matches the legacy path" do

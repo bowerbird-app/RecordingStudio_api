@@ -287,6 +287,8 @@ RecordingStudioMetrics::Api.register!(api: :operations)
 Paths on the operations API are `GET /metrics`,
 `GET /metrics?resource=api_requests`, `GET /:resource/metrics`,
 `GET /metrics/:resource/:name`, and `GET /:resource/metrics/:name`.
+A resource with no registered metrics is `404` `not_found`. A known
+resource with no authorized metrics is `{ "metrics": [] }`.
 `start`, `start_at`, and `from` set the window start. `start` and `from`
 must match when both are sent. `start_at` is the fallback when neither is
 sent. `end`, `end_at`, and `to` follow the same rule. `group_by` is passed through when the metric declares it. A resource-first

@@ -12,7 +12,11 @@ migrations.
 2. Recordable metric show JSON no longer includes `filters: {}`. The metrics
    engine `filters` object is `422`. List `filter[attribute]` and `q` still
    narrow the relation.
-3. Custom index handlers that still call `fetch` on
+3. `GET /metrics?resource=` and `GET /:resource/metrics` for a resource
+   with no registered metrics are `404` `not_found` (`Unknown API resource
+   <name>`). They used to be `200` `{ "metrics": [] }`. A known resource
+   the caller cannot see is still an empty list.
+4. Custom index handlers that still call `fetch` on
    `PaginateResourceCollection::Page` need `response_body` (see 0.8.0). That
    crash is not fixed in this gem.
 
