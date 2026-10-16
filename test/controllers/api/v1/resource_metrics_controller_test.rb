@@ -207,9 +207,9 @@ class ApiV1ResourceMetricsControllerTest < ActionDispatch::IntegrationTest
     listed = JSON.parse(response.body).fetch("metrics")
     created = listed.find { |metric| metric.fetch("name") == "folders.created_over_time" }
     assert_equal %w[day week], created.fetch("parameters").find { |parameter| parameter.fetch("name") == "interval" }.dig("schema", "enum")
-    catalog_items = paths.fetch("/recording_studio_api/api/v1/folders/metrics").fetch("get")
-      .fetch(:responses).fetch("200").fetch("content").fetch("application/json")
-      .fetch("schema").fetch("properties").fetch("metrics").fetch("items")
+    catalog_items = paths.fetch("/recording_studio_api/api/v1/folders/metrics").fetch("get").fetch(:responses)
+                         .fetch("200").fetch("content").fetch("application/json")
+                         .fetch("schema").fetch("properties").fetch("metrics").fetch("items")
     assert_equal(
       %w[name description unit title timezone freshness parameters],
       catalog_items.fetch("required")
