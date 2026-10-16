@@ -413,9 +413,9 @@ field metadata describes response data only and never grants write access.
 
 An owning gem registers the calculation with Recording Studio Metrics, then
 names those metrics on the recordable. `metrics:` is the allowlist.
-`RecordingStudioApi.metrics_for` reads name, description, and parameters from
-the live definition. Description and parameters are not stored on the
-registration.
+`RecordingStudioApi.metrics_for` reads name, description, unit, title,
+timezone, freshness, and parameters from the live definition. Description and
+parameters are not stored on the registration.
 
 ```ruby
 RecordingStudioMetrics.register(:folders, model: Folder, blast_radius: :root) do

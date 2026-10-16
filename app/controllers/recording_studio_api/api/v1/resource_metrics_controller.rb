@@ -21,7 +21,7 @@ module RecordingStudioApi
 
         def reject_stacked_format!
           catalog = params[:metrics_catalog].to_s
-          return if catalog.empty? || !catalog.include?(".json.json")
+          return if catalog.empty? || catalog.match?(/\Ametrics(\.json){0,1}\z/)
 
           raise RecordingStudioApi::NotFoundError, "Request format is not supported"
         end

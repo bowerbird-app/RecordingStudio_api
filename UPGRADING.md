@@ -1,5 +1,21 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.11.2
+
+`0.11.2` rejects a bad `limit` and tightens recordable metric JSON. No
+migrations.
+
+1. Callers that sent `limit=0`, a negative `limit`, or a non-integer `limit`
+   and received the default page size now get `422` `invalid_input` with
+   `limit must be a whole number from 1 to <max>`. Omit `limit` to keep the
+   default. There is no `per_page` query parameter.
+2. Recordable metric show JSON no longer includes `filters: {}`. The metrics
+   engine `filters` object is `422`. List `filter[attribute]` and `q` still
+   narrow the relation.
+3. Custom index handlers that still call `fetch` on
+   `PaginateResourceCollection::Page` need `response_body` (see 0.8.0). That
+   crash is not fixed in this gem.
+
 ## Upgrading to 0.11.1
 
 `0.11.1` adds `api_keys.expiring_soon` and `api_keys.stale`. No migrations.

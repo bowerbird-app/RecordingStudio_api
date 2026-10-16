@@ -425,9 +425,13 @@ module RecordingStudioApi
                         properties: {
                           name: { type: "string" },
                           description: { type: "string" },
+                          unit: { type: "string" },
+                          title: { type: "string" },
+                          timezone: { type: "string" },
+                          freshness: { type: "object" },
                           parameters: { type: "array", items: { type: "object" } }
                         },
-                        required: %w[name description parameters]
+                        required: %w[name description unit title timezone freshness parameters]
                       }
                     }
                   },

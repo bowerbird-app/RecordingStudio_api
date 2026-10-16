@@ -162,10 +162,26 @@ module RecordingStudioApi
         resolved_default = default_limit.positive? ? default_limit : 50
         resolved_max = max_limit.positive? ? max_limit : 100
 
-        requested = limit.to_i
-        requested = resolved_default if requested <= 0
+        return resolved_default if omitted_limit?
+
+        requested = parsed_limit
+        unless requested&.positive?
+          raise RecordingStudioApi::InvalidActionInputError,
+                "limit must be a whole number from 1 to #{resolved_max}"
+        end
 
         [requested, resolved_max].min
+      end
+
+      def omitted_limit?
+        limit.nil? || (limit.is_a?(String) && limit.strip.empty?)
+      end
+
+      def parsed_limit
+        return limit if limit.is_a?(Integer)
+        return Integer(limit.strip, 10) if limit.is_a?(String) && /\A[+-]?\d+\z/.match?(limit.strip)
+
+        nil
       end
 
       def decode_pagination_token(normalized_sort, normalized_order)

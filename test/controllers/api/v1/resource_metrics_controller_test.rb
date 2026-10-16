@@ -72,7 +72,9 @@ class ApiV1ResourceMetricsControllerTest < ActionDispatch::IntegrationTest
         headers: authorization_headers
 
     assert_response :success
-    assert_equal 1, JSON.parse(response.body).fetch("value")
+    filtered = JSON.parse(response.body)
+    assert_equal 1, filtered.fetch("value")
+    refute filtered.key?("filters")
 
     get "/recording_studio_api/api/v1/folders/metrics/folders.total",
         params: { q: "Bea" },
@@ -205,6 +207,12 @@ class ApiV1ResourceMetricsControllerTest < ActionDispatch::IntegrationTest
     listed = JSON.parse(response.body).fetch("metrics")
     created = listed.find { |metric| metric.fetch("name") == "folders.created_over_time" }
     assert_equal %w[day week], created.fetch("parameters").find { |parameter| parameter.fetch("name") == "interval" }.dig("schema", "enum")
+    catalog_items = paths.fetch("/recording_studio_api/api/v1/folders/metrics").fetch("get")
+      .dig(:responses, "200", :content, "application/json", :schema, :properties, :metrics, :items)
+    assert_equal(
+      %w[name description unit title timezone freshness parameters],
+      catalog_items.fetch(:required)
+    )
     assert_equal [], paths.fetch("/recording_studio_api/api/v1/folders/metrics").fetch("get").fetch(:parameters)
     refute paths.key?("/recording_studio_api/api/v1/folders/metrics/folders.total")
     refute paths.key?("/recording_studio_api/api/v1/folders/metrics/folders.alpha")
@@ -282,15 +290,17 @@ class ApiV1ResourceMetricsControllerTest < ActionDispatch::IntegrationTest
 
   test "view and admin can read metrics and a guest cannot" do
     create_folder("Ada")
-    view_token = token_for(role: :view)
-    admin_token = token_for(role: :admin)
+    view_access = grant_or_bootstrap_access!(recording: @root_recording, actor: create_user, role: :view)
+    admin_access = grant_or_bootstrap_access!(recording: @root_recording, actor: create_user, role: :admin)
+    view_token = issue_oauth_access_token_for(access_recording: view_access, name: "view metrics")
+    admin_token = issue_oauth_access_token_for(access_recording: admin_access, name: "admin metrics")
 
     [view_token, admin_token].each do |token|
       get "/recording_studio_api/api/v1/folders/metrics", headers: bearer(token)
       assert_response :success
       get "/recording_studio_api/api/v1/folders/metrics/folders.total", headers: bearer(token)
       assert_response :success
-      assert_equal 0, JSON.parse(response.body).fetch("value")
+      assert_equal 1, JSON.parse(response.body).fetch("value")
     end
 
     guest_token = token_for(role: :guest)
@@ -342,6 +352,15 @@ class ApiV1ResourceMetricsControllerTest < ActionDispatch::IntegrationTest
         headers: authorization_headers
     error = assert_api_error(:unprocessable_entity, "invalid_input")
     assert_equal "filter[name] must be a single value", error.fetch("message")
+  end
+
+  test "the metrics engine filters object is rejected" do
+    get "/recording_studio_api/api/v1/folders/metrics/folders.total",
+        params: { filters: { status: "open" } },
+        headers: authorization_headers
+
+    error = assert_api_error(:unprocessable_entity, "invalid_input")
+    assert_equal "filters is not accepted for this metric", error.fetch("message")
   end
 
   test "unknown filters are rejected instead of ignored" do

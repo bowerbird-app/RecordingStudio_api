@@ -163,6 +163,13 @@ module RecordingStudioApi
           access_grant.authorize!(recording: target_recording, role: role, include_trashed: include_trashed)
         end
 
+        def assert_index_enabled!
+          registration = RecordingStudioApi.recordable_registration_for(recordable_type, api: api_key)
+          return if registration&.supports_operation?(:index)
+
+          raise RecordingStudioApi::UnsupportedActionError, "index is not enabled for #{recordable_type}"
+        end
+
         def delete_metadata
           {
             api_action: "delete",
