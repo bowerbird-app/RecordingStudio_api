@@ -1,5 +1,12 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.11.1
+
+`0.11.1` adds `api_keys.expiring_soon` and `api_keys.stale`. No migrations.
+The gemspec pin for `recording_studio_metrics` is now `>= 0.3.0, < 0.4`.
+Recording Studio MCP `v0.17.0` allows `recording_studio_api` `>= 0.11.0, < 0.12`,
+so a host on that MCP release can take 0.11.1.
+
 ## Upgrading to 0.11.0
 
 `0.11.0` adds recordable metrics. No migrations.

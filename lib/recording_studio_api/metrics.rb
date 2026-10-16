@@ -10,6 +10,21 @@ module RecordingStudioApi
     SERVER_ERRORS_DESCRIPTION = "API responses with a 5xx status per day, from the daily request rollup. " \
                                 "Client (4xx) errors are not counted."
     SERVER_ERROR_GROUP_BY = %i[route_name request_method].freeze
+    EXPIRING_SOON_WINDOW = 30.days
+    STALE_AFTER = 90.days
+    EXPIRING_SOON = lambda { |relation|
+      now = Time.current
+      relation.merge(ApiCredential.active).where(expires_at: now..(now + EXPIRING_SOON_WINDOW))
+    }
+    STALE = lambda { |relation|
+      cutoff = Time.current - STALE_AFTER
+      table = ApiCredential.arel_table
+      relation.merge(ApiCredential.active).where(
+        table[:last_used_at].lt(cutoff).or(table[:last_used_at].eq(nil).and(table[:created_at].lt(cutoff)))
+      )
+    }
+    EXPIRING_SOON_DESCRIPTION = "Active API keys whose expires_at falls within the next 30 days."
+    STALE_DESCRIPTION = "Active API keys not used in the last 90 days (or never used and created over 90 days ago)."
     RATE_LIMITED_DESCRIPTION = "API requests rejected by the rate limiter per day, from the daily request rollup."
     AUTHORIZE = lambda { |context|
       actor = context&.access_grant&.actor
@@ -63,7 +78,15 @@ module RecordingStudioApi
         api_authorize: AUTHORIZE
       ) do
         count :active, title: "Active API keys", expose: RecordingStudioApi::Metrics::EXPOSE
+        RecordingStudioApi::Metrics.define_api_key_health(self)
       end
+    end
+
+    def define_api_key_health(dsl)
+      dsl.count :expiring_soon, title: "API keys expiring soon", description: EXPIRING_SOON_DESCRIPTION,
+                                unit: "count", scope: EXPIRING_SOON, cacheable: false, expose: EXPOSE
+      dsl.count :stale, title: "Stale API keys", description: STALE_DESCRIPTION,
+                        unit: "count", scope: STALE, cacheable: false, expose: EXPOSE
     end
 
     def define_api_requests(dsl)

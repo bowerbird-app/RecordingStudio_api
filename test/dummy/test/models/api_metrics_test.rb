@@ -48,7 +48,7 @@ class ApiMetricsTest < ActionDispatch::IntegrationTest
       api_requests.rate_limited_over_time
       api_requests.server_errors_over_time
     ], request_ids.sort
-    assert_equal ["api_keys.active"], key_ids
+    assert_equal %w[api_keys.active api_keys.expiring_soon api_keys.stale], key_ids.sort
 
     RecordingStudioMetrics.for_resource(:api_requests).each do |definition|
       assert_equal [:operations], definition.exposed_apis
@@ -96,6 +96,8 @@ class ApiMetricsTest < ActionDispatch::IntegrationTest
     assert_includes identifiers, "api_requests.by_status_class"
     assert_includes identifiers, "api_requests.rate_limited"
     assert_includes identifiers, "api_keys.active"
+    assert_includes identifiers, "api_keys.expiring_soon"
+    assert_includes identifiers, "api_keys.stale"
   end
 
   test "authorized management operations token can execute metrics" do
@@ -103,6 +105,14 @@ class ApiMetricsTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_equal RecordingStudioApi::ApiCredential.active.count, JSON.parse(response.body).fetch("value")
+
+    get "#{operations_root}/metrics/api_keys/expiring_soon", headers: bearer(@authorized_token)
+    assert_response :success
+    assert JSON.parse(response.body).key?("value")
+
+    get "#{operations_root}/metrics/api_keys/stale", headers: bearer(@authorized_token)
+    assert_response :success
+    assert JSON.parse(response.body).key?("value")
   end
 
   test "unauthorized operations token and public token are denied" do
@@ -113,11 +123,102 @@ class ApiMetricsTest < ActionDispatch::IntegrationTest
     get "#{operations_root}/metrics/api_keys/active", headers: bearer(@unauthorized_token)
     assert_response :forbidden
 
+    get "#{operations_root}/metrics/api_keys/expiring_soon", headers: bearer(@unauthorized_token)
+    assert_response :forbidden
+
+    get "#{operations_root}/metrics/api_keys/stale", headers: bearer(@unauthorized_token)
+    assert_response :forbidden
+
     get "#{operations_root}/metrics", headers: bearer(@public_token)
     assert_response :unauthorized
 
     get "#{operations_root}/metrics/api_requests/over_time", headers: bearer(@public_token)
     assert_response :unauthorized
+  end
+
+  test "api key health counts active keys expiring soon and stale keys" do
+    freeze_time do
+      base_expiring = execute("api_keys.expiring_soon").value
+      base_stale = execute("api_keys.stale").value
+      credentials = RecordingStudioApi::ApiCredential.active.order(:created_at).last(2)
+      soon, stale = credentials
+      soon.update_columns(expires_at: 10.days.from_now)
+      stale.update_columns(last_used_at: 120.days.ago, expires_at: nil)
+      revoked = RecordingStudioApi::ApiCredential.where.not(revoked_at: nil).first
+      revoked&.update_columns(expires_at: 5.days.from_now, last_used_at: 200.days.ago)
+
+      assert_equal base_expiring + 1, execute("api_keys.expiring_soon").value
+      assert_equal base_stale + 1, execute("api_keys.stale").value
+
+      soon.update_columns(expires_at: 45.days.from_now)
+      assert_equal base_expiring, execute("api_keys.expiring_soon").value
+      stale.update_columns(last_used_at: 1.day.ago)
+      assert_equal base_stale, execute("api_keys.stale").value
+    end
+  end
+
+  test "api key health catalog fields" do
+    expected = {
+      "api_keys.expiring_soon" => {
+        title: "API keys expiring soon",
+        description: RecordingStudioApi::Metrics::EXPIRING_SOON_DESCRIPTION
+      },
+      "api_keys.stale" => {
+        title: "Stale API keys",
+        description: RecordingStudioApi::Metrics::STALE_DESCRIPTION
+      }
+    }
+
+    expected.each do |identifier, fields|
+      metadata = RecordingStudioMetrics.find(identifier).catalog_metadata
+      assert_equal fields[:title], metadata[:title], identifier
+      assert_equal fields[:description], metadata[:description], identifier
+      assert_equal "count", metadata[:unit], identifier
+      assert_equal [], metadata[:group_by], identifier
+      assert_equal [:operations], metadata[:exposed_apis], identifier
+      assert_equal({ supported: false }, metadata[:date_range], identifier)
+      assert metadata[:timezone].present?, identifier
+      assert_equal({ cached: false }, metadata[:freshness], identifier)
+    end
+  end
+
+  test "api key health execute and discovery allow a site admin and deny an outsider" do
+    %w[expiring_soon stale].each do |name|
+      identifier = "api_keys.#{name}"
+      allowed = RecordingStudioMetrics::Api::ExecuteHandler.call(
+        build_api_context(@actor, resource: "api_keys", name: name, filters: {})
+      )
+      assert_equal identifier, allowed[:metric]
+      assert allowed.key?(:value)
+
+      error = assert_raises(RecordingStudioApi::AuthorizationError) do
+        RecordingStudioMetrics::Api::ExecuteHandler.call(
+          build_api_context(@outsider, resource: "api_keys", name: name, filters: {})
+        )
+      end
+      assert_match(/not authorized/i, error.message)
+    end
+
+    denied_ids = RecordingStudioMetrics::Api::DiscoveryHandler.call(
+      build_api_context(@outsider, resource: "api_keys", filters: { resource: "api_keys" })
+    ).fetch(:metrics).map { |row| row[:identifier] }
+    refute_includes denied_ids, "api_keys.expiring_soon"
+    refute_includes denied_ids, "api_keys.stale"
+
+    allowed_rows = RecordingStudioMetrics::Api::DiscoveryHandler.call(
+      build_api_context(@actor, resource: "api_keys", filters: { resource: "api_keys" })
+    ).fetch(:metrics)
+    allowed_ids = allowed_rows.map { |row| row[:identifier] }
+    assert_includes allowed_ids, "api_keys.expiring_soon"
+    assert_includes allowed_ids, "api_keys.stale"
+
+    %w[api_keys.expiring_soon api_keys.stale].each do |identifier|
+      entry = allowed_rows.find { |row| row[:identifier] == identifier }
+      assert_equal "count", entry[:unit], identifier
+      assert_equal({ supported: false }, entry[:date_range], identifier)
+      assert entry[:timezone].present?, identifier
+      assert_equal({ cached: false }, entry[:freshness], identifier)
+    end
   end
 
   private
@@ -135,6 +236,24 @@ class ApiMetricsTest < ActionDispatch::IntegrationTest
     )
   end
 
+  def build_api_context(actor, resource:, name: nil, filters: {})
+    grant = Struct.new(:actor).new(actor)
+    params = {
+      resource: resource,
+      name: name,
+      filters: filters,
+      timezone: "UTC"
+    }
+    context = Object.new
+    context.define_singleton_method(:access_grant) { grant }
+    context.define_singleton_method(:api_client) { actor }
+    context.define_singleton_method(:access_recording) { nil }
+    context.define_singleton_method(:root_recording) { nil }
+    context.define_singleton_method(:api_key) { :operations }
+    context.define_singleton_method(:params) { params }
+    context
+  end
+
   def operations_root
     "/recording_studio_api/apis/operations/v1"
   end
@@ -149,11 +268,33 @@ class ApiMetricsTest < ActionDispatch::IntegrationTest
 
   def grant_admin!(actor, recording)
     Current.actor = actor
-    result = RecordingStudioAccessible.bootstrap_owner_access!(recording: recording, actor: actor)
+    existing = RecordingStudioAccessible.access_recordings_for_actor(recording: recording, actor: actor).first
+    return existing if existing.present?
+
+    result = RecordingStudioAccessible.grant_access(
+      recording: recording,
+      actor: actor,
+      role: :admin,
+      manager_actor: actor
+    )
     return result.value if result.respond_to?(:success?) && result.success?
 
-    access = RecordingStudio::Access.create!(actor: actor, role: :admin)
-    RecordingStudio::Recording.create!(recordable: access, parent_recording: recording)
+    bootstrap = RecordingStudioAccessible.bootstrap_owner_access!(recording: recording, actor: actor)
+    return bootstrap.value if bootstrap.respond_to?(:success?) && bootstrap.success?
+
+    manager = User.find_by(email: "admin@admin.com")
+    raise result.error if manager.blank?
+
+    Current.actor = manager
+    granted = RecordingStudioAccessible.grant_access(
+      recording: recording,
+      actor: actor,
+      role: :admin,
+      manager_actor: manager
+    )
+    raise granted.error unless granted.respond_to?(:success?) && granted.success?
+
+    granted.value
   end
 
   def seed_daily_metrics!

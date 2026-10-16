@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-10-15
+
+### Added
+- `api_keys.expiring_soon` (count): active API keys whose `expires_at` falls
+  within the next 30 days.
+- `api_keys.stale` (count): active API keys not used in 90 days, or never
+  used and created over 90 days ago.
+- Both are point-in-time counts with Metrics 0.3 catalog metadata (`unit`,
+  `title`, `description`, `group_by`, `date_range`, `timezone`,
+  `freshness`). No window, `group_by`, or filters. Not cached. Same
+  `api_authorize` as `api_keys.active`. No migration.
+
+### Changed
+- The `recording_studio_metrics` gemspec pin is `>= 0.3.0, < 0.4`.
+
 ## [0.11.0] - 2026-10-15
 
 ### Added
