@@ -16,6 +16,7 @@ module RecordingStudioApi
       end
 
       def call
+        return false if LogsRegistration.summaries_enabled?
         return false unless tables_available?
 
         ApiDailyMetric.transaction do

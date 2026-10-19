@@ -69,7 +69,7 @@ module RecordingStudioApi
         buckets.map do |bucket|
           {
             label: bucket.strftime("%b %-d"),
-            count: counts.fetch(bucket, 0)
+            count: counts.fetch(bucket, LogsRegistration.summaries_enabled? ? nil : 0)
           }
         end
       end

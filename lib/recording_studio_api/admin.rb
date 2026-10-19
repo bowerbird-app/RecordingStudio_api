@@ -14,6 +14,7 @@ module RecordingStudioApi
       recording_studio_api/admin/api_context
       recording_studio_api/admin/api_authorization
       recording_studio_api/admin/api_request_log_helpers
+      recording_studio_api/admin/latency_samples
       recording_studio_api/admin/queries/api_metrics_query
       recording_studio_api/admin/queries/api_access_clients_query
       recording_studio_api/admin/queries/admin_api_credentials_query

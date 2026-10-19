@@ -61,7 +61,7 @@ module RecordingStudioApi
     def register_api_requests!
       RecordingStudioMetrics.register(
         :api_requests,
-        model: ApiDailyMetric,
+        model: (LogsRegistration.summaries_enabled? ? ApiRequestDayMetricRollup : ApiDailyMetric),
         blast_radius: :site,
         api_authorize: AUTHORIZE
       ) do

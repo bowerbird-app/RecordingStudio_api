@@ -1,5 +1,48 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.13.0
+
+`0.13.0` registers API request logs with Recording Studio Logs `v0.4.1` and
+adds ordinary daily summary tables. Readers, jobs, and raw prune stay on the
+legacy path until `config.logs_summaries_enabled` is true.
+
+1. Add `recording_studio_logs` at tag `v0.4.1`. Install migrations and migrate.
+   New tables are `recording_studio_api_api_request_day_summaries` and
+   `recording_studio_api_api_request_latency_day_summaries`. Logs run tables
+   are created on the same database as `ApiRequestLog` (`api_logging` when
+   configured). Legacy daily tables stay.
+2. Run `bin/rails recording_studio_api:api_request_logs:backfill_classifications`
+   if you have not already, then rebuild new summaries for the raw range:
+
+```sh
+FROM=2026-09-01 TO=2026-10-18 bin/rails recording_studio_api:api_request_logs:backfill_summaries
+```
+
+   Compare totals with the legacy daily tables over the same UTC days before
+   you switch. `30000` remains the overflow latency label, not a finite cap.
+3. Leave `config.logs_summaries_enabled` false until those totals match. When
+   you turn it on, `recording_studio_api:api_metrics:maintain` rebuilds only
+   `api/request_counts` and `api/request_latency` (not every Logs producer).
+   Raw delete then requires a covering success on both aggregations. A
+   logging failure still does not fail the API request.
+4. Do not schedule `RecordingStudioLogs::PartitionMaintenanceJob` or
+   `DailyAggregationJob` for this table. Keep the existing API maintain job.
+   UTC midnight is the summary day. Local `Date.current` near midnight can
+   disagree with the old rollup. Historical days that exist only in the
+   legacy tables keep that coarser status-class shape. They do not gain
+   invented roots or status codes.
+5. Rollback is turning the flag off and pointing maintain at the legacy
+   writers again. Raw rows deleted after a successful Logs prune do not come
+   back. Recording Studio MCP `v0.17.0` still allows this gem only below
+   `0.12`.
+6. UTC midnight is the summary day. A request just after UTC midnight lands
+   on that UTC date even when `Time.zone` is not UTC. Bucket-based
+   percentiles use the stored labels, so overflow stays `30000` rather than
+   the raw duration. Endpoint tables that need `request_path` still need
+   retained raw rows. Logs may auto-publish `api_request_counts` and
+   `api_request_latency`. Keep using authorized `api_requests.*` for
+   operations reports.
+
 ## Upgrading to 0.12.0
 
 `0.12.0` adds arrival time and latency buckets on raw API request logs. It does

@@ -4,8 +4,14 @@ namespace :recording_studio_api do
   namespace :api_metrics do
     desc "Aggregate recent API request logs into daily metrics"
     task aggregate: :environment do
-      RecordingStudioApi::Services::MaintainApiMetrics::LOOKBACK_DAYS.downto(1) do |days_ago|
-        RecordingStudioApi::Services::AggregateApiRequestLogMetrics.call(metric_date: Date.current - days_ago.days)
+      if RecordingStudioApi::LogsRegistration.summaries_enabled?
+        RecordingStudioApi::Services::RebuildApiRequestLogSummaries.lookback!(
+          lookback_days: RecordingStudioApi::Services::MaintainApiMetrics::LOOKBACK_DAYS
+        )
+      else
+        RecordingStudioApi::Services::MaintainApiMetrics::LOOKBACK_DAYS.downto(1) do |days_ago|
+          RecordingStudioApi::Services::AggregateApiRequestLogMetrics.call(metric_date: Date.current - days_ago.days)
+        end
       end
     end
 

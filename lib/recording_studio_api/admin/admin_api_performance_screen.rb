@@ -107,11 +107,36 @@ module RecordingStudioApi
         def latency_series_for(start_date, end_date, api: :public)
           return [] unless RecordingStudioApi::ApiRequestLog.table_available?
 
+          api_key = RecordingStudioApi::Admin::ApiContext.resolve(api).name
           buckets = daily_buckets(start_date, end_date)
-          durations_by_bucket = buckets.index_with { [] }
+          durations_by_bucket = coverage_durations(buckets, api_key) if LogsRegistration.summaries_enabled?
+          durations_by_bucket ||= legacy_raw_durations(buckets, start_date, end_date, api_key)
 
+          [
+            {
+              name: "P95 duration",
+              data: buckets.map { |bucket| { x: bucket.strftime("%b %-d"), y: series_point(durations_by_bucket, bucket, 0.95) } }
+            },
+            {
+              name: "Average duration",
+              data: buckets.map { |bucket| { x: bucket.strftime("%b %-d"), y: series_point(durations_by_bucket, bucket, :average) } }
+            }
+          ]
+        end
+
+        def coverage_durations(buckets, api_key)
+          buckets.each_with_object({}) do |bucket, hash|
+            samples = LatencySamples.for_day(day: bucket, api_key: api_key)
+            next if samples == :gap
+
+            hash[bucket] = samples
+          end
+        end
+
+        def legacy_raw_durations(buckets, start_date, end_date, api_key)
+          durations_by_bucket = buckets.index_with { [] }
           RecordingStudioApi::ApiRequestLog
-            .where(api_key: RecordingStudioApi::Admin::ApiContext.resolve(api).name, occurred_at: start_date.beginning_of_day..end_date.end_of_day)
+            .where(api_key: api_key, occurred_at: start_date.beginning_of_day..end_date.end_of_day)
             .pluck(:occurred_at, :duration_ms)
             .each do |occurred_at, duration_ms|
               next if occurred_at.nil? || duration_ms.nil?
@@ -119,17 +144,14 @@ module RecordingStudioApi
               bucket = occurred_at.to_date
               durations_by_bucket[bucket] << duration_ms if durations_by_bucket.key?(bucket)
             end
+          durations_by_bucket
+        end
 
-          [
-            {
-              name: "P95 duration",
-              data: buckets.map { |bucket| { x: bucket.strftime("%b %-d"), y: percentile(durations_by_bucket.fetch(bucket), 0.95) } }
-            },
-            {
-              name: "Average duration",
-              data: buckets.map { |bucket| { x: bucket.strftime("%b %-d"), y: average(durations_by_bucket.fetch(bucket)) } }
-            }
-          ]
+        def series_point(durations_by_bucket, bucket, kind)
+          return unless durations_by_bucket.key?(bucket)
+
+          values = durations_by_bucket.fetch(bucket)
+          kind == :average ? average(values) : percentile(values, kind)
         end
 
         def request_scope(context)

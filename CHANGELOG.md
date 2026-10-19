@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-10-19
+
+### Added
+- RecordingStudioLogs `v0.4.1` registration for raw API request logs
+  (`partition_interval: nil`) and two ordinary daily summary tables:
+  `recording_studio_api_api_request_day_summaries` (`api/request_counts`)
+  and `recording_studio_api_api_request_latency_day_summaries`
+  (`api/request_latency`). Run tables install on the logging database.
+- `rake recording_studio_api:api_request_logs:backfill_summaries` rebuilds
+  those summaries for an inclusive UTC `FROM`/`TO` range.
+
+### Changed
+- `config.logs_summaries_enabled` still defaults to false. When true,
+  nightly maintain rebuilds Logs summaries (not the legacy daily tables),
+  Admin request metrics mix covered summaries, leftover raw days, and
+  legacy rollups without overlap, latency charts use histogram labels
+  (including overflow `30000`) for covered days, and raw prune uses Logs
+  arrival-watermark coverage for this gem's two aggregations only. A day
+  with no summary, raw, or legacy rows is omitted, not reported as zero.
+  Do not schedule Logs partition jobs. Recording Studio Metrics still owns
+  `api_requests.*`. Logs may also publish `api_request_counts` and
+  `api_request_latency`. Those are not a substitute for the authorized
+  operations metrics.
+
 ## [0.12.0] - 2026-10-19
 
 ### Added
@@ -674,7 +698,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.4...v0.12.0
 [0.11.4]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.3...v0.11.4
 [0.11.3]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.2...v0.11.3
