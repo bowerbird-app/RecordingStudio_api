@@ -286,7 +286,8 @@ created over 90 days ago. Both are point-in-time (no window, no `group_by`,
 no metric filters) and are not cached. When Recording Studio Admin is
 loaded, the Admin API section shows number widgets for those two metrics.
 Each widget links to the API credentials screen with `health=expiring_soon`
-or `health=stale`.
+or `health=stale`. Status and health stay on that page. The Admin API
+section also links to API performance so the latency widget can open it.
 `api_authorize` allows an actor with the access-management view role on the
 site admin root. This gem does not call `RecordingStudioMetrics::Api.register!`.
 The host registers Metrics endpoints once:

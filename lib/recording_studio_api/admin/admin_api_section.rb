@@ -18,6 +18,11 @@ module RecordingStudioApi
            url: ->(context) { admin_screen_url(context, "admin_api_failing_endpoints") },
            style: :default
 
+      link :performance,
+           text: "API performance",
+           url: ->(context) { admin_screen_url(context, "admin_api_performance") },
+           style: :default
+
       link :credentials,
            text: "API credentials",
            url: ->(context) { admin_screen_url(context, "admin_api_credentials") },

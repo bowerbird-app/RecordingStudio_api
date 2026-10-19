@@ -13,7 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Admin API section number widgets for `api_keys.expiring_soon` and
   `api_keys.stale`. Both read `RecordingStudioMetrics` and link to the
   API credentials screen with a `health` filter (`expiring_soon` or
-  `stale`). No migrations. Admin stays an optional host dependency.
+  `stale`). Status and health stay on the credentials page, not only
+  in the filter modal. The Admin API section links to API performance
+  so the latency widget can open that screen. No migrations. Admin
+  stays an optional host dependency.
 
 ## [0.11.3] - 2026-10-16
 

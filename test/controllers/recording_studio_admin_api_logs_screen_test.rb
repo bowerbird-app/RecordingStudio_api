@@ -280,6 +280,7 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Monitor and administer API access across the site."
     assert_includes response.body, "/admin/api/screens/admin_api_requests?anchor_url=%2F"
     assert_includes response.body, "/admin/api/screens/admin_api_failing_endpoints?anchor_url=%2F"
+    assert_includes response.body, "/admin/api/screens/admin_api_performance?anchor_url=%2F"
     assert_includes response.body, "/recording_studio_api/admin_api/settings?anchor_url=%2F"
     assert_includes response.body, "widgets.recording_studio_api.admin.api_keys_expiring_soon"
     assert_includes response.body, "widgets.recording_studio_api.admin.api_keys_stale"
@@ -323,6 +324,11 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "group_by=day"
     assert_includes response.body, "ms"
     assert_match(/[+-]?\d+(?:\.\d+)?%/, response.body)
+
+    get "/admin/api/screens/admin_api_performance", params: { group_by: "day" }
+
+    assert_response :success
+    assert_includes response.body, "API performance"
 
     get "/admin/api/sections/admin_api/widgets/widgets.recording_studio_api.admin.client_errors_last_four_weeks"
 
@@ -868,6 +874,16 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
       get "/admin/api/screens/admin_api_credentials"
 
       assert_response :success
+      assert_select "form#screen-inline-filters-form" do
+        assert_select %(select[name="status"]), count: 1
+        assert_select %(select[name="health"]), count: 1
+        assert_select %(select[name="root_recording_id"]), count: 0
+        assert_select %(select[name="root_type"]), count: 0
+      end
+      assert_select "form#screen-filters-mobile-form" do
+        assert_select %(select[name="root_recording_id"]), count: 1
+        assert_select %(select[name="root_type"]), count: 1
+      end
       assert_select %(select[name="health"] option[value=""]:not([disabled])), text: "Any health", count: 1
       assert_select %(select[name="health"] option[value="expiring_soon"]), text: "Expiring soon", count: 1
       assert_select %(select[name="health"] option[value="stale"]), text: "Stale", count: 1

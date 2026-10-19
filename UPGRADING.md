@@ -10,10 +10,14 @@ are unchanged.
    come from `RecordingStudioMetrics` (`api_keys.expiring_soon` and
    `api_keys.stale`).
 2. Each card links to the API credentials screen with `health=expiring_soon`
-   or `health=stale`. That filter is new. Status, root, and root type
-   filters are unchanged.
-3. Named API admin sections and workspace API sections do not gain these
-   widgets. The metrics stay site-wide.
+   or `health=stale`. That filter is new. Status and health stay visible
+   on the page. Root and root type stay in the filter modal.
+3. The Admin API section links to **API performance**. Admin enables a
+   screen only when a section links to it, so the latency widget can open
+   that page.
+4. Named API admin sections and workspace API sections do not gain these
+   widgets. The metrics stay site-wide. Named admin sections also gain
+   the performance link when they already show the latency widget.
 
 ## Upgrading to 0.11.3
 
