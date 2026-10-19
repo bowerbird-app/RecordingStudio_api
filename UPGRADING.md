@@ -1,5 +1,23 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.12.0
+
+`0.12.0` adds arrival time and latency buckets on raw API request logs. It does
+not switch readers or retention to Recording Studio Logs.
+
+1. Install migrations and migrate. The raw table keeps its UUID `id`. New
+   columns are `arrived_at` (PostgreSQL default `clock_timestamp()`) and
+   `latency_bucket_ms`.
+2. Run `bin/rails recording_studio_api:api_request_logs:backfill_classifications`
+   so older rows get a conservative `arrived_at` (`created_at`, then
+   `occurred_at`), a bucket from `duration_ms`, `public` for a blank API name,
+   and `unknown` for a blank route. Repeat the task until it updates 0 rows.
+   Set `BATCH_SIZE` if you need smaller batches.
+3. Leave `config.logs_summaries_enabled` false. It is wired and unused.
+4. Recording Studio MCP `v0.17.0` still allows this gem only below `0.12`.
+   Stay on `0.11.4` until MCP widens that range, or wait for a later MCP
+   release.
+
 ## Upgrading to 0.11.4
 
 `0.11.4` adds two Admin API dashboard widgets for existing API key health

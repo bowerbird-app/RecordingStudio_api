@@ -8,7 +8,8 @@ Companion pins on current main: Trashable `~> 0.10` / `v0.10.0`
 (query-only), Admin `v2.2.0`, Moveable `v3.3.0`, Root Switchable
 `v0.8.0`, Accessible `~> 0.11` / `v0.18.0`, RecordingStudio `v4.6.0`,
 Metrics `v0.3.1` (`>= 0.3.0, < 0.4`). Recording Studio MCP `v0.17.0`
-allows this gem at `>= 0.11.0, < 0.12`. Recording Studio Oauth `v0.12.2`
+allows this gem at `>= 0.11.0, < 0.12`, so it cannot take `0.12.0` until
+MCP widens that pin. Recording Studio Oauth `v0.12.2`
 allows `>= 0.5.2, < 0.12`. For Trashable query-only keep/trash helpers in
 `0.7.0`, metrics window fixes in `0.6.16`, and earlier companion pins,
 see [UPGRADING.md](UPGRADING.md).
@@ -251,7 +252,21 @@ then intersects that capability with the selected API's registered recordables.
 ### Request logging and metrics retention
 
 When `api_request_logging_enabled` is on, each API request can write a row to the API logging
-database. Admin charts prefer rolled-up daily metrics, so hosts should run maintenance nightly:
+database (`api_logging` when that database is configured). New rows store `arrived_at` from
+PostgreSQL `clock_timestamp()` at insert, and `latency_bucket_ms` from the same bucket labels
+the daily histogram already uses (`25` through `10000`, then overflow label `30000` for anything
+above `10000`). Blank API names become `public`. Blank routes become `unknown`.
+`config.logs_summaries_enabled` defaults to false and is unused in this release.
+
+After you migrate an existing install, backfill those fields in batches. The task never loads
+the whole table. `BATCH_SIZE` defaults to 1000.
+
+```sh
+bin/rails recording_studio_api:api_request_logs:backfill_classifications
+BATCH_SIZE=500 bin/rails recording_studio_api:api_request_logs:backfill_classifications
+```
+
+Admin charts prefer rolled-up daily metrics, so hosts should run maintenance nightly:
 
 1. Aggregate the last few complete days into `api_daily_metrics` (and latency histogram buckets).
 2. Delete raw `api_request_logs` older than `api_request_log_retention_days` (default 30).

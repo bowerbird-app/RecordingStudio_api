@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-19
+
+### Added
+- `arrived_at` and `latency_bucket_ms` on `recording_studio_api_api_request_logs`.
+  New inserts stamp `arrived_at` with PostgreSQL `clock_timestamp()`. Latency
+  uses the existing histogram labels, with `30000` as the overflow label for
+  durations above `10000`.
+- One classifier for sync, queued, batched, enqueue-failure, bulk insert, and
+  backfill. Blank API names become `public`. Blank routes become `unknown`.
+  Queued payloads that omit the new fields still classify on write.
+- `rake recording_studio_api:api_request_logs:backfill_classifications` for
+  historical rows in bounded batches.
+- `config.logs_summaries_enabled` (default false). Unused until summary
+  cutover.
+
 ## [0.11.4] - 2026-10-19
 
 ### Added
@@ -659,7 +674,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.4...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.4...v0.12.0
 [0.11.4]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.3...v0.11.4
 [0.11.3]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.2...v0.11.3
 [0.11.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.1...v0.11.2

@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
 module RecordingStudioApi
-  # Delivers API request log payloads synchronously, via ActiveJob, or through a
-  # process-local batch that flushes to ActiveJob.
   module ApiRequestLogDelivery
     module_function
 
@@ -13,7 +11,7 @@ module RecordingStudioApi
       when "batched"
         ApiRequestLogBatch.push(serialize_payload(payload))
       else
-        ApiRequestLog.create!(payload)
+        ApiRequestLog.write_payloads!([payload])
       end
     end
 
@@ -21,8 +19,10 @@ module RecordingStudioApi
       WriteApiRequestLogsJob.perform_later(payloads)
     rescue StandardError => e
       Rails.logger.warn("[RecordingStudioApi] failed to enqueue api request logs: #{e.class}: #{e.message}")
-      payloads.each do |payload|
-        ApiRequestLog.create!(deserialize_payload(payload))
+      Array(payloads).each do |payload|
+        ApiRequestLog.write_payloads!([payload])
+      rescue StandardError => write_error
+        Rails.logger.warn("[RecordingStudioApi] api request log write failed: #{write_error.class}: #{write_error.message}")
       end
     end
     private_class_method :enqueue
@@ -34,13 +34,5 @@ module RecordingStudioApi
       data
     end
     private_class_method :serialize_payload
-
-    def deserialize_payload(payload)
-      data = payload.transform_keys(&:to_s)
-      occurred_at = data["occurred_at"]
-      data["occurred_at"] = Time.iso8601(occurred_at) if occurred_at.is_a?(String)
-      data.symbolize_keys
-    end
-    private_class_method :deserialize_payload
   end
 end

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_12_030251) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_19_010021) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -183,6 +183,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_12_030251) do
   create_table "recording_studio_api_api_request_logs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "access_recording_id"
     t.string "action_name"
+    t.datetime "arrived_at", default: -> { "clock_timestamp()" }
     t.uuid "api_client_id"
     t.uuid "api_credential_id"
     t.string "api_key", default: "public", null: false
@@ -191,6 +192,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_12_030251) do
     t.integer "duration_ms", null: false
     t.string "error_class"
     t.string "error_message"
+    t.integer "latency_bucket_ms"
     t.datetime "occurred_at", null: false
     t.boolean "rate_limited", default: false, null: false
     t.string "remote_ip"

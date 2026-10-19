@@ -3,7 +3,7 @@
 module RecordingStudioApi
   module Services
     class AggregateApiRequestLogMetrics
-      LATENCY_BUCKETS_MS = [25, 50, 100, 250, 500, 1_000, 2_500, 5_000, 10_000, 30_000].freeze
+      LATENCY_BUCKETS_MS = ApiRequestLogClassification::BUCKETS_MS
 
       class << self
         def call(metric_date: Date.yesterday)
@@ -85,14 +85,7 @@ module RecordingStudioApi
 
       def persist_histogram_buckets!
         connection = ApiRequestLog.connection
-        bucket_case = LATENCY_BUCKETS_MS.map.with_index do |upper_bound, index|
-          lower = index.zero? ? 0 : LATENCY_BUCKETS_MS[index - 1] + 1
-          if index == LATENCY_BUCKETS_MS.length - 1
-            "WHEN duration_ms >= #{lower} THEN #{upper_bound}"
-          else
-            "WHEN duration_ms BETWEEN #{lower} AND #{upper_bound} THEN #{upper_bound}"
-          end
-        end.join(" ")
+        bucket_case = ApiRequestLogClassification.bucket_case_sql
 
         sql = <<~SQL.squish
           SELECT
