@@ -127,13 +127,12 @@ module RecordingStudioApi
             occurred_at: start_date.beginning_of_day..end_date.end_of_day
           )
           scope = apply_request_log_filters(scope, request_method: request_method, request_path: request_path)
-          scope.pluck(:occurred_at, :duration_ms)
-            .each do |occurred_at, duration_ms|
-              next if occurred_at.nil? || duration_ms.nil?
+          scope.pluck(:occurred_at, :duration_ms).each do |occurred_at, duration_ms|
+            next if occurred_at.nil? || duration_ms.nil?
 
-              bucket = occurred_at.to_date
-              durations_by_bucket[bucket] << duration_ms if durations_by_bucket.key?(bucket)
-            end
+            bucket = occurred_at.to_date
+            durations_by_bucket[bucket] << duration_ms if durations_by_bucket.key?(bucket)
+          end
 
           [
             {
