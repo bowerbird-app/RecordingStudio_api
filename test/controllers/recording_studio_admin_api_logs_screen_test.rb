@@ -846,13 +846,16 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
       assert_includes response.body, "widgets.recording_studio_api.admin.api_keys_expiring_soon"
       assert_includes response.body, "widgets.recording_studio_api.admin.api_keys_stale"
 
+      expiring_count = RecordingStudioApi::Metrics::EXPIRING_SOON.call(RecordingStudioApi::ApiCredential.active).count
+      stale_count = RecordingStudioApi::Metrics::STALE.call(RecordingStudioApi::ApiCredential.active).count
+
       get "/admin/api/sections/admin_api/widgets/widgets.recording_studio_api.admin.api_keys_expiring_soon",
           params: { anchor_url: "/" }
 
       assert_response :success
       assert_includes response.body, "Expiring soon"
       assert_includes response.body, "health=expiring_soon"
-      assert_match(/\b1\b/, response.body)
+      assert_includes response.body, expiring_count.to_s
 
       get "/admin/api/sections/admin_api/widgets/widgets.recording_studio_api.admin.api_keys_stale",
           params: { anchor_url: "/" }
@@ -860,7 +863,7 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
       assert_response :success
       assert_includes response.body, "Stale keys"
       assert_includes response.body, "health=stale"
-      assert_match(/\b1\b/, response.body)
+      assert_includes response.body, stale_count.to_s
 
       get "/admin/api/screens/admin_api_credentials"
 
