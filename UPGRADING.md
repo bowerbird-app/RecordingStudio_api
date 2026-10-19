@@ -1,5 +1,20 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.11.4
+
+`0.11.4` adds two Admin API dashboard widgets for existing API key health
+metrics. No migrations. Hosts that do not load `recording_studio_admin`
+are unchanged.
+
+1. The Admin API section shows **Expiring soon** and **Stale keys**. Counts
+   come from `RecordingStudioMetrics` (`api_keys.expiring_soon` and
+   `api_keys.stale`).
+2. Each card links to the API credentials screen with `health=expiring_soon`
+   or `health=stale`. That filter is new. Status, root, and root type
+   filters are unchanged.
+3. Named API admin sections and workspace API sections do not gain these
+   widgets. The metrics stay site-wide.
+
 ## Upgrading to 0.11.3
 
 `0.11.3` stores create idempotency in Redis when Redis answers, and in

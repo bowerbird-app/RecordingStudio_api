@@ -281,6 +281,8 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "/admin/api/screens/admin_api_requests?anchor_url=%2F"
     assert_includes response.body, "/admin/api/screens/admin_api_failing_endpoints?anchor_url=%2F"
     assert_includes response.body, "/recording_studio_api/admin_api/settings?anchor_url=%2F"
+    assert_includes response.body, "widgets.recording_studio_api.admin.api_keys_expiring_soon"
+    assert_includes response.body, "widgets.recording_studio_api.admin.api_keys_stale"
     assert_includes response.body, "widgets.recording_studio_api.admin.requests_last_four_weeks"
     assert_includes response.body, "widgets.recording_studio_api.admin.api_latency_last_four_weeks"
     assert_includes response.body, "widgets.recording_studio_api.admin.client_errors_last_four_weeks"
@@ -819,6 +821,68 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_includes response.body, second_payload.fetch(:credential).oauth_client_id
     refute_includes response.body, "First scoped key"
     refute_includes response.body, first_payload.fetch(:credential).oauth_client_id
+  end
+
+  test "site admins see API key health widgets and can filter credentials by health" do
+    _root_recording, access_recording = create_access_recording_for(
+      user: @user,
+      workspace_name: "Health credential root",
+      role: :admin
+    )
+    expiring = provision_api_client_for(access_recording: access_recording, name: "Expiring site credential")
+    stale = provision_api_client_for(access_recording: access_recording, name: "Stale site credential")
+    healthy = provision_api_client_for(access_recording: access_recording, name: "Healthy site credential")
+
+    freeze_time do
+      expiring.fetch(:credential).update_columns(expires_at: 10.days.from_now, last_used_at: 1.day.ago)
+      stale.fetch(:credential).update_columns(last_used_at: 120.days.ago, expires_at: nil, created_at: 120.days.ago)
+      healthy.fetch(:credential).update_columns(expires_at: 60.days.from_now, last_used_at: 1.day.ago)
+
+      switch_to_root(@admin_root_recording)
+
+      get "/admin/api"
+
+      assert_response :success
+      assert_includes response.body, "widgets.recording_studio_api.admin.api_keys_expiring_soon"
+      assert_includes response.body, "widgets.recording_studio_api.admin.api_keys_stale"
+
+      get "/admin/api/sections/admin_api/widgets/widgets.recording_studio_api.admin.api_keys_expiring_soon",
+          params: { anchor_url: "/" }
+
+      assert_response :success
+      assert_includes response.body, "Expiring soon"
+      assert_includes response.body, "health=expiring_soon"
+      assert_match(/\b1\b/, response.body)
+
+      get "/admin/api/sections/admin_api/widgets/widgets.recording_studio_api.admin.api_keys_stale",
+          params: { anchor_url: "/" }
+
+      assert_response :success
+      assert_includes response.body, "Stale keys"
+      assert_includes response.body, "health=stale"
+      assert_match(/\b1\b/, response.body)
+
+      get "/admin/api/screens/admin_api_credentials"
+
+      assert_response :success
+      assert_select %(select[name="health"] option[value=""]:not([disabled])), text: "Any health", count: 1
+      assert_select %(select[name="health"] option[value="expiring_soon"]), text: "Expiring soon", count: 1
+      assert_select %(select[name="health"] option[value="stale"]), text: "Stale", count: 1
+
+      get "/admin/api/screens/admin_api_credentials/table", params: { health: "expiring_soon" }
+
+      assert_response :success
+      assert_includes response.body, "Expiring site credential"
+      refute_includes response.body, "Stale site credential"
+      refute_includes response.body, "Healthy site credential"
+
+      get "/admin/api/screens/admin_api_credentials/table", params: { health: "stale" }
+
+      assert_response :success
+      assert_includes response.body, "Stale site credential"
+      refute_includes response.body, "Expiring site credential"
+      refute_includes response.body, "Healthy site credential"
+    end
   end
 
   test "dummy home links to RecordingStudioAdmin API section" do

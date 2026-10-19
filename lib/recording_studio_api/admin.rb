@@ -30,6 +30,7 @@ module RecordingStudioApi
       recording_studio_api/admin/admin_api_authorization_failures_last_four_weeks_widget
       recording_studio_api/admin/admin_api_top_failing_endpoints_last_four_weeks_widget
       recording_studio_api/admin/admin_api_rate_limited_requests_last_four_weeks_widget
+      recording_studio_api/admin/api_key_health_widgets
       recording_studio_api/admin/api_section
       recording_studio_api/admin/admin_api_section
       recording_studio_api/admin/api_section_factory
@@ -67,6 +68,7 @@ module RecordingStudioApi
       ::RecordingStudioAdmin.register_widget(AdminApiAuthorizationFailuresLastFourWeeksWidget::Definition)
       ::RecordingStudioAdmin.register_widget(AdminApiTopFailingEndpointsLastFourWeeksWidget::Definition)
       ::RecordingStudioAdmin.register_widget(AdminApiRateLimitedRequestsLastFourWeeksWidget::Definition)
+      ApiKeyHealthWidgets::Definitions.each { |definition| ::RecordingStudioAdmin.register_widget(definition) }
       ::RecordingStudioAdmin.register_screen(ApiKeysScreen)
       ::RecordingStudioAdmin.register_screen(ApiAccessRequestsScreen)
       ::RecordingStudioAdmin.register_screen(AdminApiRequestsScreen)
