@@ -12,6 +12,8 @@ class RebuildApiRequestLogSummariesTest < ActiveSupport::TestCase
     RecordingStudioApi::ApiRequestLog.delete_all
     RecordingStudioApi::ApiRequestDaySummary.delete_all
     RecordingStudioApi::ApiRequestLatencyDaySummary.delete_all
+    RecordingStudioApi::ApiDailyMetric.delete_all
+    RecordingStudioApi::ApiDailyLatencyHistogramBucket.delete_all
     clear_runs!
     @day = Date.new(2026, 10, 1)
     @root_one = SecureRandom.uuid
