@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.5] - 2026-10-19
+
+### Added
+- Site-wide Failing endpoints accepts an exact `request_path` filter, the
+  same control as API requests. The table and the failure-rate chart both
+  honor it.
+- Site-wide API performance accepts exact `request_method` and
+  `request_path` filters. The latency chart uses the same values. The
+  table free-text search is gone because the path filter replaces it.
+
 ## [0.11.4] - 2026-10-19
 
 ### Added
@@ -659,7 +669,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.4...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.5...HEAD
+[0.11.5]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.4...v0.11.5
 [0.11.4]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.3...v0.11.4
 [0.11.3]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.2...v0.11.3
 [0.11.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.1...v0.11.2
