@@ -30,8 +30,7 @@ module RecordingStudioApi
       Definitions = ENTRIES.map do |entry|
         ::RecordingStudioAdmin::Widget.new(
           nil,
-          registry_prefix: entry.fetch(:widget_key),
-          blast_radius: :site
+          registry_prefix: entry.fetch(:widget_key)
         ) do
           type :number
           title entry.fetch(:title)

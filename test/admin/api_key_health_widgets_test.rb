@@ -15,7 +15,10 @@ class ApiKeyHealthWidgetsTest < ActiveSupport::TestCase
   end
 
   test "health filter keeps matching credential rows and leaves blank health unchanged" do
-    user = User.create!(email: "health-widgets-#{SecureRandom.hex(4)}@example.com")
+    user = User.create!(email: "health-widgets-#{SecureRandom.hex(4)}@example.com") do |record|
+      record.password = "HealthWidgetsPassword!2026"
+      record.password_confirmation = "HealthWidgetsPassword!2026"
+    end
     _root, access_recording = create_access_recording_for(
       user: user,
       workspace_name: "Health filter workspace",
