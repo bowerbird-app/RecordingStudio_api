@@ -283,7 +283,11 @@ per day from the same rollup, with the same window, buckets, and
 `expires_at` is within the next 30 days. `api_keys.stale` (unit `count`)
 counts active keys with `last_used_at` over 90 days ago, or never used and
 created over 90 days ago. Both are point-in-time (no window, no `group_by`,
-no filters, since the admin credentials list has none) and are not cached.
+no metric filters) and are not cached. When Recording Studio Admin is
+loaded, the Admin API section shows number widgets for those two metrics.
+Each widget links to the API credentials screen with `health=expiring_soon`
+or `health=stale`. Status and health stay on that page. The Admin API
+section also links to API performance so the latency widget can open it.
 `api_authorize` allows an actor with the access-management view role on the
 site admin root. This gem does not call `RecordingStudioMetrics::Api.register!`.
 The host registers Metrics endpoints once:

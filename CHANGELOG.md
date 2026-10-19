@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.4] - 2026-10-19
+
+### Added
+- Admin API section number widgets for `api_keys.expiring_soon` and
+  `api_keys.stale`. Both read `RecordingStudioMetrics` and link to the
+  API credentials screen with a `health` filter (`expiring_soon` or
+  `stale`). Status and health stay on the credentials page, not only
+  in the filter modal. The Admin API section links to API performance
+  so the latency widget can open that screen. No migrations. Admin
+  stays an optional host dependency.
+
 ## [0.11.3] - 2026-10-16
 
 ### Fixed
@@ -648,7 +659,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.3...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.4...HEAD
+[0.11.4]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.3...v0.11.4
 [0.11.3]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.2...v0.11.3
 [0.11.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.1...v0.11.2
 [0.8.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.7.0...v0.8.0

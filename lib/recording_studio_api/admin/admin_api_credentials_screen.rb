@@ -27,6 +27,16 @@ module RecordingStudioApi
         value.present? ? rows.select { |row| row.status.casecmp?(value.to_s) } : rows
       }
 
+      filter :health,
+             values: [""] + %w[expiring_soon stale],
+             default: "",
+             blank_label: "Any health",
+             apply: lambda { |rows, value, _context|
+               RecordingStudioApi::Admin::ApiKeyHealthWidgets.filter_rows(rows, value)
+             }
+
+      filter_presentation :modal, inline_count: 2
+
       filter :root_recording_id,
              options: -> { root_filter_options },
              blank_label: "All roots",

@@ -69,6 +69,10 @@ module RecordingStudioApi
                        text: "Failing endpoints",
                        url: ->(context) { NavigationUrlHelpers.admin_screen_url(context, "admin_api_failing_endpoints", api_key: definition.name) },
                        style: :default
+          section.link :performance,
+                       text: "API performance",
+                       url: ->(context) { NavigationUrlHelpers.admin_screen_url(context, "admin_api_performance", api_key: definition.name) },
+                       style: :default
           section.link :credentials,
                        text: "API credentials",
                        url: ->(context) { NavigationUrlHelpers.admin_screen_url(context, "admin_api_credentials", api_key: definition.name) },
