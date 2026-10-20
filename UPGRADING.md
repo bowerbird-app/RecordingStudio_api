@@ -1,5 +1,15 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.14.1
+
+`0.14.1` widens `recording_studio_logs` so API works with Logs `v0.5.0`.
+No migration. `config.logs_summaries_enabled` still defaults to false.
+
+1. Bump the host gem to `0.14.1`.
+2. Pin `recording_studio_logs` to GitHub tag `v0.5.0` (allowed range
+   `>= 0.4.1, < 0.6`).
+3. Leave `config.logs_summaries_enabled` false.
+
 ## Upgrading to 0.14.0
 
 `0.14.0` polishes Admin API key-health widgets and makes credentials,
