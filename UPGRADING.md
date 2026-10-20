@@ -1,5 +1,15 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.13.1
+
+`0.13.1` widens `recording_studio_metrics` to `>= 0.3.0, < 0.6` and pins
+GitHub tag `v0.5.0` in development and dummy. No migration.
+
+1. Bump the host gem to `0.13.1`.
+2. Update the host's `recording_studio_metrics` pin to `v0.5.0`.
+3. Metrics `chart_series` now returns `{ x:, y: }` points. This gem does not
+   remap pairs; pass the series through as Metrics emits it.
+
 ## Upgrading to 0.13.0
 
 `0.13.0` registers API request logs with Recording Studio Logs `v0.4.1` and

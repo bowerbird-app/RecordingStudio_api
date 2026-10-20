@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-10-20
+
+### Changed
+- The `recording_studio_metrics` gemspec pin is `>= 0.3.0, < 0.6`. Development
+  and dummy Gemfiles pin GitHub tag `v0.5.0`. This gem does not remap
+  `RecordingStudioMetrics::Admin.chart_series`; Metrics 0.5.0 already returns
+  `{ x:, y: }` points.
+
+### Upgrade notes
+- Bump to `0.13.1`. No migration.
+- Pin `recording_studio_metrics` to GitHub tag `v0.5.0` (allowed range
+  `>= 0.3.0, < 0.6`).
+
 ## [0.13.0] - 2026-10-19
 
 ### Added
@@ -708,7 +721,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.13.1...HEAD
+[0.13.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.5...v0.12.0
 [0.11.5]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.4...v0.11.5
