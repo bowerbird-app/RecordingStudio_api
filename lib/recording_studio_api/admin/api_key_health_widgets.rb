@@ -8,14 +8,30 @@ module RecordingStudioApi
           widget_key: "widgets.recording_studio_api.admin.api_keys_expiring_soon",
           health: "expiring_soon",
           title: "Expiring soon",
-          description: "Active keys that expire in the next 30 days.",
+          icon: "clock",
+          caption: lambda {
+            days = RecordingStudioApi::Admin::ApiKeyHealthWidgets.window_days(RecordingStudioApi::Metrics::EXPIRING_SOON_WINDOW)
+            "Expire in the next #{days} days"
+          },
+          description: lambda {
+            days = RecordingStudioApi::Admin::ApiKeyHealthWidgets.window_days(RecordingStudioApi::Metrics::EXPIRING_SOON_WINDOW)
+            "Active keys that expire in the next #{days} days."
+          },
           link_label: "Review expiring keys"
         },
         {
           widget_key: "widgets.recording_studio_api.admin.api_keys_stale",
           health: "stale",
           title: "Stale keys",
-          description: "Active keys unused for 90 days, or never used and older than that.",
+          icon: "pause",
+          caption: lambda {
+            days = RecordingStudioApi::Admin::ApiKeyHealthWidgets.window_days(RecordingStudioApi::Metrics::STALE_AFTER)
+            "Unused for #{days}+ days"
+          },
+          description: lambda {
+            days = RecordingStudioApi::Admin::ApiKeyHealthWidgets.window_days(RecordingStudioApi::Metrics::STALE_AFTER)
+            "Active keys unused for #{days} days, or never used and older than that."
+          },
           link_label: "Review stale keys"
         }
       ].freeze
@@ -33,13 +49,22 @@ module RecordingStudioApi
           nil,
           registry_prefix: entry.fetch(:widget_key)
         ) do
-          type :number
+          type :list
           title entry.fetch(:title)
-          description entry.fetch(:description)
+          subtitle { RecordingStudioApi::Admin::ApiKeyHealthWidgets.caption_for(entry) }
+          description { RecordingStudioApi::Admin::ApiKeyHealthWidgets.description_for(entry) }
           change_good_when :down
           hide_change
+          list_options compact_preview: :visual_stack
           value do |context|
             RecordingStudioApi::Admin::ApiKeyHealthWidgets.listed_count(context, entry.fetch(:health))
+          end
+          metadata do
+            { period_label: RecordingStudioApi::Admin::ApiKeyHealthWidgets.caption_for(entry) }
+          end
+          items do
+            caption = RecordingStudioApi::Admin::ApiKeyHealthWidgets.caption_for(entry)
+            [{ text: caption, icon: entry.fetch(:icon) }]
           end
           link_to do |context|
             NavigationUrlHelpers.admin_screen_url(
@@ -53,6 +78,18 @@ module RecordingStudioApi
       end.freeze
 
       module_function
+
+      def caption_for(entry)
+        entry.fetch(:caption).call
+      end
+
+      def description_for(entry)
+        entry.fetch(:description).call
+      end
+
+      def window_days(duration)
+        (duration / 1.day).to_i
+      end
 
       def listed_count(context, health)
         listed_rows(context, health).size

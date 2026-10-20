@@ -44,8 +44,8 @@ module RecordingStudioApi
            url: ->(context) { api_settings_url(context) },
            style: :default
 
-      widget "widgets.recording_studio_api.admin.api_keys_expiring_soon"
-      widget "widgets.recording_studio_api.admin.api_keys_stale"
+      widget "widgets.recording_studio_api.admin.api_keys_expiring_soon", view_variant: :compact
+      widget "widgets.recording_studio_api.admin.api_keys_stale", view_variant: :compact
       widget "widgets.recording_studio_api.admin.requests_last_four_weeks"
       widget "widgets.recording_studio_api.admin.api_latency_last_four_weeks"
       widget "widgets.recording_studio_api.admin.client_errors_last_four_weeks"

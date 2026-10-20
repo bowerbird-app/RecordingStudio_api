@@ -203,7 +203,9 @@ class RebuildApiRequestLogSummariesTest < ActiveSupport::TestCase
     RecordingStudioApi::Services::RebuildApiRequestLogSummaries.call(day: @day)
     samples = RecordingStudioApi::Admin::LatencySamples.for_day(day: @day, api_key: "public")
     assert_equal [30_000], samples
-    series = RecordingStudioApi::Admin::AdminApiPerformanceScreen.latency_series_for(@day, @day)
+    series = RecordingStudioApi::Admin::AdminApiPerformanceScreen.latency_series_for(
+      RecordingStudioApi::Admin::AdminApiPerformanceScreen.series_context(start_date: @day, end_date: @day)
+    )
     assert_equal 30_000, series.first.fetch(:data).first.fetch(:y)
   end
 

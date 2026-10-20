@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-10-20
+
+### Changed
+- Admin API **Expiring soon** and **Stale keys** widgets sit on their own
+  compact row above the other section widgets. Each has a one-line caption
+  from `Metrics::EXPIRING_SOON_WINDOW` and `Metrics::STALE_AFTER`
+  ("Expire in the next 30 days" / "Unused for 90+ days") and a distinct
+  icon (`clock` / `pause`).
+- Site-wide API credentials has a chart of the same filtered rows as the
+  table, so health (and the other screen filters) change both the count
+  and the chart.
+- Site-wide API performance adds `date_range` and `group_by` filters, and
+  the latency chart uses the same request scope as the table. Those
+  filters stay inline (no Filter button).
+- Site-wide failing endpoints shows every filter inline. The Filter button
+  that hid those inputs is gone.
+
+### Upgrade notes
+- Bump to `0.14.0`. No migration.
+
 ## [0.13.2] - 2026-10-20
 
 ### Fixed
@@ -731,7 +751,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.13.2...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.13.2...v0.14.0
 [0.13.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.13.1...v0.13.2
 [0.13.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.12.0...v0.13.0
