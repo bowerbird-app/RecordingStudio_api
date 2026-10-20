@@ -7,7 +7,7 @@
 Companion pins on current main: Trashable `~> 0.10` / `v0.10.0`
 (query-only), Admin `v2.2.0`, Moveable `v3.3.0`, Root Switchable
 `v0.8.0`, Accessible `~> 0.11` / `v0.18.0`, RecordingStudio `v4.6.0`,
-Metrics `v0.3.1` (`>= 0.3.0, < 0.4`), Logs `v0.4.1` (`~> 0.4.1`). Recording Studio MCP `v0.17.0`
+Metrics `v0.5.0` (`>= 0.3.0, < 0.6`), Logs `v0.4.1` (`~> 0.4.1`). Recording Studio MCP `v0.17.0`
 allows this gem at `>= 0.11.0, < 0.12`, so it cannot take `0.12.0` or `0.13.0` until
 MCP widens that pin. Recording Studio Oauth `v0.12.2`
 allows `>= 0.5.2, < 0.12`. For Trashable query-only keep/trash helpers in
