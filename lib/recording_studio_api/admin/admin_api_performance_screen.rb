@@ -17,6 +17,12 @@ module RecordingStudioApi
         keyword_init: true
       )
 
+      SeriesContext = Struct.new(:params, keyword_init: true) do
+        def filter_value(_key)
+          nil
+        end
+      end
+
       key "admin_api_performance"
       icon :bolt
       title "API performance"
@@ -26,6 +32,9 @@ module RecordingStudioApi
         RecordingStudioApi::Admin::AdminApiPerformanceScreen.endpoint_rows(context)
       end
 
+      filter :date_range, default: :last_4_weeks
+      filter :group_by, values: %i[hour day week month year], default: :day
+      filter_presentation :modal, inline_count: 2
       filter :request_method, values: %w[GET POST PUT PATCH DELETE], placeholder: "Method", apply: lambda { |rows, value, _context|
         if value.present?
           rows.select { |row| row.request_method.to_s == value.to_s }
@@ -50,14 +59,7 @@ module RecordingStudioApi
         title "Latency over time"
         type :area
         series lambda { |context|
-          start_date, end_date = RecordingStudioApi::Admin::AdminApiPerformanceScreen.date_range_from_context(context)
-          RecordingStudioApi::Admin::AdminApiPerformanceScreen.latency_series_for(
-            start_date,
-            end_date,
-            api: RecordingStudioApi::Admin::ApiContext.key_from_context(context),
-            request_method: context.filter_value(:request_method),
-            request_path: context.filter_value(:request_path)
-          )
+          RecordingStudioApi::Admin::AdminApiPerformanceScreen.latency_series_for(context)
         }
         options lambda { |_context|
           {
@@ -116,26 +118,41 @@ module RecordingStudioApi
           rows.sort_by { |row| [-row.p95_duration_ms.to_i, -row.average_duration_ms.to_i, row.request_path.to_s] }
         end
 
-        def latency_series_for(start_date, end_date, api: :public, request_method: nil, request_path: nil)
+        def latency_series_for(context)
           return [] unless RecordingStudioApi::ApiRequestLog.table_available?
 
-          api_key = RecordingStudioApi::Admin::ApiContext.resolve(api).name
-          buckets = daily_buckets(start_date, end_date)
-          use_coverage = LogsRegistration.summaries_enabled? && request_method.blank? && request_path.blank?
+          bucket = group_by_from_context(context)
+          buckets = chart_buckets(context, bucket)
+          return [] if buckets.empty?
+
+          api_key = RecordingStudioApi::Admin::ApiContext.key_from_context(context)
+          request_method = request_filter_value(context, :request_method)
+          request_path = request_filter_value(context, :request_path)
+          use_coverage = LogsRegistration.summaries_enabled? &&
+                         request_method.blank? &&
+                         request_path.blank? &&
+                         bucket == :day
           durations_by_bucket = coverage_durations(buckets, api_key) if use_coverage
-          durations_by_bucket ||= legacy_raw_durations(
-            buckets, start_date, end_date, api_key,
-            request_method: request_method, request_path: request_path
-          )
+          durations_by_bucket ||= scoped_raw_durations(context, buckets, bucket)
 
           [
             {
               name: "P95 duration",
-              data: buckets.map { |bucket| { x: bucket.strftime("%b %-d"), y: series_point(durations_by_bucket, bucket, 0.95) } }
+              data: buckets.map do |bucket_start|
+                {
+                  x: RecordingStudioApi::Admin::ApiAccessRequestsScreen.chart_bucket_label(bucket_start, bucket),
+                  y: series_point(durations_by_bucket, bucket_start, 0.95)
+                }
+              end
             },
             {
               name: "Average duration",
-              data: buckets.map { |bucket| { x: bucket.strftime("%b %-d"), y: series_point(durations_by_bucket, bucket, :average) } }
+              data: buckets.map do |bucket_start|
+                {
+                  x: RecordingStudioApi::Admin::ApiAccessRequestsScreen.chart_bucket_label(bucket_start, bucket),
+                  y: series_point(durations_by_bucket, bucket_start, :average)
+                }
+              end
             }
           ]
         end
@@ -149,18 +166,13 @@ module RecordingStudioApi
           end
         end
 
-        def legacy_raw_durations(buckets, start_date, end_date, api_key, request_method: nil, request_path: nil)
+        def scoped_raw_durations(context, buckets, bucket)
           durations_by_bucket = buckets.index_with { [] }
-          scope = RecordingStudioApi::ApiRequestLog.where(
-            api_key: api_key,
-            occurred_at: start_date.beginning_of_day..end_date.end_of_day
-          )
-          scope = apply_request_log_filters(scope, request_method: request_method, request_path: request_path)
-          scope.pluck(:occurred_at, :duration_ms).each do |occurred_at, duration_ms|
+          request_scope(context).pluck(:occurred_at, :duration_ms).each do |occurred_at, duration_ms|
             next if occurred_at.nil? || duration_ms.nil?
 
-            bucket = occurred_at.to_date
-            durations_by_bucket[bucket] << duration_ms if durations_by_bucket.key?(bucket)
+            bucket_start = RecordingStudioApi::Admin::ApiAccessRequestsScreen.chart_bucket_start(occurred_at, bucket)
+            durations_by_bucket[bucket_start] << duration_ms if durations_by_bucket.key?(bucket_start)
           end
           durations_by_bucket
         end
@@ -180,9 +192,21 @@ module RecordingStudioApi
           )
           apply_request_log_filters(
             scope,
-            request_method: context.filter_value(:request_method),
-            request_path: context.filter_value(:request_path)
+            request_method: request_filter_value(context, :request_method),
+            request_path: request_filter_value(context, :request_path)
           )
+        end
+
+        def request_filter_value(context, key)
+          value = context.filter_value(key) if context.respond_to?(:filter_value)
+          return value if value.present?
+
+          context.params[key] || context.params[key.to_s]
+        end
+
+        def group_by_from_context(context)
+          value = request_filter_value(context, :group_by)
+          (value.presence || :day).to_sym
         end
 
         def apply_request_log_filters(scope, request_method:, request_path:)
@@ -201,8 +225,13 @@ module RecordingStudioApi
         end
 
         def date_range_from_context(context)
-          start_date = parsed_date(context.params[:start_date] || context.params["start_date"]) || default_start_date
-          end_date = parsed_date(context.params[:end_date] || context.params["end_date"]) || Date.current
+          filter_value = context.filter_value(:date_range) if context.respond_to?(:filter_value)
+          start_date = filter_value&.start_date ||
+                       parsed_date(context.params[:start_date] || context.params["start_date"]) ||
+                       default_start_date
+          end_date = filter_value&.end_date ||
+                     parsed_date(context.params[:end_date] || context.params["end_date"]) ||
+                     Date.current
           start_date > end_date ? [end_date, start_date] : [start_date, end_date]
         end
 
@@ -210,16 +239,33 @@ module RecordingStudioApi
           Date.current - 27.days
         end
 
-        def daily_buckets(start_date, end_date)
+        def chart_buckets(context, bucket)
+          start_date, end_date = date_range_from_context(context)
+          helper = RecordingStudioApi::Admin::ApiAccessRequestsScreen
+          start_bucket = helper.chart_range_start(start_date, bucket)
+          end_bucket = helper.chart_range_end(end_date, bucket)
           buckets = []
-          current_date = start_date.to_date
+          current_bucket = start_bucket
 
-          while current_date <= end_date.to_date
-            buckets << current_date
-            current_date += 1.day
+          while current_bucket <= end_bucket
+            buckets << current_bucket
+            current_bucket = helper.next_chart_bucket(current_bucket, bucket)
           end
 
           buckets
+        end
+
+        def series_context(start_date:, end_date:, api: :public, request_method: nil, request_path: nil, group_by: :day)
+          AdminApiPerformanceScreen::SeriesContext.new(
+            params: {
+              start_date: start_date.to_date.iso8601,
+              end_date: end_date.to_date.iso8601,
+              api_key: RecordingStudioApi::Admin::ApiContext.resolve(api).name,
+              request_method: request_method,
+              request_path: request_path,
+              group_by: group_by
+            }.compact
+          )
         end
 
         def average(values)

@@ -310,14 +310,17 @@ per day from the same rollup, with the same window, buckets, and
 counts active keys with `last_used_at` over 90 days ago, or never used and
 created over 90 days ago. Both are point-in-time (no window, no `group_by`,
 no metric filters) and are not cached. When Recording Studio Admin is
-loaded, the Admin API section shows number widgets for those two health
-filters. Each widget counts the same rows as the API credentials screen
-for the current API with default `status=active` and
-`health=expiring_soon` or `health=stale`. Status and health stay on that
-page. The Admin API
+loaded, the Admin API section shows those two health widgets on their own
+compact row, with captions from `EXPIRING_SOON_WINDOW` and `STALE_AFTER`
+and distinct `clock` / `pause` icons. Each widget counts the same rows as
+the API credentials screen for the current API with default
+`status=active` and `health=expiring_soon` or `health=stale`. That screen's
+chart uses the same filtered rows as the table. The Admin API
 section also links to API performance so the latency widget can open it.
-Failing endpoints filters by exact `request_path`. API performance filters
-by exact `request_method` and `request_path`, and it has no table search.
+Failing endpoints filters by exact `request_path` and shows those filters
+inline. API performance filters by date range, group-by, exact
+`request_method`, and `request_path`. Chart and table share that scope, and
+it has no table search.
 `api_authorize` allows an actor with the access-management view role on the
 site admin root. This gem does not call `RecordingStudioMetrics::Api.register!`.
 The host registers Metrics endpoints once:

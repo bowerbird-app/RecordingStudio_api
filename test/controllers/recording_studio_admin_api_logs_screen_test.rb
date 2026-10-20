@@ -329,8 +329,16 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_includes response.body, "API performance"
-    assert_select %(select[name="request_method"]), count: 1
-    assert_select %(input[name="request_path"]), count: 1
+    assert_select "form#screen-inline-filters-form" do
+      assert_select %(input[name="date_range_preset"]), count: 1
+      assert_select %(select[name="group_by"]), count: 1
+      assert_select %(select[name="request_method"]), count: 0
+      assert_select %(input[name="request_path"]), count: 0
+    end
+    assert_select "form#screen-filters-mobile-form" do
+      assert_select %(select[name="request_method"]), count: 1
+      assert_select %(input[name="request_path"]), count: 1
+    end
     assert_select %(input[name="search"]), count: 0
 
     RecordingStudioApi::ApiRequestLog.create!(
@@ -374,6 +382,41 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "/recording_studio_api/api/v1/site-wide-pages"
     assert_includes response.body, "/recording_studio_api/api/v1/site-wide-errors"
+
+    get "/admin/api/screens/admin_api_performance/chart", params: {
+      start_date: 27.days.ago.to_date.iso8601,
+      end_date: Date.current.iso8601,
+      request_method: "POST",
+      group_by: "day"
+    }
+
+    assert_response :success
+    post_chart = CGI.unescapeHTML(response.body)
+    assert_includes post_chart, '"name":"P95 duration"'
+    assert_includes post_chart, '"y":55'
+
+    get "/admin/api/screens/admin_api_performance/chart", params: {
+      start_date: 27.days.ago.to_date.iso8601,
+      end_date: Date.current.iso8601,
+      request_method: "GET",
+      group_by: "day"
+    }
+
+    assert_response :success
+    get_chart = CGI.unescapeHTML(response.body)
+    assert_includes get_chart, '"name":"P95 duration"'
+    assert_not_equal post_chart, get_chart
+    assert_not_includes get_chart, '"y":55'
+
+    get "/admin/api/screens/admin_api_performance/chart", params: {
+      start_date: 27.days.ago.to_date.iso8601,
+      end_date: Date.current.iso8601,
+      group_by: "year"
+    }
+
+    assert_response :success
+    year_chart = CGI.unescapeHTML(response.body)
+    assert_includes year_chart, "\"x\":\"#{Time.current.year}\""
 
     get "/admin/api/sections/admin_api/widgets/widgets.recording_studio_api.admin.client_errors_last_four_weeks"
 
@@ -432,7 +475,11 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_includes response.body, "Failing endpoints"
     assert_includes response.body, "Site-wide endpoint failures relative to total API request volume."
-    assert_select %(input[type="hidden"][name="date_range_preset"][value="last_4_weeks"]), count: 1
+    assert_select 'button[data-modal-id="screen-filters-modal"]', count: 0
+    assert_select "form#screen-filters-form" do
+      assert_select %(input[type="hidden"][name="date_range_preset"][value="last_4_weeks"]), count: 1
+      assert_select %(input[name="request_path"]), count: 1
+    end
     assert_select "turbo-frame#screen-chart span", text: "0%", count: 0
 
     get "/admin/api/screens/admin_api_failing_endpoints/chart", params: {
@@ -926,6 +973,16 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
       assert_response :success
       assert_includes response.body, "widgets.recording_studio_api.admin.api_keys_expiring_soon"
       assert_includes response.body, "widgets.recording_studio_api.admin.api_keys_stale"
+      compact_keys = %w[
+        widgets.recording_studio_api.admin.api_keys_expiring_soon
+        widgets.recording_studio_api.admin.api_keys_stale
+      ]
+      other_key = "widgets.recording_studio_api.admin.requests_last_four_weeks"
+      compact_positions = compact_keys.map { |key| response.body.index(key) }
+      other_position = response.body.index(other_key)
+      assert compact_positions.all?
+      assert other_position
+      assert compact_positions.max < other_position
 
       widget_context = Struct.new(:params).new({})
       expiring_count = RecordingStudioApi::Admin::ApiKeyHealthWidgets.listed_count(widget_context, "expiring_soon")
@@ -936,6 +993,9 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
 
       assert_response :success
       assert_includes response.body, "Expiring soon"
+      assert_includes response.body, "Expire in the next #{RecordingStudioApi::Admin::ApiKeyHealthWidgets.window_days(RecordingStudioApi::Metrics::EXPIRING_SOON_WINDOW)} days"
+      assert_includes response.body, "data-icon"
+      assert_includes response.body, "clock"
       assert_includes response.body, "health=expiring_soon"
       assert_includes response.body, expiring_count.to_s
 
@@ -944,6 +1004,8 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
 
       assert_response :success
       assert_includes response.body, "Stale keys"
+      assert_includes response.body, "Unused for #{RecordingStudioApi::Admin::ApiKeyHealthWidgets.window_days(RecordingStudioApi::Metrics::STALE_AFTER)}+ days"
+      assert_includes response.body, "pause"
       assert_includes response.body, "health=stale"
       assert_includes response.body, stale_count.to_s
 
@@ -977,6 +1039,26 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
       assert_includes response.body, "Stale site credential"
       refute_includes response.body, "Expiring site credential"
       refute_includes response.body, "Healthy site credential"
+
+      get "/admin/api/screens/admin_api_credentials/chart", params: { health: "expiring_soon" }
+
+      assert_response :success
+      expiring_chart = CGI.unescapeHTML(response.body)
+      assert_includes expiring_chart, '"name":"API credentials"'
+      assert_includes expiring_chart, '"x":"Expiring site credential"'
+      refute_includes expiring_chart, '"x":"Stale site credential"'
+      refute_includes expiring_chart, '"x":"Healthy site credential"'
+      assert_includes expiring_chart, ">#{expiring_count}<"
+
+      get "/admin/api/screens/admin_api_credentials/chart", params: { health: "stale" }
+
+      assert_response :success
+      stale_chart = CGI.unescapeHTML(response.body)
+      assert_includes stale_chart, '"x":"Stale site credential"'
+      refute_includes stale_chart, '"x":"Expiring site credential"'
+      refute_includes stale_chart, '"x":"Healthy site credential"'
+      assert_includes stale_chart, ">#{stale_count}<"
+      assert_not_equal expiring_chart, stale_chart
     end
   end
 

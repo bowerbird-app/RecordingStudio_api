@@ -41,10 +41,13 @@ module RecordingStudioApi
       module_function
 
       def series(context = nil)
-        RecordingStudioApi::Admin::AdminApiPerformanceScreen.latency_series_for(
-          RecordingStudioApi::Admin::AdminApiPerformanceScreen.default_start_date,
-          Date.current,
-          api: api_key(context)
+        screen = RecordingStudioApi::Admin::AdminApiPerformanceScreen
+        screen.latency_series_for(
+          screen.series_context(
+            start_date: screen.default_start_date,
+            end_date: Date.current,
+            api: api_key(context)
+          )
         )
       end
 

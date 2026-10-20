@@ -20,6 +20,7 @@ module RecordingStudioApi
           rows
         end
       }
+      filter_presentation :inline
 
       summary do
         label "Failing endpoints"

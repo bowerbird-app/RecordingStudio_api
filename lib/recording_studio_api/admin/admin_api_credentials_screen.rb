@@ -63,6 +63,22 @@ module RecordingStudioApi
         change_good_when :neutral
       end
 
+      chart do
+        title "API credentials"
+        type :bar
+        series lambda { |context|
+          RecordingStudioApi::Admin::AdminApiCredentialsScreen.credential_series(context)
+        }
+        options lambda { |_context|
+          {
+            plotOptions: { bar: { horizontal: false } },
+            xaxis: { labels: { rotate: -45, hideOverlappingLabels: true } },
+            yaxis: { min: 0, forceNiceScale: true },
+            dataLabels: { enabled: false }
+          }
+        }
+      end
+
       table do
         filter :search, apply: lambda { |rows, value, _context|
           next rows if value.blank?
@@ -113,6 +129,27 @@ module RecordingStudioApi
       end
 
       class << self
+        def credential_series(context)
+          rows = filtered_rows(context)
+          return [] if rows.empty?
+
+          counts = rows.group_by { |row| row.api_client.name.to_s.presence || "Unknown" }
+                       .transform_values(&:size)
+                       .sort_by { |name, count| [-count, name] }
+
+          [{
+            name: "API credentials",
+            data: counts.map { |name, count| { x: name, y: count } }
+          }]
+        end
+
+        def filtered_rows(context)
+          result = context.query_result
+          return [] if result.nil?
+
+          Array(result.relation)
+        end
+
         def root_filter_options(api: :public)
           [""] + RecordingStudioApi::Admin::Queries::AdminApiCredentialsQuery.call(api: api)
                                                                              .map { |row| root_filter_value(row) }

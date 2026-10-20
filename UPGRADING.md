@@ -1,5 +1,19 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.14.0
+
+`0.14.0` polishes Admin API key-health widgets and makes credentials,
+performance, and failing-endpoints screens honour the same filters on
+chart and table. No migration.
+
+1. Bump the host gem to `0.14.0`.
+2. **Expiring soon** and **Stale keys** stay on their own compact row, with
+   captions derived from `EXPIRING_SOON_WINDOW` and `STALE_AFTER`.
+3. API credentials chart counts the same filtered rows as the table
+   (`status`, `health`, root filters).
+4. API performance accepts a date range and group-by, applied to table and
+   chart. Failing endpoints shows all filters on the page.
+
 ## Upgrading to 0.13.2
 
 `0.13.2` makes the Admin API key health widgets match the credentials

@@ -45,6 +45,26 @@ class ApiKeyHealthWidgetsTest < ActiveSupport::TestCase
     end
   end
 
+  test "captions use the metrics window constants" do
+    expiring_days = RecordingStudioApi::Admin::ApiKeyHealthWidgets.window_days(
+      RecordingStudioApi::Metrics::EXPIRING_SOON_WINDOW
+    )
+    stale_days = RecordingStudioApi::Admin::ApiKeyHealthWidgets.window_days(
+      RecordingStudioApi::Metrics::STALE_AFTER
+    )
+
+    assert_equal 30, expiring_days
+    assert_equal 90, stale_days
+    assert_equal "Expire in the next #{expiring_days} days",
+                 RecordingStudioApi::Admin::ApiKeyHealthWidgets.caption_for(
+                   RecordingStudioApi::Admin::ApiKeyHealthWidgets::ENTRIES.first
+                 )
+    assert_equal "Unused for #{stale_days}+ days",
+                 RecordingStudioApi::Admin::ApiKeyHealthWidgets.caption_for(
+                   RecordingStudioApi::Admin::ApiKeyHealthWidgets::ENTRIES.last
+                 )
+  end
+
   test "listed counts match the credentials screen and ignore other APIs and inactive keys" do
     configure_dummy_operations_api!
     user = User.create!(email: "health-count-#{SecureRandom.hex(4)}@example.com") do |record|
