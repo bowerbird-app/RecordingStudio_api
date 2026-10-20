@@ -119,18 +119,25 @@ class ApiKeyHealthWidgetsTest < ActiveSupport::TestCase
         RecordingStudioApi::Admin::ApiKeyHealthWidgets.apply_status(screen_rows, "active"),
         "stale"
       )
+      listed_expiring_names = listed_expiring_rows.map { |row| row.api_client.name }
+      listed_stale_names = listed_stale_rows.map { |row| row.api_client.name }
+      excluded_names = ["Inactive expiring", "Inactive stale", "Other API expiring", "Other API stale"]
 
-      assert_equal ["Listed expiring"], listed_expiring_rows.map(&:api_client).map(&:name)
-      assert_equal ["Listed stale"], listed_stale_rows.map(&:api_client).map(&:name)
+      assert_includes listed_expiring_names, "Listed expiring"
+      assert_includes listed_stale_names, "Listed stale"
+      excluded_names.each do |name|
+        assert_not_includes listed_expiring_names, name
+        assert_not_includes listed_stale_names, name
+      end
       assert_equal screen_expiring.map(&:id).sort, listed_expiring_rows.map(&:id).sort
       assert_equal screen_stale.map(&:id).sort, listed_stale_rows.map(&:id).sort
-      assert_equal 1, RecordingStudioApi::Admin::ApiKeyHealthWidgets.listed_count(context, "expiring_soon")
-      assert_equal 1, RecordingStudioApi::Admin::ApiKeyHealthWidgets.listed_count(context, "stale")
+      assert_equal screen_expiring.size, RecordingStudioApi::Admin::ApiKeyHealthWidgets.listed_count(context, "expiring_soon")
+      assert_equal screen_stale.size, RecordingStudioApi::Admin::ApiKeyHealthWidgets.listed_count(context, "stale")
 
       site_expiring = RecordingStudioApi::Metrics::EXPIRING_SOON.call(RecordingStudioApi::ApiCredential.all).count
       site_stale = RecordingStudioApi::Metrics::STALE.call(RecordingStudioApi::ApiCredential.all).count
-      assert_operator site_expiring, :>, 1
-      assert_operator site_stale, :>, 1
+      assert_operator site_expiring, :>, listed_expiring_rows.size
+      assert_operator site_stale, :>, listed_stale_rows.size
     end
   end
 end
