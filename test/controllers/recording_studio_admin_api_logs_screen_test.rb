@@ -329,6 +329,51 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_includes response.body, "API performance"
+    assert_select %(select[name="request_method"]), count: 1
+    assert_select %(input[name="request_path"]), count: 1
+    assert_select %(input[name="search"]), count: 0
+
+    RecordingStudioApi::ApiRequestLog.create!(
+      occurred_at: Time.current,
+      request_id: "rs-admin-site-wide-post-pages",
+      request_method: "POST",
+      request_path: "/recording_studio_api/api/v1/site-wide-pages",
+      status_code: 201,
+      duration_ms: 55,
+      rate_limited: false,
+      remote_ip: "10.40.0.20"
+    )
+
+    get "/admin/api/screens/admin_api_performance/table", params: {
+      start_date: 27.days.ago.to_date.iso8601,
+      end_date: Date.current.iso8601,
+      request_method: "POST"
+    }
+
+    assert_response :success
+    assert_includes response.body, "/recording_studio_api/api/v1/site-wide-pages"
+    assert_not_includes response.body, "/recording_studio_api/api/v1/site-wide-errors"
+    assert_not_includes response.body, "/recording_studio_api/api/v1/pages"
+
+    get "/admin/api/screens/admin_api_performance/table", params: {
+      start_date: 27.days.ago.to_date.iso8601,
+      end_date: Date.current.iso8601,
+      request_path: "/recording_studio_api/api/v1/site-wide-errors"
+    }
+
+    assert_response :success
+    assert_includes response.body, "/recording_studio_api/api/v1/site-wide-errors"
+    assert_not_includes response.body, "/recording_studio_api/api/v1/site-wide-pages"
+
+    get "/admin/api/screens/admin_api_performance/table", params: {
+      start_date: 27.days.ago.to_date.iso8601,
+      end_date: Date.current.iso8601,
+      search: "site-wide-errors"
+    }
+
+    assert_response :success
+    assert_includes response.body, "/recording_studio_api/api/v1/site-wide-pages"
+    assert_includes response.body, "/recording_studio_api/api/v1/site-wide-errors"
 
     get "/admin/api/sections/admin_api/widgets/widgets.recording_studio_api.admin.client_errors_last_four_weeks"
 
@@ -415,6 +460,36 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "100.0%"
     assert_includes response.body, "2"
     assert_not_includes response.body, "/site-wide-pages"
+
+    get "/admin/api/screens/admin_api_failing_endpoints", params: {
+      start_date: 27.days.ago.to_date.iso8601,
+      end_date: Date.current.iso8601
+    }
+
+    assert_response :success
+    assert_select %(input[name="request_path"]), count: 1
+
+    get "/admin/api/screens/admin_api_failing_endpoints/table", params: {
+      start_date: 27.days.ago.to_date.iso8601,
+      end_date: Date.current.iso8601,
+      request_path: "/site-wide-errors"
+    }
+
+    assert_response :success
+    assert_includes response.body, "/site-wide-errors"
+    assert_not_includes response.body, "/site-wide-client-errors"
+    assert_not_includes response.body, "/site-wide-pages"
+
+    get "/admin/api/screens/admin_api_failing_endpoints/chart", params: {
+      start_date: 27.days.ago.to_date.iso8601,
+      end_date: Date.current.iso8601,
+      request_path: "/site-wide-errors"
+    }
+
+    assert_response :success
+    chart_body = CGI.unescapeHTML(response.body)
+    assert_includes chart_body, '"GET /site-wide-errors"'
+    assert_not_includes chart_body, '"GET /site-wide-client-errors"'
 
     get "/admin/api/sections/admin_api/widgets/widgets.recording_studio_api.admin.rate_limited_requests_last_four_weeks"
 

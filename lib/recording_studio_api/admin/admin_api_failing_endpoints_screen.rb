@@ -13,6 +13,13 @@ module RecordingStudioApi
       end
 
       filter :date_range, default: :last_4_weeks
+      filter :request_path, placeholder: "Request path", apply: lambda { |rows, value, _context|
+        if value.present?
+          rows.select { |row| row.request_path.to_s == value.to_s }
+        else
+          rows
+        end
+      }
 
       summary do
         label "Failing endpoints"
@@ -74,11 +81,13 @@ module RecordingStudioApi
           )
 
           start_date, end_date = date_range_from_context(context)
-          RecordingStudioApi::Admin::Queries::AdminApiEndpointFailuresQuery.call(
+          rows = RecordingStudioApi::Admin::Queries::AdminApiEndpointFailuresQuery.call(
             start_date: start_date,
             end_date: end_date,
             api: RecordingStudioApi::Admin::ApiContext.key_from_context(context)
           )
+          request_path = context.filter_value(:request_path)
+          request_path.present? ? rows.select { |row| row.request_path.to_s == request_path.to_s } : rows
         end
 
         def failure_rate_series(context)

@@ -1,5 +1,20 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.11.5
+
+`0.11.5` adds request filters on two site-wide Admin API screens. No
+migrations. Hosts that do not load `recording_studio_admin` are unchanged.
+
+1. **Failing endpoints** takes `request_path`. Match is exact against the
+   compacted path shown in the table (`/site-wide-errors`, not the full
+   logged URL). The chart uses the same filter.
+2. **API performance** takes `request_method` (`GET`, `POST`, `PUT`,
+   `PATCH`, `DELETE`) and `request_path`. Path match is exact against the
+   logged path, the same as API requests. The latency chart uses both
+   filters.
+3. API performance no longer has table free-text search. Use
+   `request_path` instead.
+
 ## Upgrading to 0.11.4
 
 `0.11.4` adds two Admin API dashboard widgets for existing API key health

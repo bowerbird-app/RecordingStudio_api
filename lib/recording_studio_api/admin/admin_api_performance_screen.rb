@@ -26,6 +26,21 @@ module RecordingStudioApi
         RecordingStudioApi::Admin::AdminApiPerformanceScreen.endpoint_rows(context)
       end
 
+      filter :request_method, values: %w[GET POST PUT PATCH DELETE], placeholder: "Method", apply: lambda { |rows, value, _context|
+        if value.present?
+          rows.select { |row| row.request_method.to_s == value.to_s }
+        else
+          rows
+        end
+      }
+      filter :request_path, placeholder: "Request path", apply: lambda { |rows, value, _context|
+        if value.present?
+          rows.select { |row| row.request_path.to_s == value.to_s }
+        else
+          rows
+        end
+      }
+
       summary do
         label "Endpoints"
         change_good_when :neutral
@@ -36,7 +51,13 @@ module RecordingStudioApi
         type :area
         series lambda { |context|
           start_date, end_date = RecordingStudioApi::Admin::AdminApiPerformanceScreen.date_range_from_context(context)
-          RecordingStudioApi::Admin::AdminApiPerformanceScreen.latency_series_for(start_date, end_date, api: RecordingStudioApi::Admin::ApiContext.key_from_context(context))
+          RecordingStudioApi::Admin::AdminApiPerformanceScreen.latency_series_for(
+            start_date,
+            end_date,
+            api: RecordingStudioApi::Admin::ApiContext.key_from_context(context),
+            request_method: context.filter_value(:request_method),
+            request_path: context.filter_value(:request_path)
+          )
         }
         options lambda { |_context|
           {
@@ -50,15 +71,6 @@ module RecordingStudioApi
       end
 
       table do
-        filter :search, apply: lambda { |rows, value, _context|
-          next rows if value.blank?
-
-          query = value.to_s.downcase
-          rows.select do |row|
-            [row.request_method, row.request_path].any? { |entry| entry.to_s.downcase.include?(query) }
-          end
-        }
-
         column :request_method, title: "Method", sortable: false
         column :request_path,
                title: "Path",
@@ -104,21 +116,23 @@ module RecordingStudioApi
           rows.sort_by { |row| [-row.p95_duration_ms.to_i, -row.average_duration_ms.to_i, row.request_path.to_s] }
         end
 
-        def latency_series_for(start_date, end_date, api: :public)
+        def latency_series_for(start_date, end_date, api: :public, request_method: nil, request_path: nil)
           return [] unless RecordingStudioApi::ApiRequestLog.table_available?
 
           buckets = daily_buckets(start_date, end_date)
           durations_by_bucket = buckets.index_with { [] }
 
-          RecordingStudioApi::ApiRequestLog
-            .where(api_key: RecordingStudioApi::Admin::ApiContext.resolve(api).name, occurred_at: start_date.beginning_of_day..end_date.end_of_day)
-            .pluck(:occurred_at, :duration_ms)
-            .each do |occurred_at, duration_ms|
-              next if occurred_at.nil? || duration_ms.nil?
+          scope = RecordingStudioApi::ApiRequestLog.where(
+            api_key: RecordingStudioApi::Admin::ApiContext.resolve(api).name,
+            occurred_at: start_date.beginning_of_day..end_date.end_of_day
+          )
+          scope = apply_request_log_filters(scope, request_method: request_method, request_path: request_path)
+          scope.pluck(:occurred_at, :duration_ms).each do |occurred_at, duration_ms|
+            next if occurred_at.nil? || duration_ms.nil?
 
-              bucket = occurred_at.to_date
-              durations_by_bucket[bucket] << duration_ms if durations_by_bucket.key?(bucket)
-            end
+            bucket = occurred_at.to_date
+            durations_by_bucket[bucket] << duration_ms if durations_by_bucket.key?(bucket)
+          end
 
           [
             {
@@ -134,10 +148,21 @@ module RecordingStudioApi
 
         def request_scope(context)
           start_date, end_date = date_range_from_context(context)
-          RecordingStudioApi::ApiRequestLog.where(
+          scope = RecordingStudioApi::ApiRequestLog.where(
             api_key: RecordingStudioApi::Admin::ApiContext.key_from_context(context),
             occurred_at: start_date.beginning_of_day..end_date.end_of_day
           )
+          apply_request_log_filters(
+            scope,
+            request_method: context.filter_value(:request_method),
+            request_path: context.filter_value(:request_path)
+          )
+        end
+
+        def apply_request_log_filters(scope, request_method:, request_path:)
+          scope = scope.where(request_method: request_method) if request_method.present?
+          scope = scope.where(request_path: request_path) if request_path.present?
+          scope
         end
 
         def authorized?(context)
