@@ -1,5 +1,17 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.13.2
+
+`0.13.2` makes the Admin API key health widgets match the credentials
+screen they link to. No migration.
+
+1. Bump the host gem to `0.13.2`.
+2. **Expiring soon** and **Stale keys** now count active keys on the current
+   API, using `AdminApiCredentialsQuery` plus the screen's default
+   `status=active` and `health` filters. Keys on other APIs and inactive
+   keys are not included. Site-wide `api_keys.expiring_soon` and
+   `api_keys.stale` metrics are unchanged.
+
 ## Upgrading to 0.13.1
 
 `0.13.1` widens `recording_studio_metrics` to `>= 0.3.0, < 0.6` and pins

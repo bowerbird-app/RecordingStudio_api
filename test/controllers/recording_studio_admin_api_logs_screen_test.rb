@@ -927,8 +927,9 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
       assert_includes response.body, "widgets.recording_studio_api.admin.api_keys_expiring_soon"
       assert_includes response.body, "widgets.recording_studio_api.admin.api_keys_stale"
 
-      expiring_count = RecordingStudioApi::Metrics::EXPIRING_SOON.call(RecordingStudioApi::ApiCredential.active).count
-      stale_count = RecordingStudioApi::Metrics::STALE.call(RecordingStudioApi::ApiCredential.active).count
+      widget_context = Struct.new(:params).new({})
+      expiring_count = RecordingStudioApi::Admin::ApiKeyHealthWidgets.listed_count(widget_context, "expiring_soon")
+      stale_count = RecordingStudioApi::Admin::ApiKeyHealthWidgets.listed_count(widget_context, "stale")
 
       get "/admin/api/sections/admin_api/widgets/widgets.recording_studio_api.admin.api_keys_expiring_soon",
           params: { anchor_url: "/" }

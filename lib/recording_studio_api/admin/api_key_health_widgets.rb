@@ -5,7 +5,6 @@ module RecordingStudioApi
     module ApiKeyHealthWidgets
       ENTRIES = [
         {
-          metric: "api_keys.expiring_soon",
           widget_key: "widgets.recording_studio_api.admin.api_keys_expiring_soon",
           health: "expiring_soon",
           title: "Expiring soon",
@@ -13,7 +12,6 @@ module RecordingStudioApi
           link_label: "Review expiring keys"
         },
         {
-          metric: "api_keys.stale",
           widget_key: "widgets.recording_studio_api.admin.api_keys_stale",
           health: "stale",
           title: "Stale keys",
@@ -27,6 +25,9 @@ module RecordingStudioApi
         "stale" => RecordingStudioApi::Metrics::STALE
       }.freeze
 
+      # Same default as AdminApiCredentialsScreen's status filter.
+      LIST_STATUS = "active"
+
       Definitions = ENTRIES.map do |entry|
         ::RecordingStudioAdmin::Widget.new(
           nil,
@@ -38,7 +39,7 @@ module RecordingStudioApi
           change_good_when :down
           hide_change
           value do |context|
-            RecordingStudioApi::Admin::ApiKeyHealthWidgets.scalar(context, entry.fetch(:metric))
+            RecordingStudioApi::Admin::ApiKeyHealthWidgets.listed_count(context, entry.fetch(:health))
           end
           link_to do |context|
             NavigationUrlHelpers.admin_screen_url(
@@ -53,13 +54,19 @@ module RecordingStudioApi
 
       module_function
 
-      def scalar(context, identifier)
-        RecordingStudioMetrics::Admin.scalar_value(
-          identifier,
-          admin_context: context,
-          scope: :site,
-          site_authorized: true
+      def listed_count(context, health)
+        listed_rows(context, health).size
+      end
+
+      def listed_rows(context, health)
+        rows = RecordingStudioApi::Admin::Queries::AdminApiCredentialsQuery.call(
+          api: RecordingStudioApi::Admin::ApiContext.key_from_context(context)
         )
+        filter_rows(apply_status(rows, LIST_STATUS), health)
+      end
+
+      def apply_status(rows, value)
+        value.present? ? rows.select { |row| row.status.casecmp?(value.to_s) } : rows
       end
 
       def filter_rows(rows, value)

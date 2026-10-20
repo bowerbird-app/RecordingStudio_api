@@ -23,9 +23,12 @@ module RecordingStudioApi
         end
       end
 
-      filter :status, values: [""] + %w[active expired revoked], default: "active", apply: lambda { |rows, value, _context|
-        value.present? ? rows.select { |row| row.status.casecmp?(value.to_s) } : rows
-      }
+      filter :status,
+             values: [""] + %w[active expired revoked],
+             default: RecordingStudioApi::Admin::ApiKeyHealthWidgets::LIST_STATUS,
+             apply: lambda { |rows, value, _context|
+               RecordingStudioApi::Admin::ApiKeyHealthWidgets.apply_status(rows, value)
+             }
 
       filter :health,
              values: [""] + %w[expiring_soon stale],
