@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.2] - 2026-10-20
+
+### Fixed
+- Admin API **Expiring soon** and **Stale keys** widgets count the same rows
+  as `/admin/screens/admin_api_credentials` with the current API and default
+  `status=active`. They no longer read the site-wide `api_keys.*` metrics.
+
+### Upgrade notes
+- Bump to `0.13.2`. No migration.
+
 ## [0.13.1] - 2026-10-20
 
 ### Changed
@@ -721,7 +731,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.13.1...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.13.2...HEAD
+[0.13.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.13.1...v0.13.2
 [0.13.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.5...v0.12.0

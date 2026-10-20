@@ -310,9 +310,11 @@ per day from the same rollup, with the same window, buckets, and
 counts active keys with `last_used_at` over 90 days ago, or never used and
 created over 90 days ago. Both are point-in-time (no window, no `group_by`,
 no metric filters) and are not cached. When Recording Studio Admin is
-loaded, the Admin API section shows number widgets for those two metrics.
-Each widget links to the API credentials screen with `health=expiring_soon`
-or `health=stale`. Status and health stay on that page. The Admin API
+loaded, the Admin API section shows number widgets for those two health
+filters. Each widget counts the same rows as the API credentials screen
+for the current API with default `status=active` and
+`health=expiring_soon` or `health=stale`. Status and health stay on that
+page. The Admin API
 section also links to API performance so the latency widget can open it.
 Failing endpoints filters by exact `request_path`. API performance filters
 by exact `request_method` and `request_path`, and it has no table search.
