@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-10-20
+
+### Changed
+- The `recording_studio_logs` gemspec pin is `>= 0.4.1, < 0.6`. Development
+  and dummy Gemfiles pin GitHub tag `v0.5.0`. `config.logs_summaries_enabled`
+  still defaults to false.
+
+### Upgrade notes
+- Bump to `0.14.1`. No migration.
+- Pin `recording_studio_logs` to GitHub tag `v0.5.0` (allowed range
+  `>= 0.4.1, < 0.6`). Leave `config.logs_summaries_enabled` false.
+
 ## [0.14.0] - 2026-10-20
 
 ### Changed
@@ -751,7 +763,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.14.1...HEAD
+[0.14.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.13.2...v0.14.0
 [0.13.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.13.1...v0.13.2
 [0.13.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.13.0...v0.13.1
