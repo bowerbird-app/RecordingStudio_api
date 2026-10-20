@@ -46,6 +46,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `config.logs_summaries_enabled` (default false). Unused until summary
   cutover.
 
+## [0.11.5] - 2026-10-19
+
+### Added
+- Site-wide Failing endpoints accepts an exact `request_path` filter, the
+  same control as API requests. The table and the failure-rate chart both
+  honor it.
+- Site-wide API performance accepts exact `request_method` and
+  `request_path` filters. The latency chart uses the same values. The
+  table free-text search is gone because the path filter replaces it.
+
 ## [0.11.4] - 2026-10-19
 
 ### Added
@@ -700,7 +710,8 @@ relationship migration steps.
 
 [Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.13.0...HEAD
 [0.13.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.12.0...v0.13.0
-[0.12.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.4...v0.12.0
+[0.12.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.5...v0.12.0
+[0.11.5]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.4...v0.11.5
 [0.11.4]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.3...v0.11.4
 [0.11.3]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.2...v0.11.3
 [0.11.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.11.1...v0.11.2
