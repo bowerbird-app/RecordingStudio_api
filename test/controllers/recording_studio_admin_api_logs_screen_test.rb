@@ -329,13 +329,10 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_includes response.body, "API performance"
-    assert_select "form#screen-inline-filters-form" do
+    assert_select 'button[data-modal-id="screen-filters-modal"]', count: 0
+    assert_select "form#screen-filters-form" do
       assert_select %(input[name="date_range_preset"]), count: 1
       assert_select %(select[name="group_by"]), count: 1
-      assert_select %(select[name="request_method"]), count: 0
-      assert_select %(input[name="request_path"]), count: 0
-    end
-    assert_select "form#screen-filters-mobile-form" do
       assert_select %(select[name="request_method"]), count: 1
       assert_select %(input[name="request_path"]), count: 1
     end

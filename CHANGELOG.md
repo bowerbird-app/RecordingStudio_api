@@ -19,7 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   table, so health (and the other screen filters) change both the count
   and the chart.
 - Site-wide API performance adds `date_range` and `group_by` filters, and
-  the latency chart uses the same request scope as the table.
+  the latency chart uses the same request scope as the table. Those
+  filters stay inline (no Filter button).
 - Site-wide failing endpoints shows every filter inline. The Filter button
   that hid those inputs is gone.
 

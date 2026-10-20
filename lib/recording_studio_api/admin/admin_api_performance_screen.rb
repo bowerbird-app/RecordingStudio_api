@@ -34,7 +34,6 @@ module RecordingStudioApi
 
       filter :date_range, default: :last_4_weeks
       filter :group_by, values: %i[hour day week month year], default: :day
-      filter_presentation :modal, inline_count: 2
       filter :request_method, values: %w[GET POST PUT PATCH DELETE], placeholder: "Method", apply: lambda { |rows, value, _context|
         if value.present?
           rows.select { |row| row.request_method.to_s == value.to_s }
@@ -49,6 +48,7 @@ module RecordingStudioApi
           rows
         end
       }
+      filter_presentation :inline
 
       summary do
         label "Endpoints"

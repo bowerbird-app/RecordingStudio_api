@@ -319,8 +319,8 @@ chart uses the same filtered rows as the table. The Admin API
 section also links to API performance so the latency widget can open it.
 Failing endpoints filters by exact `request_path` and shows those filters
 inline. API performance filters by date range, group-by, exact
-`request_method`, and `request_path`. Chart and table share that scope, and
-it has no table search.
+`request_method`, and `request_path`, all inline. Chart and table share
+that scope, and it has no table search.
 `api_authorize` allows an actor with the access-management view role on the
 site admin root. This gem does not call `RecordingStudioMetrics::Api.register!`.
 The host registers Metrics endpoints once:
