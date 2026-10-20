@@ -120,8 +120,8 @@ class ApiKeyHealthWidgetsTest < ActiveSupport::TestCase
         "stale"
       )
 
-      assert_equal ["Listed expiring"], listed_expiring_rows.map { |row| row.api_client.name }
-      assert_equal ["Listed stale"], listed_stale_rows.map { |row| row.api_client.name }
+      assert_equal ["Listed expiring"], listed_expiring_rows.map(&:api_client).map(&:name)
+      assert_equal ["Listed stale"], listed_stale_rows.map(&:api_client).map(&:name)
       assert_equal screen_expiring.map(&:id).sort, listed_expiring_rows.map(&:id).sort
       assert_equal screen_stale.map(&:id).sort, listed_stale_rows.map(&:id).sort
       assert_equal 1, RecordingStudioApi::Admin::ApiKeyHealthWidgets.listed_count(context, "expiring_soon")
