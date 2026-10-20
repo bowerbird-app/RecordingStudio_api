@@ -71,11 +71,22 @@ module RecordingStudioApi
       end
 
       def daily_metric_counts(start_date:, end_date:, status_class: nil, rate_limited: nil, api: :public)
-        counts = (start_date..end_date).index_with(0)
+        counts = seeded_daily_counts(start_date, end_date)
         metric_rows(start_date:, end_date:, status_class:, rate_limited:, api: api).each do |row|
           counts[row.metric_date] += row.request_count if counts.key?(row.metric_date)
         end
         counts
+      end
+
+      def seeded_daily_counts(start_date, end_date)
+        return (start_date..end_date).index_with(0) unless LogsRegistration.summaries_enabled?
+
+        coverage = Services::ApiRequestLogCoverage.new
+        (start_date..end_date).each_with_object({}) do |day, hash|
+          next if coverage.source_for(day).kind == :gap
+
+          hash[day] = 0
+        end
       end
     end
   end

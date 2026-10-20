@@ -88,6 +88,19 @@ class OauthControllerTest < ActionDispatch::IntegrationTest
     assert_equal "rate_limit_exceeded", body.fetch("error")
   end
 
+  test "a request log write failure does not fail the oauth response" do
+    RecordingStudioApi.configuration.api_request_logging_enabled = true
+    RecordingStudioApi::ApiRequestLog.stub(:write_payloads!, proc { raise "log insert failed" }) do
+      post "/recording_studio_api/oauth/token", params: {
+        grant_type: "client_credentials",
+        client_id: @payload.fetch(:credential).oauth_client_id,
+        client_secret: "bad-secret"
+      }
+    end
+
+    assert_response :unauthorized
+  end
+
   test "writes oauth request log metadata without params by default" do
     RecordingStudioApi.configuration.api_request_logging_enabled = true
     logged_payloads = []

@@ -79,6 +79,7 @@ class ConfigurationTest < Minitest::Test
     assert_equal [], configuration.api_request_log_allowed_param_keys
     assert_equal 30, configuration.api_request_log_retention_days
     assert_nil configuration.api_daily_metric_retention_days
+    assert_equal false, configuration.logs_summaries_enabled
     assert_instance_of RecordingStudioApi::Hooks, configuration.hooks
   end
 

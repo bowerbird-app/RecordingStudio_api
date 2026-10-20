@@ -49,8 +49,8 @@ module RecordingStudioApi
       WriteApiRequestLogsJob.perform_later(payloads)
     rescue StandardError => e
       Rails.logger.warn("[RecordingStudioApi] failed to enqueue batched api request logs: #{e.class}: #{e.message}")
-      payloads.each do |payload|
-        ApiRequestLog.create!(payload)
+      Array(payloads).each do |payload|
+        ApiRequestLog.write_payloads!([payload])
       rescue StandardError => write_error
         Rails.logger.warn("[RecordingStudioApi] api request log write failed: #{write_error.class}: #{write_error.message}")
       end

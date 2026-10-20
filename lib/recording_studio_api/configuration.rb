@@ -62,7 +62,8 @@ module RecordingStudioApi
                   :api_request_logging_batch_size,
                   :api_request_log_allowed_param_keys,
                   :api_request_log_retention_days,
-                  :api_daily_metric_retention_days
+                  :api_daily_metric_retention_days,
+                  :logs_summaries_enabled
     attr_reader :hooks, :action_registry, :registered_endpoint_registry, :recordable_registry, :resource_handler_registry, :default_api_version, :api_version_profiles, :capability_action_roles
 
     # rubocop:disable Metrics/AbcSize
@@ -137,6 +138,7 @@ module RecordingStudioApi
       @api_request_log_allowed_param_keys = []
       @api_request_log_retention_days = 30
       @api_daily_metric_retention_days = nil
+      @logs_summaries_enabled = false
       @hooks = Hooks.new
       @action_registry = ActionRegistry.new
       @registered_endpoint_registry = RegisteredEndpointRegistry.new
@@ -203,6 +205,7 @@ module RecordingStudioApi
         api_request_log_allowed_param_keys: api_request_log_allowed_param_keys,
         api_request_log_retention_days: api_request_log_retention_days,
         api_daily_metric_retention_days: api_daily_metric_retention_days,
+        logs_summaries_enabled: logs_summaries_enabled,
         action_registrations: action_registry.to_h,
         registered_endpoint_registrations: registered_endpoint_registry.to_h,
         recordable_registrations: recordable_registry.to_h,

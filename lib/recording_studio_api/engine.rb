@@ -187,6 +187,10 @@ module RecordingStudioApi
       end
     end
 
+    initializer "recording_studio_api.logs" do
+      config.to_prepare { RecordingStudioApi::LogsRegistration.register! }
+    end
+
     initializer "recording_studio_api.metrics" do
       config.to_prepare { RecordingStudioApi::Metrics.register! }
     end

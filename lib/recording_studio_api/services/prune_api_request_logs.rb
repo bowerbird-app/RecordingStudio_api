@@ -5,6 +5,7 @@ module RecordingStudioApi
     class PruneApiRequestLogs
       class << self
         def call(before: default_before)
+          return GuardedApiRequestLogRetention.call(before: before) if LogsRegistration.summaries_enabled?
           return 0 unless ApiRequestLog.table_available?
 
           ApiRequestLog.where("occurred_at < ?", before).delete_all

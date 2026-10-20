@@ -562,6 +562,8 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
       t.string :action_name
       t.integer :status_code, null: false
       t.integer :duration_ms, null: false
+      t.datetime :arrived_at, default: -> { "clock_timestamp()" }
+      t.integer :latency_bucket_ms
       t.boolean :rate_limited, null: false, default: false
       t.uuid :api_client_id
       t.uuid :api_credential_id

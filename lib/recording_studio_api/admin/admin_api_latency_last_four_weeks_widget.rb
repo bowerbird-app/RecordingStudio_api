@@ -59,8 +59,19 @@ module RecordingStudioApi
       def p95_duration_ms_for(range, context = nil)
         return 0 unless RecordingStudioApi::ApiRequestLog.table_available?
 
-        durations = request_scope(context).where(occurred_at: range).pluck(:duration_ms).compact
+        api_name = api_key(context)
+        durations = covered_durations(range, api_name) if LogsRegistration.summaries_enabled?
+        durations ||= request_scope(context).where(occurred_at: range).pluck(:duration_ms).compact
         RecordingStudioApi::Admin::AdminApiPerformanceScreen.percentile(durations, 0.95)
+      end
+
+      def covered_durations(range, api_name)
+        start_date = range.begin.to_date
+        end_date = range.end.to_date
+        (start_date..end_date).flat_map do |day|
+          samples = LatencySamples.for_day(day: day, api_key: api_name)
+          samples == :gap ? [] : samples
+        end
       end
 
       def link_to(context)
