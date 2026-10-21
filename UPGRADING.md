@@ -2,16 +2,21 @@
 
 ## Upgrading to 0.14.2
 
-`0.14.2` fixes Logs-summary coverage for Admin and Metrics. No migration.
-`config.logs_summaries_enabled` still defaults to false. The flag-off path
-is unchanged.
+`0.14.2` stops writing and reading Recording Studio Logs summaries. No
+migration and no drop. Admin metrics, `api_requests.*`, nightly maintain,
+and raw prune stay on the existing daily-metric path.
 
 1. Bump the host gem to `0.14.2`.
-2. Leave `config.logs_summaries_enabled` false until you have backfilled.
-3. When the flag is on, `api_requests.*` includes leftover legacy daily
-   rows for days Logs summaries do not cover, and a day is never counted
-   twice. Coverage waits on arrival watermarks, so late raw rows keep that
-   day on leftover sources until summaries rebuild.
+2. Existing summary tables and the rollup view remain. They are unused and
+   safe to ignore. Do not add a drop migration from this gem.
+3. `config.logs_summaries_enabled` is deprecated and does nothing. Host
+   initializers that still set it will boot. Remove the assignment when
+   convenient.
+4. Keep `recording_studio_api:api_metrics:maintain` (or
+   `MaintainApiMetricsJob`). Raw rows still prune by
+   `api_request_log_retention_days`. Logs registers this table with
+   `retention: :indefinite` so Logs does not try to clean a log that has
+   no aggregations.
 
 ## Upgrading to 0.14.1
 

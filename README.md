@@ -256,16 +256,11 @@ database (`api_logging` when that database is configured). New rows store `arriv
 PostgreSQL `clock_timestamp()` at insert, and `latency_bucket_ms` from the same bucket labels
 the daily histogram already uses (`25` through `10000`, then overflow label `30000` for anything
 above `10000`). Blank API names become `public`. Blank routes become `unknown`.
-`config.logs_summaries_enabled` defaults to false. Leave it off until you have
-migrated, backfilled classifications, and rebuilt `api/request_counts` plus
-`api/request_latency` for the raw range. When it is on, Admin request charts
-use covered Logs summaries for complete UTC days, raw rows for an uncovered
-day, and legacy daily metrics only for older days that still have no raw
-rows. `api_requests.*` metrics use that same coverage for summaries and
-legacy days (they still do not read raw logs) and never count a day twice.
-A day is covered only when both aggregations finished at or after the newest
-raw arrival on that UTC day. A day with none of those sources is omitted,
-not reported as zero.
+`config.logs_summaries_enabled` is deprecated and unused. Setting it does not
+change readers or writers. API still registers the raw request-log table with
+Recording Studio Logs (root column, no partitions, `retention: :indefinite`)
+but does not write or read Logs summary tables. Tables created by the shipped
+summary migration stay in place and are safe to ignore.
 
 After you migrate an existing install, backfill those fields in batches. The task never loads
 the whole table. `BATCH_SIZE` defaults to 1000.
@@ -273,20 +268,16 @@ the whole table. `BATCH_SIZE` defaults to 1000.
 ```sh
 bin/rails recording_studio_api:api_request_logs:backfill_classifications
 BATCH_SIZE=500 bin/rails recording_studio_api:api_request_logs:backfill_classifications
-FROM=2026-09-01 TO=2026-10-18 bin/rails recording_studio_api:api_request_logs:backfill_summaries
 ```
 
 Admin charts prefer rolled-up daily metrics, so hosts should run maintenance nightly:
 
-1. With `logs_summaries_enabled` false, aggregate the last few complete local days into
-   `api_daily_metrics` and latency histogram buckets. With the flag true, rebuild UTC days
-   for `api/request_counts` and `api/request_latency` only (not every Logs producer).
+1. Aggregate the last few complete local days into `api_daily_metrics` and latency
+   histogram buckets.
 2. Delete raw `api_request_logs` older than `api_request_log_retention_days` (default 30).
-   When the flag is true, delete only days that both aggregations have covered after
-   arrival watermarks. Do not schedule Logs partition jobs.
+   Do not schedule Logs partition or aggregation jobs for this table.
 3. Optionally delete daily metrics older than `api_daily_metric_retention_days` (default `nil` =
-   keep forever). When the flag is true, that prune also drops matching Logs summaries and
-   their run markers so missing summaries are not treated as coverage.
+   keep forever).
 
 ```sh
 # Synchronous maintain (cron / Kamal / systemd timer)
@@ -297,10 +288,8 @@ bin/rails recording_studio_api:api_metrics:enqueue_maintain
 ```
 
 The engine also registers `:api_requests` and `:api_keys` with Recording Studio
-Metrics (`blast_radius: :site`, operations only). With `logs_summaries_enabled`
-false, `api_requests.*` read `api_daily_metrics`. With the flag true, they
-read covered Logs summary days plus leftover legacy daily rows for days the
-summaries do not cover. `api_requests.over_time`
+Metrics (`blast_radius: :site`, operations only). `api_requests.*` read
+`api_daily_metrics`. `api_requests.over_time`
 sums `request_count` on `metric_date`. `api_requests.errors_over_time` sums
 `client_error_count + server_error_count` on that same date column, with the
 same window, interval, timezone, and zero-filled buckets.

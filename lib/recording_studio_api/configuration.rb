@@ -62,9 +62,8 @@ module RecordingStudioApi
                   :api_request_logging_batch_size,
                   :api_request_log_allowed_param_keys,
                   :api_request_log_retention_days,
-                  :api_daily_metric_retention_days,
-                  :logs_summaries_enabled
-    attr_reader :hooks, :action_registry, :registered_endpoint_registry, :recordable_registry, :resource_handler_registry, :default_api_version, :api_version_profiles, :capability_action_roles
+                  :api_daily_metric_retention_days
+    attr_reader :hooks, :action_registry, :registered_endpoint_registry, :recordable_registry, :resource_handler_registry, :default_api_version, :api_version_profiles, :capability_action_roles, :logs_summaries_enabled
 
     # rubocop:disable Metrics/AbcSize
     def initialize
@@ -214,6 +213,17 @@ module RecordingStudioApi
       }
     end
     # rubocop:enable Metrics/AbcSize
+
+    # Deprecated no-op. Host initializers may still set this; API neither writes
+    # nor reads Logs summary tables.
+    def logs_summaries_enabled=(value)
+      @logs_summaries_enabled = ActiveModel::Type::Boolean.new.cast(value)
+      logger = defined?(Rails) ? Rails.logger : nil
+      logger&.warn(
+        "[RecordingStudioApi] config.logs_summaries_enabled is deprecated and unused. " \
+        "API request log summaries are not written or read. Existing summary tables are safe to ignore."
+      )
+    end
 
     def merge!(hash)
       return unless hash.respond_to?(:each)

@@ -31,8 +31,6 @@ module RecordingStudioApi
       attr_reader :lookback_days
 
       def aggregate_recent_days!
-        return RebuildApiRequestLogSummaries.lookback!(lookback_days: lookback_days) if LogsRegistration.summaries_enabled?
-
         aggregated = []
         lookback_days.downto(1) do |days_ago|
           metric_date = Date.current - days_ago.days

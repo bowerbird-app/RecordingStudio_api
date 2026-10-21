@@ -125,15 +125,7 @@ module RecordingStudioApi
           buckets = chart_buckets(context, bucket)
           return [] if buckets.empty?
 
-          api_key = RecordingStudioApi::Admin::ApiContext.key_from_context(context)
-          request_method = request_filter_value(context, :request_method)
-          request_path = request_filter_value(context, :request_path)
-          use_coverage = LogsRegistration.summaries_enabled? &&
-                         request_method.blank? &&
-                         request_path.blank? &&
-                         bucket == :day
-          durations_by_bucket = coverage_durations(buckets, api_key) if use_coverage
-          durations_by_bucket ||= scoped_raw_durations(context, buckets, bucket)
+          durations_by_bucket = scoped_raw_durations(context, buckets, bucket)
 
           [
             {
@@ -155,15 +147,6 @@ module RecordingStudioApi
               end
             }
           ]
-        end
-
-        def coverage_durations(buckets, api_key)
-          buckets.each_with_object({}) do |bucket, hash|
-            samples = LatencySamples.for_day(day: bucket, api_key: api_key)
-            next if samples == :gap
-
-            hash[bucket] = samples
-          end
         end
 
         def scoped_raw_durations(context, buckets, bucket)

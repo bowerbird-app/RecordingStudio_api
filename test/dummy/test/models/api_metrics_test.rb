@@ -86,60 +86,27 @@ class ApiMetricsTest < ActionDispatch::IntegrationTest
     assert_operator active_keys.value, :<, RecordingStudioApi::ApiCredential.count
   end
 
-  test "with logs summaries enabled, api_requests mix covered summaries and leftover legacy days" do
+  test "logs_summaries_enabled does not change api_requests totals from daily metrics" do
     previous = RecordingStudioApi.configuration.logs_summaries_enabled
     RecordingStudioApi.configuration.logs_summaries_enabled = true
     RecordingStudioApi::LogsRegistration.register!
     RecordingStudioMetrics.registry.reset!
     RecordingStudioApi::Metrics.register!
 
-    summary_day = Date.new(2026, 4, 3)
-    RecordingStudioApi::ApiRequestDaySummary.delete_all if RecordingStudioApi::ApiRequestDaySummary.table_available?
-    create_daily_metric(
-      metric_date: summary_day,
-      status_class: 2,
-      request_count: 99,
-      client_error_count: 0,
-      server_error_count: 0,
-      rate_limited_count: 9
-    )
-    RecordingStudioApi::ApiRequestDaySummary.create!(
-      day: summary_day,
-      api_key: "public",
-      route_name: "pages",
-      request_method: "GET",
-      status_code: 200,
-      rate_limited: false,
-      request_count: 3,
-      duration_sum_ms: 60,
-      duration_max_ms: 20
-    )
-    connection = RecordingStudioApi::LogsRegistration.logging_connection
-    [RecordingStudioApi::LogsRegistration::REQUEST_COUNTS, RecordingStudioApi::LogsRegistration::REQUEST_LATENCY].each do |name|
-      RecordingStudioLogs::AggregationRun.record!(
-        aggregation_name: name,
-        day: summary_day,
-        status: "succeeded",
-        connection: connection
-      )
-    end
-
     over_time = execute("api_requests.over_time", interval: :day, start_at: Time.utc(2026, 4, 1), end_at: Time.utc(2026, 4, 4))
     values = over_time.data.to_h { |row| [row[:date], row[:value]] }
     assert_equal 12, values["2026-04-01"]
     assert_equal 7, values["2026-04-02"]
-    assert_equal 3, values["2026-04-03"]
 
     breakdown = execute("api_requests.by_status_class")
     by_class = breakdown.data.to_h { |row| [row[:key].to_i, row[:value]] }
-    assert_equal 18, by_class[2]
+    assert_equal 15, by_class[2]
     assert_equal 3, by_class[4]
     assert_equal 1, by_class[5]
 
     rate_limited = execute("api_requests.rate_limited")
     assert_equal 4, rate_limited.value
   ensure
-    RecordingStudioApi::ApiRequestDaySummary.where(day: summary_day).delete_all if defined?(summary_day)
     RecordingStudioApi.configuration.logs_summaries_enabled = previous
     RecordingStudioMetrics.registry.reset!
     RecordingStudioApi::Metrics.register!

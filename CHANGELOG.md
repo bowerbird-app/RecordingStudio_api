@@ -9,16 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.14.2] - 2026-10-21
 
-### Fixed
-- When `config.logs_summaries_enabled` is true, `api_requests.*` metrics
-  mix covered Logs summaries with leftover legacy daily rows the same way
-  Admin does, without counting a day twice. Coverage now waits on the same
-  arrival watermark prune uses, so a succeeded run with later raw rows is
-  not treated as a finished day.
+### Changed
+- API still registers raw request logs with Recording Studio Logs (root
+  column, unpartitioned) but no longer writes or reads Logs summary
+  tables. Nightly maintain still rolls `api_daily_metrics`.
+  `PruneApiRequestLogs` still deletes raw rows by
+  `api_request_log_retention_days`. Logs retention is `:indefinite`
+  because Logs will not prune a log that has no aggregations.
+- `config.logs_summaries_enabled` is deprecated and unused. Host
+  initializers may still set it; it has no effect.
 
 ### Upgrade notes
-- Bump to `0.14.2`. No migration. `config.logs_summaries_enabled` still
-  defaults to false. The flag-off path is unchanged.
+- Bump to `0.14.2`. No migration and no drop. Existing
+  `recording_studio_api_api_request_day_summaries`,
+  `recording_studio_api_api_request_latency_day_summaries`, and the
+  rollup view stay in place and are safe to ignore.
+- `config.logs_summaries_enabled` is a no-op. Remove it when convenient.
+- Keep scheduling `recording_studio_api:api_metrics:maintain`. Do not
+  schedule Logs aggregation or partition jobs for API request logs.
 
 ## [0.14.1] - 2026-10-20
 
