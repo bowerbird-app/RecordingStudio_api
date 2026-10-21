@@ -76,9 +76,7 @@ module RecordingStudioApi
       @access_management_edit_role = :admin
       @api_management_authorization_required = true
       @token_digest_pepper = ENV["RECORDING_STUDIO_API_TOKEN_DIGEST_PEPPER"].presence
-      # Legacy unsalted SHA256 verify is off by default. Enable temporarily while
-      # rotating/rehashing credentials written before peppered digests.
-      @token_digest_legacy_verify = false
+      @token_digest_legacy_verify = false # off; enable while rotating unsalted SHA256 credentials
       @capability_action_roles = {}
       @capability_action_role_resolver = nil
       @admin_dashboard_path_resolver = lambda do |controller:, **|
@@ -113,7 +111,6 @@ module RecordingStudioApi
       @pagination_default_limit = 50
       @pagination_max_limit = 100
       @rate_limit_oauth_enabled = true
-      # Authenticated API rate limits are on by default; hosts may disable explicitly.
       @rate_limit_api_enabled = true
       @rate_limit_api_pre_auth_enabled = true
       @rate_limit_fail_closed = true
@@ -214,25 +211,15 @@ module RecordingStudioApi
     end
     # rubocop:enable Metrics/AbcSize
 
-    # Deprecated no-op. Host initializers may still set this; API neither writes
-    # nor reads Logs summary tables.
     def logs_summaries_enabled=(value)
       @logs_summaries_enabled = ActiveModel::Type::Boolean.new.cast(value)
-      logger = defined?(Rails) ? Rails.logger : nil
-      logger&.warn(
-        "[RecordingStudioApi] config.logs_summaries_enabled is deprecated and unused. " \
-        "API request log summaries are not written or read. Existing summary tables are safe to ignore."
-      )
+      Rails.logger&.warn("[RecordingStudioApi] config.logs_summaries_enabled is unused.") if defined?(Rails)
     end
 
     def merge!(hash)
       return unless hash.respond_to?(:each)
 
-      hash.each do |k, v|
-        key = k.to_s
-        setter = "#{key}="
-        public_send(setter, v) if respond_to?(setter)
-      end
+      hash.each { |k, v| public_send("#{k}=", v) if respond_to?("#{k}=") }
     end
 
     def name
