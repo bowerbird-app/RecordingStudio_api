@@ -8,7 +8,7 @@ class RecordingStudioApiTest < Minitest::Test
   end
 
   def test_version_pin
-    assert_equal "0.14.2", ::RecordingStudioApi::VERSION
+    assert_equal "0.15.0", ::RecordingStudioApi::VERSION
   end
 
   def test_metrics_dependency_pins
@@ -23,8 +23,9 @@ class RecordingStudioApiTest < Minitest::Test
     end
     %w[test/dummy/db/schema.rb test/dummy/db/api_logging_schema.rb].each do |path|
       contents = File.read(File.join(root, path))
-      assert_includes contents, "recording_studio_api_api_request_day_metric_rollups", path
-      assert_includes contents, "recording_studio_api_api_request_day_summaries", path
+      refute_includes contents, "recording_studio_api_api_request_day_metric_rollups", path
+      refute_includes contents, "recording_studio_api_api_request_day_summaries", path
+      refute_includes contents, "recording_studio_api_api_request_latency_day_summaries", path
     end
   end
 

@@ -1,14 +1,17 @@
 # Upgrading RecordingStudioApi
 
-## Upgrading to 0.14.2
+## Upgrading to 0.15.0
 
-`0.14.2` stops writing and reading Recording Studio Logs summaries. No
-migration and no drop. Admin metrics, `api_requests.*`, nightly maintain,
-and raw prune stay on the existing daily-metric path.
+`0.15.0` stops writing and reading Recording Studio Logs summaries. Run
+migrations; it drops the unused summary tables and view (derived data
+only; raw `api_request_logs` untouched). Admin metrics, `api_requests.*`,
+nightly maintain, and raw prune stay on the existing daily-metric path.
 
-1. Bump the host gem to `0.14.2`.
-2. Existing summary tables and the rollup view remain. They are unused and
-   safe to ignore. Do not add a drop migration from this gem.
+1. Bump the host gem to `0.15.0`.
+2. Run migrations. They drop `recording_studio_api_api_request_day_summaries`,
+   `recording_studio_api_api_request_latency_day_summaries`, and
+   `recording_studio_api_api_request_day_metric_rollups` when present.
+   Hosts that never ran the create migration still migrate cleanly.
 3. `config.logs_summaries_enabled` is deprecated and does nothing. Host
    initializers that still set it will boot. Remove the assignment when
    convenient.

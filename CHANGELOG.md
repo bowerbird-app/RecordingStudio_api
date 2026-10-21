@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.14.2] - 2026-10-21
+## [0.15.0] - 2026-10-21
 
 ### Changed
 - API still registers raw request logs with Recording Studio Logs (root
@@ -20,10 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   initializers may still set it; it has no effect.
 
 ### Upgrade notes
-- Bump to `0.14.2`. No migration and no drop. Existing
-  `recording_studio_api_api_request_day_summaries`,
-  `recording_studio_api_api_request_latency_day_summaries`, and the
-  rollup view stay in place and are safe to ignore.
+- Bump to `0.15.0`. Run migrations; it drops the unused summary tables
+  and view (derived data only; raw `api_request_logs` untouched).
 - `config.logs_summaries_enabled` is a no-op. Remove it when convenient.
 - Keep scheduling `recording_studio_api:api_metrics:maintain`. Do not
   schedule Logs aggregation or partition jobs for API request logs.
@@ -784,8 +782,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.14.2...HEAD
-[0.14.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.14.1...v0.14.2
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.14.1...v0.15.0
 [0.14.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.13.2...v0.14.0
 [0.13.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.13.1...v0.13.2

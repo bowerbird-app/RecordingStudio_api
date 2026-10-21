@@ -16,17 +16,17 @@ class LogsRegistrationTest < ActiveSupport::TestCase
 
   test "registers unpartitioned request logs with a root column and indefinite retention" do
     connection = RecordingStudioApi::ApiRequestLog.connection
+    assert_equal "r", connection.select_value(
+      "SELECT relkind FROM pg_class WHERE relname = #{connection.quote('recording_studio_api_api_request_logs')}"
+    )
     %w[
-      recording_studio_api_api_request_logs
       recording_studio_api_api_request_day_summaries
       recording_studio_api_api_request_latency_day_summaries
-    ].each do |table|
-      relkind = connection.select_value("SELECT relkind FROM pg_class WHERE relname = #{connection.quote(table)}")
-      assert_equal "r", relkind, table
+      recording_studio_api_api_request_day_metric_rollups
+    ].each do |name|
+      relkind = connection.select_value("SELECT relkind FROM pg_class WHERE relname = #{connection.quote(name)}")
+      assert_nil relkind, name
     end
-    assert_equal "v", connection.select_value(
-      "SELECT relkind FROM pg_class WHERE relname = #{connection.quote('recording_studio_api_api_request_day_metric_rollups')}"
-    )
 
     log = RecordingStudioLogs.registry.log_for(RecordingStudioApi::LogsRegistration::SOURCE_MODEL)
     assert_nil log.partition_interval

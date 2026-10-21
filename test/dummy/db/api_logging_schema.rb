@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_19_010022) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_19_010023) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -180,40 +180,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_19_010022) do
     t.index ["metric_date"], name: "index_recording_studio_api_api_daily_metrics_on_metric_date"
   end
 
-  create_table "recording_studio_api_api_request_day_summaries", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.date "day", null: false
-    t.uuid "root_recording_id"
-    t.string "api_key", null: false
-    t.string "route_name", null: false
-    t.string "request_method", null: false
-    t.integer "status_code", null: false
-    t.boolean "rate_limited", default: false, null: false
-    t.bigint "request_count", default: 0, null: false
-    t.bigint "duration_sum_ms", default: 0, null: false
-    t.bigint "duration_max_ms", default: 0, null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["api_key", "day"], name: "index_rs_api_request_day_summaries_on_api_and_day"
-    t.index ["day", "root_recording_id", "api_key", "route_name", "request_method", "status_code", "rate_limited"], name: "index_rs_api_request_day_summaries_identity", unique: true, nulls_not_distinct: true
-    t.index ["root_recording_id", "day"], name: "index_rs_api_request_day_summaries_on_root_and_day"
-  end
-
-  create_table "recording_studio_api_api_request_latency_day_summaries", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.date "day", null: false
-    t.uuid "root_recording_id"
-    t.string "api_key", null: false
-    t.string "route_name", null: false
-    t.string "request_method", null: false
-    t.integer "status_code", null: false
-    t.integer "latency_bucket_ms", null: false
-    t.bigint "request_count", default: 0, null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["api_key", "day"], name: "index_rs_api_request_latency_day_summaries_on_api_and_day"
-    t.index ["day", "root_recording_id", "api_key", "route_name", "request_method", "status_code", "latency_bucket_ms"], name: "index_rs_api_request_latency_day_summaries_identity", unique: true, nulls_not_distinct: true
-    t.index ["root_recording_id", "day"], name: "index_rs_api_request_latency_day_summaries_on_root_and_day"
-  end
-
   create_table "recording_studio_api_api_request_logs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.uuid "access_recording_id"
     t.string "action_name"
@@ -363,23 +329,4 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_19_010022) do
   add_foreign_key "recording_studio_recordings", "recording_studio_recordings", column: "parent_recording_id"
   add_foreign_key "recording_studio_recordings", "recording_studio_recordings", column: "root_recording_id"
   add_foreign_key "recording_studio_root_switchable_selections", "recording_studio_recordings", column: "root_recording_id", on_delete: :cascade
-
-  execute <<~SQL
-    CREATE OR REPLACE VIEW recording_studio_api_api_request_day_metric_rollups AS
-    SELECT
-      day AS metric_date,
-      api_key,
-      route_name,
-      request_method,
-      (status_code / 100) AS status_class,
-      SUM(request_count)::bigint AS request_count,
-      SUM(CASE WHEN rate_limited OR status_code = 429 THEN request_count ELSE 0 END)::bigint AS rate_limited_count,
-      SUM(CASE WHEN status_code BETWEEN 400 AND 499 THEN request_count ELSE 0 END)::bigint AS client_error_count,
-      SUM(CASE WHEN status_code BETWEEN 500 AND 599 THEN request_count ELSE 0 END)::bigint AS server_error_count,
-      SUM(request_count)::bigint AS duration_count,
-      SUM(duration_sum_ms)::bigint AS duration_sum_ms,
-      MAX(duration_max_ms)::integer AS duration_max_ms
-    FROM recording_studio_api_api_request_day_summaries
-    GROUP BY day, api_key, route_name, request_method, (status_code / 100)
-  SQL
 end
