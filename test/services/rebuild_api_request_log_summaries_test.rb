@@ -186,14 +186,16 @@ class RebuildApiRequestLogSummariesTest < ActiveSupport::TestCase
     assert coverage.covered?(@day)
     assert_equal :summary, coverage.source_for(@day).kind
 
-    insert_log(
-      root_recording_id: @root_one,
-      route_name: "pages",
-      request_method: "GET",
-      status_code: 201,
-      duration_ms: 40,
-      arrived_at: Time.utc(2026, 10, 1, 13)
-    )
+    travel_to Time.utc(2026, 10, 1, 13) do
+      insert_log(
+        root_recording_id: @root_one,
+        route_name: "pages",
+        request_method: "GET",
+        status_code: 201,
+        duration_ms: 40,
+        arrived_at: Time.utc(2026, 10, 1, 13)
+      )
+    end
 
     refute coverage.covered?(@day)
     assert_equal :raw, coverage.source_for(@day).kind
@@ -207,14 +209,25 @@ class RebuildApiRequestLogSummariesTest < ActiveSupport::TestCase
   end
 
   test "a succeeded aggregation run without a watermark does not cover a day that still has raw rows" do
-    insert_log(root_recording_id: @root_one, route_name: "pages", request_method: "GET", status_code: 200, duration_ms: 25)
     connection = RecordingStudioApi::LogsRegistration.logging_connection
-    [RecordingStudioApi::LogsRegistration::REQUEST_COUNTS, RecordingStudioApi::LogsRegistration::REQUEST_LATENCY].each do |name|
-      RecordingStudioLogs::AggregationRun.record!(
-        aggregation_name: name,
-        day: @day,
-        status: "succeeded",
-        connection: connection
+    travel_to Time.utc(2026, 10, 1, 12) do
+      [RecordingStudioApi::LogsRegistration::REQUEST_COUNTS, RecordingStudioApi::LogsRegistration::REQUEST_LATENCY].each do |name|
+        RecordingStudioLogs::AggregationRun.record!(
+          aggregation_name: name,
+          day: @day,
+          status: "succeeded",
+          connection: connection
+        )
+      end
+    end
+    travel_to Time.utc(2026, 10, 1, 13) do
+      insert_log(
+        root_recording_id: @root_one,
+        route_name: "pages",
+        request_method: "GET",
+        status_code: 200,
+        duration_ms: 25,
+        arrived_at: Time.utc(2026, 10, 1, 13)
       )
     end
 
