@@ -1,5 +1,18 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.14.2
+
+`0.14.2` fixes Logs-summary coverage for Admin and Metrics. No migration.
+`config.logs_summaries_enabled` still defaults to false. The flag-off path
+is unchanged.
+
+1. Bump the host gem to `0.14.2`.
+2. Leave `config.logs_summaries_enabled` false until you have backfilled.
+3. When the flag is on, `api_requests.*` includes leftover legacy daily
+   rows for days Logs summaries do not cover, and a day is never counted
+   twice. Coverage waits on arrival watermarks, so late raw rows keep that
+   day on leftover sources until summaries rebuild.
+
 ## Upgrading to 0.14.1
 
 `0.14.1` widens `recording_studio_logs` so API works with Logs `v0.5.0`.

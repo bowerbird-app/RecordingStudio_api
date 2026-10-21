@@ -34,6 +34,8 @@ class RebuildApiRequestLogSummariesTest < ActiveSupport::TestCase
       relkind = connection.select_value("SELECT relkind FROM pg_class WHERE relname = #{connection.quote(table)}")
       assert_equal "r", relkind, table
     end
+    log = RecordingStudioLogs.registry.log_for(RecordingStudioApi::LogsRegistration::SOURCE_MODEL)
+    assert_nil log.partition_interval
     assert_equal "id", connection.primary_key("recording_studio_api_api_request_logs")
     type = connection.select_value(<<~SQL.squish)
       SELECT data_type FROM information_schema.columns
@@ -167,6 +169,66 @@ class RebuildApiRequestLogSummariesTest < ActiveSupport::TestCase
     refute_includes dates, Date.new(2026, 1, 1)
   end
 
+  test "coverage waits on the arrival watermark before treating a day as summarized" do
+    travel_to Time.utc(2026, 10, 1, 12) do
+      insert_log(
+        root_recording_id: @root_one,
+        route_name: "pages",
+        request_method: "GET",
+        status_code: 200,
+        duration_ms: 25,
+        arrived_at: Time.utc(2026, 10, 1, 12)
+      )
+      RecordingStudioApi::Services::RebuildApiRequestLogSummaries.call(day: @day)
+    end
+
+    coverage = RecordingStudioApi::Services::ApiRequestLogCoverage.new
+    assert coverage.covered?(@day)
+    assert_equal :summary, coverage.source_for(@day).kind
+
+    insert_log(
+      root_recording_id: @root_one,
+      route_name: "pages",
+      request_method: "GET",
+      status_code: 201,
+      duration_ms: 40,
+      arrived_at: Time.utc(2026, 10, 1, 13)
+    )
+
+    refute coverage.covered?(@day)
+    assert_equal :raw, coverage.source_for(@day).kind
+
+    travel_to Time.utc(2026, 10, 1, 13, 1) do
+      RecordingStudioApi::Services::RebuildApiRequestLogSummaries.call(day: @day)
+    end
+
+    assert coverage.covered?(@day)
+    assert_equal :summary, coverage.source_for(@day).kind
+  end
+
+  test "a succeeded aggregation run without a watermark does not cover a day that still has raw rows" do
+    insert_log(root_recording_id: @root_one, route_name: "pages", request_method: "GET", status_code: 200, duration_ms: 25)
+    connection = RecordingStudioApi::LogsRegistration.logging_connection
+    [RecordingStudioApi::LogsRegistration::REQUEST_COUNTS, RecordingStudioApi::LogsRegistration::REQUEST_LATENCY].each do |name|
+      RecordingStudioLogs::AggregationRun.record!(
+        aggregation_name: name,
+        day: @day,
+        status: "succeeded",
+        connection: connection
+      )
+    end
+
+    coverage = RecordingStudioApi::Services::ApiRequestLogCoverage.new
+    assert RecordingStudioLogs::AggregationRun.fresh?(
+      RecordingStudioApi::LogsRegistration::REQUEST_COUNTS, [@day], nil, connection: connection
+    )
+    assert RecordingStudioLogs::AggregationRun.fresh?(
+      RecordingStudioApi::LogsRegistration::REQUEST_LATENCY, [@day], nil, connection: connection
+    )
+    refute coverage.covered?(@day)
+    assert_equal :raw, coverage.source_for(@day).kind
+  end
+
   test "utc midnight is the summary day under a non-utc zone" do
     Time.use_zone("Pacific/Auckland") do
       insert_log(
@@ -249,13 +311,14 @@ class RebuildApiRequestLogSummariesTest < ActiveSupport::TestCase
 
   private
 
-  def insert_log(root_recording_id:, route_name:, request_method:, status_code:, duration_ms:, api_key: "public", rate_limited: false, occurred_at: nil)
+  def insert_log(root_recording_id:, route_name:, request_method:, status_code:, duration_ms:, api_key: "public", rate_limited: false, occurred_at: nil, arrived_at: nil)
     RecordingStudioApi::ApiRequestLog.create!(
       api_key: api_key,
       route_name: route_name,
       controller_name: "RecordingStudioApi::Api::V1::ResourcesController",
       action_name: "index",
       occurred_at: occurred_at || Time.utc(@day.year, @day.month, @day.day, 12),
+      arrived_at: arrived_at,
       request_id: SecureRandom.uuid,
       request_method: request_method,
       request_path: "/#{route_name.to_s.strip.presence || 'unknown'}",

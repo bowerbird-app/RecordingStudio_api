@@ -59,12 +59,18 @@ module RecordingStudioApi
     end
 
     def register_api_requests!
-      RecordingStudioMetrics.register(
-        :api_requests,
+      options = {
         model: (LogsRegistration.summaries_enabled? ? ApiRequestDayMetricRollup : ApiDailyMetric),
         blast_radius: :site,
         api_authorize: AUTHORIZE
-      ) do
+      }
+      if LogsRegistration.summaries_enabled?
+        options[:scope] = lambda { |relation|
+          Services::ApiRequestLogCoverage.new.metric_relation(relation)
+        }
+      end
+
+      RecordingStudioMetrics.register(:api_requests, **options) do
         RecordingStudioApi::Metrics.define_api_requests(self)
       end
     end

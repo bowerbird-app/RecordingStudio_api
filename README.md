@@ -261,7 +261,11 @@ migrated, backfilled classifications, and rebuilt `api/request_counts` plus
 `api/request_latency` for the raw range. When it is on, Admin request charts
 use covered Logs summaries for complete UTC days, raw rows for an uncovered
 day, and legacy daily metrics only for older days that still have no raw
-rows. A day with none of those sources is omitted, not reported as zero.
+rows. `api_requests.*` metrics use that same coverage for summaries and
+legacy days (they still do not read raw logs) and never count a day twice.
+A day is covered only when both aggregations finished at or after the newest
+raw arrival on that UTC day. A day with none of those sources is omitted,
+not reported as zero.
 
 After you migrate an existing install, backfill those fields in batches. The task never loads
 the whole table. `BATCH_SIZE` defaults to 1000.
@@ -293,7 +297,10 @@ bin/rails recording_studio_api:api_metrics:enqueue_maintain
 ```
 
 The engine also registers `:api_requests` and `:api_keys` with Recording Studio
-Metrics (`blast_radius: :site`, operations only). `api_requests.over_time`
+Metrics (`blast_radius: :site`, operations only). With `logs_summaries_enabled`
+false, `api_requests.*` read `api_daily_metrics`. With the flag true, they
+read covered Logs summary days plus leftover legacy daily rows for days the
+summaries do not cover. `api_requests.over_time`
 sums `request_count` on `metric_date`. `api_requests.errors_over_time` sums
 `client_error_count + server_error_count` on that same date column, with the
 same window, interval, timezone, and zero-filled buckets.

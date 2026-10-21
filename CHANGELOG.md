@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.2] - 2026-10-21
+
+### Fixed
+- When `config.logs_summaries_enabled` is true, `api_requests.*` metrics
+  mix covered Logs summaries with leftover legacy daily rows the same way
+  Admin does, without counting a day twice. Coverage now waits on the same
+  arrival watermark prune uses, so a succeeded run with later raw rows is
+  not treated as a finished day.
+
+### Upgrade notes
+- Bump to `0.14.2`. No migration. `config.logs_summaries_enabled` still
+  defaults to false. The flag-off path is unchanged.
+
 ## [0.14.1] - 2026-10-20
 
 ### Changed
@@ -763,7 +776,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.14.1...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.14.2...HEAD
+[0.14.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.14.1...v0.14.2
 [0.14.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.13.2...v0.14.0
 [0.13.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.13.1...v0.13.2
