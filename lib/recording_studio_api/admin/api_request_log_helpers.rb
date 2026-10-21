@@ -79,14 +79,7 @@ module RecordingStudioApi
       end
 
       def seeded_daily_counts(start_date, end_date)
-        return (start_date..end_date).index_with(0) unless LogsRegistration.summaries_enabled?
-
-        coverage = Services::ApiRequestLogCoverage.new
-        (start_date..end_date).each_with_object({}) do |day, hash|
-          next if coverage.source_for(day).kind == :gap
-
-          hash[day] = 0
-        end
+        (start_date..end_date).index_with(0)
       end
     end
   end

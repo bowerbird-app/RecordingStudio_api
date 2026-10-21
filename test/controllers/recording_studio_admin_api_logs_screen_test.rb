@@ -1074,6 +1074,32 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     refute_includes response.body, "root_recording_id=#{workspace_root_recording.id}"
   end
 
+  test "admin metrics screens still render on the daily-metric path when logs_summaries_enabled is set" do
+    RecordingStudioApi.configuration.logs_summaries_enabled = true
+
+    get "/admin/api/screens/admin_api_performance", params: { group_by: "day" }
+
+    assert_response :success
+    assert_includes response.body, "API performance"
+
+    get "/admin/api/screens/admin_api_performance/chart", params: {
+      start_date: 27.days.ago.to_date.iso8601,
+      end_date: Date.current.iso8601,
+      group_by: "day"
+    }
+
+    assert_response :success
+    assert_includes CGI.unescapeHTML(response.body), '"name":"P95 duration"'
+
+    get "/admin/api/sections/admin_api/widgets/widgets.recording_studio_api.admin.requests_last_four_weeks", params: { anchor_url: "/" }
+    assert_response :success
+
+    get "/admin/api/sections/admin_api/widgets/widgets.recording_studio_api.admin.api_latency_last_four_weeks"
+    assert_response :success
+  ensure
+    RecordingStudioApi.configuration.logs_summaries_enabled = false
+  end
+
   private
 
   def switch_to_root(root_recording)

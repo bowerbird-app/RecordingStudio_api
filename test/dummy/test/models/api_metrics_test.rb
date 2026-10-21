@@ -86,6 +86,32 @@ class ApiMetricsTest < ActionDispatch::IntegrationTest
     assert_operator active_keys.value, :<, RecordingStudioApi::ApiCredential.count
   end
 
+  test "logs_summaries_enabled does not change api_requests totals from daily metrics" do
+    previous = RecordingStudioApi.configuration.logs_summaries_enabled
+    RecordingStudioApi.configuration.logs_summaries_enabled = true
+    RecordingStudioApi::LogsRegistration.register!
+    RecordingStudioMetrics.registry.reset!
+    RecordingStudioApi::Metrics.register!
+
+    over_time = execute("api_requests.over_time", interval: :day, start_at: Time.utc(2026, 4, 1), end_at: Time.utc(2026, 4, 4))
+    values = over_time.data.to_h { |row| [row[:date], row[:value]] }
+    assert_equal 12, values["2026-04-01"]
+    assert_equal 7, values["2026-04-02"]
+
+    breakdown = execute("api_requests.by_status_class")
+    by_class = breakdown.data.to_h { |row| [row[:key].to_i, row[:value]] }
+    assert_equal 15, by_class[2]
+    assert_equal 3, by_class[4]
+    assert_equal 1, by_class[5]
+
+    rate_limited = execute("api_requests.rate_limited")
+    assert_equal 4, rate_limited.value
+  ensure
+    RecordingStudioApi.configuration.logs_summaries_enabled = previous
+    RecordingStudioMetrics.registry.reset!
+    RecordingStudioApi::Metrics.register!
+  end
+
   test "operations metrics index lists registered metrics for an authorized management token" do
     get "#{operations_root}/metrics", headers: bearer(@authorized_token)
 
