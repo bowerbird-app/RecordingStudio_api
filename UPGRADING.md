@@ -1,5 +1,13 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.16.0
+
+`0.16.0` records the human who authorized an OAuth token on write events. The event actor is still the OAuth client or API client. No migration.
+
+1. Bump the host gem to `0.16.0`.
+2. OAuth writes merge `authorized_by_type` and `authorized_by_id` into event metadata. API-key writes do not.
+3. Action, resource, and registered-endpoint contexts expose `authorized_by` for handlers that record their own events. Use `with_authorized_by` to merge those keys into metadata you already pass.
+
 ## Upgrading to 0.15.0
 
 `0.15.0` stops writing and reading Recording Studio Logs summaries. Run

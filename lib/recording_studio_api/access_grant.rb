@@ -2,17 +2,29 @@
 
 module RecordingStudioApi
   class AccessGrant
-    def initialize(api_client:, credential:, access_recording:, root_recording: nil)
+    def initialize(api_client:, credential:, access_recording:, root_recording: nil, authorized_by: AuthorizedBy::OMITTED)
       @api_client = api_client
       @credential = credential
       @access_recording = access_recording
       @root_recording = root_recording
+      @authorized_by_source = authorized_by
       @accessible_scopes = {}
       @accessible_recordings = {}
       @accessible_recording_ids = {}
     end
 
     attr_reader :api_client, :credential, :access_recording, :root_recording
+
+    def authorized_by
+      return @authorized_by if defined?(@authorized_by)
+
+      @authorized_by =
+        if @authorized_by_source.equal?(AuthorizedBy::OMITTED)
+          AuthorizedBy.actor_for(credential: credential)
+        else
+          @authorized_by_source
+        end
+    end
 
     def access
       access_recording&.recordable
