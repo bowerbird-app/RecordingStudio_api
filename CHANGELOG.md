@@ -11,8 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - The Metrics and Logs gemspec ceilings are now `< 1.0` (`recording_studio_logs`
-  `>= 0.4.1, < 1.0` and `recording_studio_metrics` `>= 0.3.0, < 1.0`). Hosts
-  can use Logs `0.7.0` and Metrics `0.6.1`. No code change.
+  `>= 0.4.1, < 1.0` and `recording_studio_metrics` `>= 0.3.0, < 1.0`)
+  (CI tested with Logs `0.5.0` and Metrics `0.5.0`). No code change.
 
 ### Upgrade notes
 - Bump to `0.15.1`. No migration. No code change.
