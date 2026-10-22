@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-10-22
+
+### Changed
+- The Metrics and Logs gemspec ceilings are now `< 1.0` (`recording_studio_logs`
+  `>= 0.4.1, < 1.0` and `recording_studio_metrics` `>= 0.3.0, < 1.0`). Hosts
+  can use Logs `0.7.0` and Metrics `0.6.1`. No code change.
+
+### Upgrade notes
+- Bump to `0.15.1`. No migration. No code change.
+
 ## [0.15.0] - 2026-10-21
 
 ### Changed
@@ -782,7 +792,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.15.1...HEAD
+[0.15.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.14.1...v0.15.0
 [0.14.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.14.0...v0.14.1
 [0.14.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.13.2...v0.14.0
