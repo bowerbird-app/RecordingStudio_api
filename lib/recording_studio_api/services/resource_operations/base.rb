@@ -171,11 +171,11 @@ module RecordingStudioApi
         end
 
         def delete_metadata
-          {
+          context.with_authorized_by(
             api_action: "delete",
             api_client_id: api_client.id,
             api_credential_id: credential.id
-          }
+          )
         end
 
         def serialize_delete_result(serialized_recording, deleted_via:)

@@ -142,6 +142,65 @@ class AuthorizedByTest < ActiveSupport::TestCase
     assert_equal({}, event.metadata)
   end
 
+  test "write metadata drops client authorized_by keys and keeps a single server value" do
+    spoofed = {
+      "authorized_by_type" => "Spoof",
+      "authorized_by_id" => "spoof-string",
+      authorized_by_type: "SymbolSpoof",
+      authorized_by_id: "spoof-symbol",
+      api_action: "move"
+    }
+
+    without_human = RecordingStudioApi::AuthorizedBy.merge(spoofed, nil)
+    assert_equal({ api_action: "move" }, without_human)
+    assert_no_authorized_by_keys(without_human)
+    assert_equal "Spoof", spoofed["authorized_by_type"]
+    assert_equal "SymbolSpoof", spoofed[:authorized_by_type]
+
+    with_human = RecordingStudioApi::AuthorizedBy.merge(spoofed, @user)
+    assert_equal "move", with_human[:api_action]
+    assert_equal "User", with_human[:authorized_by_type]
+    assert_equal @user.id, with_human[:authorized_by_id]
+    assert_single_authorized_by_keys(with_human)
+    refute with_human.key?("authorized_by_type")
+    refute with_human.key?("authorized_by_id")
+  end
+
+  test "persisted oauth and api key writes store only the server authorized_by value" do
+    payload = provision_api_client_for(access_recording: @access_recording, name: "Spoof writer")
+    spoofed = {
+      "authorized_by_type" => "Spoof",
+      "authorized_by_id" => "spoof-string",
+      authorized_by_type: "SymbolSpoof",
+      authorized_by_id: "spoof-symbol",
+      api_action: "update"
+    }
+
+    api_folder = create_page_recording(root_recording: @root_recording).parent_recording
+    api_context = resource_context_for(payload, api_folder, api_client: payload.fetch(:api_client), human: nil, name: "unused")
+    revise_with_metadata!(api_folder, actor: payload.fetch(:api_client), metadata: api_context.with_authorized_by(spoofed), name: "Key spoof")
+
+    api_event = latest_update_event(api_folder)
+    assert_equal payload.fetch(:api_client), api_event.actor
+    assert_nil api_event.impersonator_id
+    assert_equal "update", api_event.metadata["api_action"]
+    assert_no_authorized_by_keys(api_event.metadata)
+
+    oauth_client = oauth_client_for(payload.fetch(:api_client).id)
+    oauth_folder = create_page_recording(root_recording: @root_recording).parent_recording
+    oauth_context = resource_context_for(payload, oauth_folder, api_client: oauth_client, human: @user, name: "unused")
+    revise_with_metadata!(oauth_folder, actor: oauth_client, metadata: oauth_context.with_authorized_by(spoofed), name: "OAuth spoof")
+
+    oauth_event = latest_update_event(oauth_folder)
+    assert_equal "RecordingStudioOauth::OauthClient", oauth_event.actor_type
+    assert_equal oauth_client.id, oauth_event.actor_id
+    assert_nil oauth_event.impersonator_id
+    assert_equal "update", oauth_event.metadata["api_action"]
+    assert_equal "User", oauth_event.metadata["authorized_by_type"]
+    assert_equal @user.id, oauth_event.metadata["authorized_by_id"]
+    assert_equal %w[api_action authorized_by_id authorized_by_type], oauth_event.metadata.keys.sort
+  end
+
   test "move metadata keeps its own keys and adds the authorizing human" do
     payload = provision_api_client_for(access_recording: @access_recording, name: "Move writer")
     recording = MoveCapture.new
@@ -160,7 +219,13 @@ class AuthorizedByTest < ActiveSupport::TestCase
       access_recording: payload.fetch(:access_recording),
       access_grant: grant,
       root_recording: @root_recording,
-      params: { parent_id: "destination" }
+      params: {
+        parent_id: "destination",
+        authorized_by_type: "Spoof",
+        authorized_by_id: "spoof-symbol",
+        "authorized_by_type" => "Spoof",
+        "authorized_by_id" => "spoof-string"
+      }
     )
 
     assert_equal recording, RecordingStudioApi::Services::MoveRecording.call(context)
@@ -173,6 +238,9 @@ class AuthorizedByTest < ActiveSupport::TestCase
     assert_equal payload.fetch(:credential).id, metadata[:api_credential_id]
     assert_equal "User", metadata[:authorized_by_type]
     assert_equal @user.id, metadata[:authorized_by_id]
+    assert_single_authorized_by_keys(metadata)
+    refute_equal "Spoof", metadata[:authorized_by_type]
+    refute_equal "spoof-string", metadata[:authorized_by_id].to_s
   end
 
   private
@@ -220,6 +288,26 @@ class AuthorizedByTest < ActiveSupport::TestCase
 
   def latest_update_event(recording)
     RecordingStudio::Event.where(recording_id: recording.id, action: "updated").order(occurred_at: :desc, created_at: :desc).first
+  end
+
+  def revise_with_metadata!(recording, actor:, metadata:, name:)
+    recording.root_recording.revise(recording, actor: actor, metadata: metadata) do |recordable|
+      recordable.name = name
+    end
+  end
+
+  def assert_no_authorized_by_keys(metadata)
+    metadata.to_h.each_key do |key|
+      refute_includes RecordingStudioApi::AuthorizedBy::CLAIMED_KEYS, key.to_s
+    end
+  end
+
+  def assert_single_authorized_by_keys(metadata)
+    RecordingStudioApi::AuthorizedBy::CLAIMED_KEYS.each do |claimed|
+      matches = metadata.keys.select { |key| key.to_s == claimed }
+      assert_equal 1, matches.length
+      assert_equal claimed.to_sym, matches.first
+    end
   end
 
   class MoveCapture

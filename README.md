@@ -234,8 +234,10 @@ action, resource, and registered-endpoint contexts. Update and move merge
 `authorized_by_type` and `authorized_by_id` into the event metadata they
 already write. The event actor stays the OAuth client or API client, and
 `Current.actor` stays the access grant actor. API credentials have no human
-owner, so API-key writes add nothing. Handlers that record their own events
-can call `context.with_authorized_by(metadata)`.
+owner, so API-key writes add nothing. `with_authorized_by` drops client-sent
+`authorized_by_type` and `authorized_by_id` (string or symbol keys) before it
+writes the server value, including on client_credentials and API-key writes.
+Handlers that record their own events can call `context.with_authorized_by(metadata)`.
 
 Set `api_management_authorization_required` for trusted APIs. Credential creation then requires both
 the requested RecordingStudioAccessible data grant and management access to that API's `AdminApi`

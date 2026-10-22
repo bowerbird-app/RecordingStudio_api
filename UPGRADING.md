@@ -6,7 +6,7 @@
 
 1. Bump the host gem to `0.16.0`.
 2. OAuth writes merge `authorized_by_type` and `authorized_by_id` into event metadata. API-key writes do not.
-3. Action, resource, and registered-endpoint contexts expose `authorized_by` for handlers that record their own events. Use `with_authorized_by` to merge those keys into metadata you already pass.
+3. Action, resource, and registered-endpoint contexts expose `authorized_by` for handlers that record their own events. Use `with_authorized_by` to merge those keys into metadata you already pass. It removes client-sent `authorized_by_type` and `authorized_by_id` first, on OAuth and API-key writes alike.
 
 ## Upgrading to 0.15.0
 

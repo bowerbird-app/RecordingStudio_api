@@ -6,9 +6,11 @@ module RecordingStudioApi
   # Recording Studio Oauth keeps that person on OauthAuthorization#manager_actor.
   # The access token authenticator returns the access token as the credential, and
   # that token belongs to the authorization. API credentials have no human owner,
-  # so API-key writes stay untouched.
+  # so those writes do not add one. Client-sent authorized_by keys are removed
+  # on every write, including client_credentials and API-key writes.
   module AuthorizedBy
     OMITTED = Object.new
+    CLAIMED_KEYS = %w[authorized_by_type authorized_by_id].freeze
 
     module_function
 
@@ -35,7 +37,7 @@ module RecordingStudioApi
     end
 
     def merge(metadata, actor)
-      base = metadata.respond_to?(:to_h) ? metadata.to_h : {}
+      base = without_client_claims(metadata)
       extra = metadata_for(actor)
       return base if extra.empty?
 
@@ -57,5 +59,33 @@ module RecordingStudioApi
       klass.respond_to?(:polymorphic_name) ? klass.polymorphic_name : klass.name
     end
     private_class_method :polymorphic_name
+
+    def without_client_claims(metadata)
+      hash_pairs(metadata).each_with_object({}) do |(key, value), cleaned|
+        next if claimed_key?(key)
+
+        cleaned[key] = value
+      end
+    end
+    private_class_method :without_client_claims
+
+    def hash_pairs(metadata)
+      return [] if metadata.blank?
+
+      source = if metadata.respond_to?(:to_unsafe_h)
+                 metadata.to_unsafe_h
+               elsif metadata.respond_to?(:to_h)
+                 metadata.to_h
+               else
+                 {}
+               end
+      source.to_a
+    end
+    private_class_method :hash_pairs
+
+    def claimed_key?(key)
+      CLAIMED_KEYS.include?(key.to_s)
+    end
+    private_class_method :claimed_key?
   end
 end

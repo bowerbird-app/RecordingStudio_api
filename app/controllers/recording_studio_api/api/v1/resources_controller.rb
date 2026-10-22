@@ -84,11 +84,14 @@ module RecordingStudioApi
         end
 
         def delete_metadata
-          {
-            api_action: "delete",
-            api_client_id: current_api_client.id,
-            api_credential_id: current_api_credential.id
-          }
+          RecordingStudioApi::AuthorizedBy.merge(
+            {
+              api_action: "delete",
+              api_client_id: current_api_client.id,
+              api_credential_id: current_api_credential.id
+            },
+            current_authorized_by
+          )
         end
 
         def serialize_delete_result(serialized_recording, deleted_via:)

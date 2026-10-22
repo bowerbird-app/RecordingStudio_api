@@ -44,7 +44,13 @@ class ApiV1AuthorizedByMetadataTest < ActionDispatch::IntegrationTest
 
   test "oauth write records the authorizing human and keeps the oauth client as actor" do
     patch "/recording_studio_api/api/v1/folders/#{@folder.id}",
-          params: { name: "OAuth renamed folder" },
+          params: {
+            name: "OAuth renamed folder",
+            authorized_by_type: "Spoof",
+            authorized_by_id: "spoof-symbol",
+            "authorized_by_type" => "Spoof",
+            "authorized_by_id" => "spoof-string"
+          },
           headers: { "Authorization" => "Bearer #{@oauth_token}" }
 
     assert_response :success
@@ -70,7 +76,11 @@ class ApiV1AuthorizedByMetadataTest < ActionDispatch::IntegrationTest
     token = issue_oauth_access_token_for(access_recording: @access_recording, name: "Plain key")
 
     patch "/recording_studio_api/api/v1/folders/#{@folder.id}",
-          params: { name: "Key renamed folder" },
+          params: {
+            name: "Key renamed folder",
+            authorized_by_type: "Spoof",
+            authorized_by_id: "spoof-symbol"
+          },
           headers: { "Authorization" => "Bearer #{token}" }
 
     assert_response :success
