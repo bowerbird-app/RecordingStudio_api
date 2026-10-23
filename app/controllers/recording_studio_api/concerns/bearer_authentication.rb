@@ -30,11 +30,13 @@ module RecordingStudioApi
         @current_api_credential = authenticated_client.credential
         @current_access_recording = authenticated_client.access_recording
         @current_root_recording = authenticated_client.root_recording
+        @current_authorized_by = authenticated_client.authorized_by
         @current_access_grant = RecordingStudioApi::AccessGrant.new(
           api_client: current_api_client,
           credential: current_api_credential,
           access_recording: current_access_recording,
-          root_recording: current_root_recording
+          root_recording: current_root_recording,
+          authorized_by: current_authorized_by
         )
         Current.actor = current_access_grant.actor if defined?(Current) && Current.respond_to?(:actor=)
       end

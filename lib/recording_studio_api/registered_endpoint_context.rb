@@ -11,6 +11,7 @@ module RecordingStudioApi
     :progress_reporter
   ) do
     include ProgressReporting
+    include AuthorizedBy::Context
 
     def initialize(
       api_client:,

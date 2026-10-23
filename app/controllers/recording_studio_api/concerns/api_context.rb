@@ -7,6 +7,10 @@ module RecordingStudioApi
 
       private
 
+      def current_authorized_by
+        @current_authorized_by
+      end
+
       def current_api_key
         current_api.name
       end

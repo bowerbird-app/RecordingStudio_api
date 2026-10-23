@@ -40,7 +40,8 @@ module RecordingStudioApi
             credential: credential,
             access_recording: credential.effective_access_recording,
             root_recording: root_recording,
-            api_key: api_key
+            api_key: api_key,
+            authorized_by: AuthorizedBy.actor_for(credential: credential, token_record: token_record)
           )
         )
       end

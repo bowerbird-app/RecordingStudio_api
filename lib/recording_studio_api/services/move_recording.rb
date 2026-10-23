@@ -43,11 +43,11 @@ module RecordingStudioApi
       end
 
       def metadata
-        {
+        context.with_authorized_by(
           api_action: "move",
           api_client_id: context.api_client.id,
           api_credential_id: context.credential.id
-        }
+        )
       end
     end
   end

@@ -14,6 +14,7 @@ module RecordingStudioApi
     :recordable_type
   ) do
     include ProgressReporting
+    include AuthorizedBy::Context
 
     def initialize(
       recording:,

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-10-22
+
+### Added
+- OAuth-authenticated writes add `authorized_by_type` and `authorized_by_id` to event metadata. The actor stays the OAuth client or API client. API-key writes do not set `authorized_by`.
+- Write metadata drops client-sent `authorized_by_type` and `authorized_by_id`, including string and symbol copies, on OAuth, client_credentials, and API-key writes. Only the server value is stored.
+
+### Upgrade notes
+- Bump to `0.16.0`. No migration.
+- Hosts that read event metadata can use `authorized_by_type` and `authorized_by_id` when the request was an OAuth token with a manager. API keys do not set those keys.
+
 ## [0.15.1] - 2026-10-22
 
 ### Changed

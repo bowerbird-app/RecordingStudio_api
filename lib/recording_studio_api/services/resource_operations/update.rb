@@ -10,7 +10,11 @@ module RecordingStudioApi
 
           attributes = resource_attributes.slice(*mutable_attribute_keys)
           revised_recording = if attributes.any?
-                                recording.root_recording.revise(recording, actor: api_client) do |recordable|
+                                recording.root_recording.revise(
+                                  recording,
+                                  actor: api_client,
+                                  metadata: context.with_authorized_by
+                                ) do |recordable|
                                   recordable.assign_attributes(attributes)
                                 end
                               else
