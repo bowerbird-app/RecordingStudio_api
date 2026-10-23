@@ -42,7 +42,7 @@ class ApiV1AuthorizedByMetadataTest < ActionDispatch::IntegrationTest
     Current.actor = nil if defined?(Current)
   end
 
-  test "oauth write records the authorizing human and keeps the oauth client as actor" do
+  test "oauth write records authorized_by and keeps the oauth client as actor" do
     patch "/recording_studio_api/api/v1/folders/#{@folder.id}",
           params: {
             name: "OAuth renamed folder",
@@ -96,6 +96,23 @@ class ApiV1AuthorizedByMetadataTest < ActionDispatch::IntegrationTest
     payload = JSON.parse(response.body)
     assert_nil payload.fetch("authorized_by_type")
     assert_nil payload.fetch("authorized_by_id")
+  end
+
+  test "oauth delete leaves stored authorized_by metadata unchanged" do
+    patch "/recording_studio_api/api/v1/folders/#{@folder.id}",
+          params: { name: "Named before delete" },
+          headers: { "Authorization" => "Bearer #{@oauth_token}" }
+    assert_response :success
+    stored = latest_update_event(@folder).metadata
+    page = create_page_recording(root_recording: @root_recording)
+
+    delete "/recording_studio_api/api/v1/pages/#{page.id}",
+           headers: { "Authorization" => "Bearer #{@oauth_token}" }
+
+    assert_response :success
+    assert_equal "destroyed", JSON.parse(response.body).fetch("deleted_via")
+    assert_equal stored, latest_update_event(@folder).metadata
+    assert_nil RecordingStudio::Event.where(recording_id: page.id).where("metadata ? :key", key: "authorized_by_type").first
   end
 
   private

@@ -2,7 +2,7 @@
 
 ## Upgrading to 0.16.0
 
-`0.16.0` records the human who authorized an OAuth token on write events. The event actor is still the OAuth client or API client. No migration.
+`0.16.0` records `authorized_by` for an OAuth token on write events. The event actor is still the OAuth client or API client. No migration.
 
 1. Bump the host gem to `0.16.0`.
 2. OAuth writes merge `authorized_by_type` and `authorized_by_id` into event metadata. API-key writes do not.

@@ -1,16 +1,29 @@
 # frozen_string_literal: true
 
 module RecordingStudioApi
-  # The human who authorized an OAuth token, recorded beside the API client actor.
+  # The record that authorized an OAuth token, stored beside the API client actor.
   #
-  # Recording Studio Oauth keeps that person on OauthAuthorization#manager_actor.
+  # Recording Studio Oauth keeps that record on OauthAuthorization#manager_actor.
   # The access token authenticator returns the access token as the credential, and
-  # that token belongs to the authorization. API credentials have no human owner,
-  # so those writes do not add one. Client-sent authorized_by keys are removed
+  # that token belongs to the authorization. API credentials have no manager, so
+  # those writes do not add one. Client-sent authorized_by keys are removed
   # on every write, including client_credentials and API-key writes.
   module AuthorizedBy
     OMITTED = Object.new
     CLAIMED_KEYS = %w[authorized_by_type authorized_by_id].freeze
+
+    # Reads authorized_by from the access grant. The grant is the only lookup:
+    # omitted keywords resolve there, and an explicit value is used as given.
+    module Context
+      def authorized_by
+        grant = access_grant
+        grant.authorized_by if grant.respond_to?(:authorized_by)
+      end
+
+      def with_authorized_by(metadata = {})
+        AuthorizedBy.merge(metadata, authorized_by)
+      end
+    end
 
     module_function
 

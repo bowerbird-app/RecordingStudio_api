@@ -33,7 +33,7 @@ class AuthorizedByTest < ActiveSupport::TestCase
     assert_nil RecordingStudioApi::AuthorizedBy.actor_for(credential: oauth_credential_with(manager: nil))
   end
 
-  test "access grant uses an explicit human and does not invent one for api keys" do
+  test "access grant uses an explicit authorized_by and does not invent one for api keys" do
     oauth_credential = oauth_credential_with(manager: @user)
     resolved = RecordingStudioApi::AccessGrant.new(
       api_client: nil,
@@ -57,7 +57,7 @@ class AuthorizedByTest < ActiveSupport::TestCase
     assert_nil api_key.authorized_by
   end
 
-  test "action resource and endpoint contexts expose the grant human to callers that omit it" do
+  test "action resource and endpoint contexts expose the grant authorized_by when callers omit it" do
     credential = oauth_credential_with(manager: @user)
     grant = RecordingStudioApi::AccessGrant.new(api_client: nil, credential: credential, access_recording: nil)
     action_context = RecordingStudioApi::ActionContext.new(
@@ -102,7 +102,7 @@ class AuthorizedByTest < ActiveSupport::TestCase
     end
   end
 
-  test "oauth update keeps the oauth client as actor and records the authorizing human" do
+  test "oauth update keeps the oauth client as actor and records authorized_by" do
     payload = provision_api_client_for(access_recording: @access_recording, name: "OAuth writer")
     oauth_client = oauth_client_for(payload.fetch(:api_client).id)
     folder = create_page_recording(root_recording: @root_recording).parent_recording
@@ -110,7 +110,7 @@ class AuthorizedByTest < ActiveSupport::TestCase
     Current.impersonator = nil if Current.respond_to?(:impersonator=)
 
     result = RecordingStudioApi::Services::ResourceOperations::Update.call(
-      resource_context_for(payload, folder, api_client: oauth_client, human: @user, name: "Renamed by oauth")
+      resource_context_for(payload, folder, api_client: oauth_client, authorized_by: @user, name: "Renamed by oauth")
     )
 
     assert_equal :ok, result.fetch(:status, :ok)
@@ -126,12 +126,12 @@ class AuthorizedByTest < ActiveSupport::TestCase
     assert_equal "Renamed by oauth", folder.reload.recordable.name
   end
 
-  test "api key update leaves event metadata without an authorizing human" do
+  test "api key update leaves event metadata without authorized_by" do
     payload = provision_api_client_for(access_recording: @access_recording, name: "API key writer")
     folder = create_page_recording(root_recording: @root_recording).parent_recording
 
     RecordingStudioApi::Services::ResourceOperations::Update.call(
-      resource_context_for(payload, folder, api_client: payload.fetch(:api_client), human: nil, name: "Renamed by key")
+      resource_context_for(payload, folder, api_client: payload.fetch(:api_client), authorized_by: nil, name: "Renamed by key")
     )
 
     event = latest_update_event(folder)
@@ -151,19 +151,19 @@ class AuthorizedByTest < ActiveSupport::TestCase
       api_action: "move"
     }
 
-    without_human = RecordingStudioApi::AuthorizedBy.merge(spoofed, nil)
-    assert_equal({ api_action: "move" }, without_human)
-    assert_no_authorized_by_keys(without_human)
+    without_authorized_by = RecordingStudioApi::AuthorizedBy.merge(spoofed, nil)
+    assert_equal({ api_action: "move" }, without_authorized_by)
+    assert_no_authorized_by_keys(without_authorized_by)
     assert_equal "Spoof", spoofed["authorized_by_type"]
     assert_equal "SymbolSpoof", spoofed[:authorized_by_type]
 
-    with_human = RecordingStudioApi::AuthorizedBy.merge(spoofed, @user)
-    assert_equal "move", with_human[:api_action]
-    assert_equal "User", with_human[:authorized_by_type]
-    assert_equal @user.id, with_human[:authorized_by_id]
-    assert_single_authorized_by_keys(with_human)
-    refute with_human.key?("authorized_by_type")
-    refute with_human.key?("authorized_by_id")
+    with_authorized_by = RecordingStudioApi::AuthorizedBy.merge(spoofed, @user)
+    assert_equal "move", with_authorized_by[:api_action]
+    assert_equal "User", with_authorized_by[:authorized_by_type]
+    assert_equal @user.id, with_authorized_by[:authorized_by_id]
+    assert_single_authorized_by_keys(with_authorized_by)
+    refute with_authorized_by.key?("authorized_by_type")
+    refute with_authorized_by.key?("authorized_by_id")
   end
 
   test "persisted oauth and api key writes store only the server authorized_by value" do
@@ -177,7 +177,7 @@ class AuthorizedByTest < ActiveSupport::TestCase
     }
 
     api_folder = create_page_recording(root_recording: @root_recording).parent_recording
-    api_context = resource_context_for(payload, api_folder, api_client: payload.fetch(:api_client), human: nil, name: "unused")
+    api_context = resource_context_for(payload, api_folder, api_client: payload.fetch(:api_client), authorized_by: nil, name: "unused")
     revise_with_metadata!(api_folder, actor: payload.fetch(:api_client), metadata: api_context.with_authorized_by(spoofed), name: "Key spoof")
 
     api_event = latest_update_event(api_folder)
@@ -188,7 +188,7 @@ class AuthorizedByTest < ActiveSupport::TestCase
 
     oauth_client = oauth_client_for(payload.fetch(:api_client).id)
     oauth_folder = create_page_recording(root_recording: @root_recording).parent_recording
-    oauth_context = resource_context_for(payload, oauth_folder, api_client: oauth_client, human: @user, name: "unused")
+    oauth_context = resource_context_for(payload, oauth_folder, api_client: oauth_client, authorized_by: @user, name: "unused")
     revise_with_metadata!(oauth_folder, actor: oauth_client, metadata: oauth_context.with_authorized_by(spoofed), name: "OAuth spoof")
 
     oauth_event = latest_update_event(oauth_folder)
@@ -201,17 +201,17 @@ class AuthorizedByTest < ActiveSupport::TestCase
     assert_equal %w[api_action authorized_by_id authorized_by_type], oauth_event.metadata.keys.sort
   end
 
-  test "move metadata keeps its own keys and adds the authorizing human" do
+  test "move metadata keeps its own keys and adds authorized_by" do
     payload = provision_api_client_for(access_recording: @access_recording, name: "Move writer")
     recording = MoveCapture.new
     destination = Object.new
     recordings = Object.new
     recordings.define_singleton_method(:find_by) { |id:| id == "destination" ? destination : nil }
     grant = Object.new
-    human = @user
+    approver = @user
     grant.define_singleton_method(:authorize!) { |**| true }
     grant.define_singleton_method(:accessible_recordings) { recordings }
-    grant.define_singleton_method(:authorized_by) { human }
+    grant.define_singleton_method(:authorized_by) { approver }
     context = RecordingStudioApi::ActionContext.new(
       recording: recording,
       api_client: payload.fetch(:api_client),
@@ -243,6 +243,44 @@ class AuthorizedByTest < ActiveSupport::TestCase
     refute_equal "spoof-string", metadata[:authorized_by_id].to_s
   end
 
+  test "explicit authorized_by stamps the same metadata as the lazy access grant" do
+    credential = oauth_credential_with(manager: @user)
+    lazy_grant = RecordingStudioApi::AccessGrant.new(api_client: nil, credential: credential, access_recording: nil)
+    explicit_grant = RecordingStudioApi::AccessGrant.new(
+      api_client: nil,
+      credential: credential,
+      access_recording: nil,
+      authorized_by: @user
+    )
+    metadata = { api_action: "update", "authorized_by_type" => "Spoof", authorized_by_id: "spoof-symbol" }
+
+    assert_equal @user, lazy_grant.authorized_by
+    assert_equal lazy_grant.authorized_by, explicit_grant.authorized_by
+    assert_equal(
+      RecordingStudioApi::AuthorizedBy.merge(metadata, lazy_grant.authorized_by),
+      RecordingStudioApi::AuthorizedBy.merge(metadata, explicit_grant.authorized_by)
+    )
+  end
+
+  test "delete stores no authorized_by metadata" do
+    payload = provision_api_client_for(access_recording: @access_recording, name: "Delete writer")
+    oauth_client = oauth_client_for(payload.fetch(:api_client).id)
+    page = create_page_recording(root_recording: @root_recording)
+    context = resource_context_for(payload, page, api_client: oauth_client, authorized_by: @user, name: "unused")
+    before = event_metadata_rows
+
+    result = RecordingStudioApi::Services::ResourceOperations::Destroy.call(context)
+
+    assert_equal true, result.fetch(:json).fetch(:deleted)
+    assert_equal "destroyed", result.fetch(:json).fetch(:deleted_via)
+    assert_equal before, event_metadata_rows
+    built = RecordingStudioApi::Services::ResourceOperations::Destroy.new(context).send(:delete_metadata)
+    assert_equal "delete", built[:api_action]
+    assert_equal "User", built[:authorized_by_type]
+    assert_equal @user.id, built[:authorized_by_id]
+    assert_single_authorized_by_keys(built)
+  end
+
   private
 
   def oauth_credential_with(manager:)
@@ -256,10 +294,10 @@ class AuthorizedByTest < ActiveSupport::TestCase
     RecordingStudioOauth::OauthClient.find(id)
   end
 
-  def resource_context_for(payload, folder, api_client:, human:, name:)
+  def resource_context_for(payload, folder, api_client:, authorized_by:, name:)
     credential = payload.fetch(:credential)
-    if human
-      authorization = Struct.new(:manager_actor).new(human)
+    if authorized_by
+      authorization = Struct.new(:manager_actor).new(authorized_by)
       credential.define_singleton_method(:oauth_authorization) { authorization }
     end
     grant = RecordingStudioApi::AccessGrant.new(
@@ -267,7 +305,7 @@ class AuthorizedByTest < ActiveSupport::TestCase
       credential: credential,
       access_recording: payload.fetch(:access_recording),
       root_recording: @root_recording,
-      authorized_by: human
+      authorized_by: authorized_by
     )
     RecordingStudioApi::ResourceOperationContext.new(
       recording: folder,
@@ -284,6 +322,10 @@ class AuthorizedByTest < ActiveSupport::TestCase
       scoped_recordings: grant.accessible_recordings,
       parent_recording: nil
     )
+  end
+
+  def event_metadata_rows
+    RecordingStudio::Event.order(:id).pluck(:id, :action, :metadata)
   end
 
   def latest_update_event(recording)

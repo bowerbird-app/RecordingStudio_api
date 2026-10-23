@@ -21,7 +21,7 @@ see [UPGRADING.md](UPGRADING.md).
 - external bearer-token authenticator support for host application authentication systems
 - API client recordables stored beneath `RecordingStudio::Access` recordings in the Recording Studio tree
 - authenticated API requests resolved into a `RecordingStudioApi::AccessGrant` that is passed to capability handlers
-- OAuth writes keep the API client as the event actor and also store the authorizing human on the event as `authorized_by_type` and `authorized_by_id`
+- OAuth writes keep the API client as the event actor and also store `authorized_by_type` and `authorized_by_id` on the event
 - capability-backed action registry with automatic action exposure when a recordable type enables that capability
 - `register_endpoint` for named JSON endpoints that are not a recordable collection
 - optional `ui:` widget id on those registrations, plus `ui_for` / `actions_for_ui` lookups
@@ -225,19 +225,21 @@ A later create with the same `Idempotency-Key` from the same API client
 returns that stored JSON for 24 hours. `null_store` cannot replay. A
 `register_resource_handler` for `create` does not use this store.
 
-### Authorizing human
+### `authorized_by`
 
-Bearer authentication resolves the human who authorized an OAuth token once,
-from the credential or token record's `oauth_authorization.manager_actor`.
-That person is stored on the access grant and exposed as `authorized_by` on
-action, resource, and registered-endpoint contexts. Update and move merge
-`authorized_by_type` and `authorized_by_id` into the event metadata they
-already write. The event actor stays the OAuth client or API client, and
-`Current.actor` stays the access grant actor. API credentials have no human
-owner, so API-key writes add nothing. `with_authorized_by` drops client-sent
-`authorized_by_type` and `authorized_by_id` (string or symbol keys) before it
-writes the server value, including on client_credentials and API-key writes.
-Handlers that record their own events can call `context.with_authorized_by(metadata)`.
+Bearer authentication resolves `authorized_by` once, from the credential or
+token record's `oauth_authorization.manager_actor`. It is stored on the
+access grant and exposed on action, resource, and registered-endpoint
+contexts. Update and move merge `authorized_by_type` and `authorized_by_id`
+into the event metadata they already write. The event actor stays the OAuth
+client or API client, and `Current.actor` stays the access grant actor. API
+credentials have no manager, so API-key writes add nothing.
+`with_authorized_by` drops client-sent `authorized_by_type` and
+`authorized_by_id` (string or symbol keys) before it writes the server value,
+including on client_credentials and API-key writes. Handlers that record
+their own events can call `context.with_authorized_by(metadata)`. Delete does
+not record an event; its metadata builder lives on the resource operation
+service, which is the path `destroy` runs.
 
 Set `api_management_authorization_required` for trusted APIs. Credential creation then requires both
 the requested RecordingStudioAccessible data grant and management access to that API's `AdminApi`

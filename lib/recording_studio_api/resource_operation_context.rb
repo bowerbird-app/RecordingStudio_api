@@ -22,7 +22,7 @@ module RecordingStudioApi
     :relationship_id
   ) do
     include ProgressReporting
-    include AuthorizingHuman
+    include AuthorizedBy::Context
 
     def initialize( # rubocop:disable Metrics/ParameterLists
       recording:,
