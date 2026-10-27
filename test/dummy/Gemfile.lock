@@ -32,6 +32,15 @@ GIT
       view_component (>= 4.14, < 5)
 
 GIT
+  remote: https://github.com/bowerbird-app/RecordingStudio_cache.git
+  revision: 1df36bc51b02b72a476bbbd5e6c38a200e3b5f3e
+  tag: v0.6.0
+  specs:
+    recording_studio_cache (0.6.0)
+      rails (~> 8.1.0)
+      recording_studio (>= 6.1.0)
+
+GIT
   remote: https://github.com/bowerbird-app/RecordingStudio_icons.git
   revision: 7c32c08d4c0a28dca5cfcb624d1beb03632f79b0
   specs:
@@ -69,15 +78,17 @@ GIT
 
 GIT
   remote: https://github.com/bowerbird-app/RecordingStudio_root_switchable.git
-  revision: 6f4ebe13d8021cc2097d4d93ab89d0dfb03e2c8c
-  tag: v0.8.0
+  revision: 9ae3af9f6da6039c6c1bd306cf71ec68e5814923
+  tag: v0.11.0
   specs:
-    recording_studio_root_switchable (0.8.0)
-      flat_pack
+    recording_studio_root_switchable (0.11.0)
+      flat_pack (>= 0.1.315)
       rails (~> 8.1.0)
       recording_studio (>= 6.1.0)
-      recording_studio_accessible (~> 0.13)
-      recording_studio_metrics (~> 0.2)
+      recording_studio_accessible (~> 0.18)
+      recording_studio_cache (~> 0.5)
+      recording_studio_metrics (>= 0.3.0, < 1.0)
+      view_component (>= 4.14, < 5)
 
 GIT
   remote: https://github.com/bowerbird-app/RecordingStudio_trashable.git
@@ -495,6 +506,7 @@ DEPENDENCIES
   recording_studio_accessible!
   recording_studio_admin!
   recording_studio_api!
+  recording_studio_cache!
   recording_studio_icons!
   recording_studio_logs!
   recording_studio_metrics!
@@ -607,11 +619,12 @@ CHECKSUMS
   recording_studio_accessible (0.22.1)
   recording_studio_admin (2.7.0)
   recording_studio_api (0.17.0)
+  recording_studio_cache (0.6.0)
   recording_studio_icons (0.1.0)
   recording_studio_logs (0.5.0)
   recording_studio_metrics (0.5.0)
   recording_studio_moveable (3.3.0)
-  recording_studio_root_switchable (0.8.0)
+  recording_studio_root_switchable (0.11.0)
   recording_studio_trashable (0.12.0)
   redis (5.4.1) sha256=b5e675b57ad22b15c9bcc765d5ac26f60b675408af916d31527af9bd5a81faae
   redis-client (0.31.0) sha256=6820cb2a21e6795a823141f50fd25e655de2b8dc8ff833b43509a27b0263fd75
