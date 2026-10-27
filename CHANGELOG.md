@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Development and dummy Gemfiles pin `flat_pack` to GitHub tag `v0.1.320`,
+  `recording_studio_accessible` to `v0.22.1`, and `recording_studio_trashable`
+  to `v0.12.0`. Gemspec floors are unchanged (`flat_pack >= 0.1.315`,
+  `recording_studio_accessible ~> 0.11`, `recording_studio_trashable ~> 0.10`).
+- Dummy copies Accessible access-request migrations.
+
+### Upgrade notes
+- No gem version bump. Pin Flatpack `v0.1.320`, Accessible `v0.22.1`, and
+  Trashable `v0.12.0`. Run `rails generate recording_studio_accessible:migrations`
+  and migrate (access request tables). Root Switchable stays at `v0.8.0`.
+
 ## [0.17.0] - 2026-10-27
 
 ### Changed

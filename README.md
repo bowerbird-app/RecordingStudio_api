@@ -4,11 +4,11 @@
 
 `RecordingStudioApi` is a mountable Rails engine that provides authenticated, capability-backed JSON APIs for Recording Studio addons.
 
-Companion pins on current main: Trashable `~> 0.10` / `v0.11.0`
+Companion pins on current main: Trashable `~> 0.10` / `v0.12.0`
 (query-only), Admin `v2.7.0`, Moveable `v3.3.0`, Root Switchable
-`v0.8.0`, Accessible `~> 0.11` / `v0.18.0`, RecordingStudio `v6.1.0`
-(`>= 6.1.0`), Flatpack `0.1.319`
-(`ref: 1fcbafe94f8eb118f0a22182f63f5110fcc97a56`, `>= 0.1.315`),
+`v0.8.0`, Accessible `~> 0.11` / `v0.22.1`, RecordingStudio `v6.1.0`
+(`>= 6.1.0`), Flatpack `0.1.320`
+(`tag: v0.1.320`, `>= 0.1.315`),
 Metrics `v0.5.0` (`>= 0.3.0, < 1.0`), Logs `v0.5.0` (`>= 0.4.1, < 1.0`). Recording Studio MCP `v0.17.0`
 allows this gem at `>= 0.11.0, < 0.12`, so it cannot take `0.12.0` or `0.13.0` until
 MCP widens that pin. Recording Studio Oauth `v0.12.2`

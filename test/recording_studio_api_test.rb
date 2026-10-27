@@ -22,7 +22,10 @@ class RecordingStudioApiTest < Minitest::Test
     %w[Gemfile test/dummy/Gemfile].each do |path|
       contents = File.read(File.join(root, path))
       assert_includes contents, 'RecordingStudio", tag: "v6.1.0"', path
-      assert_includes contents, 'flatpack", ref: "1fcbafe94f8eb118f0a22182f63f5110fcc97a56"', path
+      assert_includes contents, 'flatpack", tag: "v0.1.320"', path
+      assert_includes contents, 'RecordingStudio_accessible", tag: "v0.22.1"', path
+      assert_includes contents, 'RecordingStudio_trashable", tag: "v0.12.0"', path
+      assert_includes contents, 'RecordingStudio_root_switchable", tag: "v0.8.0"', path
       assert_includes contents, 'RecordingStudio_metrics", tag: "v0.5.0"', path
       assert_includes contents, 'RecordingStudio_logs", tag: "v0.5.0"', path
     end
