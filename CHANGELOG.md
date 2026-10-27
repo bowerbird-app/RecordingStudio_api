@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-10-27
+
+### Changed
+- Development and dummy Gemfiles pin `flat_pack` to GitHub tag `v0.1.320`,
+  `recording_studio_accessible` to `v0.22.1`, `recording_studio_trashable`
+  to `v0.12.0`, and `recording_studio_root_switchable` to `v0.11.0`.
+  Development/test also pin `recording_studio_cache` to `v0.6.0`. Gemspec
+  floors are unchanged (`flat_pack >= 0.1.315`,
+  `recording_studio_accessible ~> 0.11`, `recording_studio_trashable ~> 0.10`).
+- Dummy copies Accessible access-request migrations.
+
+### Upgrade notes
+- Bump to `0.17.1`. No host migration.
+- Pin Flatpack `v0.1.320`, Accessible `v0.22.1`, Trashable `v0.12.0`,
+  Root Switchable `v0.11.0`, and Cache `v0.6.0` (development/test git pin;
+  not a gemspec dependency).
+- Dummy only: it copies Accessible access-request migrations. Host apps
+  do not need `rails generate recording_studio_accessible:migrations`
+  from this bump.
+
 ## [0.17.0] - 2026-10-27
 
 ### Changed
