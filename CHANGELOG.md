@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-10-27
+
+### Changed
+- `recording_studio` is `>= 6.1.0`. Development and dummy Gemfiles pin GitHub tag `v6.1.0`.
+- `flat_pack` is `>= 0.1.315`. Development and dummy Gemfiles pin commit `1fcbafe94f8eb118f0a22182f63f5110fcc97a56` (`0.1.319`).
+- `view_component` is `>= 4.14, < 5`.
+- Engine and dummy screens use `recording_studio_layout` and `config.layout`. `UsesDefaultLayout` and hardcoded `layout "recording_studio/default_layout"` are gone.
+- Page headings come from `content_for :title` and `content_for :subtitle`. Back and close use `flat_pack_page_nav`. Page actions use `register_page_nav` or `recording_studio_page_nav_right`.
+
+### Upgrade notes
+- Bump to `0.17.0`. No migration.
+- Pin Recording Studio `v6.1.0` and Flatpack `0.1.319` (`ref: "1fcbafe94f8eb118f0a22182f63f5110fcc97a56"`). Flatpack `v0.1.315` is the minimum.
+- Set `config.layout` to `nil`, `false`, a layout name, or `->(controller:) { ... }`. `config.layout_name = "name"` still assigns `config.layout`.
+- `config.admin_layout_name` still selects the admin shell. `api.documentation_layout_name` still selects embedded Scalar docs. A blank value uses `config.layout`.
+- Replace `recording_studio_page_nav` and inline page titles. The default layout renders one heading. See [UPGRADING.md](UPGRADING.md).
+
 ## [0.16.0] - 2026-10-22
 
 ### Added

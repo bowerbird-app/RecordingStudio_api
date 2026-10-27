@@ -26,7 +26,8 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
   test "install page renders successfully" do
     get docs_install_path
     assert_response :success
-    assert_select "h1", text: "Install"
+    assert_select "h1", text: "Install", count: 1
+    assert_select "body[data-recording-studio-default-layout]", count: 1
     assert_includes response.body, "1. Add the gem"
     assert_includes response.body, "bundle add recording_studio_api"
     assert_includes response.body, "flat_pack"

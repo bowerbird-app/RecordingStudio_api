@@ -2,7 +2,10 @@
 
 module RecordingStudioApi
   class AdminController < ApplicationController
-    layout :recording_studio_api_admin_layout
+    recording_studio_layout do
+      admin_layout = RecordingStudioApi.configuration.admin_layout_name
+      admin_layout.present? ? admin_layout : RecordingStudioApi.configuration.layout
+    end
 
     before_action :authenticate_user!, if: -> { respond_to?(:authenticate_user!, true) }
     before_action :assign_current_actor

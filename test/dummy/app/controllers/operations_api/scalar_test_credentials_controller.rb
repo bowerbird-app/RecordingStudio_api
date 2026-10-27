@@ -4,7 +4,7 @@ module OperationsApi
   class ScalarTestCredentialsController < ApplicationController
     include OperationsApi::ScalarTestAuth
 
-    layout "recording_studio/default_layout"
+    recording_studio_layout { RecordingStudioApi.configuration.layout }
 
     prepend_before_action :authorize_scalar_test_auth!
     before_action :load_scalar_test_auth, only: :show

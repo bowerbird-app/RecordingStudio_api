@@ -1,9 +1,6 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
-  <%= render FlatPack::PageTitle::Component.new(
-    title: "Workspace",
-    subtitle: "Child recordings attached to the workspace access root.",
-    variant: :h1
-  ) %>
+  <% content_for :title, "Workspace" %>
+  <% content_for :subtitle, "Child recordings attached to the workspace access root." %>
 
   <%= render partial: "home/recording_tree", locals: {
     recording_tree: @recording_tree,

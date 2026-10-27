@@ -2,11 +2,13 @@
 
 source "https://rubygems.org"
 
+require_relative "test/support/widen_recording_studio_requirement"
+
 # Specify your gem's dependencies in recording_studio_api.gemspec
 gem "devise"
 gemspec
 
-gem "recording_studio", github: "bowerbird-app/RecordingStudio", tag: "v4.7.0"
+gem "recording_studio", github: "bowerbird-app/RecordingStudio", tag: "v6.1.0"
 gem "recording_studio_accessible", github: "bowerbird-app/RecordingStudio_accessible", tag: "v0.18.0"
 gem "recording_studio_admin", github: "bowerbird-app/RecordingStudio_admin", tag: "v2.2.0"
 gem "recording_studio_logs", github: "bowerbird-app/RecordingStudio_logs", tag: "v0.5.0"
@@ -15,7 +17,7 @@ gem "recording_studio_trashable", github: "bowerbird-app/RecordingStudio_trashab
 gem "recording_studio_icons", github: "bowerbird-app/RecordingStudio_icons"
 gem "recording_studio_moveable", github: "bowerbird-app/RecordingStudio_moveable", tag: "v3.3.0"
 gem "recording_studio_root_switchable", github: "bowerbird-app/RecordingStudio_root_switchable", tag: "v0.8.0"
-gem "flat_pack", github: "bowerbird-app/flatpack", tag: "v0.1.207"
+gem "flat_pack", github: "bowerbird-app/flatpack", ref: "1fcbafe94f8eb118f0a22182f63f5110fcc97a56"
 gem "pg", "~> 1.1"
 
 gem "puma"

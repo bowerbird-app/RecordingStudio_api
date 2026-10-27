@@ -1,9 +1,6 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
-  <%= render FlatPack::PageTitle::Component.new(
-    title: "Versions",
-    subtitle: "How public API versions map routes, docs, and contribution contract versions.",
-    variant: :h1
-  ) %>
+  <% content_for :title, "Versions" %>
+  <% content_for :subtitle, "How public API versions map routes, docs, and contribution contract versions." %>
 
   <%= render FlatPack::SectionTitle::Component.new(
     title: "Configuration",
@@ -61,7 +58,7 @@
     CODE
   ) %>
 
-  <%= render FlatPack::Card::Component.new(style: :default) do %>
+  <%= render FlatPack::Card::Component.new(background: :default) do %>
     <%= render FlatPack::List::Component.new(divider: true) do %>
       <%= render FlatPack::List::Item.new(icon: :queue_list) do %>
         <span><code>config.version "v1"</code> defines the public API profile for v1 clients.</span>
@@ -90,7 +87,7 @@
     anchor_link: true,
   ) %>
 
-  <%= render FlatPack::Card::Component.new(style: :default) do %>
+  <%= render FlatPack::Card::Component.new(background: :default) do %>
     <%= render FlatPack::List::Component.new(divider: true) do %>
       <%= render FlatPack::List::Item.new(icon: :check_badge) do %>
         <span>Contribution versions use RubyGems-compatible <code>Gem::Version</code> strings such as <code>1.23.4</code>, <code>2.0.0.pre</code>, or <code>2026.6.3</code>.</span>
@@ -128,7 +125,7 @@
     anchor_link: true,
   ) %>
 
-  <%= render FlatPack::Card::Component.new(style: :default) do %>
+  <%= render FlatPack::Card::Component.new(background: :default) do %>
     <%= render FlatPack::List::Component.new(divider: true) do %>
       <%= render FlatPack::List::Item.new(icon: :arrow_path_rounded_square) do %>
         <span><code>/recording_studio_api/api/v1/*</code> keeps legacy integrations working.</span>

@@ -1,27 +1,11 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6 pb-6">
-  <% recording_studio_page_nav(
-    title: "API keys",
-    page_nav_anchor_url: page_nav_close_url
-  ) %>
+  <% content_for :title, "API keys" %>
+  <% content_for :subtitle, @access_list_subtitle %>
+  <% flat_pack_page_nav(round: true, style: :default, anchor_href: page_nav_close_url, anchor_tooltip: "Close") %>
+  <% register_page_nav "New", new_api_client_path(page_nav_close_param), role: :primary if @can_manage_access_requests %>
 
-  <%= render FlatPack::PageTitle::Component.new(
-    title: "API keys",
-    subtitle: @access_list_subtitle,
-    variant: :h1
-  ) %>
-
-  <% if @can_manage_access_requests %>
-    <div>
-      <%= render FlatPack::Button::Component.new(
-        text: "New",
-        style: :primary,
-        size: :md,
-        href: new_api_client_path(page_nav_close_param)
-      ) %>
-    </div>
-
-    <% if @total_api_keys.to_i.positive? %>
-      <%= render FlatPack::Card::Component.new(style: :default) do %>
+  <% if @can_manage_access_requests && @total_api_keys.to_i.positive? %>
+      <%= render FlatPack::Card::Component.new(background: :default) do %>
           <div class="space-y-4">
             <div class="flex items-start justify-between gap-3">
               <%= render FlatPack::SectionTitle::Component.new(
@@ -67,7 +51,6 @@
             ) %>
           </div>
       <% end %>
-    <% end %>
   <% end %>
 
   <% if @api_access_rows.any? %>

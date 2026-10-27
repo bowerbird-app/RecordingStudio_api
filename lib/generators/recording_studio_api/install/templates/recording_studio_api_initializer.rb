@@ -9,8 +9,9 @@ RecordingStudioApi.configure do |config|
   # Defaults to: "Add you API intro description in the config file"
   # config.openapi_description = "Endpoints for API access and resource operations"
 
-  # Layout used by generated Scalar documentation and RecordingStudioApi engine pages.
-  # config.layout_name = "recording_studio/default_layout"
+  # Page shell for engine screens. nil uses RecordingStudio.configuration.layout,
+  # then recording_studio/default_layout. A callable is invoked as call(controller:).
+  # config.layout = "application"
 
   # Scalar documentation is disabled until explicitly enabled with an access policy.
   # config.documentation_enabled = true

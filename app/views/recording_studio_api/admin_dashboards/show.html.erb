@@ -1,35 +1,12 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
-  <%= render FlatPack::PageTitle::Component.new(
-    title: @admin_api.name,
-    subtitle: "Manage API access",
-    variant: :h1
-  ) %>
-
-  <div class="flex flex-wrap items-center gap-3">
-    <%= render FlatPack::Button::Component.new(
-      text: "Settings",
-      style: :default,
-      size: :md,
-      href: RecordingStudioApi.admin_settings_path(controller: self, close_url: request.fullpath)
-    ) %>
-
-    <%= render FlatPack::Button::Component.new(
-      text: "Rate limiting",
-      style: :default,
-      size: :md,
-      href: RecordingStudioApi.admin_rate_limiting_path(controller: self, close_url: request.fullpath)
-    ) %>
-
-    <%= render FlatPack::Button::Component.new(
-      text: "Logs",
-      style: :default,
-      size: :md,
-      href: RecordingStudioApi.admin_logs_path(controller: self, close_url: request.fullpath)
-    ) %>
-  </div>
+  <% content_for :title, @admin_api.name %>
+  <% content_for :subtitle, "Manage API access" %>
+  <% register_page_nav "Settings", RecordingStudioApi.admin_settings_path(controller: self, close_url: request.fullpath), role: :secondary %>
+  <% register_page_nav "Rate limiting", RecordingStudioApi.admin_rate_limiting_path(controller: self, close_url: request.fullpath), role: :secondary %>
+  <% register_page_nav "Logs", RecordingStudioApi.admin_logs_path(controller: self, close_url: request.fullpath), role: :secondary %>
 
   <%= render FlatPack::Grid::Component.new(cols: 2, class: "items-start gap-6") do %>
-    <%= render FlatPack::Card::Component.new(style: :default, class: "h-full") do %>
+    <%= render FlatPack::Card::Component.new(background: :default, class: "h-full") do %>
       <div class="flex h-full flex-col gap-4">
         <div class="flex items-start justify-between gap-4">
           <div class="space-y-1">
@@ -60,7 +37,7 @@
       </div>
     <% end %>
 
-    <%= render FlatPack::Card::Component.new(style: :default, class: "h-full") do %>
+    <%= render FlatPack::Card::Component.new(background: :default, class: "h-full") do %>
       <div class="flex h-full flex-col gap-4">
         <div class="flex items-start justify-between gap-4">
           <div class="space-y-1">
@@ -92,7 +69,7 @@
   <% end %>
 
   <%= render FlatPack::Grid::Component.new(cols: 2, class: "items-start gap-6") do %>
-    <%= render FlatPack::Card::Component.new(style: :default, class: "h-full") do %>
+    <%= render FlatPack::Card::Component.new(background: :default, class: "h-full") do %>
       <div class="flex h-full flex-col gap-4">
         <div class="space-y-1">
           <h3 class="text-lg font-semibold leading-tight text-slate-900">Rate limiting (last 30 days)</h3>
@@ -130,7 +107,7 @@
       </div>
     <% end %>
 
-    <%= render FlatPack::Card::Component.new(style: :default, class: "h-full") do %>
+    <%= render FlatPack::Card::Component.new(background: :default, class: "h-full") do %>
       <div class="flex h-full flex-col gap-4">
         <div class="flex items-start justify-between gap-4">
           <div class="space-y-1">

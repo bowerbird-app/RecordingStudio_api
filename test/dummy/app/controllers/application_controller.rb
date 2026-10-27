@@ -8,20 +8,15 @@ class ApplicationController < ActionController::Base
   stale_when_importmap_changes if respond_to?(:stale_when_importmap_changes)
 
   include RecordingStudio::RootSwitchable::ControllerSupport
-  include RecordingStudio::UsesDefaultLayout
 
-  layout :application_layout
+  recording_studio_layout do
+    devise_controller? ? "application" : RecordingStudioApi.configuration.layout
+  end
 
   before_action :authenticate_user!
   before_action :set_current_actor
 
   private
-
-  def application_layout
-    return "application" if devise_controller?
-
-    "recording_studio/default_layout"
-  end
 
   def set_current_actor
     Current.actor = current_user

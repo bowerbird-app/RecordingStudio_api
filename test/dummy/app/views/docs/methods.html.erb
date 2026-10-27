@@ -1,9 +1,6 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
-	<%= render FlatPack::PageTitle::Component.new(
-		title: "Methods",
-		subtitle: "Reference for the public Ruby entrypoints and runtime context used by API handlers.",
-		variant: :h1
-	) %>
+	<% content_for :title, "Methods" %>
+	<% content_for :subtitle, "Reference for the public Ruby entrypoints and runtime context used by API handlers." %>
 
 	<%= render FlatPack::SectionTitle::Component.new(
 		title: "Registration",

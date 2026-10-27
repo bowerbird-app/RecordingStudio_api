@@ -3,9 +3,7 @@
 module RecordingStudioApi
   class ApplicationController < ActionController::Base
     include RecordingStudio::RootSwitchable::ControllerSupport if defined?(RecordingStudio::RootSwitchable::ControllerSupport)
-    include RecordingStudio::UsesDefaultLayout if defined?(RecordingStudio::UsesDefaultLayout)
-
-    helper RecordingStudio::LayoutHelper if defined?(RecordingStudio::LayoutHelper)
+    include RecordingStudio::ControllerLayout
 
     helper_method :admin_root_current?
     helper_method :current_root_name
@@ -13,21 +11,13 @@ module RecordingStudioApi
     helper_method :page_nav_close_param
 
     protect_from_forgery with: :exception
-    layout :recording_studio_api_layout
+    recording_studio_layout { RecordingStudioApi.configuration.layout }
 
     rescue_from RecordingStudioApi::AuthorizationError do
       head :forbidden
     end
 
     private
-
-    def recording_studio_api_layout
-      RecordingStudioApi.configuration.layout_name.presence || "application"
-    end
-
-    def recording_studio_api_admin_layout
-      RecordingStudioApi.configuration.admin_layout_name.presence || recording_studio_api_layout
-    end
 
     def admin_root_current?
       current_root = current_root_recording if respond_to?(:current_root_recording, true)

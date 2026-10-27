@@ -1,14 +1,8 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
-  <% recording_studio_page_nav(
-    title: "API key rotated",
-    page_nav_anchor_url: page_nav_close_url
-  ) %>
+  <% flat_pack_page_nav(round: true, style: :default, anchor_href: page_nav_close_url, anchor_tooltip: "Close") %>
 
-  <%= render FlatPack::PageTitle::Component.new(
-    title: "API key rotated",
-    subtitle: "The previous credential was revoked and a new client secret was issued.",
-    variant: :h1
-  ) %>
+  <% content_for :title, "API key rotated" %>
+  <% content_for :subtitle, "The previous credential was revoked and a new client secret was issued." %>
 
   <div class="space-y-6">
     <div class="space-y-3">

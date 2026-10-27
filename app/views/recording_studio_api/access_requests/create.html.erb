@@ -1,14 +1,8 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
-  <% recording_studio_page_nav(
-    title: "Copy secret",
-    page_nav_anchor_url: page_nav_close_url
-  ) %>
+  <% flat_pack_page_nav(round: true, style: :default, anchor_href: page_nav_close_url, anchor_tooltip: "Close") %>
 
-  <%= render FlatPack::PageTitle::Component.new(
-    title: "Copy secret",
-    subtitle: "This is only shown once. Use it to access the API.",
-    variant: :h1
-  ) %>
+  <% content_for :title, "Copy secret" %>
+  <% content_for :subtitle, "This is only shown once. Use it to access the API." %>
 
   <pre class="overflow-x-auto rounded-md border border-(--surface-border-color) bg-(--surface-background-color) p-4 text-sm text-(--surface-content-color)" data-secret-reveal-target="secret"><%= @payload.fetch(:token) %></pre>
 

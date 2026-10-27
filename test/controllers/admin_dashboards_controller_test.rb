@@ -226,9 +226,9 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
     assert_select %(turbo-frame#admin-api-requests-last-24-hours-frame[src*="group_by=hour"]), count: 1
     assert_select %(turbo-frame#admin-api-requests-last-30-days-frame[src*="/recording_studio_api/admin_api/requests"]), count: 1
     assert_select %(turbo-frame#admin-api-requests-last-30-days-frame[src*="dashboard_embed=1"]), count: 1
-    assert_select %(a[href="#{admin_api_settings_path(close_url: admin_api_dashboard_path)}"]), text: "Settings", count: 1
-    assert_select %(a[href="#{admin_api_rate_limiting_path(close_url: admin_api_dashboard_path)}"]), text: "Rate limiting", count: 1
-    assert_select %(a[href="#{admin_api_logs_path(close_url: admin_api_dashboard_path)}"]), text: "Logs", count: 1
+    assert_select %(a[href="#{admin_api_settings_path(close_url: admin_api_dashboard_path)}"]), text: "Settings", count: 2
+    assert_select %(a[href="#{admin_api_rate_limiting_path(close_url: admin_api_dashboard_path)}"]), text: "Rate limiting", count: 2
+    assert_select %(a[href="#{admin_api_logs_path(close_url: admin_api_dashboard_path)}"]), text: "Logs", count: 2
     assert_select %(a[href="#{admin_api_requests_path(close_url: admin_api_dashboard_path, range: 'last_24_hours', group_by: 'hour')}"]), text: "Full screen", count: 1
     assert_select %(a[href="#{admin_api_requests_path(close_url: admin_api_dashboard_path, start_date: 29.days.ago.to_date.iso8601, end_date: Date.current.iso8601, group_by: 'day')}"]), text: "Full screen", count: 1
     assert_select %(a[href="#{admin_api_errors_path(close_url: admin_api_dashboard_path, start_date: 29.days.ago.to_date.iso8601, end_date: Date.current.iso8601)}"]), text: "Full screen", count: 1
@@ -460,7 +460,7 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
     get admin_api_rate_limiting_path
 
     assert_response :success
-    assert_includes response.body, "Rate limiting"
+    assert_select "h1", text: "Public API rate limiting", count: 1
     assert_includes response.body, "Override rate-limit enables and thresholds at runtime"
     assert_includes response.body, "Rate limit OAuth enabled"
     assert_includes response.body, "Rate limit API pre-auth enabled"

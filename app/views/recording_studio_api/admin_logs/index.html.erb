@@ -1,16 +1,8 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
-  <% recording_studio_page_nav(
-    title: "API logs",
-    page_nav_back_url: RecordingStudioApi.admin_dashboard_path(controller: self),
-    page_nav_back_label: "Back",
-    page_nav_anchor_url: page_nav_close_url
-  ) %>
+  <% flat_pack_page_nav(round: true, style: :default, back_href: RecordingStudioApi.admin_dashboard_path(controller: self), back_tooltip: "Back", anchor_href: page_nav_close_url, anchor_tooltip: "Close") %>
 
-  <%= render FlatPack::PageTitle::Component.new(
-    title: "API logs",
-    subtitle: "Request log entries recorded by the API logging database.",
-    variant: :h1
-  ) %>
+  <% content_for :title, "API logs" %>
+  <% content_for :subtitle, "Request log entries recorded by the API logging database." %>
 
   <%= render partial: "content" %>
 </div>

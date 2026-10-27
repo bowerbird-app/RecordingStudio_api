@@ -4,10 +4,12 @@
 
 `RecordingStudioApi` is a mountable Rails engine that provides authenticated, capability-backed JSON APIs for Recording Studio addons.
 
-Companion pins on current main: Trashable `~> 0.10` / `v0.10.0`
+Companion pins on current main: Trashable `~> 0.10` / `v0.11.0`
 (query-only), Admin `v2.2.0`, Moveable `v3.3.0`, Root Switchable
-`v0.8.0`, Accessible `~> 0.11` / `v0.18.0`, RecordingStudio `v4.6.0`,
-Metrics `v0.5.0` (`>= 0.3.0, < 0.6`), Logs `v0.5.0` (`>= 0.4.1, < 0.6`). Recording Studio MCP `v0.17.0`
+`v0.8.0`, Accessible `~> 0.11` / `v0.18.0`, RecordingStudio `v6.1.0`
+(`>= 6.1.0`), Flatpack `0.1.319`
+(`ref: 1fcbafe94f8eb118f0a22182f63f5110fcc97a56`, `>= 0.1.315`),
+Metrics `v0.5.0` (`>= 0.3.0, < 1.0`), Logs `v0.5.0` (`>= 0.4.1, < 1.0`). Recording Studio MCP `v0.17.0`
 allows this gem at `>= 0.11.0, < 0.12`, so it cannot take `0.12.0` or `0.13.0` until
 MCP widens that pin. Recording Studio Oauth `v0.12.2`
 allows `>= 0.5.2, < 0.12`. For Trashable query-only keep/trash helpers in
@@ -115,9 +117,12 @@ recording_studio_api_scalar_docs_for :operations,
   engine_mount_path: "/recording_studio_api"
 ```
 
-Embedded docs use `api.documentation_layout_name`, then `config.layout_name`, then
-`recording_studio/default_layout`. Custom layouts should render the `page_nav_right` content slot
-to display the **Full width** action. The fullscreen response is layout-free. A host may override
+Embedded docs use `api.documentation_layout_name`, then `config.layout`, then
+`RecordingStudio.configuration.layout`, then `recording_studio/default_layout`.
+Set the shell with `config.layout` (`nil`, `false`, a layout name, or `->(controller:) { ... }`).
+`config.layout_name = "name"` still assigns `config.layout`. Custom layouts should render
+`content_for(:page_nav_right)` beside `page_nav_button_group` to display the **Full width** action.
+The fullscreen response is layout-free. A host may override
 the gem views through normal Rails view lookup or add
 `recording_studio_api/scalar_docs/_extension.html.erb` for application-specific content.
 
@@ -420,7 +425,7 @@ Host apps and addon gems use these entrypoints for configuration, resource expos
 RecordingStudioApi.configure do |config|
   config.enable_feature_x = false
   config.timeout = 5
-  config.layout_name = "application"
+  config.layout = "application"
 end
 
 RecordingStudioApi.configuration

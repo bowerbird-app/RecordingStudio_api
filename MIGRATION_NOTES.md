@@ -1,6 +1,6 @@
 # Historical Note: Migration Notes - Private Gems to Public Gems
 
-> This file is retained as historical context from earlier template migration work. It is not part of the current RecordingStudio API handoff; use `README.md` and `test/dummy/` for the current project narrative.
+> This file is retained as historical context from earlier template migration work. It is not part of the current RecordingStudio API handoff. The `0.17.0` Recording Studio `v6.1.0` and Flatpack `0.1.319` upgrade is in [UPGRADING.md](UPGRADING.md). Use `README.md` and `test/dummy/` for the current project narrative.
 
 
 ## Changes Made

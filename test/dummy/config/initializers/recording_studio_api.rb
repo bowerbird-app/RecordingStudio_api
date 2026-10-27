@@ -7,8 +7,7 @@ RecordingStudioApi.configure do |config|
   config.openapi_description = "API endpoints for accessing and managing Recording Studio workspaces, folders, and pages."
   config.documentation_enabled = true
   config.documentation_access = :public
-  config.layout_name = "recording_studio/default_layout"
-  config.admin_layout_name = "recording_studio/default_layout"
+  config.layout = "recording_studio/default_layout"
   config.rate_limit_api_pre_auth_enabled = true
   config.rate_limit_api_enabled = true
   config.rate_limit_redis_url = ENV.fetch("RECORDING_STUDIO_API_RATE_LIMIT_REDIS_URL", "redis://127.0.0.1:6379/0")

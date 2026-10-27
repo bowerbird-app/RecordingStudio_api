@@ -1,9 +1,6 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
-  <%= render FlatPack::PageTitle::Component.new(
-    title: "Recordings tree",
-    subtitle: "All dummy-app recordings shown as a nested parent/child outline (including trashed rows).",
-    variant: :h1
-  ) %>
+  <% content_for :title, "Recordings tree" %>
+  <% content_for :subtitle, "All dummy-app recordings shown as a nested parent/child outline (including trashed rows)." %>
 
   <p class="text-sm text-(--surface-muted-content-color)">
     <%= pluralize(@recordings_count, "recording") %> total in the dummy app database.
