@@ -1,9 +1,6 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
-  <%= render FlatPack::PageTitle::Component.new(
-    title: "Gem Views",
-    subtitle: "All ERB views currently shipped by the gem, grouped by API credentials.",
-    variant: :h1
-  ) %>
+  <% content_for :title, "Gem Views" %>
+  <% content_for :subtitle, "All ERB views currently shipped by the gem, grouped by API credentials." %>
 
   <% api_credentials_views = @engine_views.select do |view| %>
     <% view.fetch(:logical_path).start_with?("recording_studio_api/access_requests/") %>

@@ -1,12 +1,8 @@
-<% content_for :page_nav_back_url, @scalar_test_auth_docs_path %>
-<% content_for :page_nav_back_label, "Back to Public API docs" %>
+<% flat_pack_page_nav(round: true, style: :default, back_href: @scalar_test_auth_docs_path, back_tooltip: "Back to Public API docs") %>
 
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
-  <%= render FlatPack::PageTitle::Component.new(
-    title: "API test token",
-    subtitle: "Create a short-lived, scoped bearer token for local API testing.",
-    variant: :h1
-  ) %>
+  <% content_for :title, "API test token" %>
+  <% content_for :subtitle, "Create a short-lived, scoped bearer token for local API testing." %>
 
   <div>
     <%= render FlatPack::Button::Component.new(

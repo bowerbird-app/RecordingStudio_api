@@ -1,6 +1,6 @@
 # Historical Note: RecordingStudio Gem Update Summary
 
-> This file is an archival snapshot from February 17, 2026. Its dependency versions, test counts, and API notes are not current; use `README.md` and `test/dummy/` for the current project narrative.
+> This file is an archival snapshot from February 17, 2026. Its dependency versions, test counts, and API notes are not current. The `0.17.0` layout upgrade is in [UPGRADING.md](UPGRADING.md). Use `README.md` and `test/dummy/` for the current project narrative.
 
 
 ## Update Completed: February 17, 2026

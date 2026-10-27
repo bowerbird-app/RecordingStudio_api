@@ -25,7 +25,8 @@ class TestAuthGeneratorTest < Minitest::Test
       routes = read(destination_root, "config/routes.rb")
 
       assert_includes credentials_controller, "def show"
-      assert_includes credentials_controller, 'layout "recording_studio/default_layout"'
+      assert_includes credentials_controller, "recording_studio_layout { RecordingStudioApi.configuration.layout }"
+      assert_not_includes credentials_controller, 'layout "recording_studio/default_layout"'
       assert_includes credentials_controller, "authorize_scalar_test_auth!"
       assert_includes credentials_controller, "return head :unauthorized"
       assert_includes credentials_controller, "head :forbidden"

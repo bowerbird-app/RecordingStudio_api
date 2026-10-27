@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative "configuration/layout_setting"
 require_relative "hooks"
 require_relative "action_registry"
 require_relative "registered_endpoint_registry"
@@ -36,7 +37,6 @@ module RecordingStudioApi
                   :documentation_enabled,
                   :documentation_access,
                   :documentation_layout_name,
-                  :layout_name,
                   :pagination_default_limit,
                   :pagination_max_limit,
                   :rate_limit_oauth_enabled,
@@ -63,7 +63,10 @@ module RecordingStudioApi
                   :api_request_log_allowed_param_keys,
                   :api_request_log_retention_days,
                   :api_daily_metric_retention_days
-    attr_reader :hooks, :action_registry, :registered_endpoint_registry, :recordable_registry, :resource_handler_registry, :default_api_version, :api_version_profiles, :capability_action_roles, :logs_summaries_enabled
+
+    include LayoutSetting
+
+    attr_reader :hooks, :action_registry, :registered_endpoint_registry, :recordable_registry, :resource_handler_registry, :default_api_version, :api_version_profiles, :capability_action_roles, :logs_summaries_enabled, :layout, :layout_name
 
     # rubocop:disable Metrics/AbcSize
     def initialize
@@ -107,7 +110,8 @@ module RecordingStudioApi
       @documentation_enabled = false
       @documentation_access = nil
       @documentation_layout_name = nil
-      @layout_name = "recording_studio/default_layout"
+      @layout_name = nil
+      @layout = nil
       @pagination_default_limit = 50
       @pagination_max_limit = 100
       @rate_limit_oauth_enabled = true
@@ -175,6 +179,7 @@ module RecordingStudioApi
         documentation_access: documentation_access.respond_to?(:call) ? :callable : documentation_access,
         documentation_layout_name: documentation_layout_name,
         layout_name: layout_name,
+        layout: exported_layout,
         pagination_default_limit: pagination_default_limit,
         pagination_max_limit: pagination_max_limit,
         rate_limit_oauth_enabled: rate_limit_oauth_enabled,

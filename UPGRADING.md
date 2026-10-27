@@ -1,5 +1,21 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.17.0
+
+`0.17.0` adopts Recording Studio `v6.1.0` and Flatpack `0.1.319`. No migration.
+
+1. Bump the host gem to `0.17.0`.
+2. Pin `recording_studio` to GitHub tag `v6.1.0` (`>= 6.1.0`), `flat_pack` to commit `1fcbafe94f8eb118f0a22182f63f5110fcc97a56` (`0.1.319`, minimum `>= 0.1.315`), and `recording_studio_admin` to GitHub tag `v2.7.0`. `view_component` stays `>= 4.14, < 5`.
+3. Rename `RecordingStudioAdmin` `config.engine_layout` to `config.layout`. Admin `v2.7.0` renders section and screen headings with `content_for :title` and `:subtitle`, back and close with `flat_pack_page_nav`, and actions with `register_page_nav`. Hosts no longer need a `recording_studio_page_nav` or legacy Flatpack keyword shim for Admin.
+4. Set the page shell with `config.layout`. `nil` uses `RecordingStudio.configuration.layout`, then `recording_studio/default_layout`. `false` renders no layout. A string is a layout name. A callable is invoked as `call(controller:)` and must return a String, `nil`, or `false`.
+5. `config.layout_name = "name"` still assigns `config.layout` for older initializers. `config.admin_layout_name` overrides the admin controller. `api.documentation_layout_name` overrides embedded Scalar docs. Leave those blank to use `config.layout`.
+6. Do not call `layout "recording_studio/default_layout"` or include `RecordingStudio::UsesDefaultLayout`. Call `recording_studio_layout { RecordingStudioApi.configuration.layout }` on the host controller. Fullscreen Scalar docs stay `layout: false`.
+7. Set `content_for :title` and `content_for :subtitle`. Remove the extra `FlatPack::PageTitle` so the layout renders one `<h1>`.
+8. Replace `recording_studio_page_nav` with `flat_pack_page_nav(round: true, style: :default, back_href:, back_tooltip:, anchor_href:, anchor_tooltip:)`. Register right-side actions with `register_page_nav "Label", path, role: :primary` or `recording_studio_page_nav_right`.
+9. `FlatPack::Card` takes `background:`, `border:`, and `shadow:`. It does not take `style:`.
+10. Load `flat_pack/variables`, `flat_pack/application`, and `flat_pack/rich_text` before the host Tailwind sheet.
+11. Sibling gems that still cap `recording_studio` below 5 need a Gemfile pin that allows `6.1.0`, or the same widen step this repo uses in `test/support/widen_recording_studio_requirement.rb` before `Bundler.setup`. `recording_studio_admin` `v2.7.0` already allows `6.1.0`, so that step does not rewrite its gemspec.
+
 ## Upgrading to 0.16.0
 
 `0.16.0` records `authorized_by` for an OAuth token on write events. The event actor is still the OAuth client or API client. No migration.

@@ -37,7 +37,7 @@
     </div>
   <% end %>
 
-  <%= render FlatPack::Card::Component.new(style: :default) do %>
+  <%= render FlatPack::Card::Component.new(background: :default) do %>
     <div class="requests-chart-gridlines">
       <%= render FlatPack::Chart::Component.new(
         card: false,

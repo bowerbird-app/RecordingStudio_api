@@ -1,26 +1,9 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
-  <% recording_studio_page_nav(
-    title: "API key",
-    page_nav_anchor_url: page_nav_close_url
-  ) %>
-
-  <%# Revoked badge removed per design: do not show warning button for revoked keys %>
-
-  <%= render FlatPack::PageTitle::Component.new(
-    title: "API key",
-    variant: :h1
-  ) %>
-
-  <div class="flex flex-wrap gap-3">
-    <% if @can_manage_access_request %>
-      <%= render FlatPack::Button::Component.new(
-        text: "Edit",
-        style: :primary,
-        size: :md,
-        href: edit_api_client_path(@api_client, page_nav_close_param)
-      ) %>
-    <% end %>
-  </div>
+  <% content_for :title, "API key" %>
+  <% flat_pack_page_nav(round: true, style: :default, anchor_href: page_nav_close_url, anchor_tooltip: "Close") %>
+  <% if @can_manage_access_request %>
+    <% register_page_nav "Edit", edit_api_client_path(@api_client, page_nav_close_param), role: :primary %>
+  <% end %>
 
   <% api_key_value = @latest_credential&.oauth_client_id || "Unknown" %>
   <% expiry_value = if @latest_credential.nil?

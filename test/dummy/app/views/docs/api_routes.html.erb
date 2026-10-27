@@ -1,9 +1,6 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
-  <%= render FlatPack::PageTitle::Component.new(
-    title: "API routes",
-    subtitle: "How the host app mounts the engine and how the engine declares the JSON API endpoints.",
-    variant: :h1
-  ) %>
+  <% content_for :title, "API routes" %>
+  <% content_for :subtitle, "How the host app mounts the engine and how the engine declares the JSON API endpoints." %>
 
   <%= render FlatPack::SectionTitle::Component.new(
     title: "Mount the engine",
@@ -99,7 +96,7 @@
     anchor_link: true,
   ) %>
 
-  <%= render FlatPack::Card::Component.new(style: :default) do %>
+  <%= render FlatPack::Card::Component.new(background: :default) do %>
     <%= render FlatPack::List::Component.new(divider: true, html_options: { id: "generated-endpoint-inventory" }) do %>
       <% @api_catalog.fetch(:endpoints, []).each do |endpoint| %>
         <%= render FlatPack::List::Item.new(icon: :link) do %>
@@ -122,7 +119,7 @@
     <% end %>
   <% end %>
 
-  <%= render FlatPack::Card::Component.new(style: :default) do %>
+  <%= render FlatPack::Card::Component.new(background: :default) do %>
     <%= render FlatPack::List::Component.new(divider: true) do %>
       <%= render FlatPack::List::Item.new(icon: :rectangle_group) do %>
         <span>Capability action routes stay grouped under their owning resource. Named endpoints sit beside those collections.</span>

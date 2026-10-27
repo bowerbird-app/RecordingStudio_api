@@ -1,9 +1,6 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
-  <%= render FlatPack::PageTitle::Component.new(
-    title: "Install",
-    subtitle: "Mount the renamed engine, copy migrations, and wire the host-app validation surface.",
-    variant: :h1
-  ) %>
+  <% content_for :title, "Install" %>
+  <% content_for :subtitle, "Mount the renamed engine, copy migrations, and wire the host-app validation surface." %>
 
   <%= render FlatPack::SectionTitle::Component.new(
     title: "1. Add the gem",

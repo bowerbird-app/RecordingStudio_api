@@ -1,9 +1,6 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
-  <%= render FlatPack::PageTitle::Component.new(
-    title: "Add API capability",
-    subtitle: "Register a capability-backed action so it appears on matching API resources.",
-    variant: :h1
-  ) %>
+  <% content_for :title, "Add API capability" %>
+  <% content_for :subtitle, "Register a capability-backed action so it appears on matching API resources." %>
 
   <%= render FlatPack::CodeBlock::Component.new(
     language: :ruby,
@@ -93,7 +90,7 @@
     anchor_link: true,
   ) %>
 
-  <%= render FlatPack::Card::Component.new(style: :default) do %>
+  <%= render FlatPack::Card::Component.new(background: :default) do %>
     <%= render FlatPack::List::Component.new(divider: true) do %>
       <%= render FlatPack::List::Item.new(icon: :key) do %>
         <span>The API core authenticates the credential and resolves <code>context.access_grant</code>.</span>

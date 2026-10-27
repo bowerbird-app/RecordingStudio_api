@@ -68,7 +68,6 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
 
       assert_response :success, "#{path} should render"
       assert_select "html[data-theme='rounded']", count: 1
-      assert_select "body[data-theme='rounded']", count: 1
       assert_select "body[data-recording-studio-default-layout='true']", count: 1
       assert_select "[data-controller='recording-studio-root-switchable--root-switch-dropdown']", count: 0
     end
@@ -547,9 +546,10 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     get "/recording_studio_api/api_clients"
 
     assert_response :success
+    assert_select "h1", text: "API keys", count: 1
     assert_includes response.body, "No API access given yet"
     assert_includes response.body, "Create API access from the demo home page to populate this list."
-    assert_select %(a[href="/recording_studio_api/api_clients/new?close_url=%2F"]), text: "New", count: 1
+    assert_select %(a[href="/recording_studio_api/api_clients/new?close_url=%2F"]), text: "New", count: 2
   end
 
   test "index subtitle falls back to root type label when multiple roots match" do

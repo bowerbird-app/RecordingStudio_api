@@ -58,7 +58,8 @@ class ConfigurationTest < Minitest::Test
     assert_equal false, configuration.documentation_enabled
     assert_nil configuration.documentation_access
     assert_nil configuration.documentation_layout_name
-    assert_equal "recording_studio/default_layout", configuration.layout_name
+    assert_nil configuration.layout_name
+    assert_nil configuration.layout
     assert_equal true, configuration.rate_limit_oauth_enabled
     assert_equal true, configuration.rate_limit_api_enabled
     assert_equal true, configuration.rate_limit_api_pre_auth_enabled
@@ -319,6 +320,37 @@ class ConfigurationTest < Minitest::Test
     @configuration.merge!(layout_name: "flat_pack_sidebar")
 
     assert_equal "flat_pack_sidebar", @configuration.layout_name
+    assert_equal "flat_pack_sidebar", @configuration.layout
+  end
+
+  def test_layout_accepts_nil_string_false_and_keyword_callable
+    @configuration.layout = nil
+    assert_nil @configuration.layout
+
+    @configuration.layout = "application"
+    assert_equal "application", @configuration.layout
+
+    @configuration.layout = false
+    assert_equal false, @configuration.layout
+
+    callable = ->(controller:) { controller.nil? ? "application" : "portal" }
+    @configuration.layout = callable
+    assert_equal callable, @configuration.layout
+    assert_equal :callable, @configuration.to_h.fetch(:layout)
+  end
+
+  def test_layout_rejects_invalid_values
+    assert_raises(ArgumentError) { @configuration.layout = 1 }
+    assert_raises(ArgumentError) { @configuration.layout = ->(_controller) { "application" } }
+    assert_raises(ArgumentError) { @configuration.layout = "" }
+  end
+
+  def test_blank_layout_name_clears_layout
+    @configuration.layout = "application"
+    @configuration.layout_name = ""
+
+    assert_nil @configuration.layout
+    assert_equal "", @configuration.layout_name
   end
 
   def test_merge_updates_admin_layout_name

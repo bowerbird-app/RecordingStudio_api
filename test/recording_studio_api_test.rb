@@ -8,16 +8,21 @@ class RecordingStudioApiTest < Minitest::Test
   end
 
   def test_version_pin
-    assert_equal "0.16.0", ::RecordingStudioApi::VERSION
+    assert_equal "0.17.0", ::RecordingStudioApi::VERSION
   end
 
   def test_metrics_dependency_pins
     root = File.expand_path("..", __dir__)
     gemspec = File.read(File.join(root, "recording_studio_api.gemspec"))
+    assert_includes gemspec, '"recording_studio", ">= 6.1.0"'
+    assert_includes gemspec, '"flat_pack", ">= 0.1.315"'
+    assert_includes gemspec, '"view_component", ">= 4.14", "< 5"'
     assert_includes gemspec, '"recording_studio_metrics", ">= 0.3.0", "< 1.0"'
     assert_includes gemspec, '"recording_studio_logs", ">= 0.4.1", "< 1.0"'
     %w[Gemfile test/dummy/Gemfile].each do |path|
       contents = File.read(File.join(root, path))
+      assert_includes contents, 'RecordingStudio", tag: "v6.1.0"', path
+      assert_includes contents, 'flatpack", ref: "1fcbafe94f8eb118f0a22182f63f5110fcc97a56"', path
       assert_includes contents, 'RecordingStudio_metrics", tag: "v0.5.0"', path
       assert_includes contents, 'RecordingStudio_logs", tag: "v0.5.0"', path
     end
@@ -48,8 +53,10 @@ class RecordingStudioApiTest < Minitest::Test
   def test_dummy_app_uses_default_layout
     application_controller_path = File.expand_path("dummy/app/controllers/application_controller.rb", __dir__)
     controller_source = File.read(application_controller_path)
-    assert_includes controller_source, "include RecordingStudio::UsesDefaultLayout"
-    assert_includes controller_source, '"recording_studio/default_layout"'
+    assert_includes controller_source, "recording_studio_layout"
+    assert_includes controller_source, "RecordingStudioApi.configuration.layout"
+    assert_not_includes controller_source, "UsesDefaultLayout"
+    assert_not_includes controller_source, "layout \"recording_studio/default_layout\""
     assert_not_includes controller_source, "flat_pack_admin_sidebar"
   end
 
@@ -66,7 +73,7 @@ class RecordingStudioApiTest < Minitest::Test
 
     assert_includes application_layout, '<html data-theme="rounded">'
     assert_includes sidebar_layout, '<html data-theme="rounded" class="h-full overflow-hidden overscroll-none">'
-    assert_includes application_controller, "include RecordingStudio::UsesDefaultLayout"
+    assert_includes application_controller, "recording_studio_layout"
     assert_not_includes application_controller, "RootSwitchDropdownHelper"
   end
 
@@ -118,13 +125,13 @@ class RecordingStudioApiTest < Minitest::Test
     folder_view_source = File.read(folder_view_path)
     admin_root_view_source = File.read(admin_root_view_path)
 
-    assert_includes standard_root_view_source, 'title: "Recording Studio API demo"'
+    assert_includes standard_root_view_source, 'content_for :title, "Recording Studio API demo"'
     assert_includes standard_root_view_source, "Demo to add and remove API access"
-    assert_includes standard_root_view_source, 'text: "API settings"'
+    assert_includes standard_root_view_source, 'register_page_nav "API settings"'
     assert_includes standard_root_view_source, "@api_admin_path"
-    assert_includes workspace_view_source, 'title: "Workspace"'
-    assert_includes folder_view_source, 'title: "Folder"'
-    assert_includes admin_root_view_source, 'title: "Admin"'
+    assert_includes workspace_view_source, 'content_for :title, "Workspace"'
+    assert_includes folder_view_source, 'content_for :title, "Folder"'
+    assert_includes admin_root_view_source, 'content_for :title, "Admin"'
     assert_includes admin_root_view_source, 'text: "Open Admin API"'
   end
 
@@ -142,7 +149,7 @@ class RecordingStudioApiTest < Minitest::Test
       elsif view_source.include?("scalar-api-reference")
         assert_includes view_source, "scalar-api-reference"
       else
-        assert_includes view_source, "FlatPack::PageTitle::Component"
+        assert_includes view_source, "content_for :title"
       end
     end
 
@@ -167,7 +174,7 @@ class RecordingStudioApiTest < Minitest::Test
     assert_includes recordable_types_view, "FlatPack::Table::Component"
 
     api_hierarchy_view = File.read(File.expand_path("dummy/app/views/docs/api_hierarchy.html.erb", __dir__))
-    assert_includes api_hierarchy_view, 'title: "API hierarchy"'
+    assert_includes api_hierarchy_view, 'content_for :title, "API hierarchy"'
     assert_includes api_hierarchy_view, "FlatPack::Tree::Component"
     assert_includes api_hierarchy_view, "render_recording_tree_nodes"
 
@@ -180,7 +187,7 @@ class RecordingStudioApiTest < Minitest::Test
   def test_dummy_recordings_tree_view_omits_structure_section_copy
     recordings_tree_view = File.read(File.expand_path("dummy/app/views/docs/recordings_tree.html.erb", __dir__))
 
-    assert_includes recordings_tree_view, 'title: "Recordings tree"'
+    assert_includes recordings_tree_view, 'content_for :title, "Recordings tree"'
     assert_includes recordings_tree_view, "FlatPack::Tree::Component"
     assert_includes recordings_tree_view, "render_recording_tree_nodes"
     assert_not_includes recordings_tree_view, "Current structure"
@@ -234,7 +241,7 @@ class RecordingStudioApiTest < Minitest::Test
     controller_source = File.read(controller_path)
 
     assert_includes controller_source, "include RecordingStudio::RootSwitchable::ControllerSupport"
-    assert_includes controller_source, "include RecordingStudio::UsesDefaultLayout"
+    assert_includes controller_source, "recording_studio_layout"
     assert_includes controller_source, 'current_root.recordable_type == "AdminRoot"'
   end
 

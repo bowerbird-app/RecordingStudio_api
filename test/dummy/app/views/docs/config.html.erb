@@ -1,9 +1,6 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
-  <%= render FlatPack::PageTitle::Component.new(
-    title: "Config",
-    subtitle: "How this gem loads and merges configuration.",
-    variant: :h1
-  ) %>
+  <% content_for :title, "Config" %>
+  <% content_for :subtitle, "How this gem loads and merges configuration." %>
 
   <%= render FlatPack::CodeBlock::Component.new(
     language: :ruby,
@@ -51,7 +48,7 @@
     CODE
   ) %>
 
-  <%= render FlatPack::Card::Component.new(style: :default) do %>
+  <%= render FlatPack::Card::Component.new(background: :default) do %>
     <%= render FlatPack::List::Component.new(divider: true) do %>
       <%= render FlatPack::List::Item.new(icon: :queue_list) do %>
         <span><code>config.api_versions</code> and <code>config.default_api_version</code> define the public API versions your app exposes.</span>

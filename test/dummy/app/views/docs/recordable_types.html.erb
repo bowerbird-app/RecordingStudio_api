@@ -1,9 +1,6 @@
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-6">
-  <%= render FlatPack::PageTitle::Component.new(
-    title: "Recordable types",
-    subtitle: "Distinct recordable types currently present in RecordingStudio::Recording.",
-    variant: :h1
-  ) %>
+  <% content_for :title, "Recordable types" %>
+  <% content_for :subtitle, "Distinct recordable types currently present in RecordingStudio::Recording." %>
 
   <% if @recordable_types.any? %>
     <%= render FlatPack::Table::Component.new(data: @recordable_types) do |table| %>

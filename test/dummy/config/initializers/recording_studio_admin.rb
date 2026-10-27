@@ -16,7 +16,7 @@ RecordingStudioAdmin.configure do |config|
       .find_by(recordable: admin_root)
   end
   config.site_admin_recording_resolver = config.access_recording_resolver
-  config.engine_layout = RecordingStudioApi.configuration.layout_name.presence || "application"
+  config.layout = "recording_studio/default_layout"
 end
 
 Rails.application.config.to_prepare do

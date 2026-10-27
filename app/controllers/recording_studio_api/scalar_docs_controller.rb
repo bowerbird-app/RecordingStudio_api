@@ -2,7 +2,10 @@
 
 module RecordingStudioApi
   class ScalarDocsController < ApplicationController
-    layout :scalar_docs_layout
+    recording_studio_layout do
+      docs_layout = @api_definition&.documentation_layout_name
+      docs_layout.present? ? docs_layout : RecordingStudioApi.configuration.layout
+    end
 
     before_action :load_api_definition
     before_action :ensure_documentation_enabled
@@ -105,12 +108,6 @@ module RecordingStudioApi
       return Current.actor if defined?(Current) && Current.respond_to?(:actor)
 
       nil
-    end
-
-    def scalar_docs_layout
-      @api_definition&.documentation_layout_name.presence ||
-        RecordingStudioApi.configuration.layout_name.presence ||
-        "recording_studio/default_layout"
     end
 
     def prepare_documentation_extension
