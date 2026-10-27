@@ -50,7 +50,7 @@ require "recording_studio_api/services/revoke_oauth_access_token"
 require "recording_studio_api/services/authenticate_oauth_access_token"
 require "recording_studio_api/services/issue_test_credential"
 require "recording_studio_api/services/revoke_test_credential"
-require "recording_studio_api/services/move_recording"
+require "recording_studio_moveable"
 require "recording_studio_api/services/documentation_catalog"
 require "recording_studio_api/services/openapi_document"
 require "recording_studio_api/services/paginate_resource_collection"
@@ -450,29 +450,8 @@ module RecordingStudioApi
     end
 
     def register_default_capability_actions!(api: nil)
-      if api.nil?
-        configuration.each_api { |definition| register_default_capability_actions!(api: definition.name) }
-        return
-      end
-      return unless moveable_available? && capability_action(:move, api: api).nil?
-
-      register_capability_action(
-        :move,
-        capability: :movable,
-        http_verb: :post,
-        required_role: :edit,
-        handler: RecordingStudioApi::Services::MoveRecording,
-        serializer: RecordingStudioApi::Serializers::ResourceRecordingSerializer,
-        input_contract: {
-          reject_unknown: true,
-          fields: {
-            parent_id: { type: :string, required: false, allow_blank: false },
-            destination_id: { type: :string, required: false, allow_blank: false },
-            new_parent_id: { type: :string, required: false, allow_blank: false }
-          }
-        },
-        api: api
-      )
+      configuration.fetch_api(api) unless api.nil?
+      RecordingStudio::Moveable::Api.register_capability_action!
     end
 
     def register_default_resource_actions!(api: nil)
@@ -552,11 +531,6 @@ module RecordingStudioApi
       return if normalized.blank?
 
       normalized.start_with?("v") ? normalized : "v#{normalized}"
-    end
-
-    def moveable_available?
-      defined?(RecordingStudio::Moveable::Capabilities::Moveable) &&
-        defined?(RecordingStudioApi::Services::MoveRecording)
     end
 
     def with_registered_endpoint_lookup(request)

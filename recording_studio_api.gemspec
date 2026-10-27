@@ -28,6 +28,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency "recording_studio_accessible", "~> 0.11"
   spec.add_dependency "recording_studio_logs", ">= 0.4.1", "< 1.0"
   spec.add_dependency "recording_studio_metrics", ">= 0.3.0", "< 1.0"
+  spec.add_dependency "recording_studio_moveable", "~> 4.0"
   spec.add_dependency "recording_studio_trashable", "~> 0.10"
   spec.add_dependency "redis", "~> 5.3"
   spec.add_dependency "view_component", ">= 4.14", "< 5"

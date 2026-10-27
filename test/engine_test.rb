@@ -282,17 +282,13 @@ class EngineTest < Minitest::Test
     assert_equal [:ReportsController], RecordingStudioApi::Engine.send(:extension_keys_for, plain)
   end
 
-  def test_register_default_capability_actions_adds_move_when_moveable_addon_is_loaded
-    moveable_module = Module.new
+  def test_register_default_capability_actions_delegates_move_to_moveable
+    RecordingStudioApi.register_default_capability_actions!
 
-    with_temporary_nested_constant(:RecordingStudio, :Moveable, Module.new) do
-      RecordingStudio::Moveable.const_set(:Capabilities, Module.new)
-      RecordingStudio::Moveable::Capabilities.const_set(:Moveable, moveable_module)
-
-      RecordingStudioApi.register_default_capability_actions!
-    end
-
-    assert_equal :movable, RecordingStudioApi.capability_action(:move).capability
+    action = RecordingStudioApi.capability_action(:move)
+    assert_equal :movable, action.capability
+    assert_equal RecordingStudio::Moveable::Api::MoveRecording, action.handler
+    assert_equal "1.0.0", action.version.to_s
   end
 
   def test_register_default_resource_actions_adds_core_resource_operations
@@ -312,20 +308,6 @@ class EngineTest < Minitest::Test
   end
 
   private
-
-  def with_temporary_nested_constant(parent_name, child_name, value)
-    parent_defined = Object.const_defined?(parent_name, false)
-    parent = parent_defined ? Object.const_get(parent_name) : Object.const_set(parent_name, Module.new)
-    child_defined = parent.const_defined?(child_name, false)
-    previous_child = parent.const_get(child_name) if child_defined
-
-    parent.const_set(child_name, value)
-    yield
-  ensure
-    parent.send(:remove_const, child_name) if parent.const_defined?(child_name, false)
-    parent.const_set(child_name, previous_child) if child_defined
-    Object.send(:remove_const, parent_name) unless parent_defined
-  end
 
   def find_initializer(name)
     RecordingStudioApi::Engine.initializers.find { |initializer| initializer.name == name }

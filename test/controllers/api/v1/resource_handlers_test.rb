@@ -103,7 +103,8 @@ class ApiV1ResourceHandlersTest < ActionDispatch::IntegrationTest
          headers: authorization_headers
 
     assert_response :unprocessable_entity
-    assert_equal "Invalid input for action move", JSON.parse(response.body).dig("error", "message")
+    assert_equal "unsupported_action", JSON.parse(response.body).dig("error", "code")
+    assert_equal "parent_id is required for move", JSON.parse(response.body).dig("error", "message")
     assert_nil JSON.parse(response.body)["handled"]
     assert_equal folder_parent_id, @folder_recording.reload.parent_recording_id
   end

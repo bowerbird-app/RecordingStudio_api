@@ -42,9 +42,9 @@ GIT
 
 GIT
   remote: https://github.com/bowerbird-app/RecordingStudio_icons.git
-  revision: 7c32c08d4c0a28dca5cfcb624d1beb03632f79b0
+  revision: 656755bcc835b24990faea3c5c11a0dfc1f6135d
   specs:
-    recording_studio_icons (0.1.0)
+    recording_studio_icons (0.1.1)
       rails (>= 8.1.0)
 
 GIT
@@ -67,14 +67,16 @@ GIT
 
 GIT
   remote: https://github.com/bowerbird-app/RecordingStudio_moveable.git
-  revision: d0e2663c7791fdd234347f9ffafa57af83b17250
-  tag: v3.3.0
+  revision: 0fdf5fa113a0853ed4e2a0ddf7601965867b88e1
+  tag: v4.0.0
   specs:
-    recording_studio_moveable (3.3.0)
+    recording_studio_moveable (4.0.0)
+      flat_pack (>= 0.1.315)
       rails (>= 8.1.0, < 9.0)
       recording_studio (>= 6.1.0)
       recording_studio_accessible (~> 0.6)
       recording_studio_icons (>= 0.1.0)
+      view_component (>= 4.14, < 5)
 
 GIT
   remote: https://github.com/bowerbird-app/RecordingStudio_root_switchable.git
@@ -115,13 +117,14 @@ GIT
 PATH
   remote: ../..
   specs:
-    recording_studio_api (0.17.1)
+    recording_studio_api (0.18.0)
       flat_pack (>= 0.1.315)
       rails (~> 8.1.0)
       recording_studio (>= 6.1.0)
       recording_studio_accessible (~> 0.11)
       recording_studio_logs (>= 0.4.1, < 1.0)
       recording_studio_metrics (>= 0.3.0, < 1.0)
+      recording_studio_moveable (~> 4.0)
       recording_studio_trashable (~> 0.10)
       redis (~> 5.3)
       view_component (>= 4.14, < 5)
@@ -618,12 +621,12 @@ CHECKSUMS
   recording_studio (6.1.0)
   recording_studio_accessible (0.22.1)
   recording_studio_admin (2.7.0)
-  recording_studio_api (0.17.1)
+  recording_studio_api (0.18.0)
   recording_studio_cache (0.6.0)
-  recording_studio_icons (0.1.0)
+  recording_studio_icons (0.1.1)
   recording_studio_logs (0.5.0)
   recording_studio_metrics (0.5.0)
-  recording_studio_moveable (3.3.0)
+  recording_studio_moveable (4.0.0)
   recording_studio_root_switchable (0.11.0)
   recording_studio_trashable (0.12.0)
   redis (5.4.1) sha256=b5e675b57ad22b15c9bcc765d5ac26f60b675408af916d31527af9bd5a81faae

@@ -13,6 +13,7 @@ class Folder < ApplicationRecord
   RecordingStudio.enable_capability(:accessible, on: self)
   RecordingStudio.enable_capability(:api_access_point, on: self)
   RecordingStudio.enable_capability(:movable, on: self)
+  include RecordingStudio::Capabilities::Moveable.to(allow_cross_root: false)
 
   recording_studio_admin_sections do
     section :api

@@ -201,7 +201,7 @@ class AuthorizedByTest < ActiveSupport::TestCase
     assert_equal %w[api_action authorized_by_id authorized_by_type], oauth_event.metadata.keys.sort
   end
 
-  test "move metadata keeps its own keys and adds authorized_by" do
+  test "move metadata keeps Moveable's keys and does not stamp authorized_by" do
     payload = provision_api_client_for(access_recording: @access_recording, name: "Move writer")
     recording = MoveCapture.new
     destination = Object.new
@@ -228,7 +228,7 @@ class AuthorizedByTest < ActiveSupport::TestCase
       }
     )
 
-    assert_equal recording, RecordingStudioApi::Services::MoveRecording.call(context)
+    assert_equal recording, RecordingStudio::Moveable::Api::MoveRecording.call(context)
 
     metadata = recording.calls.fetch(0).fetch(:metadata)
     assert_equal payload.fetch(:api_client), recording.calls.fetch(0).fetch(:actor)
@@ -236,11 +236,7 @@ class AuthorizedByTest < ActiveSupport::TestCase
     assert_equal "move", metadata[:api_action]
     assert_equal payload.fetch(:api_client).id, metadata[:api_client_id]
     assert_equal payload.fetch(:credential).id, metadata[:api_credential_id]
-    assert_equal "User", metadata[:authorized_by_type]
-    assert_equal @user.id, metadata[:authorized_by_id]
-    assert_single_authorized_by_keys(metadata)
-    refute_equal "Spoof", metadata[:authorized_by_type]
-    refute_equal "spoof-string", metadata[:authorized_by_id].to_s
+    assert_no_authorized_by_keys(metadata)
   end
 
   test "explicit authorized_by stamps the same metadata as the lazy access grant" do
