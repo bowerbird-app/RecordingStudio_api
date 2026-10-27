@@ -309,6 +309,20 @@ class EngineTest < Minitest::Test
 
   private
 
+  def with_temporary_nested_constant(parent_name, child_name, value)
+    parent_defined = Object.const_defined?(parent_name, false)
+    parent = parent_defined ? Object.const_get(parent_name) : Object.const_set(parent_name, Module.new)
+    child_defined = parent.const_defined?(child_name, false)
+    previous_child = parent.const_get(child_name) if child_defined
+
+    parent.const_set(child_name, value)
+    yield
+  ensure
+    parent.send(:remove_const, child_name) if parent.const_defined?(child_name, false)
+    parent.const_set(child_name, previous_child) if child_defined
+    Object.send(:remove_const, parent_name) unless parent_defined
+  end
+
   def find_initializer(name)
     RecordingStudioApi::Engine.initializers.find { |initializer| initializer.name == name }
   end
