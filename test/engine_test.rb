@@ -282,17 +282,13 @@ class EngineTest < Minitest::Test
     assert_equal [:ReportsController], RecordingStudioApi::Engine.send(:extension_keys_for, plain)
   end
 
-  def test_register_default_capability_actions_adds_move_when_moveable_addon_is_loaded
-    moveable_module = Module.new
+  def test_register_default_capability_actions_delegates_move_to_moveable
+    RecordingStudioApi.register_default_capability_actions!
 
-    with_temporary_nested_constant(:RecordingStudio, :Moveable, Module.new) do
-      RecordingStudio::Moveable.const_set(:Capabilities, Module.new)
-      RecordingStudio::Moveable::Capabilities.const_set(:Moveable, moveable_module)
-
-      RecordingStudioApi.register_default_capability_actions!
-    end
-
-    assert_equal :movable, RecordingStudioApi.capability_action(:move).capability
+    action = RecordingStudioApi.capability_action(:move)
+    assert_equal :movable, action.capability
+    assert_equal RecordingStudio::Moveable::Api::MoveRecording, action.handler
+    assert_equal "1.0.0", action.version.to_s
   end
 
   def test_register_default_resource_actions_adds_core_resource_operations

@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-10-27
+
+### Changed
+- `recording_studio_moveable` is a runtime dependency (`~> 4.0`). Development
+  and dummy Gemfiles pin GitHub tag `v4.0.1`.
+- Default `:move` capability action uses Moveable's
+  `RecordingStudio::Moveable::Api::MoveRecording` handler and registration.
+  `RecordingStudioApi::Services::MoveRecording` is gone.
+
+### Upgrade notes
+- Bump to `0.18.0`. No host migration.
+- Pin Moveable `v4.0.1` (`~> 4.0`). Hosts that already had Moveable as a
+  companion gem should move the pin to `v4.0.1`.
+- Do not call `RecordingStudioApi::Services::MoveRecording`. Move HTTP and
+  MCP actions still live at `POST .../actions/move` with `parent_id`,
+  `destination_id`, or `new_parent_id`.
+- Moveable v4 layout/nav breaking changes apply only to Moveable's own
+  screens, not this gem's HTTP API.
+- API-visible move differences from Moveable's handler: a missing destination
+  is `unsupported_action` (`parent_id is required for move`) instead of
+  `invalid_input`. OAuth move events stamp `authorized_by_type` /
+  `authorized_by_id` via Moveable `>= 4.0.1` (`context.with_authorized_by`).
+
 ## [0.17.1] - 2026-10-27
 
 ### Changed
@@ -840,7 +863,11 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.15.1...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.17.1...v0.18.0
+[0.17.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.17.0...v0.17.1
+[0.17.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.16.0...v0.17.0
+[0.16.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.15.1...v0.16.0
 [0.15.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.14.1...v0.15.0
 [0.14.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.14.0...v0.14.1

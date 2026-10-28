@@ -228,7 +228,7 @@ class AuthorizedByTest < ActiveSupport::TestCase
       }
     )
 
-    assert_equal recording, RecordingStudioApi::Services::MoveRecording.call(context)
+    assert_equal recording, RecordingStudio::Moveable::Api::MoveRecording.call(context)
 
     metadata = recording.calls.fetch(0).fetch(:metadata)
     assert_equal payload.fetch(:api_client), recording.calls.fetch(0).fetch(:actor)

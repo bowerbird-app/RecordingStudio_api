@@ -1,5 +1,31 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.18.0
+
+`0.18.0` takes Moveable `v4.0.1` as a runtime dependency and lets Moveable
+own the move action. No migration.
+
+1. Bump the host gem to `0.18.0`.
+2. Pin `recording_studio_moveable` to GitHub tag `v4.0.1` (`~> 4.0`).
+3. Remove any host calls to `RecordingStudioApi::Services::MoveRecording`.
+   `RecordingStudioApi.register_default_capability_actions!` registers
+   Moveable's handler (`RecordingStudio::Moveable::Api::MoveRecording`).
+4. Keep posting `parent_id`, `destination_id`, or `new_parent_id` to
+   `POST .../actions/move`. Destination still has to be in the authenticated
+   API scope.
+5. A request with no destination now returns `unsupported_action` with
+   `parent_id is required for move` (still HTTP 422). Moveable's contract
+   drops `api_key` / `api_version` so those route keys are not treated as
+   unknown body fields.
+6. OAuth move events stamp `authorized_by_type` / `authorized_by_id` via
+   Moveable `>= 4.0.1`. Update and other resource writes still stamp those
+   keys. Move metadata also includes `api_action`, `api_client_id`, and
+   `api_credential_id`.
+7. Moveable 4.0 itself requires RecordingStudio `>= 6.1.0` and Flatpack
+   `>= 0.1.315`, drops `config.full_page_layout`, and routes its own screens
+   through `config.layout`. That is Moveable UI. This gem's JSON move
+   endpoint does not change layout.
+
 ## Upgrading to 0.17.0
 
 `0.17.0` adopts Recording Studio `v6.1.0` and Flatpack `0.1.319`. No migration.
