@@ -11,15 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - `recording_studio_moveable` is a runtime dependency (`~> 4.0`). Development
-  and dummy Gemfiles pin GitHub tag `v4.0.0`.
+  and dummy Gemfiles pin GitHub tag `v4.0.1`.
 - Default `:move` capability action uses Moveable's
   `RecordingStudio::Moveable::Api::MoveRecording` handler and registration.
   `RecordingStudioApi::Services::MoveRecording` is gone.
 
 ### Upgrade notes
 - Bump to `0.18.0`. No host migration.
-- Pin Moveable `v4.0.0` (`~> 4.0`). Hosts that already had Moveable as a
-  companion gem should move the pin to `v4.0.0`.
+- Pin Moveable `v4.0.1` (`~> 4.0`). Hosts that already had Moveable as a
+  companion gem should move the pin to `v4.0.1`.
 - Do not call `RecordingStudioApi::Services::MoveRecording`. Move HTTP and
   MCP actions still live at `POST .../actions/move` with `parent_id`,
   `destination_id`, or `new_parent_id`.
@@ -27,9 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   screens, not this gem's HTTP API.
 - API-visible move differences from Moveable's handler: a missing destination
   is `unsupported_action` (`parent_id is required for move`) instead of
-  `invalid_input`; OAuth move events no longer stamp `authorized_by_type` /
-  `authorized_by_id` (Moveable's metadata is `api_action`, `api_client_id`,
-  `api_credential_id`).
+  `invalid_input`. OAuth move events stamp `authorized_by_type` /
+  `authorized_by_id` via Moveable `>= 4.0.1` (`context.with_authorized_by`).
 
 ## [0.17.1] - 2026-10-27
 

@@ -27,7 +27,7 @@ class RecordingStudioApiTest < Minitest::Test
       assert_includes contents, 'RecordingStudio_accessible", tag: "v0.22.1"', path
       assert_includes contents, 'RecordingStudio_trashable", tag: "v0.12.0"', path
       assert_includes contents, 'RecordingStudio_root_switchable", tag: "v0.11.0"', path
-      assert_includes contents, 'RecordingStudio_moveable", tag: "v4.0.0"', path
+      assert_includes contents, 'RecordingStudio_moveable", tag: "v4.0.1"', path
       assert_includes contents, 'RecordingStudio_cache", tag: "v0.6.0"', path
       assert_includes contents, 'RecordingStudio_metrics", tag: "v0.5.0"', path
       assert_includes contents, 'RecordingStudio_logs", tag: "v0.5.0"', path
