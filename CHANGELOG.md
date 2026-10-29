@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.1] - 2026-10-29
+
+### Changed
+- Gemspec `recording_studio` dependency `>= 6.1.0` → `>= 6.1.0, < 7`. The previous range had no ceiling. Core 7 is not released, so it stays outside the range. The floor stays `6.1.0`. Development and dummy Gemfiles still pin GitHub tag `v6.1.0`.
+- Lock bumps for Bundler Audit: `bcrypt` `3.1.21` → `3.1.22`, `devise` `5.0.1` → `5.0.4` (and `responders` `3.2.0` → `3.2.1`), `puma` `7.1.0` → `7.2.1` in the root and dummy locks. Dummy also moves `msgpack` `1.8.0` → `1.8.6` and `net-ssh` `7.3.0` → `7.3.8`.
+
+### Upgrade notes
+- Bump to `0.18.1`. No migration.
+- Hosts on Recording Studio 6.1 through 6.x can bundle this release. A future core 7 needs a later API release.
+- Core 4.2 and 4.7 stay outside the range. Runtime calls `RecordingStudio::ControllerLayout` and `RecordingStudio::Layout.accept` (present since core 5; core 4.x has `RecordingStudio::UsesDefaultLayout` instead). `recording_studio_moveable ~> 4.0` also requires Recording Studio `>= 6.1.0`.
+- Tag `v0.5.5` still declares `recording_studio ~> 4.2` and includes `UsesDefaultLayout`. That tag does not run on core 6.x. Use `0.18.1` (or `0.17.0`+) for a host on core 6.3.
+
 ## [0.18.0] - 2026-10-27
 
 ### Changed
@@ -863,7 +875,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.1...HEAD
+[0.18.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.0...v0.18.1
 [0.18.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.17.1...v0.18.0
 [0.17.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.17.0...v0.17.1
 [0.17.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.16.0...v0.17.0

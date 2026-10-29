@@ -8,13 +8,29 @@ class RecordingStudioApiTest < Minitest::Test
   end
 
   def test_version_pin
-    assert_equal "0.18.0", ::RecordingStudioApi::VERSION
+    assert_equal "0.18.1", ::RecordingStudioApi::VERSION
+  end
+
+  def test_gemspec_allows_recording_studio_6_1_through_6
+    root = File.expand_path("..", __dir__)
+    gemspec_path = File.join(root, "recording_studio_api.gemspec")
+    gemspec = File.read(gemspec_path)
+    spec = Gem::Specification.load(gemspec_path)
+    dependency = spec.dependencies.find { |dep| dep.name == "recording_studio" }
+
+    assert_includes gemspec, 'spec.add_dependency "recording_studio", ">= 6.1.0", "< 7"'
+    assert dependency.requirement.satisfied_by?(Gem::Version.new("6.1.0"))
+    assert dependency.requirement.satisfied_by?(Gem::Version.new("6.3.0"))
+    # Core 4.x has UsesDefaultLayout and does not provide ControllerLayout or Layout.accept.
+    refute dependency.requirement.satisfied_by?(Gem::Version.new("4.2.0"))
+    refute dependency.requirement.satisfied_by?(Gem::Version.new("4.7.0"))
+    refute dependency.requirement.satisfied_by?(Gem::Version.new("7.0.0"))
   end
 
   def test_metrics_dependency_pins
     root = File.expand_path("..", __dir__)
     gemspec = File.read(File.join(root, "recording_studio_api.gemspec"))
-    assert_includes gemspec, '"recording_studio", ">= 6.1.0"'
+    assert_includes gemspec, '"recording_studio", ">= 6.1.0", "< 7"'
     assert_includes gemspec, '"flat_pack", ">= 0.1.315"'
     assert_includes gemspec, '"view_component", ">= 4.14", "< 5"'
     assert_includes gemspec, '"recording_studio_metrics", ">= 0.3.0", "< 1.0"'

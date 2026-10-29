@@ -8,8 +8,8 @@ This Rails app exists to validate the RecordingStudio API integration surface an
 - `Current.actor` wiring for Recording Studio events
 - A dedicated admin root rendered through the host app root page
 - `RecordingStudioRootSwitchable` mounted root chooser for switching between admin and standard roots
-- RecordingStudio 4.2 hierarchy declarations for root-capable `Workspace`/`Folder`, child-only `Page`, API-owned recordables, and accessible parent grants (Accessible `0.11`)
-- `RecordingStudio::UsesDefaultLayout` from the Recording Studio gem (rounded theme on `html` / `body`; no vendored layout copy)
+- Recording Studio 6.1 hierarchy declarations for root-capable `Workspace`/`Folder`, child-only `Page`, API-owned recordables, and accessible parent grants (Accessible `~> 0.11`, dummy tag `v0.22.1`). Gemspec core range is `>= 6.1.0, < 7`; the dummy Gemfile stays on GitHub tag `v6.1.0`
+- `recording_studio_layout` (rounded theme on `html` / `body`; no vendored layout copy). The dummy does not include `RecordingStudio::UsesDefaultLayout`
 - Root workspace plus seeded folder and page recordables
 - FlatPack layout integration and Tailwind source scanning
 - Mounted `RecordingStudio::Engine` route behavior inside a host app
@@ -69,4 +69,4 @@ The custom `featured_folder` relationship is embed-only; it intentionally has no
 
 Use this app to verify the renamed engine integration, the admin-root flow, and the API-key OAuth2 client credentials flow in a host app. If a layout, route, asset source, token exchange, access-grant dispatch, root switch, or Recording Studio initializer change breaks here, the RecordingStudio API scaffold needs adjustment before deeper feature work.
 
-Authenticated pages include `RecordingStudio::UsesDefaultLayout` and render the gem's `recording_studio/default_layout` (theme `rounded` on `body`; dummy also stamps `data-theme="rounded"` on `html`). API-key screens do not render the root-switch dropdown. The home page in `app/views/home/standard_root.html.erb` stays intentionally small and links into this gem's API key screens. Use the dedicated docs pages for deeper install, config, auth, and API route notes.
+Authenticated pages call `recording_studio_layout` and render the gem's `recording_studio/default_layout` (theme `rounded` on `body`; dummy also stamps `data-theme="rounded"` on `html`). API-key screens do not render the root-switch dropdown. The home page in `app/views/home/standard_root.html.erb` stays intentionally small and links into this gem's API key screens. Use the dedicated docs pages for deeper install, config, auth, and API route notes.

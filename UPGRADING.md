@@ -1,5 +1,14 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.18.1
+
+`0.18.1` caps Recording Studio at `>= 6.1.0, < 7`. No migration.
+
+1. Bump the host gem to `0.18.1`.
+2. Stay on Recording Studio 6.1 through 6.x. Core 7 is outside this release.
+3. Do not resolve this gem against Recording Studio 4.x. The engine calls `RecordingStudio::ControllerLayout` and `RecordingStudio::Layout.accept`. Moveable `~> 4.0` also requires Recording Studio `>= 6.1.0`.
+4. Development and dummy apps stay on GitHub tag `v6.1.0`.
+
 ## Upgrading to 0.18.0
 
 `0.18.0` takes Moveable `v4.0.1` as a runtime dependency and lets Moveable

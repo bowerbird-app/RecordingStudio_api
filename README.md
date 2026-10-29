@@ -8,7 +8,7 @@ Companion pins on current main: Trashable `~> 0.10` / `v0.12.0`
 (query-only), Admin `v2.7.0`, Moveable `~> 4.0` / `v4.0.1`, Root Switchable
 `v0.11.0`, Cache `v0.6.0` (development/test), Accessible `~> 0.11` /
 `v0.22.1`, RecordingStudio `v6.1.0`
-(`>= 6.1.0`), Flatpack `0.1.320`
+(`>= 6.1.0, < 7`), Flatpack `0.1.320`
 (`tag: v0.1.320`, `>= 0.1.315`),
 Metrics `v0.5.0` (`>= 0.3.0, < 1.0`), Logs `v0.5.0` (`>= 0.4.1, < 1.0`). Recording Studio MCP `v0.17.0`
 allows this gem at `>= 0.11.0, < 0.12`, so it cannot take `0.12.0` or `0.13.0` until
@@ -1058,7 +1058,7 @@ with Draft off to load a new pack. See
 | Rails           | ~> 8.1.1 |
 | PostgreSQL      | 16      |
 | TailwindCSS     | 4       |
-| RecordingStudio | v4.6.0 (pinned in `test/dummy/Gemfile`) |
+| RecordingStudio | 6.1 through 6.x (`>= 6.1.0, < 7` in the gemspec; dummy GitHub tag `v6.1.0`) |
 | FlatPack        | v0.1.143 (pinned in `test/dummy/Gemfile`) |
 | Devise          | latest  |
 
