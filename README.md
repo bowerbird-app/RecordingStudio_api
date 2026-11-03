@@ -8,8 +8,8 @@ Companion pins on current main: Trashable `~> 0.10` / `v0.12.0`
 (query-only), Admin `v2.7.0`, Moveable `~> 4.0` / `v4.0.1`, Root Switchable
 `v0.11.0`, Cache `v0.6.0` (development/test), Accessible `~> 0.11` /
 `v0.22.1`, RecordingStudio `v6.1.0`
-(`>= 6.1.0`), Flatpack `0.1.320`
-(`tag: v0.1.320`, `>= 0.1.315`),
+(`>= 6.1.0`), Flatpack `0.1.341`
+(`tag: v0.1.341`, `>= 0.1.341`),
 Metrics `v0.5.0` (`>= 0.3.0, < 1.0`), Logs `v0.5.0` (`>= 0.4.1, < 1.0`). Recording Studio MCP `v0.17.0`
 allows this gem at `>= 0.11.0, < 0.12`, so it cannot take `0.12.0` or `0.13.0` until
 MCP widens that pin. Recording Studio Oauth `v0.12.2`

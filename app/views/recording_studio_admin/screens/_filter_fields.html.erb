@@ -6,9 +6,9 @@
         end_name: filter.end_param,
         start_value: filter.value&.start_date,
         end_value: filter.value&.end_date,
-        label: filter.key.to_s.humanize
+        label: filter.key.to_s.humanize,
+        preset_name: filter.preset_param
       ) %>
-      <%= hidden_field_tag filter.preset_param, filter.value&.preset_key %>
     <% else %>
       <% raw_options = filter.options[:values] || filter.options[:options] %>
       <% raw_options = raw_options.call if raw_options.respond_to?(:call) %>
