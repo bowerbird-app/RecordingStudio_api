@@ -40,13 +40,13 @@ class RecordingStudioApiTest < Minitest::Test
     end
   end
 
-  def test_date_range_filter_uses_flatpack_preset_name
+  def test_date_range_filter_keeps_admin_preset_hidden_field
     root = File.expand_path("..", __dir__)
     filter_fields = File.read(File.join(root, "app/views/recording_studio_admin/screens/_filter_fields.html.erb"))
     logs_content = File.read(File.join(root, "app/views/recording_studio_api/admin_logs/_content.html.erb"))
 
-    assert_includes filter_fields, "preset_name: filter.preset_param"
-    refute_includes filter_fields, "hidden_field_tag"
+    refute_includes filter_fields, "preset_name:"
+    assert_includes filter_fields, "hidden_field_tag filter.preset_param, filter.value&.preset_key"
     refute_includes logs_content, "admin-logs-date-range-submit"
     refute_includes logs_content, "submitOnApply"
     assert_includes logs_content, "change->flat-pack--auto-submit#queueSubmit"

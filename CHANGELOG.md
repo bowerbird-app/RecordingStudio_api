@@ -12,10 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `flat_pack` is `>= 0.1.341`. Development and dummy Gemfiles pin GitHub tag
   `v0.1.341`.
-- Admin screen date-range filters pass FlatPack `DateRangeInput` `preset_name:`
-  instead of a hand-written hidden preset field.
 - Legacy API logs date-range filter submits on FlatPack Apply `change` through
-  `flat-pack--auto-submit` only. The dummy click hook is gone.
+  `flat-pack--auto-submit` only. The dummy click hook is gone so Apply does not
+  double-submit.
+- Admin `_filter_fields` still posts `date_range_preset` with a hidden field.
+  FlatPack `preset_name:` only fills that field when start and end match a
+  picker preset. Admin `last_4_weeks` is a four-week duration, not the picker's
+  named 27-day `last_4_weeks`.
 
 ### Upgrade notes
 - Bump to `0.18.1`. No host migration.
