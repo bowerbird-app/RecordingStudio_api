@@ -1,5 +1,14 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.18.3
+
+`0.18.3` keeps `view_component` 4.22.0 (`>= 4.14`, `< 5`) for
+GHSA-8qw7-6phv-7q6p. No migration. Flatpack stays `v0.1.341`.
+
+1. Bump the host gem to `0.18.3`.
+2. Keep `view_component` at `>= 4.14`, `< 5`. Do not stay on `4.12.x`.
+3. Keep Flatpack at `v0.1.341`.
+
 ## Upgrading to 0.18.2
 
 `0.18.2` refreshes companion GitHub tags. No migration. Gemspec floors stay
