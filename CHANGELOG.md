@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.3] - 2026-11-04
+
+### Security
+- Lockfiles stay on `view_component` 4.22.0 (`>= 4.14`, `< 5`) so
+  GHSA-8qw7-6phv-7q6p (`view_component` `<= 4.13.0`) stays patched. Flatpack
+  stays `v0.1.341`.
+
+### Upgrade notes
+- Bump to `0.18.3`. No host migration.
+- Keep `view_component` at `>= 4.14`, `< 5`. Do not stay on `4.12.x`.
+
 ## [0.18.2] - 2026-11-04
 
 ### Changed
@@ -895,7 +906,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.2...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.3...HEAD
+[0.18.3]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.2...v0.18.3
 [0.18.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.1...v0.18.2
 [0.18.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.0...v0.18.1
 [0.18.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.17.1...v0.18.0
