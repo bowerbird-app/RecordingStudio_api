@@ -8,7 +8,7 @@ class RecordingStudioApiTest < Minitest::Test
   end
 
   def test_version_pin
-    assert_equal "0.18.1", ::RecordingStudioApi::VERSION
+    assert_equal "0.18.2", ::RecordingStudioApi::VERSION
   end
 
   def test_metrics_dependency_pins
@@ -22,15 +22,17 @@ class RecordingStudioApiTest < Minitest::Test
     assert_includes gemspec, '"recording_studio_moveable", "~> 4.0"'
     %w[Gemfile test/dummy/Gemfile].each do |path|
       contents = File.read(File.join(root, path))
-      assert_includes contents, 'RecordingStudio", tag: "v6.1.0"', path
+      assert_includes contents, 'RecordingStudio", tag: "v6.3.0"', path
       assert_includes contents, 'flatpack", tag: "v0.1.341"', path
-      assert_includes contents, 'RecordingStudio_accessible", tag: "v0.22.1"', path
-      assert_includes contents, 'RecordingStudio_trashable", tag: "v0.12.0"', path
-      assert_includes contents, 'RecordingStudio_root_switchable", tag: "v0.11.0"', path
-      assert_includes contents, 'RecordingStudio_moveable", tag: "v4.0.1"', path
-      assert_includes contents, 'RecordingStudio_cache", tag: "v0.6.0"', path
-      assert_includes contents, 'RecordingStudio_metrics", tag: "v0.5.0"', path
-      assert_includes contents, 'RecordingStudio_logs", tag: "v0.5.0"', path
+      assert_includes contents, 'RecordingStudio_accessible", tag: "v0.24.0"', path
+      assert_includes contents, 'RecordingStudio_trashable", tag: "v0.12.2"', path
+      assert_includes contents, 'RecordingStudio_root_switchable", tag: "v0.11.4"', path
+      assert_includes contents, 'RecordingStudio_moveable", tag: "v4.1.0"', path
+      assert_includes contents, 'RecordingStudio_cache", tag: "v0.6.2"', path
+      assert_includes contents, 'RecordingStudio_metrics", tag: "v0.7.2"', path
+      assert_includes contents, 'RecordingStudio_logs", tag: "v0.7.3"', path
+      assert_includes contents, 'RecordingStudio_icons", tag: "v0.2.0"', path
+      assert_includes contents, 'RecordingStudio_admin", tag: "v2.7.0"', path
     end
     %w[test/dummy/db/schema.rb test/dummy/db/api_logging_schema.rb].each do |path|
       contents = File.read(File.join(root, path))
@@ -121,6 +123,8 @@ class RecordingStudioApiTest < Minitest::Test
 
     assert_includes readme_source, "preserved in this repository under `docs/gem_template/`"
     assert_includes readme_source, "not packaged gem docs"
+    assert_includes readme_source, "| RecordingStudio | v6.3.0 (pinned in `test/dummy/Gemfile`) |"
+    assert_includes readme_source, "| FlatPack        | v0.1.341 (pinned in `test/dummy/Gemfile`) |"
   end
 
   def test_dummy_readme_explains_dummy_app_purpose
@@ -356,6 +360,7 @@ class RecordingStudioApiTest < Minitest::Test
     assert File.file?(script)
     assert_includes gitignore, ".cursor/skills/"
     assert_includes gitignore, ".cursor/rules/"
+    assert_includes gitignore, "coverage/"
     refute_includes File.read(script), "git clone"
   end
 end

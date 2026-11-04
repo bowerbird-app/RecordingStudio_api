@@ -1,5 +1,16 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.18.2
+
+`0.18.2` refreshes companion GitHub tags. No migration. Gemspec floors stay
+the same.
+
+1. Bump the host gem to `0.18.2`.
+2. Pin Recording Studio `v6.3.0`, Accessible `v0.24.0`, Logs `v0.7.3`,
+   Metrics `v0.7.2`, Trashable `v0.12.2`, Moveable `v4.1.0`, Root Switchable
+   `v0.11.4`, Cache `v0.6.2`, and Icons `v0.2.0`.
+3. Keep Admin at `v2.7.0` and Flatpack at `v0.1.341`.
+
 ## Upgrading to 0.18.1
 
 `0.18.1` takes Flatpack `v0.1.341`. Apply on the date picker fires `change` on
