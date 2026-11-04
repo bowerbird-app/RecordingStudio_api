@@ -8,14 +8,14 @@ class RecordingStudioApiTest < Minitest::Test
   end
 
   def test_version_pin
-    assert_equal "0.18.0", ::RecordingStudioApi::VERSION
+    assert_equal "0.18.1", ::RecordingStudioApi::VERSION
   end
 
   def test_metrics_dependency_pins
     root = File.expand_path("..", __dir__)
     gemspec = File.read(File.join(root, "recording_studio_api.gemspec"))
     assert_includes gemspec, '"recording_studio", ">= 6.1.0"'
-    assert_includes gemspec, '"flat_pack", ">= 0.1.315"'
+    assert_includes gemspec, '"flat_pack", ">= 0.1.341"'
     assert_includes gemspec, '"view_component", ">= 4.14", "< 5"'
     assert_includes gemspec, '"recording_studio_metrics", ">= 0.3.0", "< 1.0"'
     assert_includes gemspec, '"recording_studio_logs", ">= 0.4.1", "< 1.0"'
@@ -23,7 +23,7 @@ class RecordingStudioApiTest < Minitest::Test
     %w[Gemfile test/dummy/Gemfile].each do |path|
       contents = File.read(File.join(root, path))
       assert_includes contents, 'RecordingStudio", tag: "v6.1.0"', path
-      assert_includes contents, 'flatpack", tag: "v0.1.320"', path
+      assert_includes contents, 'flatpack", tag: "v0.1.341"', path
       assert_includes contents, 'RecordingStudio_accessible", tag: "v0.22.1"', path
       assert_includes contents, 'RecordingStudio_trashable", tag: "v0.12.0"', path
       assert_includes contents, 'RecordingStudio_root_switchable", tag: "v0.11.0"', path
@@ -38,6 +38,18 @@ class RecordingStudioApiTest < Minitest::Test
       refute_includes contents, "recording_studio_api_api_request_day_summaries", path
       refute_includes contents, "recording_studio_api_api_request_latency_day_summaries", path
     end
+  end
+
+  def test_date_range_filter_keeps_admin_preset_hidden_field
+    root = File.expand_path("..", __dir__)
+    filter_fields = File.read(File.join(root, "app/views/recording_studio_admin/screens/_filter_fields.html.erb"))
+    logs_content = File.read(File.join(root, "app/views/recording_studio_api/admin_logs/_content.html.erb"))
+
+    refute_includes filter_fields, "preset_name:"
+    assert_includes filter_fields, "hidden_field_tag filter.preset_param, filter.value&.preset_key"
+    refute_includes logs_content, "admin-logs-date-range-submit"
+    refute_includes logs_content, "submitOnApply"
+    assert_includes logs_content, "change->flat-pack--auto-submit#queueSubmit"
   end
 
   def test_engine_exists

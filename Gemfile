@@ -17,7 +17,7 @@ gem "recording_studio_trashable", github: "bowerbird-app/RecordingStudio_trashab
 gem "recording_studio_icons", github: "bowerbird-app/RecordingStudio_icons"
 gem "recording_studio_moveable", github: "bowerbird-app/RecordingStudio_moveable", tag: "v4.0.1"
 gem "recording_studio_root_switchable", github: "bowerbird-app/RecordingStudio_root_switchable", tag: "v0.11.0"
-gem "flat_pack", github: "bowerbird-app/flatpack", tag: "v0.1.320"
+gem "flat_pack", github: "bowerbird-app/flatpack", tag: "v0.1.341"
 gem "pg", "~> 1.1"
 
 gem "puma"

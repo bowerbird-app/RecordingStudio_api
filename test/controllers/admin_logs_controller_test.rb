@@ -77,8 +77,10 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
       assert_includes response.body, "sort=request_method"
       assert_includes response.body, 'data-turbo-frame="sortable_table"'
       assert_includes response.body, "Date Range"
-      assert_includes response.body, "admin-logs-date-range-submit"
-      assert_includes response.body, "click-&gt;admin-logs-date-range-submit#submitOnApply"
+      assert_includes response.body, "flat-pack--auto-submit"
+      assert_includes response.body, "change-&gt;flat-pack--auto-submit#queueSubmit"
+      refute_includes response.body, "admin-logs-date-range-submit"
+      refute_includes response.body, "submitOnApply"
     end
   end
 

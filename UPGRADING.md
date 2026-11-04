@@ -1,5 +1,18 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.18.1
+
+`0.18.1` takes Flatpack `v0.1.341`. Apply on the date picker fires `change` on
+the hidden date fields. No migration.
+
+1. Bump the host gem to `0.18.1`.
+2. Pin `flat_pack` to GitHub tag `v0.1.341` (`>= 0.1.341`).
+3. Reload kit JavaScript. Host click hooks that submit on Apply will
+   double-submit if auto-submit already listens for `change`.
+4. Admin `_filter_fields` still posts `date_range_preset` with a hidden field.
+   Do not switch that field to FlatPack `preset_name:` until the picker can
+   seed a stored key that is not inferred from start and end.
+
 ## Upgrading to 0.18.0
 
 `0.18.0` takes Moveable `v4.0.1` as a runtime dependency and lets Moveable
