@@ -1,5 +1,31 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.18.4
+
+`0.18.4` prepares hosts for Recording Studio core `6.5.0` fail-closed writes.
+No schema migration. Companion pins stay on Recording Studio `v6.3.0` until
+you take core `6.5.0`.
+
+1. Bump the host gem to `0.18.4`.
+2. Set a write authorizer and an actor before you upgrade core to `6.5.0`.
+
+```ruby
+RecordingStudio.configure do |config|
+  config.actor = -> { Current.actor }
+  config.authorize_write = lambda { |actor:, action:, **|
+    actor.is_a?(ActiveRecord::Base) && action.to_s.strip.present?
+  }
+end
+```
+
+Pass `actor:` on API-client, credential, token, and resource update writes.
+Users and service-account clients are both valid actors.
+
+3. A missing `config.authorize_write` raises `RecordingStudio::AuthorizationError`.
+   A missing actor raises `RecordingStudio::ActorRequired`.
+4. Set `config.allow_unauthorized_writes = true` only if you must keep the old
+   open writes during a host migration.
+
 ## Upgrading to 0.18.3
 
 `0.18.3` keeps `view_component` 4.22.0 (`>= 4.14`, `< 5`) for

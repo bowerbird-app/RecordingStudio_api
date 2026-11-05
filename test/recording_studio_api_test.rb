@@ -8,7 +8,7 @@ class RecordingStudioApiTest < Minitest::Test
   end
 
   def test_version_pin
-    assert_equal "0.18.3", ::RecordingStudioApi::VERSION
+    assert_equal "0.18.4", ::RecordingStudioApi::VERSION
   end
 
   def test_metrics_dependency_pins
@@ -125,6 +125,36 @@ class RecordingStudioApiTest < Minitest::Test
 
     assert_includes initializer_source, "Built-in capabilities remain disabled"
     assert_not_includes initializer_source, "config.features."
+  end
+
+  def test_dummy_authorize_write_checks_actor_and_action
+    initializer_path = File.expand_path("dummy/config/initializers/recording_studio.rb", __dir__)
+    initializer_source = File.read(initializer_path)
+
+    assert_includes initializer_source, "config.authorize_write"
+    assert_includes initializer_source, "actor:, action:"
+    assert_includes initializer_source, "action.to_s.strip.present?"
+    assert_includes initializer_source, "ActiveRecord::Base"
+    assert_not_includes initializer_source, "config.authorize_write = ->(actor:, **) { actor.present? }"
+    assert_not_includes initializer_source, "allow_unauthorized_writes = true"
+  end
+
+  def test_runtime_writes_pass_an_explicit_actor
+    root = File.expand_path("..", __dir__)
+
+    provision = File.read(File.join(root, "lib/recording_studio_api/services/provision_api_client.rb"))
+    rotate = File.read(File.join(root, "lib/recording_studio_api/services/rotate_api_credential.rb"))
+    issue = File.read(File.join(root, "lib/recording_studio_api/services/issue_oauth_access_token.rb"))
+    update = File.read(File.join(root, "lib/recording_studio_api/services/resource_operations/update.rb"))
+
+    assert_includes provision, "RecordingStudio.record!("
+    assert_includes provision, "actor: api_client"
+    assert_includes rotate, "RecordingStudio.record!("
+    assert_includes rotate, "actor: locked_client"
+    assert_includes issue, "RecordingStudio.record!("
+    assert_includes issue, "actor: credential.api_client"
+    assert_includes update, "recording.root_recording.revise("
+    assert_includes update, "actor: api_client"
   end
 
   def test_readme_marks_preserved_template_docs_as_repo_only

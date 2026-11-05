@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.4] - 2026-11-05
+
+### Security
+- Dummy and test writes set `RecordingStudio` `config.authorize_write` and pass
+  an explicit actor on API client, credential, token, and resource update
+  writes. Hosts must do the same before Recording Studio core `6.5.0`, where
+  a missing authorizer raises `AuthorizationError` and a missing actor raises
+  `ActorRequired`.
+
+### Upgrade notes
+- Bump to `0.18.4`. No host migration.
+- Set `config.authorize_write` (actor and action, not only `actor.present?`)
+  before upgrading Recording Studio to `6.5.0`. Pass `actor:` on jobs and
+  API-client writes. `config.allow_unauthorized_writes = true` is only a
+  temporary opt-out.
+
 ## [0.18.3] - 2026-11-04
 
 ### Security
@@ -906,7 +922,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.3...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.4...HEAD
+[0.18.4]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.3...v0.18.4
 [0.18.3]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.2...v0.18.3
 [0.18.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.1...v0.18.2
 [0.18.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.0...v0.18.1

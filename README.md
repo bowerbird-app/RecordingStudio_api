@@ -33,6 +33,30 @@ see [UPGRADING.md](UPGRADING.md).
 
 The current codebase still ships the template engine mechanics (configuration, hooks, install generator, sample service objects), but the engine now also exposes a real JSON API surface for authenticated resource lookup, capability-backed member actions, and named endpoints that are not a recordable.
 
+## Recording Studio 6.5.0 write authorization
+
+Set `RecordingStudio` `config.authorize_write` before you upgrade core to
+`6.5.0`. That release fails closed: a missing authorizer raises
+`RecordingStudio::AuthorizationError`, and a missing actor raises
+`RecordingStudio::ActorRequired`. `config.allow_unauthorized_writes` defaults
+to `false`; set it `true` only to keep the old open writes during a migration.
+
+The authorizer must look at the actor and the action, not only
+`actor.present?`. Users, API clients, and other service-account actors all
+write. This gem's provision, credential rotation, token issue, and resource
+update paths pass `actor:` explicitly.
+
+```ruby
+RecordingStudio.configure do |config|
+  config.actor = -> { Current.actor }
+  config.authorize_write = lambda { |actor:, action:, **|
+    actor.is_a?(ActiveRecord::Base) && action.to_s.strip.present?
+  }
+end
+```
+
+See [UPGRADING.md](UPGRADING.md#upgrading-to-0184).
+
 ## Versioning Model
 
 RecordingStudioApi separates public API versions from addon contribution contract versions.

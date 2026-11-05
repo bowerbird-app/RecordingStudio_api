@@ -9,6 +9,13 @@ RecordingStudio.configure do |config|
   # Actor resolver for events when no actor is explicitly supplied
   config.actor = -> { Current.actor }
 
+  # Core 6.5.0 writes fail closed. Hosts must set authorize_write before that
+  # upgrade. Missing authorizer raises AuthorizationError; missing actor raises
+  # ActorRequired. Check the actor and the action. Users and API clients both write.
+  config.authorize_write = lambda { |actor:, action:, **|
+    actor.is_a?(ActiveRecord::Base) && action.to_s.strip.present?
+  }
+
   # Emit ActiveSupport::Notifications events
   config.event_notifications_enabled = true
 
