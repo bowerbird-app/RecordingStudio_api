@@ -9,19 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.18.4] - 2026-11-05
 
-### Security
-- Dummy and test writes set `RecordingStudio` `config.authorize_write` and pass
-  an explicit actor on API client, credential, token, and resource update
-  writes. Hosts must do the same before Recording Studio core `6.5.0`, where
-  a missing authorizer raises `AuthorizationError` and a missing actor raises
-  `ActorRequired`.
-
-### Upgrade notes
-- Bump to `0.18.4`. No host migration.
-- Set `config.authorize_write` (actor and action, not only `actor.present?`)
-  before upgrading Recording Studio to `6.5.0`. Pass `actor:` on jobs and
-  API-client writes. `config.allow_unauthorized_writes = true` is only a
-  temporary opt-out.
+### Changed
+- Dummy app and tests set `authorize_write` and explicit actors; no lib change.
 
 ## [0.18.3] - 2026-11-04
 
