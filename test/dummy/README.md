@@ -6,6 +6,7 @@ This Rails app exists to validate the RecordingStudio API integration surface an
 
 - Devise authentication with a seeded admin user
 - `Current.actor` wiring for Recording Studio events
+- `RecordingStudio` `config.authorize_write` that checks actor and action so dummy writes stay valid when core 6.5.0 fails closed
 - A dedicated admin root rendered through the host app root page
 - `RecordingStudioRootSwitchable` mounted root chooser for switching between admin and standard roots
 - RecordingStudio 4.2 hierarchy declarations for root-capable `Workspace`/`Folder`, child-only `Page`, API-owned recordables, and accessible parent grants (Accessible `0.11`)

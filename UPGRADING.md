@@ -1,5 +1,9 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.18.4
+
+See Recording Studio core's own documentation (RecordingStudio core, write authorization).
+
 ## Upgrading to 0.18.3
 
 `0.18.3` keeps `view_component` 4.22.0 (`>= 4.14`, `< 5`) for

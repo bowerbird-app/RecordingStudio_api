@@ -33,6 +33,10 @@ see [UPGRADING.md](UPGRADING.md).
 
 The current codebase still ships the template engine mechanics (configuration, hooks, install generator, sample service objects), but the engine now also exposes a real JSON API surface for authenticated resource lookup, capability-backed member actions, and named endpoints that are not a recordable.
 
+## Recording Studio 6.5.0 write authorization
+
+See Recording Studio core's own documentation (RecordingStudio core, write authorization).
+
 ## Versioning Model
 
 RecordingStudioApi separates public API versions from addon contribution contract versions.

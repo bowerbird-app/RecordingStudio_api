@@ -4,6 +4,9 @@ ENV["RAILS_ENV"] = "test"
 require_relative "../test_helper"
 require_relative "../dummy/config/environment"
 require "rails/test_help"
+require_relative "recording_studio_authorized_writes"
+
+RecordingStudioAuthorizedWrites.install!
 
 module ApiDummyHelpers # rubocop:disable Metrics/ModuleLength
   TEST_PASSWORD = "ApiAuthPassword!2026"
@@ -76,6 +79,7 @@ module ApiDummyHelpers # rubocop:disable Metrics/ModuleLength
     RecordingStudio.enable_capability(:api_access_point, on: "Folder")
     RecordingStudio.enable_capability(:api_access_point, on: "AdminRoot") if defined?(AdminRoot)
     RecordingStudio.enable_capability(:movable, on: "Folder")
+    RecordingStudioAuthorizedWrites.install!
   end
 
   def create_user(email: "api-user-#{SecureRandom.hex(4)}@example.com")
