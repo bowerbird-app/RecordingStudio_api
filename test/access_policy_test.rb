@@ -38,4 +38,16 @@ class AccessPolicyTest < ActiveSupport::TestCase
       assert_equal expected_permissions[2], policy.can_admin?
     end
   end
+
+  test "write and admin follow Accessible on the grant parent" do
+    user = create_user(email: "access-policy-accessible@example.com")
+    root_recording, access_recording = create_access_recording_for(user: user, role: :edit)
+
+    policy = RecordingStudioApi::AccessPolicy.new(access_recording: access_recording)
+
+    assert RecordingStudioAccessible.authorized?(actor: user, recording: root_recording, role: :edit)
+    refute RecordingStudioAccessible.authorized?(actor: user, recording: root_recording, role: :admin)
+    assert policy.can_write?
+    refute policy.can_admin?
+  end
 end

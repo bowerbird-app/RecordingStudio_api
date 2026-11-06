@@ -20,7 +20,7 @@ class TrashableSiblingApiParityTest < ActiveSupport::TestCase
 
   test "query helpers expose kept sql and predicates without lifecycle methods" do
     assert defined?(RecordingStudioTrashable)
-    assert_equal "0.12.2", RecordingStudioTrashable::VERSION
+    assert_equal "0.12.3", RecordingStudioTrashable::VERSION
     refute defined?(RecordingStudioTrashable::Engine)
 
     recording = RecordingStudio::Recording
@@ -40,18 +40,15 @@ class TrashableSiblingApiParityTest < ActiveSupport::TestCase
     refute_respond_to page, :recording_studio_trashable_purge!
   end
 
-  test "accessible recording scope SQL uses kept_sql for child filter" do
+  test "accessible recording scope uses Accessible instead of recursive descendant SQL" do
     root_recording, access_recording = create_access_recording_for(user: @user, role: :edit)
     scope = RecordingStudioApi::AccessibleRecordingScope.new(
       scope_recording: root_recording,
       access_recording: access_recording
     )
 
-    sql = scope.send(:accessible_recording_ids_sql)
-    kept_sql = RecordingStudio::Recording.recording_studio_trashable_kept_sql("child")
-
-    assert_includes sql, "WHERE #{kept_sql}"
-    refute_includes sql, "WHERE child.trashed_at IS NULL"
+    refute_includes RecordingStudioApi::AccessibleRecordingScope.private_instance_methods, :accessible_recording_ids_sql
+    refute_includes scope.relation.to_sql, "WITH RECURSIVE"
   end
 
   test "actor access lookup and oauth exists use kept_sql under hostile default_scope" do

@@ -148,23 +148,36 @@ module RecordingStudioApi
 
     def access_recordings
       @access_recordings ||= begin
-        access_ids = RecordingStudio::Access.where(actor: actor).pluck(:id)
-        return [] if access_ids.empty?
+        return [] if actor.nil?
 
-        RecordingStudio::Recording.unscoped
-                                  .includes(:recordable)
-                                  .where(recordable_type: "RecordingStudio::Access", recordable_id: access_ids)
-                                  .where(RecordingStudio::Recording.recording_studio_trashable_kept_sql)
-                                  .to_a
+        collect_access_recordings_for(RecordingStudioAccessible.root_recordings_for(actor: actor))
       end
     end
 
+    def collect_access_recordings_for(parents)
+      parents.flat_map do |parent|
+        grants = RecordingStudioAccessible.access_recordings_for_actor(recording: parent, actor: actor).to_a
+        children = RecordingStudioAccessible.recordings_for(actor: actor, parent_recording: parent).reject do |recording|
+          recording.recordable_type == "RecordingStudio::Access"
+        end
+        grants + collect_access_recordings_for(children)
+      end.uniq(&:id)
+    end
+
     def api_client_access_recordings
-      @api_client_access_recordings ||= RecordingStudio::Recording.unscoped
-                                                                  .includes(:recordable)
-                                                                  .where(id: RecordingStudioApi::ApiClient.select(:access_recording_id), recordable_type: "RecordingStudio::Access")
-                                                                  .where(RecordingStudio::Recording.recording_studio_trashable_kept_sql)
-                                                                  .to_a
+      @api_client_access_recordings ||= begin
+        return [] if actor.nil?
+
+        root_ids = RecordingStudioAccessible.root_recording_ids_for(actor: actor)
+        return [] if root_ids.empty?
+
+        RecordingStudio::Recording.unscoped
+                                  .includes(:recordable)
+                                  .where(id: RecordingStudioApi::ApiClient.select(:access_recording_id), recordable_type: "RecordingStudio::Access")
+                                  .where(root_recording_id: root_ids)
+                                  .where(RecordingStudio::Recording.recording_studio_trashable_kept_sql)
+                                  .to_a
+      end
     end
   end
 end
