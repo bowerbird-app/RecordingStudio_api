@@ -1,5 +1,23 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.18.5
+
+`0.18.5` routes API scope and grant checks through Recording Studio
+Accessible. No migration. Gemspec floors stay the same.
+
+1. Bump the host gem to `0.18.5`.
+2. Pin Recording Studio `v6.5.0`, Accessible `v0.24.2`, Logs `v0.7.4`,
+   Metrics `v0.7.3`, Trashable `v0.12.3`, and Moveable `v4.1.1`.
+3. Keep Admin at `v2.7.0` and Flatpack at `v0.1.341`.
+4. API collections list recordings Accessible returns under the grant's
+   parent (`recordings_for`), plus that parent when the actor has a role
+   there. They no longer list every descendant row from recursive SQL.
+   `authorize!` on a member was already Accessible.
+5. Do not change `DEFAULT_OPERATIONS` or 0.6.x capability rules.
+
+If you are still on `0.18.4` or older, complete
+[Upgrading to 0.18.4](#upgrading-to-0184) first.
+
 ## Upgrading to 0.18.4
 
 See Recording Studio core's own documentation (RecordingStudio core, write authorization).

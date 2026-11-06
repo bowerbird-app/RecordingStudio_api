@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.5] - 2026-11-06
+
+### Changed
+- API recording scope, access policy, access-management listing, and grant
+  role checks call Recording Studio Accessible instead of recursive descendant
+  SQL or `Access.role`. Collection membership follows Accessible
+  `recordings_for` / `role_for` / `authorized?`. `DEFAULT_OPERATIONS` is
+  unchanged.
+- Development and dummy Gemfiles pin Recording Studio `v6.5.0`, Accessible
+  `v0.24.2`, Logs `v0.7.4`, Metrics `v0.7.3`, Trashable `v0.12.3`, and
+  Moveable `v4.1.1`. Admin stays `v2.7.0`. Flatpack stays `v0.1.341`.
+  Gemspec floors are unchanged. Lockfiles may take `view_component` `4.23.0`
+  inside the existing `>= 4.14`, `< 5` range.
+
+### Upgrade notes
+- Bump to `0.18.5`. No host migration.
+- Pin companion GitHub tags to match the development Gemfile. Admin and
+  Flatpack pins are unchanged.
+- API index/show scope is the Accessible child tree under the grant parent,
+  not every descendant row. Member `authorize!` was already Accessible.
+
 ## [0.18.4] - 2026-11-05
 
 ### Changed
@@ -911,7 +932,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.4...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.5...HEAD
+[0.18.5]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.4...v0.18.5
 [0.18.4]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.3...v0.18.4
 [0.18.3]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.2...v0.18.3
 [0.18.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.1...v0.18.2

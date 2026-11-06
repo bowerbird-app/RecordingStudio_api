@@ -86,9 +86,13 @@ module RecordingStudioApi
     end
 
     def role_satisfies?(required_role)
-      return false if required_role.blank?
+      return false if required_role.blank? || actor.nil? || scope_recording.nil?
 
-      RecordingStudio::AccessRoles.satisfies?(role: role, minimum_role: required_role)
+      RecordingStudioAccessible.authorized?(
+        actor: actor,
+        recording: scope_recording,
+        role: required_role
+      )
     end
 
     def recording_for_accessible_check(recording, include_trashed:)

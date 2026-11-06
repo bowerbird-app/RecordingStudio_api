@@ -7,26 +7,34 @@ module RecordingStudioApi
     end
 
     def can_read?
-      RecordingStudio::AccessRoles.value_for(access_role).present?
+      return false if actor.nil? || scoped_recording.nil?
+
+      RecordingStudioAccessible.role_for(actor: actor, recording: scoped_recording).present?
     end
 
     def can_write?
-      RecordingStudio::AccessRoles.satisfies?(role: access_role, minimum_role: :edit)
+      return false if actor.nil? || scoped_recording.nil?
+
+      RecordingStudioAccessible.authorized?(actor: actor, recording: scoped_recording, role: :edit)
     end
 
     def can_admin?
-      RecordingStudio::AccessRoles.satisfies?(role: access_role, minimum_role: :admin)
+      return false if actor.nil? || scoped_recording.nil?
+
+      RecordingStudioAccessible.authorized?(actor: actor, recording: scoped_recording, role: :admin)
     end
 
     private
 
     attr_reader :access_recording
 
-    def access_role
+    def actor
       access = access_recording&.recordable
-      return unless access.is_a?(RecordingStudio::Access)
+      access.actor if access.is_a?(RecordingStudio::Access)
+    end
 
-      access.role
+    def scoped_recording
+      access_recording&.parent_recording || access_recording&.root_recording
     end
   end
 end

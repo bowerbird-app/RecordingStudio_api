@@ -50,6 +50,17 @@ class AccessGrantTest < ActiveSupport::TestCase
     refute RecordingStudio::Access.respond_to?(:roles)
   end
 
+  test "grant role checks use Accessible on the scope recording" do
+    root_recording, access_recording = create_access_recording_for(user: @user, role: :view)
+    page_recording = create_page_recording(root_recording: root_recording)
+    grant = access_grant_for(access_recording: access_recording, root_recording: root_recording)
+
+    assert RecordingStudioAccessible.authorized?(actor: @user, recording: root_recording, role: :view)
+    refute RecordingStudioAccessible.authorized?(actor: @user, recording: root_recording, role: :edit)
+    assert grant.authorized?(recording: page_recording, role: :view)
+    refute grant.authorized?(recording: page_recording, role: :edit)
+  end
+
   test "unknown required role is not authorized" do
     root_recording, access_recording = create_access_recording_for(user: @user, role: :admin)
     page_recording = create_page_recording(root_recording: root_recording)

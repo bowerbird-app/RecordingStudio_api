@@ -94,4 +94,33 @@ class AccessManagementPolicyTest < ActiveSupport::TestCase
     assert policy.authorized_for_access_recording?(api_client_access_recording, access_management_role: :admin)
     assert_equal root_recording.id, api_client_access_recording.root_recording_id
   end
+
+  test "api client access recordings stay inside Accessible roots" do
+    user = create_user(email: "policy-api-client-scope@example.com")
+    stranger = create_user(email: "policy-api-client-other@example.com")
+    _root_recording, manager_access_recording = create_access_recording_for(user: user, role: :admin)
+    _other_root, other_access_recording = create_access_recording_for(
+      user: stranger,
+      role: :admin,
+      workspace_name: "Other API workspace"
+    )
+
+    ours = RecordingStudioApi::Services::ProvisionApiClient.call(
+      access_recording: manager_access_recording,
+      name: "Ours"
+    )
+    theirs = RecordingStudioApi::Services::ProvisionApiClient.call(
+      access_recording: other_access_recording,
+      name: "Theirs"
+    )
+
+    assert ours.success?, ours.error
+    assert theirs.success?, theirs.error
+
+    policy = RecordingStudioApi::AccessManagementPolicy.new(actor: user)
+    visible_ids = policy.visible_api_client_access_recordings.map(&:id)
+
+    assert_includes visible_ids, ours.value.fetch(:access_recording).id
+    refute_includes visible_ids, theirs.value.fetch(:access_recording).id
+  end
 end

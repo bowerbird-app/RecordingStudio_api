@@ -116,7 +116,7 @@ class AccessibleRecordingScopeTest < ActiveSupport::TestCase
     assert_empty relation.to_a
   end
 
-  test "include? checks membership without materializing the full id list" do
+  test "include? checks Accessible membership in the scoped tree" do
     root_recording, access_recording = create_access_recording_for(user: @user, role: :edit)
     page_recording = create_page_recording(root_recording: root_recording)
     other_root, = create_access_recording_for(user: @user, role: :edit, workspace_name: "Other Workspace")
@@ -130,5 +130,23 @@ class AccessibleRecordingScopeTest < ActiveSupport::TestCase
     assert scope.include?(page_recording.id)
     refute scope.include?(other_page.id)
     refute scope.include?(nil)
+  end
+
+  test "returns empty when Accessible has no role for the grant actor on the scope" do
+    root_recording, = create_access_recording_for(user: @user, role: :edit)
+    create_page_recording(root_recording: root_recording)
+    stranger = create_user(email: "scope-stranger@example.com")
+    _stranger_root, stranger_access = create_access_recording_for(
+      user: stranger,
+      role: :edit,
+      workspace_name: "Stranger workspace"
+    )
+
+    ids = RecordingStudioApi::AccessibleRecordingScope.new(
+      scope_recording: root_recording,
+      access_recording: stranger_access
+    ).relation.pluck(:id)
+
+    assert_empty ids
   end
 end
