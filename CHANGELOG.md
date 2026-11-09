@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   registration does, the document emits `x-tagGroups` for Scalar nested
   sections. Ungrouped tags share one group named `API`, listed first. Named
   groups follow. No group declarations omits `x-tagGroups`.
+- Scalar docs `customCss` indents tag items 12px under each `x-tagGroups`
+  sidebar header (`.group/sidebar-section > ul`). Headers stay flush. Nested
+  operations keep Scalar's own indent relative to their tag.
 
 ### Upgrade notes
 - Bump to `0.18.5`. No host migration. Runtime API request and response
