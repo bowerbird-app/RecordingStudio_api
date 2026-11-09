@@ -122,12 +122,24 @@ module RecordingStudioApi
         assigned = resource_tag_groups
         return if assigned.empty?
 
-        grouped = tags.map { |tag| tag.fetch(:name) }.each_with_object({}) do |name, output|
-          group_name = assigned[name].presence || name
-          output[group_name] ||= []
-          output[group_name] << name
+        ungrouped = []
+        named = {}
+
+        tags.each do |tag|
+          name = tag.fetch(:name)
+          group_name = assigned[name]
+          if group_name.blank?
+            ungrouped << name
+          else
+            named[group_name] ||= []
+            named[group_name] << name
+          end
         end
-        grouped.map { |name, tag_names| { name: name, tags: tag_names } }
+
+        groups = []
+        groups << { name: "API", tags: ungrouped } if ungrouped.any?
+        groups.concat(named.map { |name, tag_names| { name: name, tags: tag_names } })
+        groups
       end
 
       def shared_tag_descriptions

@@ -23,8 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Operation metadata may pass through `deprecated` and `externalDocs`.
 - Registrations may set `openapi: { tag: { group: "..." } }`. When any
   registration does, the document emits `x-tagGroups` for Scalar nested
-  sections. Ungrouped tags still appear. No group declarations keeps today's
-  document shape.
+  sections. Ungrouped tags share one group named `API`, listed first. Named
+  groups follow. No group declarations omits `x-tagGroups`.
 
 ### Upgrade notes
 - Bump to `0.18.5`. No host migration. Runtime API request and response

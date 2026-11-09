@@ -693,9 +693,9 @@ RecordingStudioApi.register_recordable_type_api(
 ```
 
 `tag.group` is optional. When any registration sets it, the OpenAPI document includes
-`x-tagGroups` so Scalar nests those tags under the group name. Tags without a group still
-appear, each under a heading of their own name. If no registration sets `tag.group`,
-`x-tagGroups` is omitted.
+`x-tagGroups` so Scalar nests those tags under the group name. Tags without a group go
+in one group named `API`, listed first. Named groups follow in the order they first
+appear. If no registration sets `tag.group`, `x-tagGroups` is omitted.
 
 Standard index, show, create, update, and destroy operations get generated summaries and
 descriptions from the registration (fields, filters, `include`, pagination, `count=true`,

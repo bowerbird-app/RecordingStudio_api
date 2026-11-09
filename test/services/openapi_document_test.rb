@@ -412,16 +412,26 @@ module RecordingStudioApi
               with_recordable_registration("Page", openapi: {}) do
                 document = with_recordable_types(%w[PressKit Section Video Page]) { OpenapiDocument.call }
                 groups = document.fetch(:"x-tagGroups")
+                tag_names = document.fetch(:tags).map { |tag| tag.fetch(:name) }
+                grouped_tags = ["Press Kit", "Section", "Video"]
+                ungrouped_tags = tag_names - grouped_tags
+                api_group = groups.fetch(0)
                 press_kits = groups.find { |group| group.fetch(:name) == "Press kits" }
-                page_group = groups.find { |group| group.fetch(:name) == "Page" }
-                authentication = groups.find { |group| group.fetch(:name) == "Authentication" }
+                tags_by_group = groups.to_h { |group| [group.fetch(:name), group.fetch(:tags)] }
 
-                assert_equal ["Press Kit", "Section", "Video"], press_kits.fetch(:tags)
-                assert_equal ["Page"], page_group.fetch(:tags)
-                assert_equal ["Authentication"], authentication.fetch(:tags)
-                assert(groups.any? { |group| group.fetch(:tags) == ["resources"] })
-                document.fetch(:tags).each do |tag|
-                  assert(groups.any? { |group| group.fetch(:tags).include?(tag.fetch(:name)) })
+                assert_equal "API", api_group.fetch(:name)
+                assert_equal ungrouped_tags, api_group.fetch(:tags)
+                assert_equal grouped_tags, press_kits.fetch(:tags)
+                refute_includes tags_by_group.fetch("API"), "Press Kit"
+                refute(groups.any? { |group| group.fetch(:name) == "Page" })
+                groups.each do |group|
+                  tags = group.fetch(:tags)
+                  refute_equal [group.fetch(:name)], tags
+                end
+                assert_equal tag_names.sort, groups.flat_map { |group| group.fetch(:tags) }.sort
+                tag_names.each do |name|
+                  memberships = groups.count { |group| group.fetch(:tags).include?(name) }
+                  assert_equal 1, memberships
                 end
               end
             end
