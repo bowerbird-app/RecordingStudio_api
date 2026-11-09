@@ -699,11 +699,14 @@ appear, each under a heading of their own name. If no registration sets `tag.gro
 
 Standard index, show, create, update, and destroy operations get generated summaries and
 descriptions from the registration (fields, filters, `include`, pagination, `count=true`,
-create idempotency, and permanent delete). Per-action `openapi` keys (`:index`, `:show`,
+create idempotency, and permanent delete). Index and show say results are scoped to what
+the caller can access. Create and update say they require edit access. `q` is documented
+only when the type has filterable attributes. Per-action `openapi` keys (`:index`, `:show`,
 `:create`, `:update`, `:destroy`) replace that generated `summary` and `description`. A
-`parameters` array on those keys is merged with the built-in query and path parameters
-(override wins on the same `name` + `in`). `deprecated` and `externalDocs` on an action
-are passed through to the OpenAPI operation.
+`parameters` array on those keys is added to the built-in query and path parameters
+(override wins on the same `name` + `in`; a blank `in` matches query). `parameters: []`
+keeps the built-ins. `deprecated` and `externalDocs` on an action are passed through to
+the OpenAPI operation.
 
 `operations` controls which standard resource operations are exposed for that recordable type.
 It accepts any of `:index`, `:show`, `:create`, `:update`, and `:destroy`; when omitted, all five

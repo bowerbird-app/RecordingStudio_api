@@ -11,12 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Generated OpenAPI summaries and descriptions for standard resource
-  operations now say what the endpoint returns, that results are scoped to
-  caller access, and list registered fields, filters, `include` values,
-  pagination, `count=true`, create idempotency, and permanent delete. Per-action
-  `openapi` `summary` and `description` still replace the generated text.
-- Resource `openapi` `parameters` overrides merge with built-in parameters and
-  win on the same `name` + `in`.
+  operations now say what the endpoint returns, list registered fields,
+  filters, `include` values, pagination, `count=true`, create idempotency, and
+  permanent delete. Index and show say results are scoped to caller access.
+  Create and update say they require edit access. Per-action `openapi`
+  `summary` and `description` still replace the generated text.
+- Resource `openapi` `parameters` overrides add to the built-in parameters
+  and win on the same `name` + `in` (a blank `in` matches query). They can no
+  longer remove built-ins: `parameters: []` keeps pagination, filters, and
+  `include`.
 - Operation metadata may pass through `deprecated` and `externalDocs`.
 - Registrations may set `openapi: { tag: { group: "..." } }`. When any
   registration does, the document emits `x-tagGroups` for Scalar nested
@@ -24,10 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   document shape.
 
 ### Upgrade notes
-- Bump to `0.18.5`. No host migration and no API behaviour change.
+- Bump to `0.18.5`. No host migration. Runtime API request and response
+  behaviour is unchanged.
+- A registration `parameters` override now adds to the built-in params and
+  can no longer remove them (`parameters: []` keeps them).
 - Scalar copy for generated CRUD operations is richer. Hosts that snapshot
   OpenAPI JSON should refresh those snapshots. Existing per-action `openapi`
-  overrides still win.
+  `summary` and `description` still win.
 
 ## [0.18.4] - 2026-11-05
 

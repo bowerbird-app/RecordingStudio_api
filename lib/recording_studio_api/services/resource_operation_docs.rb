@@ -58,7 +58,7 @@ module RecordingStudioApi
 
       def create_description
         join_sentences(
-          "Creates #{noun_phrase} the caller can access.",
+          "Creates #{noun_phrase}. Requires edit access.",
           write_sentence(create_write_names),
           "Send an `Idempotency-Key` header to reuse the first successful response for 24 hours."
         )
@@ -66,7 +66,7 @@ module RecordingStudioApi
 
       def update_description
         join_sentences(
-          "Updates #{noun_phrase} the caller can access.",
+          "Updates #{noun_phrase}. Requires edit access.",
           write_sentence(update_write_names)
         )
       end
@@ -79,8 +79,11 @@ module RecordingStudioApi
       end
 
       def filter_sentence
-        names = ["q"] + filterable_attribute_names.map { |attribute| "filter[#{attribute}]" }
-        "Available filters: #{format_list(names)}."
+        names = filterable_attribute_names
+        return if names.empty?
+
+        filters = ["q"] + names.map { |attribute| "filter[#{attribute}]" }
+        "Available filters: #{format_list(filters)}."
       end
 
       def include_sentence
@@ -127,11 +130,7 @@ module RecordingStudioApi
 
       def create_write_names
         names = writable_attribute_names.dup
-        if @root
-          names.unshift("parent_id") unless names.include?("parent_id")
-        else
-          names.unshift("parent_id")
-        end
+        names.unshift("parent_id") unless @root
         names.uniq
       end
 

@@ -3,6 +3,8 @@
 module RecordingStudioApi
   module Services
     class DocumentationCatalog # rubocop:disable Metrics/ClassLength
+      include OpenapiOverrideMerge
+
       DEFAULT_MOUNT_PATH = "/recording_studio_api"
       DEFAULT_API_MOUNT_PATH = "/api"
       BASE_PATH = DEFAULT_MOUNT_PATH
@@ -215,157 +217,132 @@ module RecordingStudioApi
           .sort_by { |section| section.fetch(:resource) }
       end
 
-      def default_resource_endpoints(resource_name, recordable_type)
-        context = resource_endpoint_context(resource_name, recordable_type)
-        [
-          index_resource_endpoint(context),
-          create_resource_endpoint(context),
-          show_resource_endpoint(context),
-          update_resource_endpoint(context),
-          destroy_resource_endpoint(context)
-        ].select do |endpoint|
-          context[:registration].nil? || context[:registration].supports_operation?(endpoint.fetch(:action).split("#").last)
-        end
-      end
-
-      def resource_endpoint_context(resource_name, recordable_type)
+      def default_resource_endpoints(resource_name, recordable_type) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
+        openapi_tag = openapi_tag_for(resource_name, recordable_type)
+        docs_resource_name = docs_resource_name_for(resource_name, recordable_type)
         registration = recordable_registration_for(recordable_type)
-        {
-          resource_name: resource_name,
-          recordable_type: recordable_type,
-          collection_path: "#{api_root_path}/#{resource_name}",
-          item_path: "#{api_root_path}/#{resource_name}/:id",
-          openapi_tag: openapi_tag_for(resource_name, recordable_type),
-          docs_resource_name: docs_resource_name_for(resource_name, recordable_type),
-          registration: registration,
-          openapi_overrides: registration&.openapi || {},
-          operation_docs: resource_operation_docs_for(resource_name, recordable_type, registration)
-        }
-      end
+        openapi_overrides = registration&.openapi || {}
+        operation_docs = resource_operation_docs_for(resource_name, recordable_type, registration)
 
-      def documented_resource_endpoint(context, operation, verb:, path:, action:, openapi:)
-        docs = context.fetch(:operation_docs)
-        description = if operation == :destroy
-                        destroy_description_for(context.fetch(:resource_name), context.fetch(:recordable_type))
-                      else
-                        docs.description_for(operation)
-                      end
+        endpoints = [
+          {
+            verb: "GET",
+            path: "#{api_root_path}/#{resource_name}",
+            action: "resources#index",
+            summary: operation_docs.summary_for(:index),
+            description: operation_docs.description_for(:index),
+            capability: nil,
+            scope: nil,
+            openapi: resource_openapi(
+              {
+                tags: [openapi_tag],
+                summary: operation_docs.summary_for(:index),
+                description: operation_docs.description_for(:index),
+                parameters: pagination_parameters(recordable_type) + collection_filter_parameters(recordable_type) + include_parameters_for(recordable_type),
+                responses: resource_list_responses(
+                  resource_name,
+                  recordable_type,
+                  docs_resource_name,
+                  relationship_examples: relationship_response_examples(recordable_type, collection: true),
+                  filter_meta: true
+                )
+              },
+              openapi_overrides.fetch(:index, {}),
+              recordable_type,
+              resource_name: resource_name,
+              collection: true
+            )
+          },
+          {
+            verb: "POST",
+            path: "#{api_root_path}/#{resource_name}",
+            action: "resources#create",
+            summary: operation_docs.summary_for(:create),
+            description: operation_docs.description_for(:create),
+            capability: nil,
+            scope: nil,
+            openapi: merge_openapi(
+              {
+                tags: [openapi_tag],
+                summary: operation_docs.summary_for(:create),
+                description: operation_docs.description_for(:create),
+                parameters: [idempotency_key_parameter],
+                request_body: resource_write_request_body(recordable_type, operation: :create),
+                responses: resource_create_responses(recordable_type)
+              },
+              openapi_overrides.fetch(:create, {})
+            )
+          },
+          {
+            verb: "GET",
+            path: "#{api_root_path}/#{resource_name}/:id",
+            action: "resources#show",
+            summary: operation_docs.summary_for(:show),
+            description: operation_docs.description_for(:show),
+            capability: nil,
+            scope: nil,
+            openapi: resource_openapi(
+              {
+                tags: [openapi_tag],
+                summary: operation_docs.summary_for(:show),
+                description: operation_docs.description_for(:show),
+                parameters: [id_parameter] + include_parameters_for(recordable_type),
+                responses: resource_item_responses(
+                  recordable_type,
+                  relationship_examples: relationship_response_examples(recordable_type)
+                )
+              },
+              openapi_overrides.fetch(:show, {}),
+              recordable_type,
+              resource_name: resource_name,
+              collection: false
+            )
+          },
+          {
+            verb: "PATCH",
+            path: "#{api_root_path}/#{resource_name}/:id",
+            action: "resources#update",
+            summary: operation_docs.summary_for(:update),
+            description: operation_docs.description_for(:update),
+            capability: nil,
+            scope: nil,
+            openapi: merge_openapi(
+              {
+                tags: [openapi_tag],
+                summary: operation_docs.summary_for(:update),
+                description: operation_docs.description_for(:update),
+                parameters: [id_parameter],
+                request_body: resource_write_request_body(recordable_type, operation: :update),
+                responses: resource_item_responses(recordable_type)
+              },
+              openapi_overrides.fetch(:update, {})
+            )
+          },
+          {
+            verb: "DELETE",
+            path: "#{api_root_path}/#{resource_name}/:id",
+            action: "resources#destroy",
+            summary: operation_docs.summary_for(:destroy),
+            description: destroy_description_for(resource_name, recordable_type),
+            capability: nil,
+            scope: nil,
+            openapi: merge_openapi(
+              {
+                tags: [openapi_tag],
+                summary: operation_docs.summary_for(:destroy),
+                description: destroy_description_for(resource_name, recordable_type),
+                parameters: [id_parameter],
+                responses: resource_delete_responses(recordable_type)
+              },
+              openapi_overrides.fetch(:destroy, {})
+            )
+          }
+        ]
 
-        {
-          verb: verb,
-          path: path,
-          action: action,
-          summary: docs.summary_for(operation),
-          description: description,
-          capability: nil,
-          scope: nil,
-          openapi: openapi
-        }
-      end
-
-      def index_resource_endpoint(context)
-        documented_resource_endpoint(
-          context, :index,
-          verb: "GET", path: context.fetch(:collection_path), action: "resources#index",
-          openapi: resource_openapi(
-            {
-              tags: [context.fetch(:openapi_tag)],
-              summary: context.fetch(:operation_docs).summary_for(:index),
-              description: context.fetch(:operation_docs).description_for(:index),
-              parameters: pagination_parameters(context.fetch(:recordable_type)) +
-                collection_filter_parameters(context.fetch(:recordable_type)) +
-                include_parameters_for(context.fetch(:recordable_type)),
-              responses: resource_list_responses(
-                context.fetch(:resource_name),
-                context.fetch(:recordable_type),
-                context.fetch(:docs_resource_name),
-                relationship_examples: relationship_response_examples(context.fetch(:recordable_type), collection: true),
-                filter_meta: true
-              )
-            },
-            context.fetch(:openapi_overrides).fetch(:index, {}),
-            context.fetch(:recordable_type),
-            resource_name: context.fetch(:resource_name),
-            collection: true
-          )
-        )
-      end
-
-      def create_resource_endpoint(context)
-        documented_resource_endpoint(
-          context, :create,
-          verb: "POST", path: context.fetch(:collection_path), action: "resources#create",
-          openapi: merge_openapi(
-            {
-              tags: [context.fetch(:openapi_tag)],
-              summary: context.fetch(:operation_docs).summary_for(:create),
-              description: context.fetch(:operation_docs).description_for(:create),
-              parameters: [idempotency_key_parameter],
-              request_body: resource_write_request_body(context.fetch(:recordable_type), operation: :create),
-              responses: resource_create_responses(context.fetch(:recordable_type))
-            },
-            context.fetch(:openapi_overrides).fetch(:create, {})
-          )
-        )
-      end
-
-      def show_resource_endpoint(context)
-        documented_resource_endpoint(
-          context, :show,
-          verb: "GET", path: context.fetch(:item_path), action: "resources#show",
-          openapi: resource_openapi(
-            {
-              tags: [context.fetch(:openapi_tag)],
-              summary: context.fetch(:operation_docs).summary_for(:show),
-              description: context.fetch(:operation_docs).description_for(:show),
-              parameters: [id_parameter] + include_parameters_for(context.fetch(:recordable_type)),
-              responses: resource_item_responses(
-                context.fetch(:recordable_type),
-                relationship_examples: relationship_response_examples(context.fetch(:recordable_type))
-              )
-            },
-            context.fetch(:openapi_overrides).fetch(:show, {}),
-            context.fetch(:recordable_type),
-            resource_name: context.fetch(:resource_name),
-            collection: false
-          )
-        )
-      end
-
-      def update_resource_endpoint(context)
-        documented_resource_endpoint(
-          context, :update,
-          verb: "PATCH", path: context.fetch(:item_path), action: "resources#update",
-          openapi: merge_openapi(
-            {
-              tags: [context.fetch(:openapi_tag)],
-              summary: context.fetch(:operation_docs).summary_for(:update),
-              description: context.fetch(:operation_docs).description_for(:update),
-              parameters: [id_parameter],
-              request_body: resource_write_request_body(context.fetch(:recordable_type), operation: :update),
-              responses: resource_item_responses(context.fetch(:recordable_type))
-            },
-            context.fetch(:openapi_overrides).fetch(:update, {})
-          )
-        )
-      end
-
-      def destroy_resource_endpoint(context)
-        documented_resource_endpoint(
-          context, :destroy,
-          verb: "DELETE", path: context.fetch(:item_path), action: "resources#destroy",
-          openapi: merge_openapi(
-            {
-              tags: [context.fetch(:openapi_tag)],
-              summary: context.fetch(:operation_docs).summary_for(:destroy),
-              description: destroy_description_for(context.fetch(:resource_name), context.fetch(:recordable_type)),
-              parameters: [id_parameter],
-              responses: resource_delete_responses(context.fetch(:recordable_type))
-            },
-            context.fetch(:openapi_overrides).fetch(:destroy, {})
-          )
-        )
-      end
+        endpoints.select do |endpoint|
+          registration.nil? || registration.supports_operation?(endpoint.fetch(:action).split("#").last)
+        end
+      end # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
 
       def recordable_metric_endpoints(resource_name, recordable_type)
         registration = recordable_registration_for(recordable_type)
@@ -622,36 +599,6 @@ module RecordingStudioApi
             override_value
           end
         end
-      end
-
-      def merge_openapi(base_hash, override_hash)
-        return base_hash unless override_hash.is_a?(Hash)
-
-        merged = merge_hashes(base_hash, override_hash.except(:parameters))
-        return merged unless override_hash.key?(:parameters)
-
-        merged.merge(parameters: merge_parameters(base_hash[:parameters], override_hash[:parameters]))
-      end
-
-      def merge_parameters(base_parameters, override_parameters)
-        merged = Array(base_parameters).map(&:dup)
-        Array(override_parameters).each do |parameter|
-          key = parameter_identity(parameter)
-          index = merged.index { |candidate| parameter_identity(candidate) == key }
-          if index
-            merged[index] = parameter
-          else
-            merged << parameter
-          end
-        end
-        merged
-      end
-
-      def parameter_identity(parameter)
-        [
-          (parameter[:name] || parameter["name"]).to_s,
-          (parameter[:in] || parameter["in"]).to_s
-        ]
       end
 
       def resource_operation_docs_for(resource_name, recordable_type, registration)

@@ -192,6 +192,7 @@ module RecordingStudioApi
           assert_includes index_endpoint.fetch(:description), "`filter[title]`"
           assert_includes index_endpoint.fetch(:openapi).fetch(:description), "Set `count=true`"
           assert_includes create_endpoint.fetch(:description), "`Idempotency-Key`"
+          refute_includes create_endpoint.fetch(:description), "the caller can access"
         end
       end
 
@@ -222,6 +223,57 @@ module RecordingStudioApi
           assert_equal(1, parameters.count { |parameter| parameter[:name] == "limit" })
           assert parameters.any? { |parameter| parameter[:name] == "q" }
           assert parameters.any? { |parameter| parameter[:name] == "locale" }
+        end
+      end
+
+      def test_parameter_override_without_in_replaces_query_builtin
+        with_recordable_registration(
+          "Page",
+          openapi: {
+            index: {
+              parameters: [
+                { name: "limit", description: "Host limit without in.", schema: { type: "integer" } }
+              ]
+            }
+          }
+        ) do
+          catalog = with_catalog_stubs(
+            recordable_types: ["Page"],
+            actions_by_type: { "Page" => [] },
+            preserve_recordable_registrations: true
+          ) { DocumentationCatalog.call }
+
+          parameters = catalog.fetch(:resources).find { |section| section.fetch(:resource) == "pages" }
+            .fetch(:endpoints).find { |endpoint| endpoint.fetch(:action) == "resources#index" }
+            .fetch(:openapi).fetch(:parameters)
+          limit_parameters = parameters.select { |parameter| parameter[:name] == "limit" }
+
+          assert_equal 1, limit_parameters.length
+          assert_equal "Host limit without in.", limit_parameters.first.fetch(:description)
+        end
+      end
+
+      def test_empty_parameters_override_keeps_builtin_parameters
+        with_recordable_registration(
+          "Page",
+          openapi: {
+            index: { parameters: [] }
+          }
+        ) do
+          catalog = with_catalog_stubs(
+            recordable_types: ["Page"],
+            actions_by_type: { "Page" => [] },
+            preserve_recordable_registrations: true
+          ) { DocumentationCatalog.call }
+
+          names = catalog.fetch(:resources).find { |section| section.fetch(:resource) == "pages" }
+            .fetch(:endpoints).find { |endpoint| endpoint.fetch(:action) == "resources#index" }
+            .fetch(:openapi).fetch(:parameters)
+            .map { |parameter| parameter[:name] }
+
+          assert_includes names, "limit"
+          assert_includes names, "q"
+          refute_empty names
         end
       end
 

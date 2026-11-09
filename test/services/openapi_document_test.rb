@@ -215,10 +215,48 @@ module RecordingStudioApi
           assert_includes create_operation.fetch(:description), "`Idempotency-Key`"
           assert_includes create_operation.fetch(:description), "`parent_id`"
           assert_includes create_operation.fetch(:description), "`title`"
+          assert_includes create_operation.fetch(:description), "Requires edit access."
+          refute_includes create_operation.fetch(:description), "the caller can access"
           assert_includes update_operation.fetch(:description), "Write `title`."
+          assert_includes update_operation.fetch(:description), "Requires edit access."
+          refute_includes update_operation.fetch(:description), "the caller can access"
           refute_includes update_operation.fetch(:description), "`parent_id`"
           assert_includes delete_operation.fetch(:description), "Permanently delete Page."
+          refute_includes delete_operation.fetch(:description), "the caller can access"
         end
+      end
+
+      def test_generated_index_omits_q_when_the_type_has_no_filterable_attributes
+        with_recordable_registration("Page", openapi: {}) do
+          document = with_recordable_types(["Page"]) { OpenapiDocument.call }
+          description = document.fetch(:paths).fetch("/recording_studio_api/api/v1/pages").fetch("get").fetch(:description)
+
+          refute_includes description, "Available filters"
+          refute_includes description, "`q`"
+        end
+      end
+
+      def test_generated_create_omits_parent_id_for_root_types
+        original_root_allowed = RecordingStudio::RecordableDeclarations.method(:root_allowed?)
+        RecordingStudio::RecordableDeclarations.define_singleton_method(:root_allowed?) do |recordable_type|
+          recordable_type.to_s == "Workspace"
+        end
+
+        with_recordable_registration(
+          "Workspace",
+          serializer: ->(*) { { name: "Workspace" } },
+          output_keys: %i[name],
+          writable_attributes: %i[name],
+          openapi: {}
+        ) do
+          document = with_recordable_types(["Workspace"]) { OpenapiDocument.call }
+          description = document.fetch(:paths).fetch("/recording_studio_api/api/v1/workspaces").fetch("post").fetch(:description)
+
+          assert_includes description, "Write `name`."
+          refute_includes description, "`parent_id`"
+        end
+      ensure
+        RecordingStudio::RecordableDeclarations.define_singleton_method(:root_allowed?, original_root_allowed)
       end
 
       def test_openapi_action_overrides_replace_generated_summary_and_description
@@ -292,6 +330,47 @@ module RecordingStudioApi
           refute_nil(parameters.find { |parameter| parameter.fetch("name") == "q" })
           refute_nil(parameters.find { |parameter| parameter.fetch("name") == "pagination_token" })
           assert_equal "Only published pages.", published_parameter.fetch("description")
+        end
+      end
+
+      def test_parameter_override_without_in_matches_query_builtins
+        with_recordable_registration(
+          "Page",
+          openapi: {
+            index: {
+              parameters: [
+                { name: "limit", description: "Host limit without in.", schema: { type: "integer" } }
+              ]
+            }
+          }
+        ) do
+          document = with_recordable_types(["Page"]) { OpenapiDocument.call }
+          parameters = document.fetch(:paths).fetch("/recording_studio_api/api/v1/pages").fetch("get").fetch(:parameters)
+          limit_parameters = parameters.select { |parameter| parameter.fetch("name") == "limit" }
+
+          assert_equal 1, limit_parameters.length
+          assert_equal "query", limit_parameters.first.fetch("in")
+          assert_equal "Host limit without in.", limit_parameters.first.fetch("description")
+        end
+      end
+
+      def test_empty_parameters_override_keeps_builtin_parameters
+        with_recordable_registration(
+          "Page",
+          openapi: {
+            index: {
+              parameters: []
+            }
+          }
+        ) do
+          document = with_recordable_types(["Page"]) { OpenapiDocument.call }
+          names = document.fetch(:paths).fetch("/recording_studio_api/api/v1/pages").fetch("get").fetch(:parameters)
+                         .map { |parameter| parameter.fetch("name") }
+
+          assert_includes names, "limit"
+          assert_includes names, "pagination_token"
+          assert_includes names, "q"
+          refute_empty names
         end
       end
 
