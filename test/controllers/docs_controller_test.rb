@@ -312,6 +312,9 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_select "#scalar-api-reference-source[src^='/assets/recording_studio_api/scalar-1.64.0']", count: 1
     assert_select "#scalar-api-reference-source[src^='http']", count: 0
     assert_includes response.body, "createApiReference"
+    assert_includes response.body, '"customCss"'
+    assert_includes response.body, ".group\\\\/sidebar-section"
+    assert_includes response.body, "padding-left: 12px"
     assert_includes response.body, 'source.addEventListener("load", initializeScalar'
     assert_select %(body[data-recording-studio-default-layout="true"]), count: 1
     assert_select %(a[href="#{public_api_scalar_docs_fullscreen_path(version: 'v1')}"]), text: "Full width"
@@ -452,6 +455,9 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_select "#scalar-api-reference-source[src^='/assets/recording_studio_api/scalar-1.64.0']", count: 1
     assert_select "#scalar-api-reference-source[src^='http']", count: 0
     assert_includes response.body, "createApiReference"
+    assert_includes response.body, '"customCss"'
+    assert_includes response.body, ".group\\\\/sidebar-section"
+    assert_includes response.body, "padding-left: 12px"
     assert_includes response.body, 'source.addEventListener("load", initializeScalar'
     assert_select %(body[data-recording-studio-default-layout]), count: 0
   end

@@ -3,6 +3,8 @@
 module RecordingStudioApi
   module Services
     class DocumentationCatalog # rubocop:disable Metrics/ClassLength
+      include OpenapiOverrideMerge
+
       DEFAULT_MOUNT_PATH = "/recording_studio_api"
       DEFAULT_API_MOUNT_PATH = "/api"
       BASE_PATH = DEFAULT_MOUNT_PATH
@@ -220,14 +222,15 @@ module RecordingStudioApi
         docs_resource_name = docs_resource_name_for(resource_name, recordable_type)
         registration = recordable_registration_for(recordable_type)
         openapi_overrides = registration&.openapi || {}
+        operation_docs = resource_operation_docs_for(resource_name, recordable_type, registration)
 
         endpoints = [
           {
             verb: "GET",
             path: "#{api_root_path}/#{resource_name}",
             action: "resources#index",
-            summary: "List #{docs_resource_name}",
-            description: "List #{docs_resource_name}",
+            summary: operation_docs.summary_for(:index),
+            description: operation_docs.description_for(:index),
             capability: nil,
             scope: nil,
             openapi: resource_openapi(
@@ -252,11 +255,11 @@ module RecordingStudioApi
             verb: "POST",
             path: "#{api_root_path}/#{resource_name}",
             action: "resources#create",
-            summary: "Create #{docs_resource_name}",
-            description: "Create #{docs_resource_name}",
+            summary: operation_docs.summary_for(:create),
+            description: operation_docs.description_for(:create),
             capability: nil,
             scope: nil,
-            openapi: merge_hashes(
+            openapi: merge_openapi(
               {
                 tags: [openapi_tag],
                 parameters: [idempotency_key_parameter],
@@ -270,8 +273,8 @@ module RecordingStudioApi
             verb: "GET",
             path: "#{api_root_path}/#{resource_name}/:id",
             action: "resources#show",
-            summary: "Get #{docs_resource_name}",
-            description: "Get #{docs_resource_name}",
+            summary: operation_docs.summary_for(:show),
+            description: operation_docs.description_for(:show),
             capability: nil,
             scope: nil,
             openapi: resource_openapi(
@@ -293,11 +296,11 @@ module RecordingStudioApi
             verb: "PATCH",
             path: "#{api_root_path}/#{resource_name}/:id",
             action: "resources#update",
-            summary: "Update #{docs_resource_name}",
-            description: "Update #{docs_resource_name}",
+            summary: operation_docs.summary_for(:update),
+            description: operation_docs.description_for(:update),
             capability: nil,
             scope: nil,
-            openapi: merge_hashes(
+            openapi: merge_openapi(
               {
                 tags: [openapi_tag],
                 parameters: [id_parameter],
@@ -311,11 +314,11 @@ module RecordingStudioApi
             verb: "DELETE",
             path: "#{api_root_path}/#{resource_name}/:id",
             action: "resources#destroy",
-            summary: "Delete #{docs_resource_name}",
+            summary: operation_docs.summary_for(:destroy),
             description: destroy_description_for(resource_name, recordable_type),
             capability: nil,
             scope: nil,
-            openapi: merge_hashes(
+            openapi: merge_openapi(
               {
                 tags: [openapi_tag],
                 parameters: [id_parameter],
@@ -588,8 +591,17 @@ module RecordingStudioApi
         end
       end
 
+      def resource_operation_docs_for(resource_name, recordable_type, registration)
+        ResourceOperationDocs.new(
+          resource_name: resource_name,
+          docs_resource_name: docs_resource_name_for(resource_name, recordable_type),
+          registration: registration,
+          root: root_recordable_type?(recordable_type)
+        )
+      end
+
       def resource_openapi(default_openapi, override_openapi, recordable_type, resource_name:, collection:)
-        openapi = merge_hashes(default_openapi, override_openapi)
+        openapi = merge_openapi(default_openapi, override_openapi)
         relationship_description = relationship_documentation_for(
           recordable_type,
           resource_name: resource_name,
@@ -597,7 +609,7 @@ module RecordingStudioApi
         )
         return openapi if relationship_description.blank?
 
-        openapi.merge(description: [openapi[:description], relationship_description].compact.join("\n\n"))
+        openapi.merge(relationship_description: relationship_description)
       end
 
       def api_root_path

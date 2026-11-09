@@ -51,7 +51,11 @@ module RecordingStudioApi
       @scalar_url = "#{version_path}/openapi.json"
       @fullscreen_url = "#{version_path}/fullscreen"
       @scalar_configuration_json = ERB::Util.json_escape(
-        { url: @scalar_url, layout: "modern" }.to_json
+        {
+          url: @scalar_url,
+          layout: "modern",
+          customCss: ".group\\/sidebar-section > ul { padding-left: 12px; }"
+        }.to_json
       )
     end
 

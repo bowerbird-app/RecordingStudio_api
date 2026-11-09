@@ -685,11 +685,28 @@ RecordingStudioApi.register_recordable_type_api(
   "Page",
   openapi: {
     tag: {
-      description: "Create and organize the content pages in a workspace."
+      description: "Create and organize the content pages in a workspace.",
+      group: "Content"
     }
   }
 )
 ```
+
+`tag.group` is optional. When any registration sets it, the OpenAPI document includes
+`x-tagGroups` so Scalar nests those tags under the group name. Tags without a group go
+in one group named `API`, listed first. Named groups follow in the order they first
+appear. If no registration sets `tag.group`, `x-tagGroups` is omitted.
+
+Standard index, show, create, update, and destroy operations get generated summaries and
+descriptions from the registration (fields, filters, `include`, pagination, `count=true`,
+create idempotency, and permanent delete). Index and show say results are scoped to what
+the caller can access. Create and update say they require edit access. `q` is documented
+only when the type has filterable attributes. Per-action `openapi` keys (`:index`, `:show`,
+`:create`, `:update`, `:destroy`) replace that generated `summary` and `description`. A
+`parameters` array on those keys is added to the built-in query and path parameters
+(override wins on the same `name` + `in`; a blank `in` matches query). `parameters: []`
+keeps the built-ins. `deprecated` and `externalDocs` on an action are passed through to
+the OpenAPI operation.
 
 `operations` controls which standard resource operations are exposed for that recordable type.
 It accepts any of `:index`, `:show`, `:create`, `:update`, and `:destroy`; when omitted, all five

@@ -1,5 +1,22 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.18.5
+
+OpenAPI and Scalar copy for standard resource operations is richer. No
+migration. Runtime API request and response behaviour is unchanged.
+
+A registration `parameters` override now adds to the built-in params and
+can no longer remove them (`parameters: []` keeps them).
+
+1. Bump the host gem to `0.18.5`.
+2. Refresh OpenAPI snapshots if you pin generated descriptions.
+3. If an action override used `parameters: []` or a short list to hide
+   pagination, filters, or `include`, those built-ins now stay. Add only
+   extra params, or override a built-in by the same `name` (blank `in`
+   matches query).
+4. Optional: set `openapi: { tag: { group: "Press kits" } }` so Scalar
+   nests tags.
+
 ## Upgrading to 0.18.4
 
 See Recording Studio core's own documentation (RecordingStudio core, write authorization).

@@ -155,6 +155,9 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
     assert_select %(a[href="/admin/operations-api/docs/v1/fullscreen"]), text: "Full width"
     assert_includes response.body, 'source.addEventListener("load", initializeScalar'
     assert_includes response.body, '"url":"/admin/operations-api/docs/v1/openapi.json"'
+    assert_includes response.body, '"customCss"'
+    assert_includes response.body, ".group\\\\/sidebar-section"
+    assert_includes response.body, "padding-left: 12px"
 
     get "/admin/operations-api/docs/v1/openapi.json"
 
