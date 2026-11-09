@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.5] - 2026-11-09
+
+### Changed
+- Generated OpenAPI summaries and descriptions for standard resource
+  operations now say what the endpoint returns, that results are scoped to
+  caller access, and list registered fields, filters, `include` values,
+  pagination, `count=true`, create idempotency, and permanent delete. Per-action
+  `openapi` `summary` and `description` still replace the generated text.
+- Resource `openapi` `parameters` overrides merge with built-in parameters and
+  win on the same `name` + `in`.
+- Operation metadata may pass through `deprecated` and `externalDocs`.
+- Registrations may set `openapi: { tag: { group: "..." } }`. When any
+  registration does, the document emits `x-tagGroups` for Scalar nested
+  sections. Ungrouped tags still appear. No group declarations keeps today's
+  document shape.
+
+### Upgrade notes
+- Bump to `0.18.5`. No host migration and no API behaviour change.
+- Scalar copy for generated CRUD operations is richer. Hosts that snapshot
+  OpenAPI JSON should refresh those snapshots. Existing per-action `openapi`
+  overrides still win.
+
 ## [0.18.4] - 2026-11-05
 
 ### Changed
@@ -911,7 +933,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.4...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.5...HEAD
+[0.18.5]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.4...v0.18.5
 [0.18.4]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.3...v0.18.4
 [0.18.3]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.2...v0.18.3
 [0.18.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.1...v0.18.2

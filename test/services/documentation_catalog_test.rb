@@ -132,7 +132,7 @@ module RecordingStudioApi
           endpoint.fetch(:path) == "/recording_studio_api/api/v1/access"
         end
 
-        assert_equal "List Access", index_endpoint.fetch(:summary)
+        assert_equal "List access", index_endpoint.fetch(:summary)
         assert_equal ["Access"], index_endpoint.fetch(:openapi).fetch(:tags)
       end
 
@@ -167,6 +167,62 @@ module RecordingStudioApi
         assert_equal true, list_branch.fetch(:properties).key?(:type)
         assert_equal %w[limit sort order has_more next_pagination_token total_count],
                      list_branch.fetch(:properties).fetch(:meta).fetch(:required)
+      end
+
+      def test_generated_resource_docs_cover_filters_pagination_and_idempotency
+        with_recordable_registration(
+          "Page",
+          serializer: ->(*) { { title: "Page" } },
+          output_keys: %i[title],
+          sortable_attributes: %i[title],
+          writable_attributes: %i[title]
+        ) do
+          catalog = with_catalog_stubs(
+            recordable_types: ["Page"],
+            actions_by_type: { "Page" => [] },
+            preserve_recordable_registrations: true
+          ) { DocumentationCatalog.call }
+
+          page_section = catalog.fetch(:resources).find { |section| section.fetch(:resource) == "pages" }
+          index_endpoint = page_section.fetch(:endpoints).find { |endpoint| endpoint.fetch(:action) == "resources#index" }
+          create_endpoint = page_section.fetch(:endpoints).find { |endpoint| endpoint.fetch(:action) == "resources#create" }
+
+          assert_equal "List pages", index_endpoint.fetch(:summary)
+          assert_includes index_endpoint.fetch(:description), "Returns pages the caller can access."
+          assert_includes index_endpoint.fetch(:description), "`filter[title]`"
+          assert_includes index_endpoint.fetch(:openapi).fetch(:description), "Set `count=true`"
+          assert_includes create_endpoint.fetch(:description), "`Idempotency-Key`"
+        end
+      end
+
+      def test_recordable_openapi_parameter_overrides_merge_with_builtin_parameters
+        with_recordable_registration(
+          "Page",
+          openapi: {
+            index: {
+              parameters: [
+                { name: "limit", in: "query", description: "Host limit.", schema: { type: "integer" } },
+                { name: "locale", in: "query", description: "Locale code.", schema: { type: "string" } }
+              ]
+            }
+          }
+        ) do
+          catalog = with_catalog_stubs(
+            recordable_types: ["Page"],
+            actions_by_type: { "Page" => [] },
+            preserve_recordable_registrations: true
+          ) { DocumentationCatalog.call }
+
+          page_section = catalog.fetch(:resources).find { |section| section.fetch(:resource) == "pages" }
+          parameters = page_section.fetch(:endpoints).find { |endpoint| endpoint.fetch(:action) == "resources#index" }
+            .fetch(:openapi).fetch(:parameters)
+          limit_parameter = parameters.find { |parameter| parameter[:name] == "limit" }
+
+          assert_equal "Host limit.", limit_parameter.fetch(:description)
+          assert_equal(1, parameters.count { |parameter| parameter[:name] == "limit" })
+          assert parameters.any? { |parameter| parameter[:name] == "q" }
+          assert parameters.any? { |parameter| parameter[:name] == "locale" }
+        end
       end
 
       def test_recordable_openapi_endpoint_overrides_are_merged
@@ -655,7 +711,8 @@ module RecordingStudioApi
         relationships: nil,
         immutable_relationships: nil,
         operations: nil,
-        writable_attributes: nil
+        writable_attributes: nil,
+        sortable_attributes: nil
       )
         registry = RecordingStudioApi.configuration.recordable_registry
         registrations = registry.instance_variable_get(:@registrations)
@@ -672,7 +729,8 @@ module RecordingStudioApi
           relationships: relationships,
           immutable_relationships: immutable_relationships,
           operations: operations,
-          writable_attributes: writable_attributes
+          writable_attributes: writable_attributes,
+          sortable_attributes: sortable_attributes
         )
         yield
       ensure

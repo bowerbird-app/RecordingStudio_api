@@ -22,7 +22,7 @@ module RecordingStudioApi
       end
 
       def call
-        {
+        document = {
           openapi: OPENAPI_VERSION,
           info: {
             title: RecordingStudioApi.openapi_title(api: @api_key),
@@ -39,6 +39,9 @@ module RecordingStudioApi
             { bearerAuth: [] }
           ]
         }
+        groups = tag_groups
+        document[:"x-tagGroups"] = groups if groups
+        document
       end
 
       private
@@ -84,18 +87,47 @@ module RecordingStudioApi
 
       def resource_tag_descriptions
         documentation_catalog.fetch(:resources).each_with_object(shared_tag_descriptions) do |section, descriptions|
-          recordable_type = section.fetch(:recordable_type)
-          registration = if @api_key == "public"
-                           RecordingStudioApi.recordable_registration_for(recordable_type)
-                         else
-                           RecordingStudioApi.recordable_registration_for(recordable_type, api: @api_key)
-                         end
-          tag_metadata = registration&.openapi&.fetch(:tag, {})
-          description = tag_metadata.fetch(:description, nil) if tag_metadata.is_a?(Hash)
-          tag_name = section.fetch(:resource).to_s.singularize.humanize.titleize
+          tag_metadata = recordable_tag_metadata(section.fetch(:recordable_type))
+          description = tag_metadata.fetch(:description, nil)
+          tag_name = resource_tag_name(section)
 
           descriptions[tag_name] = description.presence || "View and manage #{section.fetch(:resource).to_s.humanize.downcase} available to your client."
         end
+      end
+
+      def resource_tag_name(section)
+        section.fetch(:resource).to_s.singularize.humanize.titleize
+      end
+
+      def recordable_tag_metadata(recordable_type)
+        registration = if @api_key == "public"
+                         RecordingStudioApi.recordable_registration_for(recordable_type)
+                       else
+                         RecordingStudioApi.recordable_registration_for(recordable_type, api: @api_key)
+                       end
+        tag_metadata = registration&.openapi&.fetch(:tag, {})
+        tag_metadata.is_a?(Hash) ? tag_metadata : {}
+      end
+
+      def resource_tag_groups
+        documentation_catalog.fetch(:resources).each_with_object({}) do |section, groups|
+          group = recordable_tag_metadata(section.fetch(:recordable_type))[:group]
+          next if group.blank?
+
+          groups[resource_tag_name(section)] = group.to_s
+        end
+      end
+
+      def tag_groups
+        assigned = resource_tag_groups
+        return if assigned.empty?
+
+        grouped = tags.map { |tag| tag.fetch(:name) }.each_with_object({}) do |name, output|
+          group_name = assigned[name].presence || name
+          output[group_name] ||= []
+          output[group_name] << name
+        end
+        grouped.map { |name, tag_names| { name: name, tags: tag_names } }
       end
 
       def shared_tag_descriptions
@@ -128,6 +160,9 @@ module RecordingStudioApi
 
         security = security_for(endpoint, metadata)
         operation[:security] = security if security
+
+        operation[:deprecated] = metadata[:deprecated] if metadata.key?(:deprecated)
+        operation[:externalDocs] = metadata[:externalDocs] if metadata.key?(:externalDocs)
 
         operation
       end

@@ -168,6 +168,188 @@ module RecordingStudioApi
         assert_not document.fetch(:paths).key?("/recording_studio_api/api/v1/workspaces/{id}")
       end
 
+      def test_generated_resource_docs_describe_registration_without_inventing_fields
+        fields = { summary: { resolver: ->(*) { "Summary" }, include: :request } }
+        relationships = {
+          comments: {
+            source: :children, child_type: "Comment", many: true, include: :request,
+            serializer: ->(*) { { body: "Body" } }, output_keys: %i[body], limit: 20
+          }
+        }
+
+        with_recordable_registration(
+          "Page",
+          serializer: ->(*) { { title: "Page" } },
+          output_keys: %i[title],
+          fields: fields,
+          relationships: relationships,
+          sortable_attributes: %i[title],
+          writable_attributes: %i[title],
+          openapi: {}
+        ) do
+          document = with_recordable_types(["Page"]) { OpenapiDocument.call }
+          collection = document.fetch(:paths).fetch("/recording_studio_api/api/v1/pages")
+          item = document.fetch(:paths).fetch("/recording_studio_api/api/v1/pages/{id}")
+          index_operation = collection.fetch("get")
+          create_operation = collection.fetch("post")
+          show_operation = item.fetch("get")
+          update_operation = item.fetch("patch")
+          delete_operation = item.fetch("delete")
+
+          assert_equal "List pages", index_operation.fetch(:summary)
+          assert_equal "Get a page", show_operation.fetch(:summary)
+          assert_equal "Create a page", create_operation.fetch(:summary)
+          assert_equal "Update a page", update_operation.fetch(:summary)
+          assert_equal "Delete a page", delete_operation.fetch(:summary)
+
+          index_description = index_operation.fetch(:description)
+          assert_includes index_description, "Returns pages the caller can access."
+          assert_includes index_description, "`title`"
+          assert_includes index_description, "`id`"
+          assert_includes index_description, "Available filters: `q` and `filter[title]`."
+          assert_includes index_description, "Paginate with `limit` and `pagination_token`."
+          assert_includes index_description, "Set `count=true`"
+          assert_includes index_description, "Optional `include` values: `summary` and `comments`."
+          refute_includes index_description, "`status`"
+
+          assert_includes create_operation.fetch(:description), "`Idempotency-Key`"
+          assert_includes create_operation.fetch(:description), "`parent_id`"
+          assert_includes create_operation.fetch(:description), "`title`"
+          assert_includes update_operation.fetch(:description), "Write `title`."
+          refute_includes update_operation.fetch(:description), "`parent_id`"
+          assert_includes delete_operation.fetch(:description), "Permanently delete Page."
+        end
+      end
+
+      def test_openapi_action_overrides_replace_generated_summary_and_description
+        relationships = {
+          folders: {
+            source: :children, child_type: "Folder", many: true, include: true,
+            serializer: ->(*) { { name: "Folder" } }, output_keys: %i[name], limit: 20,
+            endpoints: %i[index]
+          }
+        }
+
+        with_recordable_registration(
+          "Page",
+          serializer: ->(*) { { title: "Page" } },
+          output_keys: %i[title],
+          relationships: relationships,
+          openapi: {
+            index: {
+              summary: "Browse published pages",
+              description: "Host-owned list copy."
+            },
+            show: {
+              summary: "Get page details"
+            }
+          }
+        ) do
+          document = with_recordable_types(%w[Page Folder]) { OpenapiDocument.call }
+          index_operation = document.fetch(:paths).fetch("/recording_studio_api/api/v1/pages").fetch("get")
+          show_operation = document.fetch(:paths).fetch("/recording_studio_api/api/v1/pages/{id}").fetch("get")
+
+          assert_equal "Browse published pages", index_operation.fetch(:summary)
+          refute_includes index_operation.fetch(:description), "Returns pages the caller can access."
+          assert_includes index_operation.fetch(:description), "Host-owned list copy."
+          assert_includes index_operation.fetch(:description), "Each item in `records` includes `folders`"
+          assert_equal "Get page details", show_operation.fetch(:summary)
+          assert_includes show_operation.fetch(:description), "Returns a page the caller can access."
+        end
+      end
+
+      def test_openapi_parameter_overrides_add_to_builtin_parameters
+        with_recordable_registration(
+          "Page",
+          openapi: {
+            index: {
+              parameters: [
+                {
+                  name: "limit",
+                  in: "query",
+                  required: false,
+                  description: "Host limit copy.",
+                  schema: { type: "integer" }
+                },
+                {
+                  name: "published",
+                  in: "query",
+                  required: false,
+                  description: "Only published pages.",
+                  schema: { type: "boolean" }
+                }
+              ]
+            }
+          }
+        ) do
+          document = with_recordable_types(["Page"]) { OpenapiDocument.call }
+          parameters = document.fetch(:paths).fetch("/recording_studio_api/api/v1/pages").fetch("get").fetch(:parameters)
+          limit_parameter = parameters.find { |parameter| parameter.fetch("name") == "limit" && parameter.fetch("in") == "query" }
+          published_parameter = parameters.find { |parameter| parameter.fetch("name") == "published" }
+
+          assert_equal "Host limit copy.", limit_parameter.fetch("description")
+          assert_equal(1, parameters.count { |parameter| parameter.fetch("name") == "limit" })
+          refute_nil(parameters.find { |parameter| parameter.fetch("name") == "q" })
+          refute_nil(parameters.find { |parameter| parameter.fetch("name") == "pagination_token" })
+          assert_equal "Only published pages.", published_parameter.fetch("description")
+        end
+      end
+
+      def test_operation_for_passes_through_deprecated_and_external_docs
+        with_recordable_registration(
+          "Page",
+          openapi: {
+            show: {
+              deprecated: true,
+              externalDocs: {
+                url: "https://example.test/pages",
+                description: "Page guide"
+              }
+            }
+          }
+        ) do
+          document = with_recordable_types(["Page"]) { OpenapiDocument.call }
+          show_operation = document.fetch(:paths).fetch("/recording_studio_api/api/v1/pages/{id}").fetch("get")
+
+          assert_equal true, show_operation.fetch(:deprecated)
+          assert_equal(
+            { url: "https://example.test/pages", description: "Page guide" },
+            show_operation.fetch(:externalDocs)
+          )
+          refute document.fetch(:paths).fetch("/recording_studio_api/api/v1/pages").fetch("get").key?(:deprecated)
+        end
+      end
+
+      def test_tag_groups_are_omitted_when_no_registration_declares_a_group
+        document = with_recordable_types(["Page"]) { OpenapiDocument.call }
+
+        refute document.key?(:"x-tagGroups")
+      end
+
+      def test_tag_groups_nest_declared_tags_and_keep_ungrouped_tags_visible
+        with_recordable_registration("PressKit", openapi: { tag: { group: "Press kits" } }) do
+          with_recordable_registration("Section", openapi: { tag: { group: "Press kits" } }) do
+            with_recordable_registration("Video", openapi: { tag: { group: "Press kits" } }) do
+              with_recordable_registration("Page", openapi: {}) do
+                document = with_recordable_types(%w[PressKit Section Video Page]) { OpenapiDocument.call }
+                groups = document.fetch(:"x-tagGroups")
+                press_kits = groups.find { |group| group.fetch(:name) == "Press kits" }
+                page_group = groups.find { |group| group.fetch(:name) == "Page" }
+                authentication = groups.find { |group| group.fetch(:name) == "Authentication" }
+
+                assert_equal ["Press Kit", "Section", "Video"], press_kits.fetch(:tags)
+                assert_equal ["Page"], page_group.fetch(:tags)
+                assert_equal ["Authentication"], authentication.fetch(:tags)
+                assert(groups.any? { |group| group.fetch(:tags) == ["resources"] })
+                document.fetch(:tags).each do |tag|
+                  assert(groups.any? { |group| group.fetch(:tags).include?(tag.fetch(:name)) })
+                end
+              end
+            end
+          end
+        end
+      end
+
       def test_delete_operation_description_mentions_permanent_delete
         with_stubbed_recordable_class("Page", [column_stub("id", :uuid, false)]) do
           with_recordable_registration("Page", openapi: {}, operations: %i[index show create update destroy]) do
@@ -766,13 +948,23 @@ module RecordingStudioApi
         Object.const_set(class_name, existing_class) if existing_class
       end
 
-      def with_recordable_registration(recordable_type, openapi:, serializer: nil, output_keys: nil, fields: nil, relationships: nil, operations: nil)
+      def with_recordable_registration(recordable_type, openapi:, serializer: nil, output_keys: nil, fields: nil, relationships: nil, operations: nil, sortable_attributes: nil, writable_attributes: nil)
         registry = RecordingStudioApi.configuration.recordable_registry
         registrations = registry.instance_variable_get(:@registrations)
         key = recordable_type.to_s
         existing = registrations.delete(key)
 
-        registry.register(recordable_type, serializer: serializer, output_keys: output_keys, fields: fields, relationships: relationships, openapi: openapi, operations: operations)
+        registry.register(
+          recordable_type,
+          serializer: serializer,
+          output_keys: output_keys,
+          fields: fields,
+          relationships: relationships,
+          openapi: openapi,
+          operations: operations,
+          sortable_attributes: sortable_attributes,
+          writable_attributes: writable_attributes
+        )
         yield
       ensure
         registrations.delete(key)
