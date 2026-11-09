@@ -217,7 +217,7 @@ module RecordingStudioApi
           .sort_by { |section| section.fetch(:resource) }
       end
 
-      def default_resource_endpoints(resource_name, recordable_type) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
+      def default_resource_endpoints(resource_name, recordable_type) # rubocop:disable Metrics/MethodLength
         openapi_tag = openapi_tag_for(resource_name, recordable_type)
         docs_resource_name = docs_resource_name_for(resource_name, recordable_type)
         registration = recordable_registration_for(recordable_type)
@@ -236,8 +236,6 @@ module RecordingStudioApi
             openapi: resource_openapi(
               {
                 tags: [openapi_tag],
-                summary: operation_docs.summary_for(:index),
-                description: operation_docs.description_for(:index),
                 parameters: pagination_parameters(recordable_type) + collection_filter_parameters(recordable_type) + include_parameters_for(recordable_type),
                 responses: resource_list_responses(
                   resource_name,
@@ -264,8 +262,6 @@ module RecordingStudioApi
             openapi: merge_openapi(
               {
                 tags: [openapi_tag],
-                summary: operation_docs.summary_for(:create),
-                description: operation_docs.description_for(:create),
                 parameters: [idempotency_key_parameter],
                 request_body: resource_write_request_body(recordable_type, operation: :create),
                 responses: resource_create_responses(recordable_type)
@@ -284,8 +280,6 @@ module RecordingStudioApi
             openapi: resource_openapi(
               {
                 tags: [openapi_tag],
-                summary: operation_docs.summary_for(:show),
-                description: operation_docs.description_for(:show),
                 parameters: [id_parameter] + include_parameters_for(recordable_type),
                 responses: resource_item_responses(
                   recordable_type,
@@ -309,8 +303,6 @@ module RecordingStudioApi
             openapi: merge_openapi(
               {
                 tags: [openapi_tag],
-                summary: operation_docs.summary_for(:update),
-                description: operation_docs.description_for(:update),
                 parameters: [id_parameter],
                 request_body: resource_write_request_body(recordable_type, operation: :update),
                 responses: resource_item_responses(recordable_type)
@@ -329,8 +321,6 @@ module RecordingStudioApi
             openapi: merge_openapi(
               {
                 tags: [openapi_tag],
-                summary: operation_docs.summary_for(:destroy),
-                description: destroy_description_for(resource_name, recordable_type),
                 parameters: [id_parameter],
                 responses: resource_delete_responses(recordable_type)
               },
@@ -342,7 +332,7 @@ module RecordingStudioApi
         endpoints.select do |endpoint|
           registration.nil? || registration.supports_operation?(endpoint.fetch(:action).split("#").last)
         end
-      end # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
+      end # rubocop:enable Metrics/MethodLength
 
       def recordable_metric_endpoints(resource_name, recordable_type)
         registration = recordable_registration_for(recordable_type)
@@ -619,7 +609,7 @@ module RecordingStudioApi
         )
         return openapi if relationship_description.blank?
 
-        openapi.merge(description: [openapi[:description], relationship_description].compact.join("\n\n"))
+        openapi.merge(relationship_description: relationship_description)
       end
 
       def api_root_path

@@ -149,7 +149,10 @@ module RecordingStudioApi
         operation = {
           operationId: operation_id_for(endpoint),
           summary: metadata.fetch(:summary, summary),
-          description: metadata.fetch(:description, endpoint.fetch(:description)),
+          description: [
+            metadata.fetch(:description, endpoint.fetch(:description)),
+            metadata[:relationship_description]
+          ].compact.join("\n\n"),
           tags: Array(metadata.fetch(:tags, [tag_for(endpoint)])),
           parameters: normalize_parameters(metadata.fetch(:parameters, [])),
           responses: responses_for(endpoint)

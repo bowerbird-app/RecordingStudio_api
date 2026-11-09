@@ -190,7 +190,7 @@ module RecordingStudioApi
           assert_equal "List pages", index_endpoint.fetch(:summary)
           assert_includes index_endpoint.fetch(:description), "Returns pages the caller can access."
           assert_includes index_endpoint.fetch(:description), "`filter[title]`"
-          assert_includes index_endpoint.fetch(:openapi).fetch(:description), "Set `count=true`"
+          assert_includes index_endpoint.fetch(:description), "Set `count=true`"
           assert_includes create_endpoint.fetch(:description), "`Idempotency-Key`"
           refute_includes create_endpoint.fetch(:description), "the caller can access"
         end
