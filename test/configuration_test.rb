@@ -500,6 +500,7 @@ class ConfigurationTest < Minitest::Test
     assert_equal ["title"], registration.fetch(:writable_attributes)
     assert_equal %i[create destroy index show update], registration.fetch(:operations)
     assert_equal [], registration.fetch(:capability_actions)
+    assert_equal true, registration.fetch(:auto_capability_actions)
   end
 
   def test_recordable_registration_accepts_a_capability_action_allowlist
@@ -524,26 +525,71 @@ class ConfigurationTest < Minitest::Test
     original_configuration_defined = RecordingStudioApi.instance_variable_defined?(:@configuration)
     original_configuration = RecordingStudioApi.instance_variable_get(:@configuration)
     RecordingStudioApi.instance_variable_set(:@configuration, @configuration)
-    @configuration.action_registry.register(
-      :grant_access,
-      capability: :accessible,
-      http_verb: :post,
-      handler: ->(_context) { :ok }
-    )
-    @configuration.action_registry.register(
-      :publish,
-      capability: :publishable,
-      http_verb: :post,
-      handler: ->(_context) { :ok }
-    )
+    register_shout_and_publish_actions
     @configuration.recordable_registry.register("Page")
     @configuration.recordable_registry.register("Folder")
+    shout = RecordingStudioApi.capability_action(:shout)
 
     RecordingStudio.stub(:capability_enabled?, lambda { |capability, **kwargs|
-      capability == :accessible && kwargs[:for] == "Page"
+      capability == :echoable && kwargs[:for] == "Page"
     }) do
-      assert_equal ["grant_access"], RecordingStudioApi.capability_actions_for("Page").map(&:name)
+      assert_equal ["shout"], RecordingStudioApi.capability_actions_for("Page").map(&:name)
       assert_equal [], RecordingStudioApi.capability_actions_for("Folder").map(&:name)
+      assert RecordingStudioApi.capability_action_enabled_for?(shout, "Page")
+      refute RecordingStudioApi.capability_action_enabled_for?(shout, "Folder")
+    end
+  ensure
+    restore_recording_studio_api_configuration(original_configuration_defined, original_configuration)
+  end
+
+  def test_capability_action_enabled_for_unregistered_type
+    original_configuration_defined = RecordingStudioApi.instance_variable_defined?(:@configuration)
+    original_configuration = RecordingStudioApi.instance_variable_get(:@configuration)
+    RecordingStudioApi.instance_variable_set(:@configuration, @configuration)
+    register_shout_and_publish_actions
+    shout = RecordingStudioApi.capability_action(:shout)
+
+    RecordingStudio.stub(:capability_enabled?, ->(*) { true }) do
+      refute RecordingStudioApi.capability_action_enabled_for?(shout, "UnregisteredType")
+      assert_equal [], RecordingStudioApi.capability_actions_for("UnregisteredType").map(&:name)
+    end
+  ensure
+    restore_recording_studio_api_configuration(original_configuration_defined, original_configuration)
+  end
+
+  def test_capability_actions_are_isolated_to_the_named_api_they_are_registered_on
+    original_configuration_defined = RecordingStudioApi.instance_variable_defined?(:@configuration)
+    original_configuration = RecordingStudioApi.instance_variable_get(:@configuration)
+    RecordingStudioApi.instance_variable_set(:@configuration, @configuration)
+    @configuration.api(:operations)
+    register_shout_and_publish_actions
+    @configuration.recordable_registry.register("Page")
+    @configuration.api(:operations).recordable_registry.register("Page")
+
+    RecordingStudio.stub(:capability_enabled?, ->(capability, **kwargs) { capability == :echoable && kwargs[:for] == "Page" }) do
+      assert_equal ["shout"], RecordingStudioApi.capability_actions_for("Page").map(&:name)
+      assert_nil RecordingStudioApi.capability_action(:shout, api: :operations)
+      assert_equal [], RecordingStudioApi.capability_actions_for("Page", api: :operations).map(&:name)
+    end
+  ensure
+    restore_recording_studio_api_configuration(original_configuration_defined, original_configuration)
+  end
+
+  def test_capability_actions_opt_out_treats_the_list_as_an_allowlist
+    original_configuration_defined = RecordingStudioApi.instance_variable_defined?(:@configuration)
+    original_configuration = RecordingStudioApi.instance_variable_get(:@configuration)
+    RecordingStudioApi.instance_variable_set(:@configuration, @configuration)
+    register_shout_and_publish_actions
+    @configuration.recordable_registry.register(
+      "Page",
+      capability_actions: %i[publish],
+      auto_capability_actions: false
+    )
+    shout = RecordingStudioApi.capability_action(:shout)
+
+    RecordingStudio.stub(:capability_enabled?, ->(*) { true }) do
+      assert_equal ["publish"], RecordingStudioApi.capability_actions_for("Page").map(&:name)
+      refute RecordingStudioApi.capability_action_enabled_for?(shout, "Page")
     end
   ensure
     restore_recording_studio_api_configuration(original_configuration_defined, original_configuration)
@@ -709,6 +755,21 @@ class ConfigurationTest < Minitest::Test
   end
 
   private
+
+  def register_shout_and_publish_actions
+    @configuration.action_registry.register(
+      :shout,
+      capability: :echoable,
+      http_verb: :post,
+      handler: ->(_context) { :ok }
+    )
+    @configuration.action_registry.register(
+      :publish,
+      capability: :publishable,
+      http_verb: :post,
+      handler: ->(_context) { :ok }
+    )
+  end
 
   def restore_recording_studio_api_configuration(original_configuration_defined, original_configuration)
     if original_configuration_defined

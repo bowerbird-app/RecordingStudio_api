@@ -11,24 +11,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Member capability actions registered with a `capability:` (for example
-  `:accessible`) are offered and routable on every API-registered type that
+  `:movable`) are offered and routable on every API-registered type that
   declares that Recording Studio capability, even when the type's explicit
   `capability_actions` list does not name them. OpenAPI, Scalar, and
   `capability_actions_for` include those auto-enabled actions. Authorization
   is unchanged: `required_role` and handler checks still run.
-- Explicit `capability_actions` lists still enable named actions the same
-  way. Conflicting supplied lists still raise on registry merge.
+- `auto_capability_actions:` on `register_recordable_type_api` defaults to
+  `true`. Set it to `false` to treat that type's `capability_actions` list as
+  an allowlist again.
+- Explicit `capability_actions` lists still enable named extra member actions
+  the same way. Conflicting supplied lists still raise on registry merge.
 
 ### Upgrade notes
 - Bump to `0.19.0`. No host migration.
 - Capability-owner gems register the action once with
-  `RecordingStudioApi.register_capability_action(:grant_access, capability: :accessible, ...)`.
+  `RecordingStudioApi.register_capability_action(:move, capability: :movable, ...)`.
   Type gems do not repeat those names in `capability_actions`.
-- A type that has a mixin for UI but omitted the action from its API
-  `capability_actions` list will now expose that member action. Close it by
-  not enabling the capability on that type. Listing the name is still valid
-  and still required for any member action whose capability is not on the
-  type (those stay unavailable via `applicable_to?`).
+- A type that has a mixin for UI but should not expose that mixin’s API
+  actions can set `auto_capability_actions: false`. Then only names in
+  `capability_actions` are offered. Listing a name is still valid. Member
+  actions whose capability is not on the type stay unavailable via
+  `applicable_to?`.
 
 ## [0.18.5] - 2026-11-09
 

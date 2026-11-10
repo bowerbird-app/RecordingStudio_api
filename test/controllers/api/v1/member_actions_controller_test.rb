@@ -48,19 +48,34 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "executes a capability action for types that declare the capability without listing it" do
-    RecordingStudio.enable_capability(:accessible, on: "Page")
     RecordingStudioApi.register_capability_action(
-      :grant_access,
-      capability: :accessible,
+      :shout,
+      capability: :echoable,
       http_verb: :post,
       handler: ->(context) { context.recording }
     )
 
-    post "/recording_studio_api/api/v1/pages/#{@page_recording.id}/actions/grant_access",
+    post "/recording_studio_api/api/v1/pages/#{@page_recording.id}/actions/shout",
          headers: authorization_headers
 
     assert_response :success
     assert_equal @page_recording.id, JSON.parse(response.body).fetch("id")
+  end
+
+  test "rejects an auto capability action when the type opts out of auto enablement" do
+    RecordingStudioApi.register_capability_action(
+      :shout,
+      capability: :echoable,
+      http_verb: :post,
+      handler: ->(context) { context.recording }
+    )
+    RecordingStudioApi.register_recordable_type_api("Page", auto_capability_actions: false)
+
+    post "/recording_studio_api/api/v1/pages/#{@page_recording.id}/actions/shout",
+         headers: authorization_headers
+
+    assert_response :unprocessable_entity
+    assert_equal "shout is not enabled for Page", JSON.parse(response.body).dig("error", "message")
   end
 
   test "rejects a capability action when the type does not declare the capability" do
@@ -90,10 +105,9 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "denies an auto-enabled capability action below the required role" do
-    RecordingStudio.enable_capability(:accessible, on: "Page")
     RecordingStudioApi.register_capability_action(
-      :grant_access,
-      capability: :accessible,
+      :shout,
+      capability: :echoable,
       http_verb: :post,
       required_role: :edit,
       handler: ->(context) { context.recording }
@@ -103,7 +117,7 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
     view_page_recording = create_page_recording(root_recording: view_root_recording)
     view_token = issue_oauth_access_token_for(access_recording: view_access_recording, name: "View-only auto-enable token")
 
-    post "/recording_studio_api/api/v1/pages/#{view_page_recording.id}/actions/grant_access",
+    post "/recording_studio_api/api/v1/pages/#{view_page_recording.id}/actions/shout",
          headers: { "Authorization" => "Bearer #{view_token}" }
 
     assert_response :forbidden

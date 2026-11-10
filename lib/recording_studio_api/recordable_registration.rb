@@ -76,12 +76,13 @@ module RecordingStudioApi
 
     attr_reader :recordable_type, :serializer, :output_keys, :fields, :openapi, :sortable_attributes,
                 :writable_attributes, :immutable_fields, :relationships, :immutable_relationships,
-                :operations, :capability_actions, :metric_names
+                :operations, :capability_actions, :auto_capability_actions, :metric_names
 
     def initialize(recordable_type:, serializer: nil, output_keys: nil, fields: nil, openapi: nil,
                    sortable_attributes: nil, writable_attributes: nil, immutable_fields: nil,
                    relationships: nil, immutable_relationships: nil, operations: nil, capability_actions: nil,
-                   metrics: nil, operations_supplied: nil, capability_actions_supplied: nil, metrics_supplied: nil)
+                   auto_capability_actions: nil, metrics: nil, operations_supplied: nil,
+                   capability_actions_supplied: nil, auto_capability_actions_supplied: nil, metrics_supplied: nil)
       @recordable_type = recordable_type.to_s
       @serializer = serializer
       @output_keys = normalize_names(output_keys, "Output keys")
@@ -94,9 +95,15 @@ module RecordingStudioApi
       @immutable_relationships = normalize_names(immutable_relationships, "Immutable relationships").sort.freeze
       @operations_supplied = operations_supplied.nil? ? !operations.nil? : operations_supplied
       @capability_actions_supplied = capability_actions_supplied.nil? ? !capability_actions.nil? : capability_actions_supplied
+      @auto_capability_actions_supplied = if auto_capability_actions_supplied.nil?
+                                            !auto_capability_actions.nil?
+                                          else
+                                            auto_capability_actions_supplied
+                                          end
       @metrics_supplied = metrics_supplied.nil? ? !metrics.nil? : metrics_supplied
       @operations = normalize_operations(operations)
       @capability_actions = normalize_capability_actions(capability_actions)
+      @auto_capability_actions = normalize_auto_capability_actions(auto_capability_actions)
       @metric_names = normalize_metric_names(metrics)
       validate!
       freeze
@@ -155,6 +162,10 @@ module RecordingStudioApi
       @capability_actions_supplied
     end
 
+    def auto_capability_actions_supplied?
+      @auto_capability_actions_supplied
+    end
+
     def metrics_supplied?
       @metrics_supplied
     end
@@ -169,7 +180,8 @@ module RecordingStudioApi
         fields: fields.transform_values(&:to_h), openapi: openapi, sortable_attributes: sortable_attributes,
         writable_attributes: writable_attributes, immutable_fields: immutable_fields,
         relationships: relationships.transform_values(&:to_h), immutable_relationships: immutable_relationships,
-        operations: operations, capability_actions: capability_actions, metric_names: metric_names
+        operations: operations, capability_actions: capability_actions,
+        auto_capability_actions: auto_capability_actions, metric_names: metric_names
       }
     end
 
@@ -357,6 +369,13 @@ module RecordingStudioApi
 
     def normalize_capability_actions(value)
       Array(value).map(&:to_s).uniq.sort.freeze
+    end
+
+    def normalize_auto_capability_actions(value)
+      return true if value.nil?
+      return value if [true, false].include?(value)
+
+      raise ConfigurationError, "auto_capability_actions must be true or false for #{recordable_type}"
     end
 
     def normalize_metric_names(value)

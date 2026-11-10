@@ -8,23 +8,24 @@ to repeat those action names in `capability_actions`. Authorization is
 unchanged.
 
 1. Bump the host gem to `0.19.0`.
-2. Capability-owner gems (Accessible first) register once:
+2. Capability-owner gems register once:
 
    ```ruby
    RecordingStudioApi.register_capability_action(
-     :grant_access,
-     capability: :accessible,
-     handler: GrantAccess
+     :move,
+     capability: :movable,
+     handler: RecordingStudio::Moveable::Api::MoveRecording
    )
    ```
 
-   Types that `enable_capability(:accessible, on: PressKit)` get
-   `grant_access` without listing it. Conflicting `capability_actions`
-   merges still raise; do not union-merge those lists.
-3. If a type enabled a mixin for UI only and omitted the action from
-   `capability_actions`, the API now exposes it. Stop enabling the
-   capability on that type if the API action must stay closed.
-4. Keep listing host-specific member actions on `capability_actions`.
+   Types that `enable_capability(:movable, on: Folder)` get `move` without
+   listing it. Conflicting `capability_actions` merges still raise; do not
+   union-merge those lists.
+3. If a type enabled a mixin for UI only and must not expose that mixin’s
+   API actions, set `auto_capability_actions: false` on its
+   `register_recordable_type_api`. Then `capability_actions` is an allowlist
+   again. Do not drop the mixin just to hide the API action.
+4. Keep listing host-specific extra member actions on `capability_actions`.
    `required_role` and handler `authorize!` checks still apply.
 
 ## Upgrading to 0.18.5

@@ -15,13 +15,13 @@ module RecordingStudioApi
     def register(recordable_type, serializer: nil, output_keys: nil, fields: nil, openapi: nil,
                  sortable_attributes: nil, writable_attributes: nil, immutable_fields: nil,
                  relationships: nil, immutable_relationships: nil, operations: nil, capability_actions: nil,
-                 metrics: nil)
+                 auto_capability_actions: nil, metrics: nil)
       incoming = RecordableRegistration.new(
         recordable_type: recordable_type, serializer: serializer, output_keys: output_keys, fields: fields,
         openapi: openapi, sortable_attributes: sortable_attributes, writable_attributes: writable_attributes,
         immutable_fields: immutable_fields, relationships: relationships,
         immutable_relationships: immutable_relationships, operations: operations,
-        capability_actions: capability_actions, metrics: metrics
+        capability_actions: capability_actions, auto_capability_actions: auto_capability_actions, metrics: metrics
       )
       key = incoming.recordable_type
       @mutex.synchronize do
@@ -74,16 +74,27 @@ module RecordingStudioApi
         immutable_fields: existing.immutable_fields | incoming.immutable_fields,
         relationships: merge_definitions("relationship", existing.relationships, incoming.relationships),
         immutable_relationships: existing.immutable_relationships | incoming.immutable_relationships,
+        **merged_explicit_sets(existing, incoming)
+      )
+    end
+
+    def merged_explicit_sets(existing, incoming)
+      {
         operations: merge_explicit_set("operations", existing.operations, incoming.operations,
                                        existing.operations_supplied?, incoming.operations_supplied?),
         capability_actions: merge_explicit_set("capability actions", existing.capability_actions, incoming.capability_actions,
                                                existing.capability_actions_supplied?, incoming.capability_actions_supplied?),
+        auto_capability_actions: merge_explicit_set(
+          "auto capability actions", existing.auto_capability_actions, incoming.auto_capability_actions,
+          existing.auto_capability_actions_supplied?, incoming.auto_capability_actions_supplied?
+        ),
         metrics: merge_explicit_set("metrics", existing.metric_names, incoming.metric_names,
                                     existing.metrics_supplied?, incoming.metrics_supplied?, replace: @replace_metrics),
         operations_supplied: existing.operations_supplied? || incoming.operations_supplied?,
         capability_actions_supplied: existing.capability_actions_supplied? || incoming.capability_actions_supplied?,
+        auto_capability_actions_supplied: existing.auto_capability_actions_supplied? || incoming.auto_capability_actions_supplied?,
         metrics_supplied: existing.metrics_supplied? || incoming.metrics_supplied?
-      )
+      }
     end
 
     def merge_definitions(kind, existing, incoming)
