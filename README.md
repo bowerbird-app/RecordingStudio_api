@@ -713,9 +713,13 @@ It accepts any of `:index`, `:show`, `:create`, `:update`, and `:destroy`; when 
 remain available for backward compatibility. For a collection-only resource, use
 `operations: %i[index]`. Disabled operations are rejected by the API and omitted from OpenAPI.
 
-`capability_actions` is a default-deny allowlist for custom capability actions. A capability action
-requires the underlying Recording Studio capability, a registered API action handler, and an entry
-in the recordable type's `capability_actions` list before it is callable or appears in OpenAPI.
+`capability_actions` is an allowlist for custom capability actions. A capability action
+requires a registered API action handler and the underlying Recording Studio capability on
+the recordable type. When the action is registered with a `capability:` (for example
+`:accessible`), every API-registered type that declares that capability gets the action
+without naming it in `capability_actions`. OpenAPI and `capability_actions_for` include
+those auto-enabled actions. An explicit list still enables named actions the same way.
+Authorization (`required_role` and the handler) is separate from this enablement check.
 
 ### Access management role settings
 

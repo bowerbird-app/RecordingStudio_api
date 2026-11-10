@@ -676,6 +676,35 @@ module RecordingStudioApi
         end
       end
 
+      def test_catalog_includes_capability_actions_auto_enabled_by_declared_capability
+        original_configuration = RecordingStudioApi.configuration
+        api_singleton = RecordingStudioApi.singleton_class
+        original_recordable_types = RecordingStudioApi.method(:api_recordable_types)
+
+        RecordingStudioApi.instance_variable_set(:@configuration, RecordingStudioApi::Configuration.new)
+        RecordingStudioApi.register_capability_action(
+          :grant_access,
+          capability: :accessible,
+          http_verb: :post,
+          handler: ->(_context) { :ok },
+          openapi: { summary: "Grant access" }
+        )
+        RecordingStudioApi.register_recordable_type_api("Page")
+        api_singleton.send(:define_method, :api_recordable_types) { ["Page"] }
+
+        RecordingStudio.stub(:capability_enabled?, ->(capability, **kwargs) { capability == :accessible && kwargs[:for] == "Page" }) do
+          catalog = DocumentationCatalog.call
+          page_section = catalog.fetch(:resources).find { |resource| resource.fetch(:resource) == "pages" }
+          endpoint_paths = page_section.fetch(:endpoints).map { |endpoint| endpoint.fetch(:path) }
+
+          assert_includes endpoint_paths, "/recording_studio_api/api/v1/pages/:id/actions/grant_access"
+          assert_equal "Grant access", action_endpoint_summary(catalog, "pages", "grant_access")
+        end
+      ensure
+        api_singleton.send(:define_method, :api_recordable_types, original_recordable_types) if api_singleton && original_recordable_types
+        RecordingStudioApi.instance_variable_set(:@configuration, original_configuration) if original_configuration
+      end
+
       def test_catalog_selects_action_contract_by_api_version_profile
         original_configuration = RecordingStudioApi.configuration
         api_singleton = RecordingStudioApi.singleton_class

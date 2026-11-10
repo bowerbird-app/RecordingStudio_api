@@ -1,5 +1,32 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.19.0
+
+Member actions registered with a `capability:` are offered on every
+API-registered type that declares that capability. Type gems no longer need
+to repeat those action names in `capability_actions`. Authorization is
+unchanged.
+
+1. Bump the host gem to `0.19.0`.
+2. Capability-owner gems (Accessible first) register once:
+
+   ```ruby
+   RecordingStudioApi.register_capability_action(
+     :grant_access,
+     capability: :accessible,
+     handler: GrantAccess
+   )
+   ```
+
+   Types that `enable_capability(:accessible, on: PressKit)` get
+   `grant_access` without listing it. Conflicting `capability_actions`
+   merges still raise; do not union-merge those lists.
+3. If a type enabled a mixin for UI only and omitted the action from
+   `capability_actions`, the API now exposes it. Stop enabling the
+   capability on that type if the API action must stay closed.
+4. Keep listing host-specific member actions on `capability_actions`.
+   `required_role` and handler `authorize!` checks still apply.
+
 ## Upgrading to 0.18.5
 
 OpenAPI and Scalar copy for standard resource operations is richer. No

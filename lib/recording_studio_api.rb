@@ -280,7 +280,11 @@ module RecordingStudioApi
 
     def capability_action_enabled_for?(action, recordable_type, api: :public)
       registration = recordable_registration_for(recordable_type, api: api)
-      registration&.supports_capability_action?(action.name)
+      return false unless registration
+      return true if registration.supports_capability_action?(action.name)
+      return false if action.capability.blank?
+
+      action.applicable_to?(recordable_type)
     end
 
     def resource_actions_for(recordable_type, scope: nil, version: nil, api: :public)

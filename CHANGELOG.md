@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-11-10
+
+### Added
+- Member capability actions registered with a `capability:` (for example
+  `:accessible`) are offered and routable on every API-registered type that
+  declares that Recording Studio capability, even when the type's explicit
+  `capability_actions` list does not name them. OpenAPI, Scalar, and
+  `capability_actions_for` include those auto-enabled actions. Authorization
+  is unchanged: `required_role` and handler checks still run.
+- Explicit `capability_actions` lists still enable named actions the same
+  way. Conflicting supplied lists still raise on registry merge.
+
+### Upgrade notes
+- Bump to `0.19.0`. No host migration.
+- Capability-owner gems register the action once with
+  `RecordingStudioApi.register_capability_action(:grant_access, capability: :accessible, ...)`.
+  Type gems do not repeat those names in `capability_actions`.
+- A type that has a mixin for UI but omitted the action from its API
+  `capability_actions` list will now expose that member action. Close it by
+  not enabling the capability on that type. Listing the name is still valid
+  and still required for any member action whose capability is not on the
+  type (those stay unavailable via `applicable_to?`).
+
 ## [0.18.5] - 2026-11-09
 
 ### Changed
@@ -942,7 +965,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.5...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.5...v0.19.0
 [0.18.5]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.4...v0.18.5
 [0.18.4]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.3...v0.18.4
 [0.18.3]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.2...v0.18.3
