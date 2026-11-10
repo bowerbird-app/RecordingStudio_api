@@ -676,6 +676,39 @@ module RecordingStudioApi
         end
       end
 
+      def test_catalog_includes_capability_actions_auto_enabled_by_declared_capability
+        original_configuration = RecordingStudioApi.configuration
+        api_singleton = RecordingStudioApi.singleton_class
+        original_recordable_types = RecordingStudioApi.method(:api_recordable_types)
+
+        RecordingStudioApi.instance_variable_set(:@configuration, RecordingStudioApi::Configuration.new)
+        RecordingStudioApi.register_capability_action(
+          :shout,
+          capability: :echoable,
+          http_verb: :post,
+          handler: ->(_context) { :ok },
+          openapi: { summary: "Shout" }
+        )
+        RecordingStudioApi.register_recordable_type_api("Page")
+        RecordingStudioApi.register_recordable_type_api("Folder", auto_capability_actions: false)
+        api_singleton.send(:define_method, :api_recordable_types) { %w[Page Folder] }
+
+        RecordingStudio.stub(:capability_enabled?, ->(capability, **) { capability == :echoable }) do
+          catalog = DocumentationCatalog.call
+          page_section = catalog.fetch(:resources).find { |resource| resource.fetch(:resource) == "pages" }
+          folder_section = catalog.fetch(:resources).find { |resource| resource.fetch(:resource) == "folders" }
+          page_paths = page_section.fetch(:endpoints).map { |endpoint| endpoint.fetch(:path) }
+          folder_paths = folder_section.fetch(:endpoints).map { |endpoint| endpoint.fetch(:path) }
+
+          assert_includes page_paths, "/recording_studio_api/api/v1/pages/:id/actions/shout"
+          refute_includes folder_paths, "/recording_studio_api/api/v1/folders/:id/actions/shout"
+          assert_equal "Shout", action_endpoint_summary(catalog, "pages", "shout")
+        end
+      ensure
+        api_singleton.send(:define_method, :api_recordable_types, original_recordable_types) if api_singleton && original_recordable_types
+        RecordingStudioApi.instance_variable_set(:@configuration, original_configuration) if original_configuration
+      end
+
       def test_catalog_selects_action_contract_by_api_version_profile
         original_configuration = RecordingStudioApi.configuration
         api_singleton = RecordingStudioApi.singleton_class

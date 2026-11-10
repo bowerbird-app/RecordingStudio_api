@@ -587,6 +587,36 @@ module RecordingStudioApi
         assert_equal ["Folder"], move_operation.fetch(:tags)
       end
 
+      def test_openapi_includes_auto_enabled_capability_actions_and_excludes_opted_out_ones
+        with_isolated_configuration do
+          singleton = RecordingStudioApi.singleton_class
+          original_recordable_types = RecordingStudioApi.method(:api_recordable_types)
+          singleton.send(:define_method, :api_recordable_types) { %w[Page Folder] }
+
+          RecordingStudioApi.register_capability_action(
+            :shout,
+            capability: :echoable,
+            http_verb: :post,
+            handler: ->(_context) { :ok }
+          )
+          RecordingStudioApi.register_recordable_type_api("Page")
+          RecordingStudioApi.register_recordable_type_api(
+            "Folder",
+            capability_actions: %i[publish],
+            auto_capability_actions: false
+          )
+
+          RecordingStudio.stub(:capability_enabled?, ->(capability, **) { capability == :echoable }) do
+            paths = OpenapiDocument.call.fetch(:paths).keys
+
+            assert_includes paths, "/recording_studio_api/api/v1/pages/{id}/actions/shout"
+            refute_includes paths, "/recording_studio_api/api/v1/folders/{id}/actions/shout"
+          end
+        ensure
+          singleton.send(:define_method, :api_recordable_types, original_recordable_types)
+        end
+      end
+
       def test_components_only_include_shared_schemas
         document = with_recordable_types(["Page"]) { OpenapiDocument.call }
 

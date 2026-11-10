@@ -218,7 +218,7 @@ module RecordingStudioApi
     def register_recordable_type_api(recordable_type, serializer: nil, output_keys: nil, fields: nil, openapi: nil,
                                      sortable_attributes: nil, writable_attributes: nil, immutable_fields: nil,
                                      relationships: nil, immutable_relationships: nil, operations: nil,
-                                     capability_actions: nil, metrics: nil, api: :public)
+                                     capability_actions: nil, auto_capability_actions: nil, metrics: nil, api: :public)
       definition = configuration.api(api)
       resolved_operations = operations
       resolved_operations = %i[index show] if resolved_operations.nil? && definition.respond_to?(:default_access) && definition.default_access == :read_only
@@ -235,6 +235,7 @@ module RecordingStudioApi
         immutable_relationships: immutable_relationships,
         operations: resolved_operations,
         capability_actions: capability_actions,
+        auto_capability_actions: auto_capability_actions,
         metrics: metrics
       )
     end
@@ -280,7 +281,12 @@ module RecordingStudioApi
 
     def capability_action_enabled_for?(action, recordable_type, api: :public)
       registration = recordable_registration_for(recordable_type, api: api)
-      registration&.supports_capability_action?(action.name)
+      return false unless registration
+      return true if registration.supports_capability_action?(action.name)
+      return false if action.capability.blank?
+      return false if registration.auto_capability_actions == false
+
+      action.applicable_to?(recordable_type)
     end
 
     def resource_actions_for(recordable_type, scope: nil, version: nil, api: :public)

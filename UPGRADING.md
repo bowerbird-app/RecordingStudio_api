@@ -1,5 +1,33 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.19.0
+
+Member actions registered with a `capability:` are offered on every
+API-registered type that declares that capability. Type gems no longer need
+to repeat those action names in `capability_actions`. Authorization is
+unchanged.
+
+1. Bump the host gem to `0.19.0`.
+2. Capability-owner gems register once:
+
+   ```ruby
+   RecordingStudioApi.register_capability_action(
+     :move,
+     capability: :movable,
+     handler: RecordingStudio::Moveable::Api::MoveRecording
+   )
+   ```
+
+   Types that `enable_capability(:movable, on: Folder)` get `move` without
+   listing it. Conflicting `capability_actions` merges still raise; do not
+   union-merge those lists.
+3. If a type enabled a mixin for UI only and must not expose that mixin’s
+   API actions, set `auto_capability_actions: false` on its
+   `register_recordable_type_api`. Then `capability_actions` is an allowlist
+   again. Do not drop the mixin just to hide the API action.
+4. Keep listing host-specific extra member actions on `capability_actions`.
+   `required_role` and handler `authorize!` checks still apply.
+
 ## Upgrading to 0.18.6
 
 Handler-backed member actions now run the same required-role check as

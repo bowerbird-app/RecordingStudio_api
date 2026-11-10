@@ -211,6 +211,26 @@ class RecordableRegistrationTest < Minitest::Test
     assert_configuration_error("Capability actions cannot be redefined") do
       registry.register("Page", capability_actions: [:archive])
     end
+
+    registry.register("Page", auto_capability_actions: false)
+    assert_configuration_error("Auto capability actions cannot be redefined") do
+      registry.register("Page", auto_capability_actions: true)
+    end
+  end
+
+  def test_auto_capability_actions_defaults_to_true_and_rejects_non_booleans
+    registration = RecordingStudioApi::RecordableRegistration.new(recordable_type: "Page")
+
+    assert_equal true, registration.auto_capability_actions
+    refute registration.auto_capability_actions_supplied?
+
+    opted_out = RecordingStudioApi::RecordableRegistration.new(recordable_type: "Page", auto_capability_actions: false)
+    assert_equal false, opted_out.auto_capability_actions
+    assert opted_out.auto_capability_actions_supplied?
+
+    assert_configuration_error("auto_capability_actions must be true or false") do
+      RecordingStudioApi::RecordableRegistration.new(recordable_type: "Page", auto_capability_actions: :nope)
+    end
   end
 
   private
