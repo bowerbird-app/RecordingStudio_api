@@ -281,6 +281,34 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
     assert_response :unauthorized
   end
 
+  test "denies a handler-backed member action below the required role" do
+    view_user = create_user(email: "view-only-handler-member-actions@example.com")
+    view_root_recording, view_access_recording = create_access_recording_for(user: view_user, role: :view)
+    view_page_recording = create_page_recording(root_recording: view_root_recording)
+    view_token = issue_oauth_access_token_for(access_recording: view_access_recording, name: "View-only handler token")
+    RecordingStudioApi.register_resource_handler("Page", :echo, handler: lambda { |_context|
+      { json: { handled: "echo" }, status: :ok }
+    })
+
+    post "/recording_studio_api/api/v1/pages/#{view_page_recording.id}/actions/echo",
+         headers: { "Authorization" => "Bearer #{view_token}" }
+
+    assert_response :forbidden
+    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
+  end
+
+  test "allows a handler-backed member action at the required role" do
+    RecordingStudioApi.register_resource_handler("Page", :echo, handler: lambda { |_context|
+      { json: { handled: "echo" }, status: :ok }
+    })
+
+    post "/recording_studio_api/api/v1/pages/#{@page_recording.id}/actions/echo",
+         headers: authorization_headers
+
+    assert_response :success
+    assert_equal "echo", JSON.parse(response.body).fetch("handled")
+  end
+
   test "denies custom member actions for clients below the default edit role" do
     view_user = create_user(email: "view-only-member-actions@example.com")
     view_root_recording, view_access_recording = create_access_recording_for(user: view_user, role: :view)
