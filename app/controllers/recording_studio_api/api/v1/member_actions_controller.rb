@@ -26,7 +26,12 @@ module RecordingStudioApi
           handler = RecordingStudioApi.resource_handler(recordable_type, action.name, api: current_api_key)
           if handler
             assert_action_enabled!(action, recordable_type)
-            result = handler.call(handler_action_context(action, recordable_type))
+            handler_context = handler_action_context(action, recordable_type)
+            authorize_action!(
+              action,
+              handler_context.with(recording: recording_for_handler_authorization)
+            )
+            result = handler.call(handler_context)
             render json: result.fetch(:json), status: result.fetch(:status, :ok)
           else
             assert_action_enabled!(action, resource_recording.recordable_type)
@@ -105,6 +110,10 @@ module RecordingStudioApi
           return if required_role.nil?
 
           context.access_grant.authorize!(recording: context.recording, role: required_role)
+        end
+
+        def recording_for_handler_authorization
+          scoped_recordings.find_by(id: params[:id]) || current_root_recording || current_access_recording
         end
 
         def assert_action_enabled!(action, recordable_type)
