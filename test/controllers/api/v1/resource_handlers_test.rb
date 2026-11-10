@@ -109,7 +109,7 @@ class ApiV1ResourceHandlersTest < ActionDispatch::IntegrationTest
     assert_equal folder_parent_id, @folder_recording.reload.parent_recording_id
   end
 
-  test "a per-type handler owns access and the shared handler still checks the role" do
+  test "a per-type handler and the shared handler both check the required role" do
     view_user = create_user
     view_root, view_access = create_access_recording_for(user: view_user, role: :view)
     view_page = create_page_recording(root_recording: view_root)
@@ -131,8 +131,8 @@ class ApiV1ResourceHandlersTest < ActionDispatch::IntegrationTest
     })
 
     post "/recording_studio_api/api/v1/pages/#{view_page.id}/actions/echo", headers: headers
-    assert_response :success
-    assert_equal "echo", JSON.parse(response.body).fetch("handled")
+    assert_response :forbidden
+    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
 
     post "/recording_studio_api/api/v1/workspaces/#{view_root.id}/actions/echo", headers: headers
     assert_response :forbidden

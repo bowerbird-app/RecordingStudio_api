@@ -33,6 +33,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   actions whose capability is not on the type stay unavailable via
   `applicable_to?`.
 
+## [0.18.6] - 2026-11-10
+
+### Security
+- Member actions that dispatch a registered `resource_handler` now run the
+  same `authorize_action!` required-role check as shared capability handlers.
+  A client below the action's required role receives 403 instead of skipping
+  that check.
+
+### Upgrade notes
+- Bump to `0.18.6`. No host migration.
+- Handler-backed member actions now 403 when the access grant is below the
+  action's required role, matching the shared handler path.
+
 ## [0.18.5] - 2026-11-09
 
 ### Changed
@@ -969,7 +982,8 @@ relationship migration steps.
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
 [Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.19.0...HEAD
-[0.19.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.5...v0.19.0
+[0.19.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.6...v0.19.0
+[0.18.6]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.5...v0.18.6
 [0.18.5]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.4...v0.18.5
 [0.18.4]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.3...v0.18.4
 [0.18.3]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.2...v0.18.3

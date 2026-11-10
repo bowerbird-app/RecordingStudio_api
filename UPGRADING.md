@@ -28,6 +28,15 @@ unchanged.
 4. Keep listing host-specific extra member actions on `capability_actions`.
    `required_role` and handler `authorize!` checks still apply.
 
+## Upgrading to 0.18.6
+
+Handler-backed member actions now run the same required-role check as
+shared capability handlers. No migration.
+
+1. Bump the host gem to `0.18.6`.
+2. Expect 403 on handler-backed member actions when the access grant is
+   below the action's required role (default `:edit`).
+
 ## Upgrading to 0.18.5
 
 OpenAPI and Scalar copy for standard resource operations is richer. No
