@@ -24,7 +24,7 @@ see [UPGRADING.md](UPGRADING.md).
 - external bearer-token authenticator support for host application authentication systems
 - API client recordables stored beneath `RecordingStudio::Access` recordings in the Recording Studio tree
 - authenticated API requests resolved into a `RecordingStudioApi::AccessGrant` that is passed to capability handlers
-- OAuth writes keep the API client as the event actor and also store `authorized_by_type` and `authorized_by_id` on the event
+- OAuth user writes use `access_grant.actor` (the signed-in person) as the event actor and store the API client as `impersonator`; they also store `authorized_by_type` and `authorized_by_id` on the event. A `client_credentials` grant with no user still writes as the API client.
 - capability-backed action registry with automatic action exposure when a recordable type enables that capability
 - `register_endpoint` for named JSON endpoints that are not a recordable collection
 - optional `ui:` widget id on those registrations, plus `ui_for` / `actions_for_ui` lookups
@@ -241,9 +241,12 @@ Bearer authentication resolves `authorized_by` once, from the credential or
 token record's `oauth_authorization.manager_actor`. It is stored on the
 access grant and exposed on action, resource, and registered-endpoint
 contexts. Update and move merge `authorized_by_type` and `authorized_by_id`
-into the event metadata they already write. The event actor stays the OAuth
-client or API client, and `Current.actor` stays the access grant actor. API
-credentials have no manager, so API-key writes add nothing.
+into the event metadata they already write. Resource updates write as
+`access_grant.actor` (the signed-in user on an OAuth user token) and keep
+the API client as event `impersonator` when it is not that actor.
+`Current.actor` stays the access grant actor. A `client_credentials`
+grant with no user still writes as the API client. API credentials have
+no manager, so API-key writes add no `authorized_by` keys.
 `with_authorized_by` drops client-sent `authorized_by_type` and
 `authorized_by_id` (string or symbol keys) before it writes the server value,
 including on client_credentials and API-key writes. Handlers that record

@@ -9,11 +9,13 @@ module RecordingStudioApi
           authorize_access!(recording, role: :edit)
 
           attributes = resource_attributes.slice(*mutable_attribute_keys)
+          impersonator = write_impersonator
           revised_recording = if attributes.any?
                                 recording.root_recording.revise(
                                   recording,
-                                  actor: api_client,
-                                  metadata: context.with_authorized_by
+                                  actor: write_actor,
+                                  metadata: context.with_authorized_by,
+                                  **(impersonator ? { impersonator: impersonator } : {})
                                 ) do |recordable|
                                   recordable.assign_attributes(attributes)
                                 end

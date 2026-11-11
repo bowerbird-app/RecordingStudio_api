@@ -163,6 +163,19 @@ module RecordingStudioApi
           access_grant.authorize!(recording: target_recording, role: role, include_trashed: include_trashed)
         end
 
+        def write_actor
+          access_grant.actor || api_client
+        end
+
+        def write_impersonator
+          client = api_client
+          actor = write_actor
+          return if client.nil? || actor.nil?
+          return if client.class.table_name == actor.class.table_name && client.id == actor.id
+
+          client
+        end
+
         def assert_index_enabled!
           registration = RecordingStudioApi.recordable_registration_for(recordable_type, api: api_key)
           return if registration&.supports_operation?(:index)
