@@ -169,27 +169,11 @@ module RecordingStudioApi
 
         def write_impersonator
           client = api_client
-          return if client.nil? || same_write_record?(client, write_actor)
+          actor = write_actor
+          return if client.nil? || actor.nil?
+          return if client.class.table_name == actor.class.table_name && client.id == actor.id
 
           client
-        end
-
-        def write_event_context
-          event_context = {
-            actor: write_actor,
-            metadata: context.with_authorized_by
-          }
-          impersonator = write_impersonator
-          event_context[:impersonator] = impersonator if impersonator
-          event_context
-        end
-
-        def same_write_record?(left, right)
-          return true if left.equal?(right)
-          return false if left.nil? || right.nil?
-          return true if left == right
-
-          left.instance_of?(right.class) && left.respond_to?(:id) && right.respond_to?(:id) && left.id == right.id
         end
 
         def assert_index_enabled!

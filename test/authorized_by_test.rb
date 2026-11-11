@@ -110,18 +110,41 @@ class AuthorizedByTest < ActiveSupport::TestCase
     Current.impersonator = nil if Current.respond_to?(:impersonator=)
 
     result = RecordingStudioApi::Services::ResourceOperations::Update.call(
-      resource_context_for(payload, folder, api_client: oauth_client, authorized_by: @user, name: "Renamed by oauth")
+      resource_context_for(
+        payload,
+        folder,
+        api_client: oauth_client,
+        authorized_by: @user,
+        name: "Renamed by oauth",
+        access_recording: @access_recording
+      )
     )
 
     assert_equal :ok, result.fetch(:status, :ok)
     event = latest_update_event(folder)
-    assert_equal payload.fetch(:api_client), event.actor
+    assert_equal @user, event.actor
     assert_equal oauth_client, event.impersonator
     assert_equal "User", event.metadata["authorized_by_type"]
     assert_equal @user.id, event.metadata["authorized_by_id"]
     assert_equal @user, Current.actor
     assert_nil Current.impersonator if Current.respond_to?(:impersonator)
     assert_equal "Renamed by oauth", folder.reload.recordable.name
+  end
+
+  test "client credentials write does not record the same row as actor and impersonator" do
+    payload = provision_api_client_for(access_recording: @access_recording, name: "Machine writer")
+    oauth_client = oauth_client_for(payload.fetch(:api_client).id)
+    folder = create_page_recording(root_recording: @root_recording).parent_recording
+
+    RecordingStudioApi::Services::ResourceOperations::Update.call(
+      resource_context_for(payload, folder, api_client: oauth_client, authorized_by: nil, name: "Renamed by client credentials")
+    )
+
+    event = latest_update_event(folder)
+    assert_equal payload.fetch(:api_client), event.actor
+    assert_nil event.impersonator_id
+    assert_nil event.impersonator_type
+    assert_equal "Renamed by client credentials", folder.reload.recordable.name
   end
 
   test "api key update leaves event metadata without authorized_by" do
@@ -292,16 +315,17 @@ class AuthorizedByTest < ActiveSupport::TestCase
     RecordingStudioOauth::OauthClient.find(id)
   end
 
-  def resource_context_for(payload, folder, api_client:, authorized_by:, name:)
+  def resource_context_for(payload, folder, api_client:, authorized_by:, name:, access_recording: nil)
     credential = payload.fetch(:credential)
     if authorized_by
       authorization = Struct.new(:manager_actor).new(authorized_by)
       credential.define_singleton_method(:oauth_authorization) { authorization }
     end
+    access_recording ||= payload.fetch(:access_recording)
     grant = RecordingStudioApi::AccessGrant.new(
       api_client: payload.fetch(:api_client),
       credential: credential,
-      access_recording: payload.fetch(:access_recording),
+      access_recording: access_recording,
       root_recording: @root_recording,
       authorized_by: authorized_by
     )
@@ -311,7 +335,7 @@ class AuthorizedByTest < ActiveSupport::TestCase
       resource_name: "folders",
       api_client: api_client,
       credential: credential,
-      access_recording: payload.fetch(:access_recording),
+      access_recording: access_recording,
       access_grant: grant,
       root_recording: @root_recording,
       api_version: "v1",

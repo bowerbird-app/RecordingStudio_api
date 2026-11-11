@@ -17,7 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   write actor, so history can show the user via the app. `authorized_by`
   metadata and token scopes are unchanged.
 - A `client_credentials` grant with no user still writes as the API client
-  and does not set an impersonator.
+  and does not set an impersonator, including when the request's API client
+  class is a different Ruby class for the same `api_clients` row.
 - Create and destroy still authorize through `AccessGrant` (the signed-in
   user or client on that grant) before they insert or delete. They do not
   call `record!` / `revise`, so they do not pass an event actor or
