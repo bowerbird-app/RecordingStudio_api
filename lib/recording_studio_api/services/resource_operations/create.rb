@@ -69,17 +69,7 @@ module RecordingStudioApi
         end
 
         def invalid_parent_input_error(message)
-          RecordingStudioApi::InvalidActionInputError.new(
-            message,
-            details: [
-              {
-                attribute: :parent_id,
-                message: "is not allowed for #{recordable_type}",
-                full_message: message,
-                type: :invalid
-              }
-            ]
-          )
+          RecordingStudioApi::InvalidParentInput.call(message, recordable_type: recordable_type)
         end
       end
     end

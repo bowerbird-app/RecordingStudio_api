@@ -1,5 +1,20 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.21.0
+
+Addon gems can read the request body through
+`RecordingStudioApi::RequestPayload.call(context)`. No migration.
+
+1. Bump the host gem to `0.21.0`.
+2. In a resource or capability handler, call
+   `RecordingStudioApi::RequestPayload.call(context)` instead of copying
+   `request_params` / `params` lookup. It prefers `request_params` (MCP)
+   over `params`, then uses `to_unsafe_h` or `to_h`. An empty
+   `request_params` hash is the body.
+3. Raise `RecordingStudioApi::InvalidParentInput.call(message, recordable_type:)`
+   when create maps `RecordingStudio::InvalidParent`. Builtin create already
+   does. Access still goes through Accessible.
+
 ## Upgrading to 0.20.0
 
 API and MCP resource updates authorize and write as the signed-in user

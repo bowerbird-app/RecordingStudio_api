@@ -115,8 +115,7 @@ module RecordingStudioApi
         end
 
         def request_payload
-          request_params = context.request_params || params
-          request_params.respond_to?(:to_unsafe_h) ? request_params.to_unsafe_h : request_params.to_h
+          RecordingStudioApi::RequestPayload.call(context)
         end
 
         def allowed_attribute_keys
