@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-11-11
+
+### Changed
+- Builtin resource updates now write as `access_grant.actor` (the signed-in
+  user on an OAuth user token). Host `authorize_write` policies that call
+  Accessible on that actor see the person, not the OAuth app. The API client
+  is stored as Recording Studio's event `impersonator` when it is not the
+  write actor, so history can show the user via the app. `authorized_by`
+  metadata and token scopes are unchanged.
+- A `client_credentials` grant with no user still writes as the API client
+  and does not set an impersonator.
+- Create and destroy still authorize through `AccessGrant` (the signed-in
+  user or client on that grant) before they insert or delete. They do not
+  call `record!` / `revise`, so they do not pass an event actor or
+  impersonator.
+
+### Upgrade notes
+- Bump to `0.20.0`. No host migration.
+- OAuth user writes that previously stored the OAuth app as `Event#actor`
+  now store the access-grant actor there and the app as `Event#impersonator`.
+- Host write policies that check Accessible against the event actor now
+  match the signed-in user's role. An app cannot do more than that user
+  can. `client_credentials` with no user is unchanged.
+
 ## [0.19.0] - 2026-11-10
 
 ### Added
@@ -981,7 +1005,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.6...v0.19.0
 [0.18.6]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.5...v0.18.6
 [0.18.5]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.4...v0.18.5

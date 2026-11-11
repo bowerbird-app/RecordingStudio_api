@@ -1,5 +1,24 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.20.0
+
+API and MCP resource updates authorize and write as the signed-in user
+(`access_grant.actor`). The OAuth app is provenance only. No migration.
+
+1. Bump the host gem to `0.20.0`.
+2. Expect update events for an OAuth user token to set `actor` to the
+   access-grant actor (the person behind the token) and `impersonator` to
+   the API client / OAuth app. `authorized_by_*` metadata is unchanged.
+3. Host `authorize_write` policies that call
+   `RecordingStudioAccessible.authorized?(actor:)` now see that person.
+   The app cannot exceed their real role.
+4. A `client_credentials` grant with no user still writes as the API
+   client, with no impersonator, as in `0.19.0`.
+5. Create and destroy still check `AccessGrant` first. They do not call
+   `record!` / `revise`, so they do not stamp event actor or impersonator.
+   Member actions registered in other gems (for example Moveable `move`)
+   still pass their own actor until those gems change.
+
 ## Upgrading to 0.19.0
 
 Member actions registered with a `capability:` are offered on every

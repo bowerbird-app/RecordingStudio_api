@@ -12,8 +12,7 @@ module RecordingStudioApi
           revised_recording = if attributes.any?
                                 recording.root_recording.revise(
                                   recording,
-                                  actor: api_client,
-                                  metadata: context.with_authorized_by
+                                  **write_event_context
                                 ) do |recordable|
                                   recordable.assign_attributes(attributes)
                                 end

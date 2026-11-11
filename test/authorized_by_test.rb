@@ -102,7 +102,7 @@ class AuthorizedByTest < ActiveSupport::TestCase
     end
   end
 
-  test "oauth update keeps the oauth client as actor and records authorized_by" do
+  test "oauth update writes as the grant actor and records the oauth client as impersonator" do
     payload = provision_api_client_for(access_recording: @access_recording, name: "OAuth writer")
     oauth_client = oauth_client_for(payload.fetch(:api_client).id)
     folder = create_page_recording(root_recording: @root_recording).parent_recording
@@ -115,10 +115,8 @@ class AuthorizedByTest < ActiveSupport::TestCase
 
     assert_equal :ok, result.fetch(:status, :ok)
     event = latest_update_event(folder)
-    assert_equal "RecordingStudioOauth::OauthClient", event.actor_type
-    assert_equal oauth_client.id, event.actor_id
-    assert_nil event.impersonator_id
-    assert_nil event.impersonator_type
+    assert_equal payload.fetch(:api_client), event.actor
+    assert_equal oauth_client, event.impersonator
     assert_equal "User", event.metadata["authorized_by_type"]
     assert_equal @user.id, event.metadata["authorized_by_id"]
     assert_equal @user, Current.actor

@@ -163,6 +163,35 @@ module RecordingStudioApi
           access_grant.authorize!(recording: target_recording, role: role, include_trashed: include_trashed)
         end
 
+        def write_actor
+          access_grant.actor || api_client
+        end
+
+        def write_impersonator
+          client = api_client
+          return if client.nil? || same_write_record?(client, write_actor)
+
+          client
+        end
+
+        def write_event_context
+          event_context = {
+            actor: write_actor,
+            metadata: context.with_authorized_by
+          }
+          impersonator = write_impersonator
+          event_context[:impersonator] = impersonator if impersonator
+          event_context
+        end
+
+        def same_write_record?(left, right)
+          return true if left.equal?(right)
+          return false if left.nil? || right.nil?
+          return true if left == right
+
+          left.instance_of?(right.class) && left.respond_to?(:id) && right.respond_to?(:id) && left.id == right.id
+        end
+
         def assert_index_enabled!
           registration = RecordingStudioApi.recordable_registration_for(recordable_type, api: api_key)
           return if registration&.supports_operation?(:index)

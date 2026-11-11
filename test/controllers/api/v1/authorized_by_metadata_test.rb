@@ -42,7 +42,7 @@ class ApiV1AuthorizedByMetadataTest < ActionDispatch::IntegrationTest
     Current.actor = nil if defined?(Current)
   end
 
-  test "oauth write records authorized_by and keeps the oauth client as actor" do
+  test "oauth write records authorized_by and keeps the oauth client as impersonator" do
     patch "/recording_studio_api/api/v1/folders/#{@folder.id}",
           params: {
             name: "OAuth renamed folder",
@@ -55,9 +55,8 @@ class ApiV1AuthorizedByMetadataTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     event = latest_update_event(@folder)
-    assert_equal "RecordingStudioOauth::OauthClient", event.actor_type
-    assert_equal @oauth_client.id, event.actor_id
-    assert_nil event.impersonator_id
+    assert_equal @payload.fetch(:api_client), event.actor
+    assert_equal @oauth_client, event.impersonator
     assert_equal "User", event.metadata["authorized_by_type"]
     assert_equal @user.id, event.metadata["authorized_by_id"]
 
