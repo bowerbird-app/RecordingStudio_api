@@ -580,7 +580,12 @@ Resource and nested handlers get a `ResourceOperationContext` with:
 
 Read writable fields with `RecordingStudioApi::RequestPayload.call(context)`.
 It prefers `request_params` (MCP) over `params`, then `to_unsafe_h` or
-`to_h`. Builtin resource operations use the same helper.
+`to_h`. An empty `request_params` hash is the body; it does not fall back
+to `params`. Builtin resource operations use the same helper.
+
+Map a disallowed parent with
+`RecordingStudioApi::InvalidParentInput.call(message, recordable_type:)`.
+Builtin create raises that error. Access is unchanged.
 
 `recording` and `parent_recording` stay `nil` on that path. Look the
 record up yourself.

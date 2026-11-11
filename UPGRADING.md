@@ -9,9 +9,11 @@ Addon gems can read the request body through
 2. In a resource or capability handler, call
    `RecordingStudioApi::RequestPayload.call(context)` instead of copying
    `request_params` / `params` lookup. It prefers `request_params` (MCP)
-   over `params`, then uses `to_unsafe_h` or `to_h`.
-3. Builtin create, update, and destroy are unchanged. They already used
-   this lookup. Access still goes through Accessible.
+   over `params`, then uses `to_unsafe_h` or `to_h`. An empty
+   `request_params` hash is the body.
+3. Raise `RecordingStudioApi::InvalidParentInput.call(message, recordable_type:)`
+   when create maps `RecordingStudio::InvalidParent`. Builtin create already
+   does. Access still goes through Accessible.
 
 ## Upgrading to 0.20.0
 

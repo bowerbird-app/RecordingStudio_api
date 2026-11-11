@@ -13,7 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `RecordingStudioApi::RequestPayload.call(context)` reads the request body
   the same way builtin resource operations do: `request_params` when present,
   otherwise `params`, then `to_unsafe_h` or `to_h`. Addon gems can call this
-  instead of copying that lookup.
+  instead of copying that lookup. An empty `request_params` hash is used as
+  the body; it does not fall back to `params`.
+- `RecordingStudioApi::InvalidParentInput.call(message, recordable_type:)`
+  builds the same `InvalidActionInputError` builtin create uses for a
+  disallowed parent (`parent_id`, type `:invalid`). Addon gems can raise it
+  instead of copying that detail.
 
 ### Upgrade notes
 - Bump to `0.21.0`. No host migration.

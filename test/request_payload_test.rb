@@ -5,6 +5,12 @@ require "test_helper"
 class RequestPayloadTest < Minitest::Test
   Context = Struct.new(:request_params, :params, keyword_init: true)
 
+  def test_empty_request_params_hash_does_not_fall_back_to_params
+    context = Context.new(request_params: {}, params: { "title" => "x" })
+
+    assert_equal({}, RecordingStudioApi::RequestPayload.call(context))
+  end
+
   def test_uses_params_when_request_params_is_nil
     context = Context.new(request_params: nil, params: { "title" => "From params" })
 
