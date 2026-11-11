@@ -7,21 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.22.0] - 2026-11-11
+## [0.21.1] - 2026-11-11
 
-### Added
-- A metadata-only `register_recordable_type_api` call (`openapi:` given, no
-  `operations`, `capability_actions`, or other registration sets) on a type
-  already registered for that API skips the read-only named API operations
-  default (`index`/`show`) and deep-merges the OpenAPI metadata. Addon gems
-  can add `openapi: { tags:, tag: { group: } }` without re-sending CRUD
-  operations. A metadata-only call for a type that is not yet registered on
-  that API still uses today's first-registration defaults.
+### Fixed
+- On a read-only API, the index/show default applies only to a type's first
+  registration. A later call without operations keeps the established set
+  instead of raising.
 
 ### Upgrade notes
-- Bump to `0.22.0`. No host migration.
-- Gems that re-passed operations only to attach OpenAPI tags can pass
-  `openapi:` alone. Authorization is unchanged.
+- Bump to `0.21.1`. No host migration.
+- Addon gems can attach OpenAPI tags on a later
+  `register_recordable_type_api` without re-sending operations. Authorization
+  is unchanged.
 
 ## [0.21.0] - 2026-11-11
 
@@ -1041,8 +1038,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.22.0...HEAD
-[0.22.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.0...v0.22.0
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.1...HEAD
+[0.21.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.6...v0.19.0

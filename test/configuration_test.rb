@@ -699,6 +699,36 @@ class ConfigurationTest < Minitest::Test
     restore_recording_studio_api_configuration(original_configuration_defined, original_configuration)
   end
 
+  def test_later_full_call_without_operations_keeps_the_established_set_on_read_only_api
+    original_configuration_defined = RecordingStudioApi.instance_variable_defined?(:@configuration)
+    original_configuration = RecordingStudioApi.instance_variable_get(:@configuration)
+    RecordingStudioApi.instance_variable_set(:@configuration, @configuration)
+    @configuration.api(:operations) { |api| api.default_access = :read_only }
+
+    serializer = ->(*) { { title: "Help" } }
+    RecordingStudioApi.register_recordable_type_api(
+      "SupportPage",
+      api: :operations,
+      operations: %i[index show create update destroy],
+      serializer: serializer,
+      output_keys: %i[title]
+    )
+    RecordingStudioApi.register_recordable_type_api(
+      "SupportPage",
+      api: :operations,
+      serializer: serializer,
+      output_keys: %i[title],
+      writable_attributes: %i[title]
+    )
+
+    registration = RecordingStudioApi.recordable_registration_for("SupportPage", api: :operations)
+
+    assert_equal %i[create destroy index show update], registration.operations
+    assert_equal %w[title], registration.writable_attributes
+  ensure
+    restore_recording_studio_api_configuration(original_configuration_defined, original_configuration)
+  end
+
   def test_metadata_only_openapi_call_for_an_unregistered_type_uses_read_only_defaults
     original_configuration_defined = RecordingStudioApi.instance_variable_defined?(:@configuration)
     original_configuration = RecordingStudioApi.instance_variable_get(:@configuration)

@@ -1,19 +1,17 @@
 # Upgrading RecordingStudioApi
 
-## Upgrading to 0.22.0
+## Upgrading to 0.21.1
 
-Addon gems can attach OpenAPI tags to a type that is already registered on
-a read-only named API without re-sending its operations. No migration.
+On a read-only API, the index/show default applies only to a type's first
+registration. A later call without operations keeps the established set
+instead of raising. No migration.
 
-1. Bump the host gem to `0.22.0`.
-2. After the type is registered, call
-   `RecordingStudioApi.register_recordable_type_api` with only `openapi:`
-   (and `api:` when it is not public). That deep-merges tags and tag groups
-   and keeps the existing operations. Do not invent a second registrar.
-3. A metadata-only call for a type that is not registered on that API yet
-   still registers it with the usual read-only default (`index`/`show`).
-4. A call that omits `openapi:` or also passes operations or other
-   registration sets still uses today's defaults and merge rules.
+1. Bump the host gem to `0.21.1`.
+2. After a type is registered, a later `register_recordable_type_api` that
+   omits `operations` (for example to attach `openapi:` tags) keeps that
+   type's existing operations. Do not invent a second registrar.
+3. A first registration that omits `operations` on a read-only API still
+   defaults to `index`/`show`.
 
 ## Upgrading to 0.21.0
 

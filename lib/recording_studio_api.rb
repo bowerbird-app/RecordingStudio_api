@@ -223,22 +223,8 @@ module RecordingStudioApi
                                      capability_actions: nil, auto_capability_actions: nil, metrics: nil, api: :public)
       definition = configuration.api(api)
       resolved_operations = operations
-      resolved_operations = %i[index show] if resolved_operations.nil? && definition.respond_to?(:default_access) && definition.default_access == :read_only && !metadata_only_openapi_merge?(
-        definition,
-        recordable_type,
-        serializer: serializer,
-        output_keys: output_keys,
-        fields: fields,
-        openapi: openapi,
-        sortable_attributes: sortable_attributes,
-        writable_attributes: writable_attributes,
-        immutable_fields: immutable_fields,
-        relationships: relationships,
-        immutable_relationships: immutable_relationships,
-        capability_actions: capability_actions,
-        auto_capability_actions: auto_capability_actions,
-        metrics: metrics
-      )
+      resolved_operations = %i[index show] if resolved_operations.nil? && definition.respond_to?(:default_access) && definition.default_access == :read_only
+      resolved_operations = nil if operations.nil? && definition.recordable_registry[recordable_type]&.operations_supplied?
       definition.recordable_registry.register(
         recordable_type,
         serializer: serializer,
@@ -532,19 +518,6 @@ module RecordingStudioApi
     end
 
     private
-
-    def metadata_only_openapi_merge?(definition, recordable_type, serializer:, output_keys:, fields:, openapi:,
-                                     sortable_attributes:, writable_attributes:, immutable_fields:,
-                                     relationships:, immutable_relationships:, capability_actions:,
-                                     auto_capability_actions:, metrics:)
-      return false if openapi.nil?
-      return false unless serializer.nil? && output_keys.nil? && fields.nil?
-      return false unless sortable_attributes.nil? && writable_attributes.nil? && immutable_fields.nil?
-      return false unless relationships.nil? && immutable_relationships.nil?
-      return false unless capability_actions.nil? && auto_capability_actions.nil? && metrics.nil?
-
-      definition.recordable_registry[recordable_type]
-    end
 
     def resolved_action_for_ui(action_name, api:, version:)
       capability_action(action_name, version: version, api: api) || registered_endpoint(action_name, api: api)

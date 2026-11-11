@@ -709,12 +709,10 @@ RecordingStudioApi.register_recordable_type_api(
 in one group named `API`, listed first. Named groups follow in the order they first
 appear. If no registration sets `tag.group`, `x-tagGroups` is omitted.
 
-A later `register_recordable_type_api` that only passes `openapi:` (no
-`operations`, `capability_actions`, or other registration sets) deep-merges
-that metadata into the existing type on that API. On a read-only named API
-this does not reset operations to index and show. If the type is not
-registered on that API yet, the call still registers it with the usual
-read-only default.
+On a read-only named API, omitted `operations` default to index and show only
+on a type's first registration. A later `register_recordable_type_api` that
+omits `operations` (including one that only passes `openapi:` tags) keeps the
+established set and deep-merges the rest of the registration.
 
 Standard index, show, create, update, and destroy operations get generated summaries and
 descriptions from the registration (fields, filters, `include`, pagination, `count=true`,
