@@ -224,6 +224,7 @@ module RecordingStudioApi
       definition = configuration.api(api)
       resolved_operations = operations
       resolved_operations = %i[index show] if resolved_operations.nil? && definition.respond_to?(:default_access) && definition.default_access == :read_only
+      resolved_operations = nil if operations.nil? && definition.recordable_registry[recordable_type]&.operations_supplied?
       definition.recordable_registry.register(
         recordable_type,
         serializer: serializer,

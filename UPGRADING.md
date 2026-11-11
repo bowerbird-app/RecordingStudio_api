@@ -1,5 +1,18 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.21.1
+
+On a read-only API, the index/show default applies only to a type's first
+registration. A later call without operations keeps the established set
+instead of raising. No migration.
+
+1. Bump the host gem to `0.21.1`.
+2. After a type is registered, a later `register_recordable_type_api` that
+   omits `operations` (for example to attach `openapi:` tags) keeps that
+   type's existing operations. Do not invent a second registrar.
+3. A first registration that omits `operations` on a read-only API still
+   defaults to `index`/`show`.
+
 ## Upgrading to 0.21.0
 
 Addon gems can read the request body through
