@@ -651,6 +651,75 @@ class ConfigurationTest < Minitest::Test
     assert_equal "Unsupported API operations for AuditLog: export", error.message
   end
 
+  def test_metadata_only_openapi_call_merges_tags_and_keeps_operations_on_read_only_api
+    original_configuration_defined = RecordingStudioApi.instance_variable_defined?(:@configuration)
+    original_configuration = RecordingStudioApi.instance_variable_get(:@configuration)
+    RecordingStudioApi.instance_variable_set(:@configuration, @configuration)
+    @configuration.api(:operations) { |api| api.default_access = :read_only }
+
+    RecordingStudioApi.register_recordable_type_api(
+      "SupportPage",
+      api: :operations,
+      operations: %i[index show create update destroy],
+      serializer: ->(*) { { title: "Help" } },
+      output_keys: %i[title]
+    )
+    RecordingStudioApi.register_recordable_type_api(
+      "SupportPage",
+      api: :operations,
+      openapi: { tags: ["Support"], tag: { group: "Support" } }
+    )
+
+    registration = RecordingStudioApi.recordable_registration_for("SupportPage", api: :operations)
+
+    assert_equal %i[create destroy index show update], registration.operations
+    assert_equal ["Support"], registration.openapi.fetch(:tags)
+    assert_equal "Support", registration.openapi.fetch(:tag).fetch(:group)
+  ensure
+    restore_recording_studio_api_configuration(original_configuration_defined, original_configuration)
+  end
+
+  def test_read_only_api_still_defaults_omitted_operations_on_a_non_metadata_call
+    original_configuration_defined = RecordingStudioApi.instance_variable_defined?(:@configuration)
+    original_configuration = RecordingStudioApi.instance_variable_get(:@configuration)
+    RecordingStudioApi.instance_variable_set(:@configuration, @configuration)
+    @configuration.api(:operations) { |api| api.default_access = :read_only }
+
+    RecordingStudioApi.register_recordable_type_api(
+      "AuditLog",
+      api: :operations,
+      serializer: ->(*) { { name: "Log" } },
+      output_keys: %i[name]
+    )
+
+    registration = RecordingStudioApi.recordable_registration_for("AuditLog", api: :operations)
+
+    assert_equal %i[index show], registration.operations
+  ensure
+    restore_recording_studio_api_configuration(original_configuration_defined, original_configuration)
+  end
+
+  def test_metadata_only_openapi_call_for_an_unregistered_type_uses_read_only_defaults
+    original_configuration_defined = RecordingStudioApi.instance_variable_defined?(:@configuration)
+    original_configuration = RecordingStudioApi.instance_variable_get(:@configuration)
+    RecordingStudioApi.instance_variable_set(:@configuration, @configuration)
+    @configuration.api(:operations) { |api| api.default_access = :read_only }
+
+    RecordingStudioApi.register_recordable_type_api(
+      "FreshType",
+      api: :operations,
+      openapi: { tags: ["Fresh"], tag: { group: "Fresh" } }
+    )
+
+    registration = RecordingStudioApi.recordable_registration_for("FreshType", api: :operations)
+
+    assert_equal %i[index show], registration.operations
+    assert_equal ["Fresh"], registration.openapi.fetch(:tags)
+    assert_equal "Fresh", registration.openapi.fetch(:tag).fetch(:group)
+  ensure
+    restore_recording_studio_api_configuration(original_configuration_defined, original_configuration)
+  end
+
   def test_register_recordable_type_api_composes_multiple_registrations_for_same_type
     @configuration.recordable_registry.register(
       "Page",
