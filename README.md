@@ -578,6 +578,10 @@ Resource and nested handlers get a `ResourceOperationContext` with:
 - `recordable_type`, `resource_name`, `credential`, `access_recording`,
   `root_recording`, `api_version`, `scoped_recordings`, `idempotency_key`
 
+Read writable fields with `RecordingStudioApi::RequestPayload.call(context)`.
+It prefers `request_params` (MCP) over `params`, then `to_unsafe_h` or
+`to_h`. Builtin resource operations use the same helper.
+
 `recording` and `parent_recording` stay `nil` on that path. Look the
 record up yourself.
 

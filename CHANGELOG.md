@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-11-11
+
+### Added
+- `RecordingStudioApi::RequestPayload.call(context)` reads the request body
+  the same way builtin resource operations do: `request_params` when present,
+  otherwise `params`, then `to_unsafe_h` or `to_h`. Addon gems can call this
+  instead of copying that lookup.
+
+### Upgrade notes
+- Bump to `0.21.0`. No host migration.
+- Builtin resource operations still use the same payload. Call
+  `RecordingStudioApi::RequestPayload.call(context)` from addon handlers that
+  previously duplicated it.
+
 ## [0.20.0] - 2026-11-11
 
 ### Changed
@@ -1006,7 +1020,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.20.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.0...HEAD
+[0.21.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.6...v0.19.0
 [0.18.6]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.18.5...v0.18.6
