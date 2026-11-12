@@ -685,9 +685,10 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     get "/admin/api/screens/admin_api_credentials"
 
     assert_response :success
-    assert_select %(select[name="root_recording_id"] option[value="queued_root"]), text: "queued_root"
-    assert_select %(select[name="root_recording_id"] option[value=""]:not([disabled])), text: "All roots"
-    assert_select %(select[name="status"] option[disabled]), text: "All"
+    assert_select %(select[name="root_recording_id"] option[value="queued_root"]), text: "queued_root", count: 1
+    assert_select %(select[name="root_recording_id"] option[value=""]:not([disabled])), text: "All roots", count: 1
+    assert_select %(select[name="root_recording_id"] option), text: "Queued root", count: 0
+    assert_select %(select[name="status"] option[disabled]), text: "All", count: 1
   end
 
   test "site admins can filter credentials by root and revoke an active credential" do
@@ -1075,7 +1076,7 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
         assert_select %(select[name="root_recording_id"]), count: 1
         assert_select %(select[name="root_type"]), count: 1
       end
-      assert_select %(select[name="health"] option[value=""]:not([disabled])), count: 1
+      assert_select %(select[name="health"] option[value=""]:not([disabled])), text: "Any health", count: 1
       assert_select %(select[name="health"] option[value="expiring_soon"]), text: "Expiring soon", count: 1
       assert_select %(select[name="health"] option[value="stale"]), text: "Stale", count: 1
 
