@@ -666,8 +666,10 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
 
     lookup = ActionView::LookupContext.new(RecordingStudioAdmin::ScreensController.view_paths)
     template = lookup.find("filter_fields", %w[recording_studio_admin/screens], true)
-    assert_equal File.expand_path(admin_partial.to_s), File.expand_path(template.identifier)
-    refute_includes template.identifier, RecordingStudioApi::Engine.root.to_s
+    resolved = File.expand_path(template.identifier)
+    assert_equal File.expand_path(admin_partial.to_s), resolved
+    refute_equal File.expand_path(api_partial.to_s), resolved
+    refute_includes resolved, RecordingStudioApi::Engine.root.join("app/views").to_s
   end
 
   test "credential select filters keep raw option labels and the All placeholder" do
