@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.4] - 2026-11-12
+
+### Fixed
+- Stop shipping a copy of Admin's `screens/_filter_fields` and stop
+  prepending this gem's view path onto Admin's ScreensController. Admin
+  screens render Admin's own partial, so host gems keep Admin's filter
+  labels and options.
+- Credential and request select filters omit `placeholder: nil`, so Admin
+  v2.13.0 shows each filter's `blank_label` (All roots, All root types,
+  All API clients, All API keys).
+
+### Upgrade notes
+- Bump to `0.21.4`. No host migration.
+- Development and dummy Gemfiles pin Admin `v2.13.0`.
+- Admin screen filters follow the host's `recording_studio_admin` version.
+  This gem no longer replaces that partial. Hosts that mount Admin should
+  use Admin `v2.13.0` so `blank_label` wins over a missing placeholder.
+
 ## [0.21.3] - 2026-11-12
 
 ### Changed
@@ -1079,7 +1097,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.3...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.4...HEAD
+[0.21.4]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.3...v0.21.4
 [0.21.3]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.2...v0.21.3
 [0.21.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.1...v0.21.2
 [0.21.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.0...v0.21.1

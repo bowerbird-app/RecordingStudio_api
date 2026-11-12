@@ -27,7 +27,6 @@ module RecordingStudioApi
       filter :api_client_name,
              options: -> { RecordingStudioApi::Admin::AdminApiRequestsScreen.api_client_name_filter_options },
              blank_label: "All API clients",
-             placeholder: nil,
              humanize_options: false,
              apply: lambda { |relation, value, context|
                if value.present?

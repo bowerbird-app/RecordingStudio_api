@@ -8,7 +8,7 @@ class RecordingStudioApiTest < Minitest::Test
   end
 
   def test_version_pin
-    assert_equal "0.21.3", ::RecordingStudioApi::VERSION
+    assert_equal "0.21.4", ::RecordingStudioApi::VERSION
   end
 
   def test_metrics_dependency_pins
@@ -41,7 +41,7 @@ class RecordingStudioApiTest < Minitest::Test
       assert_includes contents, 'RecordingStudio_metrics", tag: "v0.7.2"', path
       assert_includes contents, 'RecordingStudio_logs", tag: "v0.7.3"', path
       assert_includes contents, 'RecordingStudio_icons", tag: "v0.2.0"', path
-      assert_includes contents, 'RecordingStudio_admin", tag: "v2.11.0"', path
+      assert_includes contents, 'RecordingStudio_admin", tag: "v2.13.0"', path
     end
     %w[test/dummy/db/schema.rb test/dummy/db/api_logging_schema.rb].each do |path|
       contents = File.read(File.join(root, path))
@@ -51,15 +51,19 @@ class RecordingStudioApiTest < Minitest::Test
     end
   end
 
+  def test_does_not_shadow_admin_screens_filter_fields
+    root = File.expand_path("..", __dir__)
+    engine_source = File.read(File.join(root, "lib/recording_studio_api/engine.rb"))
+
+    refute File.exist?(File.join(root, "app/views/recording_studio_admin/screens/_filter_fields.html.erb"))
+    refute_includes engine_source, "prepend_recording_studio_admin_views"
+    refute_includes engine_source, "prepend_view_path"
+  end
+
   def test_date_range_filter_uses_flatpack_preset_name
     root = File.expand_path("..", __dir__)
-    filter_fields = File.read(File.join(root, "app/views/recording_studio_admin/screens/_filter_fields.html.erb"))
     logs_content = File.read(File.join(root, "app/views/recording_studio_api/admin_logs/_content.html.erb"))
 
-    assert_includes filter_fields, "preset_name: filter.preset_param.to_s"
-    assert_includes filter_fields, "key: :last_30_days"
-    assert_includes filter_fields, "days: 31"
-    refute_includes filter_fields, "hidden_field_tag filter.preset_param"
     refute_includes logs_content, "admin-logs-date-range-submit"
     refute_includes logs_content, "submitOnApply"
     assert_includes logs_content, "change->flat-pack--auto-submit#queueSubmit"

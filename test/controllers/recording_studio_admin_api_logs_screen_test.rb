@@ -559,6 +559,7 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Site-wide API request activity across every API client."
     assert_includes response.body, "area"
     assert_select 'button[data-modal-id="screen-filters-modal"]', count: 1
+    assert_select %(select[name="api_client_name"] option[value=""]:not([disabled])), text: "All API clients", count: 1
 
     get "/admin/api/screens/admin_api_requests/table", params: {
       start_date: 27.days.ago.to_date.iso8601,
@@ -653,7 +654,26 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_select %(input[readonly][value="2020-01-03 to 2020-01-09"]), count: 1
   end
 
-  test "credential select filters keep raw option labels and the All placeholder" do
+  test "screens filter fields resolve to Admin not this gem" do
+    api_partial = RecordingStudioApi::Engine.root.join(
+      "app/views/recording_studio_admin/screens/_filter_fields.html.erb"
+    )
+    admin_partial = RecordingStudioAdmin::Engine.root.join(
+      "app/views/recording_studio_admin/screens/_filter_fields.html.erb"
+    )
+
+    refute File.exist?(api_partial)
+    assert File.exist?(admin_partial)
+
+    lookup = ActionView::LookupContext.new(RecordingStudioAdmin::ScreensController.view_paths)
+    template = lookup.find("filter_fields", %w[recording_studio_admin/screens], true)
+    resolved = File.expand_path(template.identifier)
+    assert_equal File.expand_path(admin_partial.to_s), resolved
+    refute_equal File.expand_path(api_partial.to_s), resolved
+    refute_includes resolved, RecordingStudioApi::Engine.root.join("app/views").to_s
+  end
+
+  test "credential select filters keep raw option labels and blank labels" do
     _root_recording, access_recording = create_access_recording_for(
       user: @user,
       workspace_name: "queued_root",
@@ -665,9 +685,8 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     get "/admin/api/screens/admin_api_credentials"
 
     assert_response :success
-    assert_select %(select[name="root_recording_id"] option[value=""]), text: "All roots", count: 1
-    assert_select %(select[name="root_type"] option[value=""]), text: "All root types", count: 1
     assert_select %(select[name="root_recording_id"] option[value="queued_root"]), text: "queued_root", count: 1
+    assert_select %(select[name="root_recording_id"] option[value=""]:not([disabled])), text: "All roots", count: 1
     assert_select %(select[name="root_recording_id"] option), text: "Queued root", count: 0
     assert_select %(select[name="status"] option[disabled]), text: "All", count: 1
   end
@@ -908,11 +927,10 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     end
     assert_select "form#screen-filters-mobile-form" do
       assert_select %(select[name="api_client_name"]), count: 1
-      assert_select %(select[name="api_client_name"] option[value=""]:not([disabled])), count: 1
+      assert_select %(select[name="api_client_name"] option[value=""]:not([disabled])), text: "All API keys", count: 1
       assert_select %(select[name="api_client_name"] option[value="Analytics API key"]), count: 1
       assert_select %(select[name="status"] option[value=""][disabled][selected]), count: 1
     end
-    assert_includes response.body, "All API keys"
     assert_includes response.body, "Analytics API key"
     assert_includes response.body, "Status"
     refute_includes response.body, "Avg duration"
