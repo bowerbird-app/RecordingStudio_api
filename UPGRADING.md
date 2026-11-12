@@ -1,5 +1,14 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.21.4
+
+Admin screens render Admin's `screens/_filter_fields` partial. This gem no
+longer ships or prepends a copy. No migration.
+
+1. Bump the host gem to `0.21.4`.
+2. Filter labels, placeholders, and option formatting come from the host's
+   `recording_studio_admin` version.
+
 ## Upgrading to 0.21.3
 
 Admin date-range filters post `date_range_preset` through Flatpack

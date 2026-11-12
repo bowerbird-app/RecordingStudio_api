@@ -653,6 +653,23 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_select %(input[readonly][value="2020-01-03 to 2020-01-09"]), count: 1
   end
 
+  test "screens filter fields resolve to Admin not this gem" do
+    api_partial = RecordingStudioApi::Engine.root.join(
+      "app/views/recording_studio_admin/screens/_filter_fields.html.erb"
+    )
+    admin_partial = RecordingStudioAdmin::Engine.root.join(
+      "app/views/recording_studio_admin/screens/_filter_fields.html.erb"
+    )
+
+    refute File.exist?(api_partial)
+    assert File.exist?(admin_partial)
+
+    lookup = ActionView::LookupContext.new(RecordingStudioAdmin::ScreensController.view_paths)
+    template = lookup.find("filter_fields", %w[recording_studio_admin/screens], true)
+    assert_equal File.expand_path(admin_partial.to_s), File.expand_path(template.identifier)
+    refute_includes template.identifier, RecordingStudioApi::Engine.root.to_s
+  end
+
   test "credential select filters keep raw option labels and the All placeholder" do
     _root_recording, access_recording = create_access_recording_for(
       user: @user,
@@ -665,11 +682,8 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     get "/admin/api/screens/admin_api_credentials"
 
     assert_response :success
-    assert_select %(select[name="root_recording_id"] option[value=""]), text: "All roots", count: 1
-    assert_select %(select[name="root_type"] option[value=""]), text: "All root types", count: 1
-    assert_select %(select[name="root_recording_id"] option[value="queued_root"]), text: "queued_root", count: 1
-    assert_select %(select[name="root_recording_id"] option), text: "Queued root", count: 0
-    assert_select %(select[name="status"] option[disabled]), text: "All", count: 1
+    assert_select %(select[name="root_recording_id"] option[value="queued_root"]), text: "Queued root"
+    assert_select %(select[name="status"] option[disabled]), text: "All"
   end
 
   test "site admins can filter credentials by root and revoke an active credential" do
@@ -699,8 +713,8 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select %(select[name="status"] option[value="active"][selected]), text: "Active", count: 1
     assert_select %(select[name="status"] option[value=""]:not([disabled])), count: 1
-    assert_select %(select[name="root_recording_id"] option[value=""]:not([disabled])), text: "All roots", count: 1
-    assert_select %(select[name="root_type"] option[value=""]:not([disabled])), text: "All root types", count: 1
+    assert_select %(select[name="root_recording_id"] option[value=""]:not([disabled])), count: 1
+    assert_select %(select[name="root_type"] option[value=""]:not([disabled])), count: 1
     assert_select %(select[name="root_recording_id"] option[value="First credential root"]), text: "First credential root", count: 1
     assert_select %(select[name="status"] option[disabled]), text: "All", count: 1
 
@@ -912,7 +926,6 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
       assert_select %(select[name="api_client_name"] option[value="Analytics API key"]), count: 1
       assert_select %(select[name="status"] option[value=""][disabled][selected]), count: 1
     end
-    assert_includes response.body, "All API keys"
     assert_includes response.body, "Analytics API key"
     assert_includes response.body, "Status"
     refute_includes response.body, "Avg duration"
@@ -1058,7 +1071,7 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
         assert_select %(select[name="root_recording_id"]), count: 1
         assert_select %(select[name="root_type"]), count: 1
       end
-      assert_select %(select[name="health"] option[value=""]:not([disabled])), text: "Any health", count: 1
+      assert_select %(select[name="health"] option[value=""]:not([disabled])), count: 1
       assert_select %(select[name="health"] option[value="expiring_soon"]), text: "Expiring soon", count: 1
       assert_select %(select[name="health"] option[value="stale"]), text: "Stale", count: 1
 
