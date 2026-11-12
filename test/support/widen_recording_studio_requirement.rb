@@ -1,13 +1,12 @@
 # frozen_string_literal: true
 
 # Several sibling git tags still declare `recording_studio` below 5.
-# `recording_studio_admin` v2.7.0 already allows 6.1.0, so this patch
-# leaves that gemspec alone. Bundler reads the others while resolving
-# this app. Relax only a requirement that rejects 6.1.0 so the lockfile
-# can select Recording Studio v6.1.0.
+# Relax only a requirement that rejects the pinned release, so Bundler can
+# select Recording Studio v6.3.0. `recording_studio_admin` v2.11.0 allows
+# `>= 6.3.0, < 7`, so this patch leaves that gemspec alone.
 module WidenRecordingStudioRequirement
   NAME = "recording_studio"
-  VERSION = Gem::Version.new("6.1.0")
+  VERSION = Gem::Version.new("6.3.0")
   REQUIREMENT = Gem::Requirement.new(">= 6.1.0")
 
   module SpecificationPatch
