@@ -232,7 +232,13 @@ Create idempotency uses that same Redis client
 `Redis::BaseError`, `IdempotencyStore` writes the first response to
 `Rails.cache` with `unless_exist` and logs one warning. Redis uses `SET NX`.
 A later create with the same `Idempotency-Key` from the same API client
-returns that stored JSON for 24 hours. `null_store` cannot replay. A
+returns that stored JSON for 24 hours. The stored key is
+`{namespace}:idempotency:{api}:{api_client.id}:{digest}`. Index cursors use
+the same client id as `client:{api_client.id}` inside the pagination token.
+An in-process grant with an actor and no API client (MCP tools running for
+a signed-in user) uses `{ActorType}:{actor id}` in that client slot, and
+`client:{ActorType}:{actor id}` as the pagination scope. Actor type is the
+record's polymorphic name. `null_store` cannot replay. A
 `register_resource_handler` for `create` does not use this store.
 
 ### `authorized_by`

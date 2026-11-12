@@ -54,6 +54,23 @@ module RecordingStudioApi
           context.api_client
         end
 
+        # Idempotency and list cursors stay on the API client id when a client
+        # is present. In-process grants (MCP) have an actor and no client, so
+        # those keys use the actor's type and id instead.
+        def idempotency_client_id
+          client = api_client
+          return client.id if client
+
+          actor_identity
+        end
+
+        def pagination_scope_key
+          identity = idempotency_client_id
+          return if identity.blank?
+
+          "client:#{identity}"
+        end
+
         def credential
           context.credential
         end
@@ -180,6 +197,24 @@ module RecordingStudioApi
           return if registration&.supports_operation?(:index)
 
           raise RecordingStudioApi::UnsupportedActionError, "index is not enabled for #{recordable_type}"
+        end
+
+        def actor_identity
+          actor = access_grant.actor
+          return if actor.blank?
+
+          type_name = actor_type_name(actor)
+          identifier = actor.id if actor.respond_to?(:id)
+          return if type_name.blank? || identifier.blank?
+
+          "#{type_name}:#{identifier}"
+        end
+
+        def actor_type_name(actor)
+          klass = actor.class
+          return klass.polymorphic_name if klass.respond_to?(:polymorphic_name)
+
+          klass.name
         end
 
         def delete_metadata

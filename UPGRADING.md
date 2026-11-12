@@ -1,5 +1,19 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.21.2
+
+Create idempotency and index pagination accept an access grant that has an
+actor and no API client. No migration.
+
+1. Bump the host gem to `0.21.2`.
+2. Requests that include an API client keep the same keys. Idempotency
+   storage stays `{namespace}:idempotency:{api}:{api_client.id}:{digest}`.
+   Pagination cursors stay scoped to `client:{api_client.id}`.
+3. In-process calls with no API client (MCP tools on a signed-in user) key
+   those same slots by `{ActorType}:{actor id}`. Pagination scope is
+   `client:{ActorType}:{actor id}`. Actor type is the record's polymorphic
+   name. Those cursors are not interchangeable with API-client cursors.
+
 ## Upgrading to 0.21.1
 
 On a read-only API, the index/show default applies only to a type's first

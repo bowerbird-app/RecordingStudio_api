@@ -40,7 +40,7 @@ module RecordingStudioApi
 
           payload = RecordingStudioApi::IdempotencyStore.fetch(
             api: api_key,
-            client_id: api_client.id,
+            client_id: idempotency_client_id,
             key: key
           )
           return nil if payload.blank?
@@ -57,7 +57,7 @@ module RecordingStudioApi
 
           RecordingStudioApi::IdempotencyStore.write(
             api: api_key,
-            client_id: api_client.id,
+            client_id: idempotency_client_id,
             key: key,
             payload: result.fetch(:json),
             status: result.fetch(:status, :created).to_s
