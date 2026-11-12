@@ -54,21 +54,21 @@ module RecordingStudioApi
           context.api_client
         end
 
-        # Idempotency and list cursors stay on the API client id when a client
-        # is present. In-process grants (MCP) have an actor and no client, so
-        # those keys use the actor's type and id instead.
+        # API-client requests keep `api_client.id` and `client:<id>`.
+        # An in-process grant with only an actor uses `actor:<Type>:<id>`
+        # for both the idempotency client slot and the pagination scope.
         def idempotency_client_id
           client = api_client
           return client.id if client
 
-          actor_identity
+          actor_scope_key
         end
 
         def pagination_scope_key
-          identity = idempotency_client_id
-          return if identity.blank?
+          client = api_client
+          return "client:#{client.id}" if client
 
-          "client:#{identity}"
+          actor_scope_key
         end
 
         def credential
@@ -199,6 +199,13 @@ module RecordingStudioApi
           raise RecordingStudioApi::UnsupportedActionError, "index is not enabled for #{recordable_type}"
         end
 
+        def actor_scope_key
+          identity = actor_identity
+          raise RecordingStudioApi::AuthorizationError, RecordingStudioApi::AuthorizationError::MISSING_REQUEST_PRINCIPAL if identity.blank?
+
+          "actor:#{identity}"
+        end
+
         def actor_identity
           actor = access_grant.actor
           return if actor.blank?
@@ -215,14 +222,6 @@ module RecordingStudioApi
           return klass.polymorphic_name if klass.respond_to?(:polymorphic_name)
 
           klass.name
-        end
-
-        def delete_metadata
-          context.with_authorized_by(
-            api_action: "delete",
-            api_client_id: api_client.id,
-            api_credential_id: credential.id
-          )
         end
 
         def serialize_delete_result(serialized_recording, deleted_via:)

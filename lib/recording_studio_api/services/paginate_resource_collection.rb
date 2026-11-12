@@ -33,7 +33,9 @@ module RecordingStudioApi
         @sort = sort
         @order = order
         @api_key = RecordingStudioApi.configuration.fetch_api(api).name
-        @scope_key = scope_key.to_s.presence || "anonymous"
+        @scope_key = scope_key.to_s.presence
+        raise RecordingStudioApi::AuthorizationError, RecordingStudioApi::AuthorizationError::MISSING_REQUEST_PRINCIPAL if @scope_key.nil?
+
         @count = count
       end
 

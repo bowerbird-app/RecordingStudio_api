@@ -236,9 +236,12 @@ returns that stored JSON for 24 hours. The stored key is
 `{namespace}:idempotency:{api}:{api_client.id}:{digest}`. Index cursors use
 the same client id as `client:{api_client.id}` inside the pagination token.
 An in-process grant with an actor and no API client (MCP tools running for
-a signed-in user) uses `{ActorType}:{actor id}` in that client slot, and
-`client:{ActorType}:{actor id}` as the pagination scope. Actor type is the
-record's polymorphic name. `null_store` cannot replay. A
+a signed-in user) uses `actor:{ActorType}:{actor id}` for both. Idempotency
+storage is `{namespace}:idempotency:{api}:actor:{ActorType}:{actor id}:{digest}`.
+The pagination scope is `actor:{ActorType}:{actor id}`. Actor type is the
+record's polymorphic name. A request with neither an API client nor an actor
+raises `AuthorizationError` instead of skipping the idempotency store or
+sharing a cursor scope. `null_store` cannot replay. A
 `register_resource_handler` for `create` does not use this store.
 
 ### `authorized_by`
@@ -257,8 +260,7 @@ no manager, so API-key writes add no `authorized_by` keys.
 `authorized_by_id` (string or symbol keys) before it writes the server value,
 including on client_credentials and API-key writes. Handlers that record
 their own events can call `context.with_authorized_by(metadata)`. Delete does
-not record an event; its metadata builder lives on the resource operation
-service, which is the path `destroy` runs.
+not record an event.
 
 Set `api_management_authorization_required` for trusted APIs. Credential creation then requires both
 the requested RecordingStudioAccessible data grant and management access to that API's `AdminApi`

@@ -21,9 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - API-client idempotency keys stay
   `{namespace}:idempotency:{api}:{api_client.id}:{digest}`. Pagination cursors
   for those requests stay scoped to `client:{api_client.id}`.
-- A grant with no API client uses `{ActorType}:{actor id}` in that client
-  slot. Pagination scope is `client:{ActorType}:{actor id}`. Actor type is
-  the record's polymorphic name. Existing client keys and cursors stay valid.
+- A grant with no API client uses `actor:{ActorType}:{actor id}` as the
+  idempotency client slot and as the pagination scope. Storage looks like
+  `{namespace}:idempotency:{api}:actor:User:<uuid>:{digest}`. The cursor
+  scope is `actor:User:<uuid>`. Actor type is the record's polymorphic name.
+  Existing client keys and cursors stay valid.
+- A request with neither an API client nor an actor raises
+  `AuthorizationError`. Idempotency is not skipped, and list cursors do not
+  fall back to a shared anonymous scope.
 
 ## [0.21.1] - 2026-11-11
 

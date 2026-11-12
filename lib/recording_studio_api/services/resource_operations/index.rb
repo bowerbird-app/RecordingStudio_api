@@ -5,6 +5,7 @@ module RecordingStudioApi
     module ResourceOperations
       class Index < Base
         def call
+          scope_key = pagination_scope_key
           authorize_access!(access_scope_recording, role: :view)
 
           pagination = RecordingStudioApi::Services::PaginateResourceCollection.call(
@@ -17,7 +18,7 @@ module RecordingStudioApi
             order: params[:order],
             count: params[:count],
             api: api_key,
-            scope_key: pagination_scope_key
+            scope_key: scope_key
           )
           raise RecordingStudioApi::InvalidPaginationTokenError, pagination.error if pagination.failure?
 
