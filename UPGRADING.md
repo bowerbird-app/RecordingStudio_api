@@ -6,8 +6,12 @@ Admin screens render Admin's `screens/_filter_fields` partial. This gem no
 longer ships or prepends a copy. No migration.
 
 1. Bump the host gem to `0.21.4`.
-2. Filter labels, placeholders, and option formatting come from the host's
-   `recording_studio_admin` version.
+2. Pin `recording_studio_admin` to GitHub tag `v2.13.0` when the host mounts
+   Admin. Select filters use `placeholder.presence || blank_label.presence ||
+   "All"`.
+3. Filter labels, placeholders, and option formatting come from the host's
+   `recording_studio_admin` version. Empty choices on credential and request
+   screens show All roots, All root types, All API clients, and All API keys.
 
 ## Upgrading to 0.21.3
 

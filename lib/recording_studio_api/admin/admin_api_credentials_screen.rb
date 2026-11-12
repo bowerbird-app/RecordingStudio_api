@@ -43,7 +43,6 @@ module RecordingStudioApi
       filter :root_recording_id,
              options: -> { root_filter_options },
              blank_label: "All roots",
-             placeholder: nil,
              humanize_options: false,
              apply: lambda { |rows, value, _context|
                value.present? ? rows.select { |row| row.root == value } : rows
@@ -52,7 +51,6 @@ module RecordingStudioApi
       filter :root_type,
              options: -> { root_type_filter_options },
              blank_label: "All root types",
-             placeholder: nil,
              humanize_options: false,
              apply: lambda { |rows, value, _context|
                value.present? ? rows.select { |row| row.root_type == value } : rows

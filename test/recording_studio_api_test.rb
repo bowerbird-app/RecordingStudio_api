@@ -41,7 +41,7 @@ class RecordingStudioApiTest < Minitest::Test
       assert_includes contents, 'RecordingStudio_metrics", tag: "v0.7.2"', path
       assert_includes contents, 'RecordingStudio_logs", tag: "v0.7.3"', path
       assert_includes contents, 'RecordingStudio_icons", tag: "v0.2.0"', path
-      assert_includes contents, 'RecordingStudio_admin", tag: "v2.11.0"', path
+      assert_includes contents, 'RecordingStudio_admin", tag: "v2.13.0"', path
     end
     %w[test/dummy/db/schema.rb test/dummy/db/api_logging_schema.rb].each do |path|
       contents = File.read(File.join(root, path))

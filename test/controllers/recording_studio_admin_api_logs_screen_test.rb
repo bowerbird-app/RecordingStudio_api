@@ -559,6 +559,7 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Site-wide API request activity across every API client."
     assert_includes response.body, "area"
     assert_select 'button[data-modal-id="screen-filters-modal"]', count: 1
+    assert_select %(select[name="api_client_name"] option[value=""]:not([disabled])), text: "All API clients", count: 1
 
     get "/admin/api/screens/admin_api_requests/table", params: {
       start_date: 27.days.ago.to_date.iso8601,
@@ -672,7 +673,7 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     refute_includes resolved, RecordingStudioApi::Engine.root.join("app/views").to_s
   end
 
-  test "credential select filters keep raw option labels and the All placeholder" do
+  test "credential select filters keep raw option labels and blank labels" do
     _root_recording, access_recording = create_access_recording_for(
       user: @user,
       workspace_name: "queued_root",
@@ -684,7 +685,8 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     get "/admin/api/screens/admin_api_credentials"
 
     assert_response :success
-    assert_select %(select[name="root_recording_id"] option[value="queued_root"]), text: "Queued root"
+    assert_select %(select[name="root_recording_id"] option[value="queued_root"]), text: "queued_root"
+    assert_select %(select[name="root_recording_id"] option[value=""]:not([disabled])), text: "All roots"
     assert_select %(select[name="status"] option[disabled]), text: "All"
   end
 
@@ -715,8 +717,8 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select %(select[name="status"] option[value="active"][selected]), text: "Active", count: 1
     assert_select %(select[name="status"] option[value=""]:not([disabled])), count: 1
-    assert_select %(select[name="root_recording_id"] option[value=""]:not([disabled])), count: 1
-    assert_select %(select[name="root_type"] option[value=""]:not([disabled])), count: 1
+    assert_select %(select[name="root_recording_id"] option[value=""]:not([disabled])), text: "All roots", count: 1
+    assert_select %(select[name="root_type"] option[value=""]:not([disabled])), text: "All root types", count: 1
     assert_select %(select[name="root_recording_id"] option[value="First credential root"]), text: "First credential root", count: 1
     assert_select %(select[name="status"] option[disabled]), text: "All", count: 1
 
@@ -924,7 +926,7 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     end
     assert_select "form#screen-filters-mobile-form" do
       assert_select %(select[name="api_client_name"]), count: 1
-      assert_select %(select[name="api_client_name"] option[value=""]:not([disabled])), count: 1
+      assert_select %(select[name="api_client_name"] option[value=""]:not([disabled])), text: "All API keys", count: 1
       assert_select %(select[name="api_client_name"] option[value="Analytics API key"]), count: 1
       assert_select %(select[name="status"] option[value=""][disabled][selected]), count: 1
     end

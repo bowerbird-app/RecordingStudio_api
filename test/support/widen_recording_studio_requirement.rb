@@ -2,7 +2,7 @@
 
 # Several sibling git tags still declare `recording_studio` below 5.
 # Relax only a requirement that rejects the pinned release, so Bundler can
-# select Recording Studio v6.3.0. `recording_studio_admin` v2.11.0 allows
+# select Recording Studio v6.3.0. `recording_studio_admin` v2.13.0 allows
 # `>= 6.3.0, < 7`, so this patch leaves that gemspec alone.
 module WidenRecordingStudioRequirement
   NAME = "recording_studio"
