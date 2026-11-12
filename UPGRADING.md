@@ -1,5 +1,20 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.21.3
+
+Admin date-range filters post `date_range_preset` through Flatpack
+`preset_name` and use the Admin v2.11.0 preset list. No migration.
+
+1. Bump the host gem to `0.21.3`.
+2. Pin `recording_studio_admin` to GitHub tag `v2.11.0` when the host mounts
+   Admin. `last_4_weeks` is the 27-day window at that pin. The 0.18.1
+   four-week mismatch does not apply.
+3. Expect Last 30 days and Last 4 weeks on every Admin screen. This gem's
+   filter partial replaces Admin's partial.
+4. Select filters still take callable `options` or `values`, Hash and Array
+   options, `blank_label`, and `humanize_options: false`. Pass
+   `placeholder:`, including `nil`, when All is the wrong label.
+
 ## Upgrading to 0.21.2
 
 Create idempotency and index pagination accept an access grant that has an
@@ -157,7 +172,8 @@ the hidden date fields. No migration.
    double-submit if auto-submit already listens for `change`.
 4. Admin `_filter_fields` still posts `date_range_preset` with a hidden field.
    Do not switch that field to FlatPack `preset_name:` until the picker can
-   seed a stored key that is not inferred from start and end.
+   seed a stored key that is not inferred from start and end. `0.21.3`
+   supersedes this warning at Admin `v2.11.0`.
 
 ## Upgrading to 0.18.0
 

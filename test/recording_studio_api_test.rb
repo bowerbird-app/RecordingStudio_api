@@ -8,7 +8,7 @@ class RecordingStudioApiTest < Minitest::Test
   end
 
   def test_version_pin
-    assert_equal "0.21.2", ::RecordingStudioApi::VERSION
+    assert_equal "0.21.3", ::RecordingStudioApi::VERSION
   end
 
   def test_metrics_dependency_pins
@@ -41,7 +41,7 @@ class RecordingStudioApiTest < Minitest::Test
       assert_includes contents, 'RecordingStudio_metrics", tag: "v0.7.2"', path
       assert_includes contents, 'RecordingStudio_logs", tag: "v0.7.3"', path
       assert_includes contents, 'RecordingStudio_icons", tag: "v0.2.0"', path
-      assert_includes contents, 'RecordingStudio_admin", tag: "v2.7.0"', path
+      assert_includes contents, 'RecordingStudio_admin", tag: "v2.11.0"', path
     end
     %w[test/dummy/db/schema.rb test/dummy/db/api_logging_schema.rb].each do |path|
       contents = File.read(File.join(root, path))
@@ -51,13 +51,15 @@ class RecordingStudioApiTest < Minitest::Test
     end
   end
 
-  def test_date_range_filter_keeps_admin_preset_hidden_field
+  def test_date_range_filter_uses_flatpack_preset_name
     root = File.expand_path("..", __dir__)
     filter_fields = File.read(File.join(root, "app/views/recording_studio_admin/screens/_filter_fields.html.erb"))
     logs_content = File.read(File.join(root, "app/views/recording_studio_api/admin_logs/_content.html.erb"))
 
-    refute_includes filter_fields, "preset_name:"
-    assert_includes filter_fields, "hidden_field_tag filter.preset_param, filter.value&.preset_key"
+    assert_includes filter_fields, "preset_name: filter.preset_param.to_s"
+    assert_includes filter_fields, "key: :last_30_days"
+    assert_includes filter_fields, "days: 31"
+    refute_includes filter_fields, "hidden_field_tag filter.preset_param"
     refute_includes logs_content, "admin-logs-date-range-submit"
     refute_includes logs_content, "submitOnApply"
     assert_includes logs_content, "change->flat-pack--auto-submit#queueSubmit"

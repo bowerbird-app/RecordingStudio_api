@@ -633,6 +633,45 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "/recording_studio_api/api/v1/site-wide-pages"
   end
 
+  test "date range filters show the preset label and still post a custom range" do
+    switch_to_root(@admin_root_recording)
+
+    get "/admin/api/screens/admin_api_failing_endpoints", params: { date_range_preset: "last_30_days" }
+
+    assert_response :success
+    assert_select %(input[readonly][value="Last 30 days"]), count: 1
+    assert_select %(input[type="hidden"][name="date_range_preset"][value="last_30_days"]), count: 1
+
+    get "/admin/api/screens/admin_api_failing_endpoints", params: {
+      start_date: "2020-01-03",
+      end_date: "2020-01-09"
+    }
+
+    assert_response :success
+    assert_select %(input[type="hidden"][name="date_range_preset"]), count: 1
+    assert_select %(input[type="hidden"][name="date_range_preset"][value]:not([value=""])), count: 0
+    assert_select %(input[readonly][value="2020-01-03 to 2020-01-09"]), count: 1
+  end
+
+  test "credential select filters keep raw option labels and the All placeholder" do
+    _root_recording, access_recording = create_access_recording_for(
+      user: @user,
+      workspace_name: "queued_root",
+      role: :admin
+    )
+    provision_api_client_for(access_recording: access_recording, name: "Queued root credential")
+    switch_to_root(@admin_root_recording)
+
+    get "/admin/api/screens/admin_api_credentials"
+
+    assert_response :success
+    assert_select %(select[name="root_recording_id"] option[value=""]), text: "All roots", count: 1
+    assert_select %(select[name="root_type"] option[value=""]), text: "All root types", count: 1
+    assert_select %(select[name="root_recording_id"] option[value="queued_root"]), text: "queued_root", count: 1
+    assert_select %(select[name="root_recording_id"] option), text: "Queued root", count: 0
+    assert_select %(select[name="status"] option[disabled]), text: "All", count: 1
+  end
+
   test "site admins can filter credentials by root and revoke an active credential" do
     _first_root_recording, first_access_recording = create_access_recording_for(
       user: @user,
@@ -660,9 +699,10 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select %(select[name="status"] option[value="active"][selected]), text: "Active", count: 1
     assert_select %(select[name="status"] option[value=""]:not([disabled])), count: 1
-    assert_select %(select[name="root_recording_id"] option[value=""]:not([disabled])), count: 1
-    assert_select %(select[name="root_type"] option[value=""]:not([disabled])), count: 1
+    assert_select %(select[name="root_recording_id"] option[value=""]:not([disabled])), text: "All roots", count: 1
+    assert_select %(select[name="root_type"] option[value=""]:not([disabled])), text: "All root types", count: 1
     assert_select %(select[name="root_recording_id"] option[value="First credential root"]), text: "First credential root", count: 1
+    assert_select %(select[name="status"] option[disabled]), text: "All", count: 1
 
     get "/admin/api/screens/admin_api_credentials/table"
 

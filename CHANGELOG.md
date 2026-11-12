@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.3] - 2026-11-12
+
+### Changed
+- Admin date-range filters use the Admin v2.11.0 preset list. Last 30 days
+  and Last 4 weeks show on every Admin screen, because this override
+  replaces Admin's partial. The picker posts `date_range_preset` through
+  Flatpack `preset_name`. Select filters still accept callable options,
+  Hash and Array options, `blank_label`, `humanize_options: false`, and
+  `placeholder:` including `nil`. A filter that omits `placeholder:` shows
+  All.
+
+### Upgrade notes
+- Bump to `0.21.3`. No host migration.
+- Development and dummy Gemfiles pin Admin `v2.11.0`.
+- Hosts that mount Admin should use Admin `v2.11.0` so `last_4_weeks` stays
+  the 27-day window. The 0.18.1 four-week mismatch does not apply at that
+  pin.
+
 ## [0.21.2] - 2026-11-12
 
 ### Fixed
@@ -1061,7 +1079,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.2...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.3...HEAD
+[0.21.3]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.2...v0.21.3
 [0.21.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.1...v0.21.2
 [0.21.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.20.0...v0.21.0
