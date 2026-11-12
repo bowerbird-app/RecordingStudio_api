@@ -1,5 +1,26 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.21.2
+
+Create idempotency and index pagination accept an access grant that has an
+actor and no API client. No migration.
+
+1. Bump the host gem to `0.21.2`.
+2. Requests that include an API client keep the same keys. Idempotency
+   storage stays `{namespace}:idempotency:{api}:{api_client.id}:{digest}`.
+   Pagination cursors stay scoped to `client:{api_client.id}`.
+3. In-process calls with no API client (MCP tools on a signed-in user) use
+   `actor:{ActorType}:{actor id}` for both. Idempotency storage is
+   `{namespace}:idempotency:{api}:actor:User:<uuid>:{digest}`. Pagination
+   scope is `actor:User:<uuid>`. Actor type is the record's polymorphic
+   name. Those cursors are not interchangeable with API-client cursors, or
+   with another actor's cursors.
+4. A request with neither an API client nor an actor raises
+   `AuthorizationError` (`This request has no API client or actor to scope
+   idempotency and pagination`). Create does this when an idempotency key
+   is present. Index does this before it authorizes. `PaginateResourceCollection`
+   raises the same error when `scope_key` is blank.
+
 ## Upgrading to 0.21.1
 
 On a read-only API, the index/show default applies only to a type's first

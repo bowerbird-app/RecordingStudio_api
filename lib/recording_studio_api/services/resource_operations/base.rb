@@ -54,6 +54,23 @@ module RecordingStudioApi
           context.api_client
         end
 
+        # API-client requests keep `api_client.id` and `client:<id>`.
+        # An in-process grant with only an actor uses `actor:<Type>:<id>`
+        # for both the idempotency client slot and the pagination scope.
+        def idempotency_client_id
+          client = api_client
+          return client.id if client
+
+          actor_scope_key
+        end
+
+        def pagination_scope_key
+          client = api_client
+          return "client:#{client.id}" if client
+
+          actor_scope_key
+        end
+
         def credential
           context.credential
         end
@@ -182,12 +199,29 @@ module RecordingStudioApi
           raise RecordingStudioApi::UnsupportedActionError, "index is not enabled for #{recordable_type}"
         end
 
-        def delete_metadata
-          context.with_authorized_by(
-            api_action: "delete",
-            api_client_id: api_client.id,
-            api_credential_id: credential.id
-          )
+        def actor_scope_key
+          identity = actor_identity
+          raise RecordingStudioApi::AuthorizationError, RecordingStudioApi::AuthorizationError::MISSING_REQUEST_PRINCIPAL if identity.blank?
+
+          "actor:#{identity}"
+        end
+
+        def actor_identity
+          actor = access_grant.actor
+          return if actor.blank?
+
+          type_name = actor_type_name(actor)
+          identifier = actor.id if actor.respond_to?(:id)
+          return if type_name.blank? || identifier.blank?
+
+          "#{type_name}:#{identifier}"
+        end
+
+        def actor_type_name(actor)
+          klass = actor.class
+          return klass.polymorphic_name if klass.respond_to?(:polymorphic_name)
+
+          klass.name
         end
 
         def serialize_delete_result(serialized_recording, deleted_via:)

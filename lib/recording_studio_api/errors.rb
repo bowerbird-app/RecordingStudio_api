@@ -13,7 +13,11 @@ module RecordingStudioApi
   end
 
   class AuthenticationError < Error; end
-  class AuthorizationError < Error; end
+
+  class AuthorizationError < Error
+    MISSING_REQUEST_PRINCIPAL = "This request has no API client or actor to scope idempotency and pagination"
+  end
+
   class ConfigurationError < Error; end
   class InvalidPaginationTokenError < Error; end
   class NotFoundError < Error; end

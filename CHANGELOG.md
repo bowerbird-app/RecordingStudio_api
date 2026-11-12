@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.2] - 2026-11-12
+
+### Fixed
+- Create idempotency and index pagination no longer call `api_client.id`
+  when the access grant has an actor and no API client. In-process callers
+  such as MCP tools can create with an `Idempotency-Key` and list resources.
+  Requests that include an API client keep the same idempotency and cursor
+  keys as before.
+
+### Upgrade notes
+- Bump to `0.21.2`. No host migration.
+- API-client idempotency keys stay
+  `{namespace}:idempotency:{api}:{api_client.id}:{digest}`. Pagination cursors
+  for those requests stay scoped to `client:{api_client.id}`.
+- A grant with no API client uses `actor:{ActorType}:{actor id}` as the
+  idempotency client slot and as the pagination scope. Storage looks like
+  `{namespace}:idempotency:{api}:actor:User:<uuid>:{digest}`. The cursor
+  scope is `actor:User:<uuid>`. Actor type is the record's polymorphic name.
+  Existing client keys and cursors stay valid.
+- A request with neither an API client nor an actor raises
+  `AuthorizationError`. Idempotency is not skipped, and list cursors do not
+  fall back to a shared anonymous scope.
+
 ## [0.21.1] - 2026-11-11
 
 ### Fixed
@@ -1038,7 +1061,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.1...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.2...HEAD
+[0.21.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.1...v0.21.2
 [0.21.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.19.0...v0.20.0

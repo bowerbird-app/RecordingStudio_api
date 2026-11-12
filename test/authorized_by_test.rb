@@ -295,11 +295,6 @@ class AuthorizedByTest < ActiveSupport::TestCase
     assert_equal true, result.fetch(:json).fetch(:deleted)
     assert_equal "destroyed", result.fetch(:json).fetch(:deleted_via)
     assert_equal before, event_metadata_rows
-    built = RecordingStudioApi::Services::ResourceOperations::Destroy.new(context).send(:delete_metadata)
-    assert_equal "delete", built[:api_action]
-    assert_equal "User", built[:authorized_by_type]
-    assert_equal @user.id, built[:authorized_by_id]
-    assert_single_authorized_by_keys(built)
   end
 
   private
