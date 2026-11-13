@@ -159,6 +159,42 @@ class RegisteredEndpointRegistryTest < Minitest::Test
     assert_equal "describe_widget", @registry.to_h.fetch("describe_widget").fetch(:name)
   end
 
+  def test_openapi_path_parameters_take_docs_from_matching_path_entry
+    @registry.register(
+      :show_item,
+      http_verb: :get,
+      path: "items/:id",
+      handler: ->(_context) { :ok },
+      openapi: {
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            description: "The item.",
+            example: "item_1",
+            required: false
+          },
+          {
+            name: "verbose",
+            in: "query",
+            description: "Include extras.",
+            schema: { type: "boolean" }
+          }
+        ]
+      }
+    )
+
+    parameters = @registry.fetch(:show_item).openapi_path_parameters
+    assert_equal 1, parameters.length
+    id = parameters.first
+    assert_equal "id", id.fetch(:name)
+    assert_equal "path", id.fetch(:in)
+    assert_equal true, id.fetch(:required)
+    assert_equal "The item.", id.fetch(:description)
+    assert_equal "item_1", id.fetch(:example)
+    assert_equal({ type: "string" }, id.fetch(:schema))
+  end
+
   def test_literal_template_beats_a_resource_token_regardless_of_order
     @registry.register(:token, http_verb: :get, path: ":resource/metrics", handler: ->(_) { :token })
     @registry.register(:literal, http_verb: :get, path: "foo/metrics", handler: ->(_) { :literal })

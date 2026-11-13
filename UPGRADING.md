@@ -1,5 +1,18 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.22.0
+
+Path tokens on `register_endpoint` pick up OpenAPI documentation from a
+matching `openapi` path parameter. No migration.
+
+1. Bump the host gem to `0.22.0`.
+2. To describe `:id` on `items/:id`, pass
+   `openapi: { parameters: [{ name: "id", in: "path", description: "The item." }] }`.
+   Other keys such as `example` copy onto the generated parameter.
+   `name`, `in`, and `required` stay generated.
+3. Query and header parameters in that same list still append. A matching
+   path entry is not listed twice.
+
 ## Upgrading to 0.21.4
 
 Admin screens render Admin's `screens/_filter_fields` partial. This gem no

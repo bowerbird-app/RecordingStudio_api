@@ -950,7 +950,12 @@ RecordingStudioApi.register_endpoint(
   api: :public,
   http_verb: :post,
   path: "echo/:key",
-  handler: ->(context) { { key: context.params[:key], message: context.params[:message] } }
+  handler: ->(context) { { key: context.params[:key], message: context.params[:message] } },
+  openapi: {
+    parameters: [
+      { name: "key", in: "path", description: "Echo this key back." }
+    ]
+  }
 )
 ```
 

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-11-13
+
+### Added
+- Generated OpenAPI path parameters for `register_endpoint` take
+  `description` and other documentation keys from a matching
+  `openapi: { parameters: [...] }` entry (`name` plus `in: "path"`).
+  The document lists each path parameter once. Query and header
+  parameters still append.
+
+### Upgrade notes
+- Bump to `0.22.0`. No host migration.
+- Describe a path token by passing `openapi: { parameters: [{ name:,
+  in: "path", description: }] }`. `name`, `in`, and `required` on that
+  entry do not replace the generated path parameter. MCP already reads
+  `openapi_path_parameters[:description]`.
+
 ## [0.21.4] - 2026-11-12
 
 ### Fixed
@@ -1097,7 +1113,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.4...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.22.0...HEAD
+[0.22.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.4...v0.22.0
 [0.21.4]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.3...v0.21.4
 [0.21.3]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.2...v0.21.3
 [0.21.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.1...v0.21.2
