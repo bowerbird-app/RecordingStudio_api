@@ -7,11 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.1] - 2026-11-13
+
 ### Fixed
 - OpenAPI content-type overrides merge into the generated string key. A
   registration symbolizes `application/json`, and the document keeps that
   name as a string. Both keys now collapse, so the schema and the examples
   stay together and the JSON encoder can write the document.
+
+### Upgrade notes
+- Bump to `0.23.1`. No host migration.
+- Hosts that pass `application/json` examples on a recordable `openapi:`
+  hash keep those examples next to the generated schema. The document
+  encodes as one content type.
 
 ## [0.23.0] - 2026-11-13
 
@@ -1173,7 +1181,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.1...HEAD
+[0.23.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.0...v0.23.1
 [0.23.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.22.1...v0.23.0
 [0.22.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.22.0...v0.22.1
 [0.22.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.4...v0.22.0

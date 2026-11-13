@@ -1,5 +1,14 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.23.1
+
+OpenAPI content-type overrides stay on the generated string key. No migration.
+
+1. Bump the host gem to `0.23.1`.
+2. A recordable `openapi:` hash may still use `"application/json"`. The
+   registration symbolizes that key. The document merges it back onto the
+   string key, so the schema and the examples encode together.
+
 ## Upgrading to 0.23.0
 
 Capability-action OpenAPI can vary by recordable type. No migration.
