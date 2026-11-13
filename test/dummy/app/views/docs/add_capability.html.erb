@@ -53,6 +53,15 @@
               description: "Validation failed while publishing."
             }
           }
+        },
+        openapi_for: ->(type:, action:) {
+          next unless type.to_s == "Article"
+
+          {
+            title: "Publish article",
+            summary: "Publish this article.",
+            description: "Puts the article live."
+          }
         }
       )
     CODE

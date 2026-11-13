@@ -514,6 +514,7 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_select "h1", text: "Add API capability"
     assert_includes response.body, "Register a capability-backed action"
     assert_includes response.body, "RecordingStudioApi.register_capability_action"
+    assert_includes response.body, "openapi_for:"
     assert_includes response.body, "capability: :publishable"
     assert_includes response.body, "config/initializers/recording_studio_api.rb"
     assert_includes response.body, "context.access_grant.authorize!"

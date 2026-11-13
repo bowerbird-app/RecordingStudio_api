@@ -587,6 +587,58 @@ module RecordingStudioApi
         assert_equal ["Folder"], move_operation.fetch(:tags)
       end
 
+      def test_per_type_capability_action_openapi_overrides_title_summary_and_description
+        with_isolated_configuration do
+          singleton = RecordingStudioApi.singleton_class
+          original_recordable_types = RecordingStudioApi.method(:api_recordable_types)
+          singleton.send(:define_method, :api_recordable_types) do
+            %w[Page RecordingStudioPresskits::PressKit]
+          end
+
+          RecordingStudioApi.register_capability_action(
+            :attach,
+            capability: :attachable,
+            http_verb: :post,
+            handler: ->(_context) { :ok },
+            openapi: {
+              title: "Attach",
+              summary: "Generic attach",
+              description: "Generic attach description"
+            },
+            openapi_for: lambda { |type:, action:|
+              next unless action.to_s == "attach" && type.to_s == "RecordingStudioPresskits::PressKit"
+
+              {
+                title: "Add File",
+                summary: "Attach a file to this press kit.",
+                description: "Adds a file to the press kit Files section."
+              }
+            }
+          )
+          RecordingStudioApi.register_recordable_type_api("Page")
+          RecordingStudioApi.register_recordable_type_api("RecordingStudioPresskits::PressKit")
+
+          RecordingStudio.stub(:capability_enabled?, ->(capability, **) { capability == :attachable }) do
+            document = OpenapiDocument.call
+            press_kit = document.fetch(:paths)
+              .fetch("/recording_studio_api/api/v1/press_kits/{id}/actions/attach")
+              .fetch("post")
+            page = document.fetch(:paths)
+              .fetch("/recording_studio_api/api/v1/pages/{id}/actions/attach")
+              .fetch("post")
+
+            assert_equal "Add File", press_kit.fetch(:title)
+            assert_equal "Attach a file to this press kit.", press_kit.fetch(:summary)
+            assert_equal "Adds a file to the press kit Files section.", press_kit.fetch(:description)
+            assert_equal "Attach", page.fetch(:title)
+            assert_equal "Generic attach", page.fetch(:summary)
+            assert_equal "Generic attach description", page.fetch(:description)
+          end
+        ensure
+          singleton.send(:define_method, :api_recordable_types, original_recordable_types)
+        end
+      end
+
       def test_openapi_includes_auto_enabled_capability_actions_and_excludes_opted_out_ones
         with_isolated_configuration do
           singleton = RecordingStudioApi.singleton_class

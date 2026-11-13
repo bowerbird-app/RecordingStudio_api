@@ -200,7 +200,7 @@ module RecordingStudioApi
       configuration.fetch_api(api).resource_handler_registry.fetch(recordable_type, action)
     end
 
-    def register_capability_action(name, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil, ui: nil, api: :public)
+    def register_capability_action(name, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil, ui: nil, api: :public, **)
       configuration.api(api).action_registry.register(
         name,
         capability: capability,
@@ -214,7 +214,8 @@ module RecordingStudioApi
         openapi: openapi,
         input_contract: input_contract,
         required_role: required_role,
-        ui: ui
+        ui: ui,
+        **
       )
     end
 

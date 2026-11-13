@@ -570,21 +570,29 @@ module RecordingStudioApi
         capability_actions_for(recordable_type)
           .sort_by(&:name)
           .map do |action|
-            action_openapi = action.respond_to?(:openapi) && action.openapi.is_a?(Hash) ? action.openapi : {}
-            docs_resource_name_for(resource_name, recordable_type)
+            action_openapi = action_openapi_for(action, recordable_type)
 
             {
               verb: action.http_verb.to_s.upcase,
               path: "#{api_root_path}/#{resource_name}/:id/actions/#{action.name}",
               action: "member_actions#create",
               summary: action_openapi.fetch(:summary, action.name.humanize),
-              description: "Execute the #{action.name} action.",
+              description: action_openapi.fetch(:description, "Execute the #{action.name} action."),
               action_name: action.capability.to_s,
               capability: action.capability.to_s,
               scope: action.scope.to_s,
               openapi: merge_hashes(default_action_openapi(resource_name, recordable_type, action), action_openapi)
             }
           end
+      end
+
+      def action_openapi_for(action, recordable_type)
+        if action.respond_to?(:openapi_for)
+          resolved = action.openapi_for(type: recordable_type)
+          return resolved if resolved.is_a?(Hash)
+        end
+
+        action.respond_to?(:openapi) && action.openapi.is_a?(Hash) ? action.openapi : {}
       end
 
       def merge_hashes(base_hash, override_hash)
