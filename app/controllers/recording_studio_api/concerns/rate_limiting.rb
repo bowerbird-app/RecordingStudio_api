@@ -5,18 +5,6 @@ module RecordingStudioApi
     module RateLimiting
       extend ActiveSupport::Concern
 
-      # Atomically increment and set TTL only on first hit in the window so we
-      # avoid rewriting expiry on every request. Re-apply EXPIRE if TTL is missing.
-      RATE_LIMIT_INCR_EXPIRE_SCRIPT = <<~LUA
-        local count = redis.call("INCR", KEYS[1])
-        local ttl = redis.call("TTL", KEYS[1])
-        if count == 1 or ttl < 0 then
-          redis.call("EXPIRE", KEYS[1], ARGV[1])
-          ttl = redis.call("TTL", KEYS[1])
-        end
-        return { count, ttl }
-      LUA
-
       class << self
         attr_accessor :decider
 
@@ -116,40 +104,23 @@ module RecordingStudioApi
       def computed_rate_limit_decision
         return nil unless rate_limit_enabled_for_request?
 
-        redis = rate_limit_redis_client
-        return nil if redis.nil?
-
-        limit = rate_limit_window_limit
-        period = rate_limit_window_period
-        return nil if limit <= 0 || period <= 0
-
-        current_window = (Time.current.to_i / period).to_i
-        key = "#{rate_limit_scoped_namespace}:#{rate_limit_bucket}:#{rate_limit_identifier}:#{current_window}"
-
-        count, retry_after = increment_rate_limit_counter(redis, key, period)
-        remaining = [limit - count, 0].max
+        limit, period = rate_limit_window
+        decision = RecordingStudioApi::RateLimit.check(
+          kind: rate_limit_bucket,
+          identifier: rate_limit_identifier,
+          limit: limit,
+          period: period,
+          namespace: rate_limit_scoped_namespace,
+          redis: rate_limit_redis_client
+        )
+        return nil unless decision
 
         {
-          limited: count > limit,
-          limit: limit,
-          remaining: remaining,
-          retry_after: retry_after.positive? ? retry_after : period
+          limited: decision.limited?,
+          limit: decision.limit,
+          remaining: decision.remaining,
+          retry_after: decision.retry_after
         }
-      end
-
-      def increment_rate_limit_counter(redis, key, period)
-        if redis.respond_to?(:eval)
-          result = redis.eval(RATE_LIMIT_INCR_EXPIRE_SCRIPT, keys: [key], argv: [period.to_i])
-          return [result[0].to_i, result[1].to_i]
-        end
-
-        count = redis.incr(key)
-        ttl = redis.ttl(key)
-        if count == 1 || ttl.to_i < 0
-          redis.expire(key, period)
-          ttl = redis.ttl(key)
-        end
-        [count, ttl.to_i]
       end
 
       def normalize_decision(decision)
@@ -230,34 +201,16 @@ module RecordingStudioApi
         end
       end
 
+      def rate_limit_window
+        RecordingStudioApi::RateLimit.limits(kind: rate_limit_bucket, policy: rate_limit_api)
+      end
+
       def rate_limit_window_limit
-        case rate_limit_bucket
-        when "oauth"
-          rate_limit_api.rate_limit_oauth_requests.to_i
-        when "api_pre_auth"
-          rate_limit_api.rate_limit_api_pre_auth_requests.to_i
-        when "api_read"
-          rate_limit_api.rate_limit_api_read_requests.to_i.nonzero? ||
-            rate_limit_api.rate_limit_api_requests.to_i
-        else
-          rate_limit_api.rate_limit_api_write_requests.to_i.nonzero? ||
-            rate_limit_api.rate_limit_api_requests.to_i
-        end
+        rate_limit_window.first
       end
 
       def rate_limit_window_period
-        case rate_limit_bucket
-        when "oauth"
-          rate_limit_api.rate_limit_oauth_period_seconds.to_i
-        when "api_pre_auth"
-          rate_limit_api.rate_limit_api_pre_auth_period_seconds.to_i
-        when "api_read"
-          rate_limit_api.rate_limit_api_read_period_seconds.to_i.nonzero? ||
-            rate_limit_api.rate_limit_api_period_seconds.to_i
-        else
-          rate_limit_api.rate_limit_api_write_period_seconds.to_i.nonzero? ||
-            rate_limit_api.rate_limit_api_period_seconds.to_i
-        end
+        rate_limit_window.last
       end
 
       def rate_limit_identifier

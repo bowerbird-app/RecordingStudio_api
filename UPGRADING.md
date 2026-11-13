@@ -1,5 +1,19 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.21.5
+
+Other gems share the API rate-limit counters through
+`RecordingStudioApi::RateLimit`. No migration. Existing Redis keys are
+unchanged.
+
+1. Bump the host gem to `0.21.5`.
+2. Call `RecordingStudioApi::RateLimit.check(kind:, identifier:)` instead of
+   copying the key layout or the Redis increment script. `kind` is `:read`
+   or `:write`. Pass `api:` for a named API.
+3. Keys stay `{namespace}:api_read|api_write|oauth|api_pre_auth:{identifier}:{window}`.
+   The default namespace is still `recording_studio_api`. `window` is
+   `now.to_i / period`.
+
 ## Upgrading to 0.21.4
 
 Admin screens render Admin's `screens/_filter_fields` partial. This gem no

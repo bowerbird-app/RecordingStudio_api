@@ -65,8 +65,8 @@ class RateLimitingTest < ActiveSupport::TestCase
       @ttl
     end
 
-    def eval(_script, keys:, argv:)
-      eval_calls << { keys: keys, argv: argv }
+    def eval(script, keys:, argv:)
+      eval_calls << { script: script, keys: keys, argv: argv }
       key = keys.fetch(0)
       count = incr(key)
       current_ttl = ttl(key)
@@ -154,6 +154,16 @@ class RateLimitingTest < ActiveSupport::TestCase
     assert_equal [[expected_key, 30]], redis.expire_calls
     assert_equal 2, redis.ttl_calls.length
     assert_equal 1, redis.eval_calls.length
+    assert_equal RecordingStudioApi::RateLimit::INCR_EXPIRE_SCRIPT, redis.eval_calls.first.fetch(:script)
+    assert_equal(
+      RecordingStudioApi::RateLimit.key(
+        kind: :read,
+        identifier: "credential:cred-1",
+        window: current_window,
+        namespace: "custom_ns"
+      ),
+      expected_key
+    )
   end
 
   test "computed oauth decision applies an IP bucket before the recognized client bucket" do
