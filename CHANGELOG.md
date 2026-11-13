@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.1] - 2026-11-13
+
+### Added
+- `RecordingStudioApi::RateLimit` is the shared fixed-window counter.
+  `check` builds the key, increments it, and returns whether the call is
+  allowed, plus the count, limit, remaining, retry-after, and reset time.
+  `key` builds the counter key. `limits` reads the configured window for a
+  policy. The HTTP limiter uses this same counter.
+- `RateLimit.check` takes `fail_closed:`. It must be nil, true, or false.
+  nil reads `config.rate_limit_check_fail_closed`, which must be true or
+  false and defaults to false. When it is true and Redis is missing, or a
+  Redis or connection error is raised, `check` logs a warning, resets the
+  shared client, and returns a limited decision (`allowed?` false, `count`
+  0, `remaining` 0). Other errors propagate. A limit or period that is not
+  positive still returns nil. The HTTP limiter passes `fail_closed: false`,
+  so this setting does not change request limiting. It is separate from
+  `rate_limit_fail_closed`, which stays the HTTP limiter's bucket policy.
+
+### Deprecated
+- `RecordingStudioApi::Concerns::RateLimiting::RATE_LIMIT_INCR_EXPIRE_SCRIPT`
+  remains as an alias of `RecordingStudioApi::RateLimit::INCR_EXPIRE_SCRIPT`.
+  Call `RateLimit.check` instead of evaluating the script.
+
+### Upgrade notes
+- Bump to `0.22.1`. No host migration.
+- Redis keys stay `{namespace}:{kind}:{identifier}:{window}`. The default
+  namespace is still `recording_studio_api`. Existing counters keep working.
+- Gems that copied the private key layout or Redis script should call
+  `RecordingStudioApi::RateLimit.check` instead. The old script constant
+  still resolves.
+- `check` returns nil when Redis is missing and fail closed is off. That
+  nil means the counter did not move. Allow the call, or reject it, in the
+  caller. Set `fail_closed: true` or `config.rate_limit_check_fail_closed`
+  when a missing Redis should count as limited. The default is false, so
+  current callers keep the nil result.
+
 ## [0.22.0] - 2026-11-13
 
 ### Added
@@ -1113,7 +1149,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.22.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.22.1...HEAD
+[0.22.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.22.0...v0.22.1
 [0.22.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.4...v0.22.0
 [0.21.4]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.3...v0.21.4
 [0.21.3]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.2...v0.21.3

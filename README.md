@@ -30,6 +30,7 @@ see [UPGRADING.md](UPGRADING.md).
 - optional `ui:` widget id on those registrations, plus `ui_for` / `actions_for_ui` lookups
 - site-wide API usage metrics on the operations API via Recording Studio Metrics
 - preserved template reference material in `docs/gem_template/`
+- shared fixed-window rate limits through `RecordingStudioApi::RateLimit`
 
 The current codebase still ships the template engine mechanics (configuration, hooks, install generator, sample service objects), but the engine now also exposes a real JSON API surface for authenticated resource lookup, capability-backed member actions, and named endpoints that are not a recordable.
 
@@ -243,6 +244,98 @@ record's polymorphic name. A request with neither an API client nor an actor
 raises `AuthorizationError` instead of skipping the idempotency store or
 sharing a cursor scope. `null_store` cannot replay. A
 `register_resource_handler` for `create` does not use this store.
+
+Read and write rate limits use this same Redis. See [Rate limits](#rate-limits).
+
+### Rate limits
+
+HTTP requests and other gems share one fixed-window counter,
+`RecordingStudioApi::RateLimit`. The key is
+`{namespace}:{kind}:{identifier}:{window}`.
+
+`kind` is `:read` or `:write`, stored as `api_read` or `api_write`. The HTTP
+limiter also counts `oauth` and `api_pre_auth` on this counter. `window` is
+`now.to_i / period`. The default namespace is `recording_studio_api`
+(`rate_limit_redis_namespace`). A named API prefixes that namespace with the
+API name (`recording_studio_api:operations`). Pass `namespace:` when the
+prefix is already built.
+
+Use the same identifier the HTTP limiter would, so the counters stay shared:
+
+- `credential:{id}`
+- `client:{id}`
+- `ip:{remote_ip}`
+- `actor:{ActorType}:{id}` for an in-process actor with no API client
+
+```ruby
+decision = RecordingStudioApi::RateLimit.check(
+  kind: :read,
+  identifier: "actor:User:#{user.id}"
+)
+
+if decision.nil?
+  # Nothing was counted. Allow this call, or reject it here.
+else
+  decision.allowed?    # false once the count is above the limit
+  decision.count
+  decision.limit
+  decision.remaining
+  decision.retry_after # seconds until this window expires
+  decision.reset_at
+  decision.key
+end
+```
+
+`nil` means the counter did not move. That happens when the limit or period
+is not positive, or when Redis is missing and fail closed is off. Do not
+read `nil` as "over the limit". The caller decides whether to allow the
+work. A Redis or connection error is logged, the shared client is reset,
+and then the error propagates, so rescue it if you need a fallback of your
+own. Any other error, such as a bug in the caller, propagates immediately
+even when fail closed is on.
+
+Pass `fail_closed: true` when a missing Redis, or a Redis or connection
+error, should count as limited. `check` then returns a decision with
+`allowed?` false, `count` 0, `remaining` 0, and `retry_after` set to the
+period. The counter still did not move. `fail_closed:` must be nil, true,
+or false. nil reads `config.rate_limit_check_fail_closed`, which must be
+true or false and defaults to false, so existing callers keep the nil
+result. Turn it on for a caller that must not proceed without a counter.
+The HTTP limiter always passes `fail_closed: false`, so this setting does
+not change request limiting. It is separate from
+`config.rate_limit_fail_closed`, which is the HTTP limiter's bucket policy.
+
+```ruby
+RecordingStudioApi::RateLimit.check(
+  kind: :write,
+  identifier: "actor:User:#{user.id}",
+  fail_closed: true
+)
+```
+
+`check` reads the read or write limit for `api:` (default `:public`) from
+the API runtime policy. A read or write value that is not positive falls
+back to the shared API limit. Pass `limit:` and `period:` together to use
+another pair. Omit `redis:` to use the shared client (`rate_limit_redis_url`).
+
+The increment is one Redis `INCR`. `EXPIRE` runs on the first hit in the
+window, and again when the key has no TTL. A call that lands on the limit
+is still allowed. The next call is not, and it still increments.
+`retry_after` is the key TTL, or the period when that TTL is not positive.
+
+`RateLimit.key` builds the counter key without incrementing:
+
+```ruby
+RecordingStudioApi::RateLimit.key(
+  kind: :write,
+  identifier: "client:#{client.id}",
+  window: Time.current.to_i / 60
+)
+# => "recording_studio_api:api_write:client:<id>:<window>"
+```
+
+`RateLimit.limits(kind:, policy:)` returns `[limit, period_seconds]` for a
+policy.
 
 ### `authorized_by`
 

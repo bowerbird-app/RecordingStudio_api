@@ -65,6 +65,7 @@ class ConfigurationTest < Minitest::Test
     assert_equal true, configuration.rate_limit_api_pre_auth_enabled
     assert_equal true, configuration.rate_limit_fail_closed
     assert_equal %w[oauth api_pre_auth api], configuration.rate_limit_fail_closed_buckets
+    assert_equal false, configuration.rate_limit_check_fail_closed
     assert_equal false, configuration.token_digest_legacy_verify
     assert_equal "recording_studio_api", configuration.rate_limit_redis_namespace
     assert_equal 10, configuration.rate_limit_oauth_requests
@@ -813,6 +814,20 @@ class ConfigurationTest < Minitest::Test
 
   def test_validate_allows_nil_credential_ttl
     @configuration.credential_ttl = nil
+
+    @configuration.validate!
+  end
+
+  def test_validate_rejects_non_boolean_rate_limit_check_fail_closed
+    @configuration.rate_limit_check_fail_closed = "yes"
+
+    error = assert_raises(RecordingStudioApi::ConfigurationError) { @configuration.validate! }
+
+    assert_equal "rate_limit_check_fail_closed must be true or false", error.message
+  end
+
+  def test_validate_accepts_boolean_rate_limit_check_fail_closed
+    @configuration.rate_limit_check_fail_closed = true
 
     @configuration.validate!
   end

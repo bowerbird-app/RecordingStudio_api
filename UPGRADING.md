@@ -1,5 +1,30 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.22.1
+
+Other gems share the API rate-limit counters through
+`RecordingStudioApi::RateLimit`. No migration. Existing Redis keys are
+unchanged.
+
+1. Bump the host gem to `0.22.1`.
+2. Call `RecordingStudioApi::RateLimit.check(kind:, identifier:)` instead of
+   copying the key layout or the Redis increment script. `kind` is `:read`
+   or `:write`. Pass `api:` for a named API.
+3. Keys stay `{namespace}:api_read|api_write|oauth|api_pre_auth:{identifier}:{window}`.
+   The default namespace is still `recording_studio_api`. `window` is
+   `now.to_i / period`.
+4. `RecordingStudioApi::Concerns::RateLimiting::RATE_LIMIT_INCR_EXPIRE_SCRIPT`
+   still points at `RecordingStudioApi::RateLimit::INCR_EXPIRE_SCRIPT`. It is
+   deprecated. Call `RateLimit.check` instead of evaluating the script.
+5. `check` returns nil when the limit is not positive, or when Redis is
+   missing and fail closed is off. Nil means the counter did not move. The
+   caller chooses whether to allow the call. `fail_closed:` must be nil,
+   true, or false. nil uses `config.rate_limit_check_fail_closed`, which
+   must be true or false and defaults to false. Pass `fail_closed: true` to
+   get a limited decision when Redis is missing or a Redis or connection
+   error is raised. Other errors propagate. The HTTP limiter ignores this
+   setting. It is separate from `rate_limit_fail_closed`.
+
 ## Upgrading to 0.22.0
 
 Path tokens on `register_endpoint` pick up OpenAPI documentation from a

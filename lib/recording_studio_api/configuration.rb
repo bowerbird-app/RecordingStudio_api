@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "configuration/layout_setting"
+require_relative "configuration/rate_limit_validation"
 require_relative "hooks"
 require_relative "action_registry"
 require_relative "registered_endpoint_registry"
@@ -44,6 +45,7 @@ module RecordingStudioApi
                   :rate_limit_api_pre_auth_enabled,
                   :rate_limit_fail_closed,
                   :rate_limit_fail_closed_buckets,
+                  :rate_limit_check_fail_closed,
                   :rate_limit_redis_url,
                   :rate_limit_redis_namespace,
                   :rate_limit_oauth_requests,
@@ -65,6 +67,7 @@ module RecordingStudioApi
                   :api_daily_metric_retention_days
 
     include LayoutSetting
+    include RateLimitValidation
 
     attr_reader :hooks, :action_registry, :registered_endpoint_registry, :recordable_registry, :resource_handler_registry, :default_api_version, :api_version_profiles, :capability_action_roles, :logs_summaries_enabled, :layout, :layout_name
 
@@ -119,6 +122,7 @@ module RecordingStudioApi
       @rate_limit_api_pre_auth_enabled = true
       @rate_limit_fail_closed = true
       @rate_limit_fail_closed_buckets = %w[oauth api_pre_auth api]
+      @rate_limit_check_fail_closed = false
       @rate_limit_redis_url = ENV["RECORDING_STUDIO_API_RATE_LIMIT_REDIS_URL"].presence
       @rate_limit_redis_namespace = "recording_studio_api"
       @rate_limit_oauth_requests = 10
@@ -187,6 +191,7 @@ module RecordingStudioApi
         rate_limit_api_pre_auth_enabled: rate_limit_api_pre_auth_enabled,
         rate_limit_fail_closed: rate_limit_fail_closed,
         rate_limit_fail_closed_buckets: rate_limit_fail_closed_buckets,
+        rate_limit_check_fail_closed: rate_limit_check_fail_closed,
         rate_limit_redis_url_present: rate_limit_redis_url.present?,
         rate_limit_redis_namespace: rate_limit_redis_namespace,
         rate_limit_oauth_requests: rate_limit_oauth_requests,
@@ -428,6 +433,7 @@ module RecordingStudioApi
       validate_token_digest_pepper!
       validate_positive_duration!(:access_token_ttl, access_token_ttl)
       validate_non_negative_duration!(:credential_ttl, credential_ttl) if credential_ttl.present?
+      validate_rate_limit_check_fail_closed!
       validate_enabled_rate_limits!
       validate_positive_days!(:api_request_log_retention_days, api_request_log_retention_days)
       validate_positive_days!(:api_daily_metric_retention_days, api_daily_metric_retention_days) if api_daily_metric_retention_days.present?
@@ -451,24 +457,6 @@ module RecordingStudioApi
       return if allowed.include?(api_request_logging_delivery.to_s)
 
       raise ConfigurationError, "api_request_logging_delivery must be one of: #{allowed.join(', ')}"
-    end
-
-    def validate_enabled_rate_limits!
-      validate_rate_limit!(:oauth, rate_limit_oauth_requests, rate_limit_oauth_period_seconds) if rate_limit_oauth_enabled
-      validate_rate_limit!(:api_pre_auth, rate_limit_api_pre_auth_requests, rate_limit_api_pre_auth_period_seconds) if rate_limit_api_pre_auth_enabled
-      return unless rate_limit_api_enabled
-
-      validate_rate_limit!(:api_read, effective_rate_limit_value(rate_limit_api_read_requests, rate_limit_api_requests), effective_rate_limit_value(rate_limit_api_read_period_seconds, rate_limit_api_period_seconds))
-      validate_rate_limit!(:api_write, effective_rate_limit_value(rate_limit_api_write_requests, rate_limit_api_requests), effective_rate_limit_value(rate_limit_api_write_period_seconds, rate_limit_api_period_seconds))
-    end
-
-    def effective_rate_limit_value(primary, fallback)
-      primary.to_i.nonzero? || fallback
-    end
-
-    def validate_rate_limit!(bucket, requests, period)
-      raise ConfigurationError, "rate_limit_#{bucket}_requests must be positive when rate limiting is enabled" unless positive_number?(requests)
-      raise ConfigurationError, "rate_limit_#{bucket}_period_seconds must be positive when rate limiting is enabled" unless positive_number?(period)
     end
 
     def validate_positive_duration!(name, value)
