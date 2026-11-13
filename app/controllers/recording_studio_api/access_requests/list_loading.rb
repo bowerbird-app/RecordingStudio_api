@@ -21,7 +21,7 @@ module RecordingStudioApi
 
       private
 
-      # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
+      # rubocop:disable-next Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
       def load_api_access_list
         @page = infinite_api_access_request? ? resolved_page : 1
         root_type_filter = params[:root_type].presence
@@ -100,7 +100,6 @@ module RecordingStudioApi
 
         load_api_key_chart_data(all_api_access_rows)
       end
-      # rubocop:enable Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
 
       def load_api_key_chart_data(rows)
         @most_used_api_keys = top_api_key_chart_rows(rows)

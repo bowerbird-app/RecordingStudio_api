@@ -4,7 +4,8 @@ require "test_helper"
 
 class RecordableMetricsTest < Minitest::Test
   MetricSample = Class.new
-  Child = Class.new(MetricSample)
+  class Child < MetricSample
+  end
   OtherSample = Class.new
 
   SAMPLE = "RecordableMetricsTest::MetricSample"

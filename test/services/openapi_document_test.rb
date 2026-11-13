@@ -764,6 +764,52 @@ module RecordingStudioApi
         end
       end
 
+      def test_symbolized_content_type_override_merges_into_the_string_key
+        with_recordable_registration(
+          "Folder",
+          writable_attributes: %i[name],
+          openapi: {
+            details_schema: {
+              type: "object",
+              properties: {
+                name: { type: "string", description: "Folder attributes." }
+              },
+              required: ["name"]
+            },
+            create: {
+              request_body: {
+                content: {
+                  "application/json" => {
+                    examples: {
+                      default: {
+                        value: {
+                          name: "Marketing",
+                          parent_id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ) do
+          document = with_recordable_types(%w[Folder]) { OpenapiDocument.call }
+          content = document.fetch(:paths)
+                            .fetch("/recording_studio_api/api/v1/folders")
+                            .fetch("post")
+                            .dig(:requestBody, :content)
+
+          assert_equal ["application/json"], content.keys
+          body = content.fetch("application/json")
+          assert_equal "Folder attributes.", body.dig(:schema, :properties, :name, :description)
+          assert_equal "Marketing", body.dig(:examples, :default, :value, :name)
+          encoded = JSON.generate(document)
+          assert_includes encoded, "Marketing"
+          assert_includes encoded, "Folder attributes."
+        end
+      end
+
       def test_relationship_get_documentation_generates_descriptions_and_examples
         relationships = {
           folders: {

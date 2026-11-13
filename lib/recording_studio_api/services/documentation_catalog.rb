@@ -598,12 +598,31 @@ module RecordingStudioApi
       def merge_hashes(base_hash, override_hash)
         return base_hash unless override_hash.is_a?(Hash)
 
-        base_hash.merge(override_hash) do |_key, base_value, override_value|
-          if base_value.is_a?(Hash) && override_value.is_a?(Hash)
-            merge_hashes(base_value, override_value)
+        override_hash.each_with_object(base_hash.dup) do |(override_key, override_value), merged|
+          base_key = matching_merge_key(merged, override_key)
+          merged_value = merged_hash_value(merged[base_key], override_value)
+          if base_key
+            merged[base_key] = merged_value
           else
-            override_value
+            merged[override_key] = merged_value
           end
+        end
+      end
+
+      # Registrations symbolize every OpenAPI key, including "application/json".
+      # The generated document keeps string content types. JSON refuses to encode
+      # both forms of the same key.
+      def matching_merge_key(hash, key)
+        return key if hash.key?(key)
+
+        hash.each_key.find { |candidate| candidate.to_s == key.to_s }
+      end
+
+      def merged_hash_value(base_value, override_value)
+        if base_value.is_a?(Hash) && override_value.is_a?(Hash)
+          merge_hashes(base_value, override_value)
+        else
+          override_value
         end
       end
 

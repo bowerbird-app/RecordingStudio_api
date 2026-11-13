@@ -55,11 +55,10 @@ module RecordingStudioApi
         end
       end
 
-      # rubocop:disable Naming/PredicateMethod
+      # rubocop:disable-next Naming/PredicateMethod
       def enforce_rate_limit!
         current_rate_limit_exceeded?
       end
-      # rubocop:enable Naming/PredicateMethod
 
       def current_rate_limit_exceeded?
         decision = resolved_rate_limit_decision

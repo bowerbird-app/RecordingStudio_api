@@ -1,5 +1,14 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.23.1
+
+OpenAPI content-type overrides stay on the generated string key. No migration.
+
+1. Bump the host gem to `0.23.1`.
+2. A recordable `openapi:` hash may still use `"application/json"`. The
+   registration symbolizes that key. The document merges it back onto the
+   string key, so the schema and the examples encode together.
+
 ## Upgrading to 0.23.0
 
 Capability-action OpenAPI can vary by recordable type. No migration.
@@ -296,7 +305,7 @@ own the move action. No migration.
 8. Replace `recording_studio_page_nav` with `flat_pack_page_nav(round: true, style: :default, back_href:, back_tooltip:, anchor_href:, anchor_tooltip:)`. Register right-side actions with `register_page_nav "Label", path, role: :primary` or `recording_studio_page_nav_right`.
 9. `FlatPack::Card` takes `background:`, `border:`, and `shadow:`. It does not take `style:`.
 10. Load `flat_pack/variables`, `flat_pack/application`, and `flat_pack/rich_text` before the host Tailwind sheet.
-11. Sibling gems that still cap `recording_studio` below 5 need a Gemfile pin that allows `6.1.0`, or the same widen step this repo uses in `test/support/widen_recording_studio_requirement.rb` before `Bundler.setup`. `recording_studio_admin` `v2.7.0` already allows `6.1.0`, so that step does not rewrite its gemspec.
+11. Sibling gems that still cap `recording_studio` below 5 need a Gemfile pin that allows `6.1.0`. `recording_studio_admin` `v2.7.0` already allows `6.1.0`, so that pin does not rewrite its gemspec.
 
 ## Upgrading to 0.16.0
 
