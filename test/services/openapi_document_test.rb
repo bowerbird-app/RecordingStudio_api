@@ -949,6 +949,46 @@ module RecordingStudioApi
         }
       end
 
+      def test_registered_endpoint_path_parameter_description_appears_once
+        document = with_isolated_configuration do
+          RecordingStudioApi.register_endpoint(
+            :show_item,
+            http_verb: :get,
+            path: "items/:id",
+            handler: ->(_context) { { ok: true } },
+            openapi: {
+              parameters: [
+                { name: "id", in: "path", description: "The item." },
+                { name: "verbose", in: "query", description: "Include extras.", schema: { type: "boolean" } }
+              ]
+            }
+          )
+          RecordingStudioApi.register_endpoint(
+            :describe_widget,
+            http_verb: :get,
+            path: "widgets/:key",
+            handler: ->(_context) { { ok: true } }
+          )
+          OpenapiDocument.call
+        end
+
+        described = document.fetch(:paths).fetch("/recording_studio_api/api/v1/items/{id}").fetch("get").fetch(:parameters)
+        undescribed = document.fetch(:paths).fetch("/recording_studio_api/api/v1/widgets/{key}").fetch("get").fetch(:parameters)
+        id_parameters = described.select { |parameter| parameter.fetch("name") == "id" }
+        verbose = described.find { |parameter| parameter.fetch("name") == "verbose" }
+        key_parameters = undescribed.select { |parameter| parameter.fetch("name") == "key" }
+
+        assert_equal 1, id_parameters.length
+        assert_equal "path", id_parameters.first.fetch("in")
+        assert_equal true, id_parameters.first.fetch("required")
+        assert_equal "The item.", id_parameters.first.fetch("description")
+        assert_equal "query", verbose.fetch("in")
+        assert_equal "Include extras.", verbose.fetch("description")
+        assert_equal 1, key_parameters.length
+        assert_equal "path", key_parameters.first.fetch("in")
+        refute key_parameters.first.key?("description")
+      end
+
       def test_metrics_openapi_documents_period_aliases_group_by_and_resource
         document = with_isolated_configuration do
           RecordingStudioMetrics::Api.register!(api: :operations)
