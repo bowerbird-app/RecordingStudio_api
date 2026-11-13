@@ -1,5 +1,35 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.23.0
+
+Capability-action OpenAPI can vary by recordable type. No migration.
+
+1. Bump the host gem to `0.23.0`.
+2. Keep the generic `openapi:` hash on `register_capability_action`.
+3. Pass `openapi_for:` when a type needs its own title, summary, or
+   description. The callable receives `type:` and `action:` and returns a
+   Hash or nil. Only keys with a value overlay the generic hash.
+4. OpenAPI paths and the MCP documentation catalog both read that merged
+   hash per type. Other types stay on the generic copy.
+
+```ruby
+RecordingStudioApi.register_capability_action(
+  :attach,
+  capability: :attachable,
+  handler: Attach,
+  openapi: { title: "Attach", summary: "Attach a file.", description: "Attach a file." },
+  openapi_for: ->(type:, action:) {
+    next unless type.to_s == "RecordingStudioPresskits::PressKit"
+
+    {
+      title: "Add File",
+      summary: "Attach a file to this press kit.",
+      description: "Adds a file to the press kit Files section."
+    }
+  }
+)
+```
+
 ## Upgrading to 0.22.1
 
 Other gems share the API rate-limit counters through

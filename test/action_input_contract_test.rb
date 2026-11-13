@@ -284,4 +284,55 @@ class ActionInputContractTest < Minitest::Test
 
     assert_match(/deprecation/, error.message)
   end
+
+  def test_action_registration_merges_present_per_type_openapi_keys
+    registration = RecordingStudioApi::ActionRegistration.new(
+      name: :attach,
+      capability: :attachable,
+      http_verb: :post,
+      handler: ->(_context) { true },
+      openapi: {
+        title: "Attach",
+        summary: "Generic attach",
+        description: "Generic attach description"
+      },
+      openapi_for: lambda { |type:, action:|
+        next unless action.to_s == "attach" && type.to_s == "RecordingStudioPresskits::PressKit"
+
+        {
+          title: "Add File",
+          summary: "Attach a file to this press kit.",
+          description: "Adds a file to the press kit Files section.",
+          extra: nil
+        }
+      }
+    )
+    registration.validate!
+
+    press_kit = registration.openapi_for(type: "RecordingStudioPresskits::PressKit")
+    page = registration.openapi_for(type: "Page")
+
+    assert_equal "Add File", press_kit.fetch(:title)
+    assert_equal "Attach a file to this press kit.", press_kit.fetch(:summary)
+    assert_equal "Adds a file to the press kit Files section.", press_kit.fetch(:description)
+    refute press_kit.key?(:extra)
+    assert_equal "Attach", page.fetch(:title)
+    assert_equal "Generic attach", page.fetch(:summary)
+    assert_equal "Generic attach description", page.fetch(:description)
+    assert_equal registration.openapi, registration.openapi_for
+  end
+
+  def test_action_registration_rejects_non_callable_openapi_for
+    registration = RecordingStudioApi::ActionRegistration.new(
+      name: :echo,
+      capability: :echoable,
+      http_verb: :post,
+      handler: ->(_context) { true },
+      openapi_for: { title: "Nope" }
+    )
+
+    error = assert_raises(RecordingStudioApi::ConfigurationError) { registration.validate! }
+
+    assert_includes error.message, "openapi_for must respond to call"
+  end
 end

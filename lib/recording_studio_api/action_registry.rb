@@ -9,7 +9,7 @@ module RecordingStudioApi
       @registrations = {}
     end
 
-    def register(name, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil, ui: nil)
+    def register(name, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil, **)
       registration = ActionRegistration.new(
         name: name,
         capability: capability,
@@ -23,7 +23,7 @@ module RecordingStudioApi
         openapi: openapi,
         input_contract: input_contract,
         required_role: required_role,
-        ui: ui
+        **
       )
       registration.validate!
 

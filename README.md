@@ -1025,6 +1025,34 @@ RecordingStudioApi.register_capability_action(
 
 If a recordable type enables `:movable`, the API automatically exposes the newest compatible `move` contribution selected for the current public API version.
 
+`openapi:` is the generic copy for every type that gets the action. Pass optional
+`openapi_for:` when a type needs its own title, summary, or description. The
+callable receives `type:` and `action:` and returns a Hash or nil. Only keys
+with a value overlay the generic hash for that type's OpenAPI path and MCP
+catalog entry. Other types keep the generic copy.
+
+```ruby
+RecordingStudioApi.register_capability_action(
+  :attach,
+  capability: :attachable,
+  handler: Attach,
+  openapi: {
+    title: "Attach",
+    summary: "Attach a file.",
+    description: "Attach a file."
+  },
+  openapi_for: ->(type:, action:) {
+    next unless type.to_s == "RecordingStudioPresskits::PressKit"
+
+    {
+      title: "Add File",
+      summary: "Attach a file to this press kit.",
+      description: "Adds a file to the press kit Files section."
+    }
+  }
+)
+```
+
 ### Named endpoints that are not a recordable
 
 Use `register_endpoint` when the host needs a JSON path that is not a tree collection. Do not invent a fake recordable or a one-off API controller.

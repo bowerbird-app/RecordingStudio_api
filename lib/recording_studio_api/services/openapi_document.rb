@@ -169,6 +169,7 @@ module RecordingStudioApi
           parameters: normalize_parameters(metadata.fetch(:parameters, [])),
           responses: responses_for(endpoint)
         }
+        operation[:title] = metadata[:title] if metadata[:title].present?
 
         request_body = metadata[:request_body]
         operation[:requestBody] = request_body if request_body.present?

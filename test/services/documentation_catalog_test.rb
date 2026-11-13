@@ -742,6 +742,55 @@ module RecordingStudioApi
         RecordingStudioApi.instance_variable_set(:@configuration, original_configuration) if original_configuration
       end
 
+      def test_catalog_applies_per_type_capability_action_openapi
+        original_configuration = RecordingStudioApi.configuration
+        api_singleton = RecordingStudioApi.singleton_class
+        original_recordable_types = RecordingStudioApi.method(:api_recordable_types)
+
+        RecordingStudioApi.instance_variable_set(:@configuration, RecordingStudioApi::Configuration.new)
+        RecordingStudioApi.register_capability_action(
+          :attach,
+          capability: :attachable,
+          http_verb: :post,
+          handler: ->(_context) { :ok },
+          openapi: {
+            title: "Attach",
+            summary: "Generic attach",
+            description: "Generic attach description"
+          },
+          openapi_for: lambda { |type:, action:|
+            next unless action.to_s == "attach" && type.to_s == "RecordingStudioPresskits::PressKit"
+
+            {
+              title: "Add File",
+              summary: "Attach a file to this press kit.",
+              description: "Adds a file to the press kit Files section."
+            }
+          }
+        )
+        RecordingStudioApi.register_recordable_type_api("Page")
+        RecordingStudioApi.register_recordable_type_api("RecordingStudioPresskits::PressKit")
+        api_singleton.send(:define_method, :api_recordable_types) do
+          %w[Page RecordingStudioPresskits::PressKit]
+        end
+
+        RecordingStudio.stub(:capability_enabled?, ->(capability, **) { capability == :attachable }) do
+          catalog = DocumentationCatalog.call
+          press_kit = action_endpoint_for(catalog, "press_kits", "attach")
+          page = action_endpoint_for(catalog, "pages", "attach")
+
+          assert_equal "Attach a file to this press kit.", press_kit.fetch(:summary)
+          assert_equal "Adds a file to the press kit Files section.", press_kit.fetch(:description)
+          assert_equal "Add File", press_kit.fetch(:openapi).fetch(:title)
+          assert_equal "Generic attach", page.fetch(:summary)
+          assert_equal "Generic attach description", page.fetch(:description)
+          assert_equal "Attach", page.fetch(:openapi).fetch(:title)
+        end
+      ensure
+        api_singleton.send(:define_method, :api_recordable_types, original_recordable_types) if api_singleton && original_recordable_types
+        RecordingStudioApi.instance_variable_set(:@configuration, original_configuration) if original_configuration
+      end
+
       def test_catalog_selects_action_contract_by_api_version_profile
         original_configuration = RecordingStudioApi.configuration
         api_singleton = RecordingStudioApi.singleton_class
@@ -787,10 +836,12 @@ module RecordingStudioApi
       private
 
       def action_endpoint_summary(catalog, resource_name, action_name)
-        section = catalog.fetch(:resources).find { |resource| resource.fetch(:resource) == resource_name }
-        endpoint = section.fetch(:endpoints).find { |entry| entry.fetch(:path).end_with?("/actions/#{action_name}") }
+        action_endpoint_for(catalog, resource_name, action_name).fetch(:summary)
+      end
 
-        endpoint.fetch(:summary)
+      def action_endpoint_for(catalog, resource_name, action_name)
+        section = catalog.fetch(:resources).find { |resource| resource.fetch(:resource) == resource_name }
+        section.fetch(:endpoints).find { |entry| entry.fetch(:path).end_with?("/actions/#{action_name}") }
       end
 
       def with_catalog_stubs(recordable_types:, actions_by_type:, root_recordable_types: [], preserve_recordable_registrations: false)

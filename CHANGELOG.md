@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-11-13
+
+### Added
+- `register_capability_action` accepts optional `openapi_for:`. The callable
+  receives `type:` and `action:` and returns a Hash (or nil). When the
+  catalog builds each type's capability-action entry, present keys from that
+  Hash overlay the registered `openapi:` hash. Missing or nil keys keep the
+  global title, summary, description, and other OpenAPI fields. OpenAPI and
+  the MCP documentation catalog both use that merged hash.
+
+### Upgrade notes
+- Bump to `0.23.0`. No host migration.
+- Addon gems that already keep per-type OpenAPI copy should pass
+  `openapi_for:` when they register the action. The callable must accept
+  `type:` and `action:` keywords. Return only the keys that change, or the
+  full document; nil values are skipped.
+- Types without an overlay keep the global `openapi:` hash.
+
 ## [0.22.1] - 2026-11-13
 
 ### Added
@@ -1149,7 +1167,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.22.1...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.0...HEAD
+[0.23.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.22.1...v0.23.0
 [0.22.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.22.0...v0.22.1
 [0.22.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.4...v0.22.0
 [0.21.4]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.21.3...v0.21.4

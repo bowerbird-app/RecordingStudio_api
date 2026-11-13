@@ -13,7 +13,7 @@ module RecordingStudioApi
 
     attr_reader :name, :capability, :version, :version_notes, :deprecation, :http_verb, :handler, :serializer, :scope, :openapi, :input_contract, :required_role, :ui
 
-    def initialize(name:, capability:, http_verb:, handler:, version: nil, version_notes: nil, deprecation: nil, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil, ui: nil)
+    def initialize(name:, capability:, http_verb:, handler:, version: nil, version_notes: nil, deprecation: nil, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil, **options)
       @name = name.to_s
       @capability = capability&.to_sym
       @version = normalize_version(version)
@@ -24,9 +24,11 @@ module RecordingStudioApi
       @serializer = serializer
       @scope = scope.to_sym
       @openapi = normalize_openapi(openapi)
+      @per_type_openapi = options.delete(:openapi_for)
       @input_contract = normalize_input_contract(input_contract)
       @required_role = normalize_required_role(required_role)
-      @ui = UiWidgetId.normalize(ui, name: name)
+      @ui = UiWidgetId.normalize(options.delete(:ui), name: name)
+      raise ArgumentError, "unknown keywords: #{options.keys.join(', ')}" if options.any?
     end
 
     # rubocop:disable Metrics/AbcSize, Metrics/CyclomaticComplexity
@@ -38,6 +40,8 @@ module RecordingStudioApi
       raise ConfigurationError, "Unsupported scope #{scope} for #{name}" unless ALLOWED_SCOPES.include?(scope)
       raise ConfigurationError, "Serializer must respond to call for #{name}" if serializer && !serializer.respond_to?(:call)
       raise ConfigurationError, "OpenAPI metadata must be a hash for #{name}" unless openapi.is_a?(Hash)
+
+      validate_openapi_for!
       raise ConfigurationError, "Input contract must be a RecordingStudioApi::ActionInputContract for #{name}" if input_contract && !input_contract.is_a?(ActionInputContract)
       raise ConfigurationError, "required_role must be one of: #{valid_access_roles.join(', ')} for #{name}" if required_role && !valid_access_roles.include?(required_role)
       raise ConfigurationError, "version_notes must be a string or array of strings for #{name}" unless version_notes.is_a?(Array)
@@ -47,6 +51,20 @@ module RecordingStudioApi
 
     def applicable_to?(recordable_type)
       capability_enabled_for?(recordable_type)
+    end
+
+    def openapi_for(type: nil, action: nil)
+      overlay = per_type_openapi_overlay(type: type, action: action)
+      return openapi unless overlay.is_a?(Hash)
+
+      present = overlay.each_with_object({}) do |(key, value), memo|
+        next if value.nil?
+
+        memo[key.to_sym] = value
+      end
+      return openapi if present.empty?
+
+      openapi.merge(present)
     end
 
     def contribution_keys
@@ -129,6 +147,19 @@ module RecordingStudioApi
       return false unless defined?(RecordingStudio) && RecordingStudio.respond_to?(:capability_enabled?)
 
       RecordingStudio.capability_enabled?(capability, for: recordable_type)
+    end
+
+    def validate_openapi_for!
+      return if @per_type_openapi.nil? || @per_type_openapi.respond_to?(:call)
+
+      raise ConfigurationError, "openapi_for must respond to call for #{name}"
+    end
+
+    def per_type_openapi_overlay(type:, action:)
+      return unless @per_type_openapi.respond_to?(:call)
+      return if type.nil?
+
+      @per_type_openapi.call(type: type, action: action.presence || name)
     end
 
     def normalize_openapi(value)
