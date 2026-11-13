@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "test_helper"
+require "redis"
 require_relative "../app/controllers/recording_studio_api/concerns/rate_limiting"
 
 class RateLimitTest < ActiveSupport::TestCase
@@ -46,7 +47,25 @@ class RateLimitTest < ActiveSupport::TestCase
 
   class BrokenRedis < MemoryRedis
     def eval(*)
-      raise "offline"
+      raise Redis::BaseError, "offline"
+    end
+  end
+
+  class BugRedis
+    def eval(*)
+      raise NoMethodError, "missing piece"
+    end
+  end
+
+  class FakeLogger
+    attr_reader :warnings
+
+    def initialize
+      @warnings = []
+    end
+
+    def warn(message)
+      warnings << message
     end
   end
 
@@ -290,7 +309,7 @@ class RateLimitTest < ActiveSupport::TestCase
     )
     assert_nil decision
 
-    error = assert_raises(RuntimeError) do
+    error = assert_raises(Redis::BaseError) do
       RecordingStudioApi::RateLimit.check(
         kind: :read,
         identifier: "credential:1",
@@ -361,6 +380,82 @@ class RateLimitTest < ActiveSupport::TestCase
     assert_equal false, from_config.allowed?
     assert_equal 0, from_config.count
     assert_nil overridden
+  end
+
+  test "a redis error with fail closed logs and resets the shared client" do
+    moment = Time.at(1_700_000_040)
+    logger = FakeLogger.new
+    RecordingStudioApi::Concerns::RateLimiting.instance_variable_set(:@redis_client, BrokenRedis.new)
+
+    decision = Rails.stub(:logger, logger) do
+      RecordingStudioApi::RateLimit.check(
+        kind: :write,
+        identifier: "client:client-7",
+        limit: 4,
+        period: 20,
+        now: moment,
+        fail_closed: true
+      )
+    end
+
+    assert_equal false, decision.allowed?
+    assert_equal 0, decision.count
+    assert_equal 4, decision.limit
+    assert_nil RecordingStudioApi::Concerns::RateLimiting.instance_variable_get(:@redis_client)
+    assert_includes logger.warnings.first, "Redis::BaseError"
+    assert_includes logger.warnings.first, "offline"
+    refute_includes logger.warnings.first, "redis://"
+  ensure
+    RecordingStudioApi::Concerns::RateLimiting.reset_redis_client!
+  end
+
+  test "connection errors fail closed the same way as redis errors" do
+    redis = Object.new
+    def redis.eval(*)
+      raise Errno::ECONNREFUSED
+    end
+
+    decision = RecordingStudioApi::RateLimit.check(
+      kind: :read,
+      identifier: "credential:1",
+      limit: 2,
+      period: 30,
+      redis: redis,
+      fail_closed: true
+    )
+
+    assert_equal false, decision.allowed?
+    assert_equal 0, decision.count
+  end
+
+  test "a NoMethodError propagates whether or not fail closed is on" do
+    RecordingStudioApi::Concerns::RateLimiting.instance_variable_set(:@redis_client, :kept)
+
+    [true, false].each do |fail_closed|
+      assert_raises(NoMethodError) do
+        RecordingStudioApi::RateLimit.check(
+          kind: :read,
+          identifier: "credential:1",
+          limit: 2,
+          period: 30,
+          redis: BugRedis.new,
+          fail_closed: fail_closed
+        )
+      end
+    end
+
+    assert_equal :kept, RecordingStudioApi::Concerns::RateLimiting.instance_variable_get(:@redis_client)
+  ensure
+    RecordingStudioApi::Concerns::RateLimiting.reset_redis_client!
+  end
+
+  test "fail_closed rejects anything other than nil true or false" do
+    assert_raises(ArgumentError) do
+      RecordingStudioApi::RateLimit.check(kind: :read, identifier: "credential:1", limit: 1, period: 30, redis: nil, fail_closed: "yes")
+    end
+    assert_raises(ArgumentError) do
+      RecordingStudioApi::RateLimit.check(kind: :read, identifier: "credential:1", limit: 1, period: 30, redis: nil, fail_closed: 1)
+    end
   end
 
   test "fail closed still returns nil when the limit is not positive" do

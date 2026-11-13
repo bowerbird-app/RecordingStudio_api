@@ -435,6 +435,31 @@ class RateLimitingTest < ActiveSupport::TestCase
     assert_equal 1, redis.expire_calls.length
   end
 
+  test "http limiter ignores rate_limit_check_fail_closed when redis fails" do
+    RecordingStudioApi.configuration.rate_limit_api_enabled = true
+    RecordingStudioApi.configuration.rate_limit_check_fail_closed = true
+    RecordingStudioApi.configuration.rate_limit_fail_closed = true
+    RecordingStudioApi.configuration.rate_limit_fail_closed_buckets = %w[oauth api_pre_auth]
+    RecordingStudioApi.configuration.rate_limit_api_read_requests = 2
+    RecordingStudioApi.configuration.rate_limit_api_read_period_seconds = 30
+
+    harness = Harness.new(path: "/recording_studio_api/api/v1/pages", method: :get)
+    broken = Object.new
+    def broken.eval(*)
+      raise Redis::BaseError, "offline"
+    end
+    logger = FakeLogger.new
+    RecordingStudioApi::Concerns::RateLimiting.instance_variable_set(:@redis_client, broken)
+
+    decision = Rails.stub(:logger, logger) do
+      harness.send(:resolved_rate_limit_decision)
+    end
+
+    assert_equal({ limited: false, limit: 0, remaining: 0, retry_after: 0 }, decision)
+    assert_nil RecordingStudioApi::Concerns::RateLimiting.instance_variable_get(:@redis_client)
+    assert_includes logger.messages.first, "rate limiter unavailable"
+  end
+
   test "resets memoized redis client after a redis error" do
     RecordingStudioApi.configuration.rate_limit_api_enabled = true
     RecordingStudioApi.configuration.rate_limit_fail_closed = true
@@ -449,7 +474,9 @@ class RateLimitingTest < ActiveSupport::TestCase
     end
 
     RecordingStudioApi::Concerns::RateLimiting.instance_variable_set(:@redis_client, broken)
-    decision = harness.send(:resolved_rate_limit_decision)
+    decision = Rails.stub(:logger, FakeLogger.new) do
+      harness.send(:resolved_rate_limit_decision)
+    end
 
     assert_equal true, decision.fetch(:limited)
     assert_nil RecordingStudioApi::Concerns::RateLimiting.instance_variable_get(:@redis_client)

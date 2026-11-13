@@ -289,15 +289,20 @@ end
 `nil` means the counter did not move. That happens when the limit or period
 is not positive, or when Redis is missing and fail closed is off. Do not
 read `nil` as "over the limit". The caller decides whether to allow the
-work. A Redis error propagates in that mode, so rescue it if you need a
-fallback of your own.
+work. A Redis or connection error is logged, the shared client is reset,
+and then the error propagates, so rescue it if you need a fallback of your
+own. Any other error, such as a bug in the caller, propagates immediately
+even when fail closed is on.
 
-Pass `fail_closed: true` when a missing or broken Redis should count as
-limited. `check` then returns a decision with `allowed?` false, `count` 0,
-`remaining` 0, and `retry_after` set to the period. The counter still did
-not move. `fail_closed:` defaults to `config.rate_limit_check_fail_closed`,
-which is false, so existing callers keep the nil result. Turn it on for a
-caller that must not proceed without a counter. It is separate from
+Pass `fail_closed: true` when a missing Redis, or a Redis or connection
+error, should count as limited. `check` then returns a decision with
+`allowed?` false, `count` 0, `remaining` 0, and `retry_after` set to the
+period. The counter still did not move. `fail_closed:` must be nil, true,
+or false. nil reads `config.rate_limit_check_fail_closed`, which must be
+true or false and defaults to false, so existing callers keep the nil
+result. Turn it on for a caller that must not proceed without a counter.
+The HTTP limiter always passes `fail_closed: false`, so this setting does
+not change request limiting. It is separate from
 `config.rate_limit_fail_closed`, which is the HTTP limiter's bucket policy.
 
 ```ruby

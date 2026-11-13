@@ -77,11 +77,12 @@ module RecordingStudioApi
       # Increments the counter for this window and compares it to the limit.
       #
       # Returns nil when the limit or period is not positive. Nothing was counted.
-      # Returns nil when Redis is missing and fail closed is off. Redis errors
-      # propagate in that mode. Pass `fail_closed: true` (or set
-      # `config.rate_limit_check_fail_closed`) to get a limited decision instead
-      # when Redis is missing or raises. `fail_closed: nil` reads that config,
-      # which defaults to false.
+      # Returns nil when Redis is missing and fail closed is off. A Redis or
+      # connection error is logged, and the shared client is reset. Fail closed
+      # then returns a limited decision. Otherwise that error propagates.
+      # Any other error propagates immediately. `fail_closed:` must be nil,
+      # true, or false. nil reads `config.rate_limit_check_fail_closed`, which
+      # defaults to false.
       #
       # Omit `limit` and `period` to use {.limits} for `api` (default `:public`).
       # Omit `redis` to use the shared rate-limit client.
@@ -92,8 +93,9 @@ module RecordingStudioApi
         close_on_failure = resolve_fail_closed(fail_closed)
         moment = now || Time.current
         counter_key = key(kind: kind, identifier: identifier, window: moment.to_i / resolved_period, namespace: namespace, api: api)
+        shared_client = redis.equal?(:shared)
         count, ttl = begin
-          client = redis.equal?(:shared) ? shared_redis : redis
+          client = shared_client ? shared_redis : redis
           if client.nil?
             return closed_decision(resolved_limit, resolved_period, moment, counter_key) if close_on_failure
 
@@ -101,7 +103,11 @@ module RecordingStudioApi
           end
 
           increment(client, counter_key, resolved_period)
-        rescue StandardError
+        rescue StandardError => e
+          raise unless redis_unavailable?(e)
+
+          warn_redis_unavailable(e)
+          reset_shared_redis! if shared_client
           raise unless close_on_failure
 
           return closed_decision(resolved_limit, resolved_period, moment, counter_key)
@@ -170,9 +176,28 @@ module RecordingStudioApi
       end
 
       def resolve_fail_closed(value)
-        return RecordingStudioApi.configuration.rate_limit_check_fail_closed if value.nil?
+        resolved = value.nil? ? RecordingStudioApi.configuration.rate_limit_check_fail_closed : value
+        return resolved if [true, false].include?(resolved)
 
-        value
+        raise ArgumentError, "fail_closed must be true or false"
+      end
+
+      def redis_unavailable?(error)
+        return true if error.is_a?(Errno::ECONNREFUSED) || error.is_a?(IOError) || error.is_a?(Timeout::Error)
+        return true if defined?(Redis::BaseError) && error.is_a?(Redis::BaseError)
+        return true if defined?(RedisClient::Error) && error.is_a?(RedisClient::Error)
+
+        false
+      end
+
+      def warn_redis_unavailable(error)
+        return unless defined?(Rails) && Rails.respond_to?(:logger)
+
+        Rails.logger&.warn("[RecordingStudioApi] rate limiter unavailable: #{error.class}: #{error.message}")
+      end
+
+      def reset_shared_redis!
+        RecordingStudioApi::Concerns::RateLimiting.reset_redis_client!
       end
 
       def closed_decision(limit, period, moment, counter_key)

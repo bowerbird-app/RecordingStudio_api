@@ -818,6 +818,20 @@ class ConfigurationTest < Minitest::Test
     @configuration.validate!
   end
 
+  def test_validate_rejects_non_boolean_rate_limit_check_fail_closed
+    @configuration.rate_limit_check_fail_closed = "yes"
+
+    error = assert_raises(RecordingStudioApi::ConfigurationError) { @configuration.validate! }
+
+    assert_equal "rate_limit_check_fail_closed must be true or false", error.message
+  end
+
+  def test_validate_accepts_boolean_rate_limit_check_fail_closed
+    @configuration.rate_limit_check_fail_closed = true
+
+    @configuration.validate!
+  end
+
   def test_validate_rejects_invalid_enabled_rate_limit_bucket
     @configuration.rate_limit_oauth_enabled = true
     @configuration.rate_limit_oauth_requests = 0

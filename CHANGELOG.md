@@ -15,13 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   allowed, plus the count, limit, remaining, retry-after, and reset time.
   `key` builds the counter key. `limits` reads the configured window for a
   policy. The HTTP limiter uses this same counter.
-- `RateLimit.check` takes `fail_closed:`. It defaults to
-  `config.rate_limit_check_fail_closed`, which defaults to false. When it is
-  true and Redis is missing or raises, `check` returns a limited decision
-  (`allowed?` false, `count` 0, `remaining` 0) instead of nil or an error.
-  A limit or period that is not positive still returns nil. This setting is
-  separate from `rate_limit_fail_closed`, which stays the HTTP limiter's
-  bucket policy.
+- `RateLimit.check` takes `fail_closed:`. It must be nil, true, or false.
+  nil reads `config.rate_limit_check_fail_closed`, which must be true or
+  false and defaults to false. When it is true and Redis is missing, or a
+  Redis or connection error is raised, `check` logs a warning, resets the
+  shared client, and returns a limited decision (`allowed?` false, `count`
+  0, `remaining` 0). Other errors propagate. A limit or period that is not
+  positive still returns nil. The HTTP limiter passes `fail_closed: false`,
+  so this setting does not change request limiting. It is separate from
+  `rate_limit_fail_closed`, which stays the HTTP limiter's bucket policy.
 
 ### Deprecated
 - `RecordingStudioApi::Concerns::RateLimiting::RATE_LIMIT_INCR_EXPIRE_SCRIPT`

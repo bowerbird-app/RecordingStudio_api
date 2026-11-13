@@ -18,10 +18,12 @@ unchanged.
    deprecated. Call `RateLimit.check` instead of evaluating the script.
 5. `check` returns nil when the limit is not positive, or when Redis is
    missing and fail closed is off. Nil means the counter did not move. The
-   caller chooses whether to allow the call. Pass `fail_closed: true`, or set
-   `config.rate_limit_check_fail_closed` (default false), to get a limited
-   decision when Redis is missing or raises. That setting is separate from
-   `rate_limit_fail_closed`.
+   caller chooses whether to allow the call. `fail_closed:` must be nil,
+   true, or false. nil uses `config.rate_limit_check_fail_closed`, which
+   must be true or false and defaults to false. Pass `fail_closed: true` to
+   get a limited decision when Redis is missing or a Redis or connection
+   error is raised. Other errors propagate. The HTTP limiter ignores this
+   setting. It is separate from `rate_limit_fail_closed`.
 
 ## Upgrading to 0.21.4
 

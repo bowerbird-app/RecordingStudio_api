@@ -115,7 +115,8 @@ module RecordingStudioApi
           limit: limit,
           period: period,
           namespace: rate_limit_scoped_namespace,
-          redis: rate_limit_redis_client
+          redis: rate_limit_redis_client,
+          fail_closed: false
         )
         return nil unless decision
 
