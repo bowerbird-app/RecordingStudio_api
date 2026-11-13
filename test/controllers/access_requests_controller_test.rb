@@ -249,7 +249,6 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_select %(nav.flat-pack-page-nav a[href="/workspace"][aria-label="Close"]), count: 1
   end
 
-  # rubocop:disable Metrics/BlockLength
   test "requests chart filters series by date range status and api key within the scoped recordings" do
     api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Filtered chart client")
 
@@ -346,7 +345,6 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_select %(div[role="option"][data-value="#{outside_api_client.id}"]), count: 0
     assert_select %(select[name="status"] option[value=""]:not([disabled])), text: "All statuses", count: 1
   end
-  # rubocop:enable Metrics/BlockLength
 
   test "index infinite scroll returns paged table content for xhr page requests" do
     52.times do |index|

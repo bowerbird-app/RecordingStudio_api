@@ -177,8 +177,8 @@ module RecordingStudioApi
           RecordingStudioApi::ApiCredential
             .includes(:api_client)
             .where(id: credential_ids)
-            .each_with_object({}) do |credential, names|
-              names[credential.id] = credential.api_client&.name.to_s.presence || "Unknown"
+            .to_h do |credential|
+              [credential.id, credential.api_client&.name.to_s.presence || "Unknown"]
             end
         end
 

@@ -80,7 +80,7 @@ require "recording_studio_api/admin"
 require "recording_studio_api/metrics"
 require "recording_studio_api/metrics/endpoints"
 
-# rubocop:disable Metrics/ModuleLength
+# rubocop:disable-next Metrics/ModuleLength
 module RecordingStudioApi
   class << self
     include OpenapiHelpers
@@ -560,4 +560,3 @@ module RecordingStudioApi
     end
   end
 end
-# rubocop:enable Metrics/ModuleLength

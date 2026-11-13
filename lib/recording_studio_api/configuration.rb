@@ -71,7 +71,7 @@ module RecordingStudioApi
 
     attr_reader :hooks, :action_registry, :registered_endpoint_registry, :recordable_registry, :resource_handler_registry, :default_api_version, :api_version_profiles, :capability_action_roles, :logs_summaries_enabled, :layout, :layout_name
 
-    # rubocop:disable Metrics/AbcSize
+    # rubocop:disable-next Metrics/AbcSize
     def initialize
       @timeout = 5
       @credential_ttl = 30.respond_to?(:days) ? 30.days : 30 * 24 * 60 * 60
@@ -150,9 +150,8 @@ module RecordingStudioApi
       @resource_handler_registry = ResourceHandlerRegistry.new
       @apis = {}
     end
-    # rubocop:enable Metrics/AbcSize
 
-    # rubocop:disable Metrics/AbcSize
+    # rubocop:disable-next Metrics/AbcSize
     def to_h
       {
         timeout: timeout,
@@ -219,7 +218,6 @@ module RecordingStudioApi
         hooks_registered: hooks.instance_variable_get(:@registry).transform_values(&:size)
       }
     end
-    # rubocop:enable Metrics/AbcSize
 
     def logs_summaries_enabled=(value)
       @logs_summaries_enabled = ActiveModel::Type::Boolean.new.cast(value)

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- OpenAPI content-type overrides merge into the generated string key. A
+  registration symbolizes `application/json`, and the document keeps that
+  name as a string. Both keys now collapse, so the schema and the examples
+  stay together and the JSON encoder can write the document.
+
 ## [0.23.0] - 2026-11-13
 
 ### Added
