@@ -1,12 +1,12 @@
 # Upgrading RecordingStudioApi
 
-## Upgrading to 0.21.5
+## Upgrading to 0.22.1
 
 Other gems share the API rate-limit counters through
 `RecordingStudioApi::RateLimit`. No migration. Existing Redis keys are
 unchanged.
 
-1. Bump the host gem to `0.21.5`.
+1. Bump the host gem to `0.22.1`.
 2. Call `RecordingStudioApi::RateLimit.check(kind:, identifier:)` instead of
    copying the key layout or the Redis increment script. `kind` is `:read`
    or `:write`. Pass `api:` for a named API.
@@ -24,6 +24,19 @@ unchanged.
    get a limited decision when Redis is missing or a Redis or connection
    error is raised. Other errors propagate. The HTTP limiter ignores this
    setting. It is separate from `rate_limit_fail_closed`.
+
+## Upgrading to 0.22.0
+
+Path tokens on `register_endpoint` pick up OpenAPI documentation from a
+matching `openapi` path parameter. No migration.
+
+1. Bump the host gem to `0.22.0`.
+2. To describe `:id` on `items/:id`, pass
+   `openapi: { parameters: [{ name: "id", in: "path", description: "The item." }] }`.
+   Other keys such as `example` copy onto the generated parameter.
+   `name`, `in`, and `required` stay generated.
+3. Query and header parameters in that same list still append. A matching
+   path entry is not listed twice.
 
 ## Upgrading to 0.21.4
 

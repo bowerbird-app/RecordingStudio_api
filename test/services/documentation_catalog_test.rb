@@ -89,6 +89,39 @@ module RecordingStudioApi
         RecordingStudioApi.instance_variable_set(:@configuration, original_configuration)
       end
 
+      def test_registered_endpoint_path_parameters_are_listed_once_with_description
+        original_configuration = RecordingStudioApi.configuration
+        RecordingStudioApi.instance_variable_set(:@configuration, RecordingStudioApi::Configuration.new)
+        RecordingStudioApi.register_endpoint(
+          :show_item,
+          http_verb: :get,
+          path: "items/:id",
+          handler: ->(_context) { { ok: true } },
+          openapi: {
+            parameters: [
+              { name: "id", in: "path", description: "The item.", example: "item_1" },
+              { name: "verbose", in: "query", description: "Include extras.", schema: { type: "boolean" } }
+            ]
+          }
+        )
+
+        catalog = DocumentationCatalog.call
+        show_item = catalog.fetch(:endpoints).find { |endpoint| endpoint.fetch(:action_name) == "show_item" }
+        parameters = show_item.fetch(:openapi).fetch(:parameters)
+        id_parameters = parameters.select { |parameter| parameter[:name] == "id" }
+        verbose = parameters.find { |parameter| parameter[:name] == "verbose" }
+
+        assert_equal 1, id_parameters.length
+        assert_equal "path", id_parameters.first.fetch(:in)
+        assert_equal true, id_parameters.first.fetch(:required)
+        assert_equal "The item.", id_parameters.first.fetch(:description)
+        assert_equal "item_1", id_parameters.first.fetch(:example)
+        assert_equal "query", verbose.fetch(:in)
+        assert_equal "Include extras.", verbose.fetch(:description)
+      ensure
+        RecordingStudioApi.instance_variable_set(:@configuration, original_configuration)
+      end
+
       def test_default_action_openapi_groups_actions_under_resource_tag
         catalog = with_catalog_stubs(
           recordable_types: ["Folder"],

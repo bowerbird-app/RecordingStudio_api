@@ -66,12 +66,13 @@ module RecordingStudioApi
       path_segments.filter_map do |segment|
         next unless segment.start_with?(":")
 
+        name = segment.delete_prefix(":")
         {
-          name: segment.delete_prefix(":"),
+          name: name,
           in: "path",
           required: true,
           schema: { type: "string" }
-        }
+        }.merge(path_parameter_documentation(name))
       end
     end
 
@@ -119,6 +120,24 @@ module RecordingStudioApi
       return value.deep_symbolize_keys if value.respond_to?(:deep_symbolize_keys)
 
       value
+    end
+
+    def path_parameter_documentation(name)
+      entry = Array(openapi[:parameters]).find { |parameter| documented_path_parameter?(parameter, name) }
+      return {} unless entry
+
+      symbolized_parameter(entry).except(:name, :in, :required)
+    end
+
+    def documented_path_parameter?(parameter, name)
+      keys = symbolized_parameter(parameter)
+      keys[:name].to_s == name && keys[:in].to_s == "path"
+    end
+
+    def symbolized_parameter(parameter)
+      return parameter.symbolize_keys if parameter.respond_to?(:symbolize_keys)
+
+      parameter
     end
 
     def normalize_input_contract(value)

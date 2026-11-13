@@ -180,11 +180,19 @@ module RecordingStudioApi
         metadata = endpoint.openapi
         openapi = {
           tags: endpoint.openapi_tags,
-          parameters: endpoint.openapi_path_parameters + Array(metadata[:parameters]),
+          parameters: endpoint.openapi_path_parameters + appended_registered_endpoint_parameters(endpoint),
           request_body: metadata[:request_body],
           responses: metadata.fetch(:responses, default_registered_endpoint_responses)
         }
         openapi.compact.merge(metadata.except(:tags, :parameters, :request_body, :responses, :summary, :description))
+      end
+
+      def appended_registered_endpoint_parameters(endpoint)
+        path_names = endpoint.openapi_path_parameters.map { |parameter| parameter[:name].to_s }
+        Array(endpoint.openapi[:parameters]).reject do |parameter|
+          keys = parameter.respond_to?(:symbolize_keys) ? parameter.symbolize_keys : parameter
+          keys[:in].to_s == "path" && path_names.include?(keys[:name].to_s)
+        end
       end
 
       def default_registered_endpoint_responses
