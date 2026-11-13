@@ -53,6 +53,8 @@ RecordingStudioApi.configure do |config|
   config.rate_limit_api_write_period_seconds = 60
   # config.rate_limit_fail_closed = true
   config.rate_limit_fail_closed_buckets = %w[oauth api_pre_auth api]
+  # RateLimit.check returns nil when Redis is missing unless this is true.
+  # config.rate_limit_check_fail_closed = false
 
   # Optional: log API requests to the API request log database
   # config.api_request_logging_enabled = true

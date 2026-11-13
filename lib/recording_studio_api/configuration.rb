@@ -44,6 +44,7 @@ module RecordingStudioApi
                   :rate_limit_api_pre_auth_enabled,
                   :rate_limit_fail_closed,
                   :rate_limit_fail_closed_buckets,
+                  :rate_limit_check_fail_closed,
                   :rate_limit_redis_url,
                   :rate_limit_redis_namespace,
                   :rate_limit_oauth_requests,
@@ -119,6 +120,7 @@ module RecordingStudioApi
       @rate_limit_api_pre_auth_enabled = true
       @rate_limit_fail_closed = true
       @rate_limit_fail_closed_buckets = %w[oauth api_pre_auth api]
+      @rate_limit_check_fail_closed = false
       @rate_limit_redis_url = ENV["RECORDING_STUDIO_API_RATE_LIMIT_REDIS_URL"].presence
       @rate_limit_redis_namespace = "recording_studio_api"
       @rate_limit_oauth_requests = 10
@@ -187,6 +189,7 @@ module RecordingStudioApi
         rate_limit_api_pre_auth_enabled: rate_limit_api_pre_auth_enabled,
         rate_limit_fail_closed: rate_limit_fail_closed,
         rate_limit_fail_closed_buckets: rate_limit_fail_closed_buckets,
+        rate_limit_check_fail_closed: rate_limit_check_fail_closed,
         rate_limit_redis_url_present: rate_limit_redis_url.present?,
         rate_limit_redis_namespace: rate_limit_redis_namespace,
         rate_limit_oauth_requests: rate_limit_oauth_requests,

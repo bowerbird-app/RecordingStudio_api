@@ -274,7 +274,7 @@ decision = RecordingStudioApi::RateLimit.check(
 )
 
 if decision.nil?
-  # Redis is unset, or the configured limit is not positive. Nothing was counted.
+  # Nothing was counted. Allow this call, or reject it here.
 else
   decision.allowed?    # false once the count is above the limit
   decision.count
@@ -286,10 +286,32 @@ else
 end
 ```
 
+`nil` means the counter did not move. That happens when the limit or period
+is not positive, or when Redis is missing and fail closed is off. Do not
+read `nil` as "over the limit". The caller decides whether to allow the
+work. A Redis error propagates in that mode, so rescue it if you need a
+fallback of your own.
+
+Pass `fail_closed: true` when a missing or broken Redis should count as
+limited. `check` then returns a decision with `allowed?` false, `count` 0,
+`remaining` 0, and `retry_after` set to the period. The counter still did
+not move. `fail_closed:` defaults to `config.rate_limit_check_fail_closed`,
+which is false, so existing callers keep the nil result. Turn it on for a
+caller that must not proceed without a counter. It is separate from
+`config.rate_limit_fail_closed`, which is the HTTP limiter's bucket policy.
+
+```ruby
+RecordingStudioApi::RateLimit.check(
+  kind: :write,
+  identifier: "actor:User:#{user.id}",
+  fail_closed: true
+)
+```
+
 `check` reads the read or write limit for `api:` (default `:public`) from
-the API runtime policy, including a read or write value of `0` falling back
-to the shared API limit. Pass `limit:` and `period:` together to use another
-pair. Omit `redis:` to use the shared client (`rate_limit_redis_url`).
+the API runtime policy. A read or write value that is not positive falls
+back to the shared API limit. Pass `limit:` and `period:` together to use
+another pair. Omit `redis:` to use the shared client (`rate_limit_redis_url`).
 
 The increment is one Redis `INCR`. `EXPIRE` runs on the first hit in the
 window, and again when the key has no TTL. A call that lands on the limit

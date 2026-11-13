@@ -5,6 +5,10 @@ module RecordingStudioApi
     module RateLimiting
       extend ActiveSupport::Concern
 
+      # Deprecated. Use RecordingStudioApi::RateLimit::INCR_EXPIRE_SCRIPT.
+      # Kept so this patch release does not drop a constant other gems already call.
+      RATE_LIMIT_INCR_EXPIRE_SCRIPT = RecordingStudioApi::RateLimit::INCR_EXPIRE_SCRIPT
+
       class << self
         attr_accessor :decider
 

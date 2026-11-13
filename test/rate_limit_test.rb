@@ -44,6 +44,12 @@ class RateLimitTest < ActiveSupport::TestCase
     undef_method :eval
   end
 
+  class BrokenRedis < MemoryRedis
+    def eval(*)
+      raise "offline"
+    end
+  end
+
   def setup
     @original_configuration = RecordingStudioApi.instance_variable_get(:@configuration)
     RecordingStudioApi.instance_variable_set(:@configuration, RecordingStudioApi::Configuration.new)
@@ -252,6 +258,120 @@ class RateLimitTest < ActiveSupport::TestCase
 
     assert_equal 1, decision.count
     assert_equal 1, redis.eval_calls.length
+  end
+
+  test "deprecated script alias still points at the public script" do
+    assert_equal(
+      RecordingStudioApi::RateLimit::INCR_EXPIRE_SCRIPT,
+      RecordingStudioApi::Concerns::RateLimiting::RATE_LIMIT_INCR_EXPIRE_SCRIPT
+    )
+  end
+
+  test "a specific limit that is not positive falls back to the shared api limit" do
+    RecordingStudioApi.configuration.rate_limit_api_read_requests = -3
+    RecordingStudioApi.configuration.rate_limit_api_requests = 9
+    RecordingStudioApi.configuration.rate_limit_api_read_period_seconds = 0
+    RecordingStudioApi.configuration.rate_limit_api_period_seconds = 15
+
+    policy = RecordingStudioApi::ApiRuntimePolicy.for(:public)
+
+    assert_equal [9, 15], RecordingStudioApi::RateLimit.limits(kind: :read, policy: policy)
+  end
+
+  test "check returns nil when redis is missing and fail closed is off" do
+    assert_equal false, RecordingStudioApi.configuration.rate_limit_check_fail_closed
+
+    decision = RecordingStudioApi::RateLimit.check(
+      kind: :read,
+      identifier: "credential:1",
+      limit: 2,
+      period: 30,
+      redis: nil
+    )
+    assert_nil decision
+
+    error = assert_raises(RuntimeError) do
+      RecordingStudioApi::RateLimit.check(
+        kind: :read,
+        identifier: "credential:1",
+        limit: 2,
+        period: 30,
+        redis: BrokenRedis.new,
+        fail_closed: false
+      )
+    end
+    assert_equal "offline", error.message
+  end
+
+  test "check returns a limited decision when fail closed and redis is missing or raises" do
+    moment = Time.at(1_700_000_040)
+    missing = RecordingStudioApi::RateLimit.check(
+      kind: :write,
+      identifier: "client:client-7",
+      limit: 4,
+      period: 20,
+      redis: nil,
+      now: moment,
+      fail_closed: true
+    )
+    raised = RecordingStudioApi::RateLimit.check(
+      kind: :write,
+      identifier: "client:client-7",
+      limit: 4,
+      period: 20,
+      redis: BrokenRedis.new,
+      now: moment,
+      fail_closed: true
+    )
+
+    [missing, raised].each do |decision|
+      assert_equal false, decision.allowed?
+      assert_equal true, decision.limited?
+      assert_equal 0, decision.count
+      assert_equal 4, decision.limit
+      assert_equal 0, decision.remaining
+      assert_equal 20, decision.retry_after
+      assert_equal moment + 20, decision.reset_at
+      assert_equal "recording_studio_api:api_write:client:client-7:#{moment.to_i / 20}", decision.key
+    end
+  end
+
+  test "fail closed defaults from config and an explicit false still returns nil" do
+    RecordingStudioApi.configuration.rate_limit_check_fail_closed = true
+    moment = Time.at(1_700_000_040)
+
+    from_config = RecordingStudioApi::RateLimit.check(
+      kind: :read,
+      identifier: "credential:1",
+      limit: 3,
+      period: 10,
+      redis: nil,
+      now: moment
+    )
+    overridden = RecordingStudioApi::RateLimit.check(
+      kind: :read,
+      identifier: "credential:1",
+      limit: 3,
+      period: 10,
+      redis: nil,
+      now: moment,
+      fail_closed: false
+    )
+
+    assert_equal false, from_config.allowed?
+    assert_equal 0, from_config.count
+    assert_nil overridden
+  end
+
+  test "fail closed still returns nil when the limit is not positive" do
+    assert_nil RecordingStudioApi::RateLimit.check(
+      kind: :read,
+      identifier: "credential:1",
+      limit: 0,
+      period: 30,
+      redis: nil,
+      fail_closed: true
+    )
   end
 
   test "check rejects an unknown kind a blank identifier and a half specified window" do

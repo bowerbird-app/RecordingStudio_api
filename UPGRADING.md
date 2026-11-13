@@ -13,6 +13,15 @@ unchanged.
 3. Keys stay `{namespace}:api_read|api_write|oauth|api_pre_auth:{identifier}:{window}`.
    The default namespace is still `recording_studio_api`. `window` is
    `now.to_i / period`.
+4. `RecordingStudioApi::Concerns::RateLimiting::RATE_LIMIT_INCR_EXPIRE_SCRIPT`
+   still points at `RecordingStudioApi::RateLimit::INCR_EXPIRE_SCRIPT`. It is
+   deprecated. Call `RateLimit.check` instead of evaluating the script.
+5. `check` returns nil when the limit is not positive, or when Redis is
+   missing and fail closed is off. Nil means the counter did not move. The
+   caller chooses whether to allow the call. Pass `fail_closed: true`, or set
+   `config.rate_limit_check_fail_closed` (default false), to get a limited
+   decision when Redis is missing or raises. That setting is separate from
+   `rate_limit_fail_closed`.
 
 ## Upgrading to 0.21.4
 

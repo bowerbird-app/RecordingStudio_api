@@ -75,24 +75,39 @@ module RecordingStudioApi
       end
 
       # Increments the counter for this window and compares it to the limit.
-      # Returns nil when the limit or period is not positive, or when no Redis
-      # client is available. Redis errors propagate.
+      #
+      # Returns nil when the limit or period is not positive. Nothing was counted.
+      # Returns nil when Redis is missing and fail closed is off. Redis errors
+      # propagate in that mode. Pass `fail_closed: true` (or set
+      # `config.rate_limit_check_fail_closed`) to get a limited decision instead
+      # when Redis is missing or raises. `fail_closed: nil` reads that config,
+      # which defaults to false.
       #
       # Omit `limit` and `period` to use {.limits} for `api` (default `:public`).
       # Omit `redis` to use the shared rate-limit client.
-      def check(kind:, identifier:, api: :public, namespace: nil, limit: nil, period: nil, redis: :shared, now: nil)
+      def check(kind:, identifier:, api: :public, namespace: nil, limit: nil, period: nil, redis: :shared, now: nil, fail_closed: nil)
         resolved_limit, resolved_period = resolve_limits(kind, limit, period, api)
         return nil if resolved_limit <= 0 || resolved_period <= 0
 
-        client = redis.equal?(:shared) ? shared_redis : redis
-        return nil if client.nil?
-
+        close_on_failure = resolve_fail_closed(fail_closed)
         moment = now || Time.current
-        window = moment.to_i / resolved_period
-        counter_key = key(kind: kind, identifier: identifier, window: window, namespace: namespace, api: api)
-        count, ttl = increment(client, counter_key, resolved_period)
-        retry_after = ttl.positive? ? ttl : resolved_period
+        counter_key = key(kind: kind, identifier: identifier, window: moment.to_i / resolved_period, namespace: namespace, api: api)
+        count, ttl = begin
+          client = redis.equal?(:shared) ? shared_redis : redis
+          if client.nil?
+            return closed_decision(resolved_limit, resolved_period, moment, counter_key) if close_on_failure
 
+            return nil
+          end
+
+          increment(client, counter_key, resolved_period)
+        rescue StandardError
+          raise unless close_on_failure
+
+          return closed_decision(resolved_limit, resolved_period, moment, counter_key)
+        end
+
+        retry_after = ttl.positive? ? ttl : resolved_period
         Decision.new(
           allowed: count <= resolved_limit,
           count: count,
@@ -148,8 +163,28 @@ module RecordingStudioApi
         BUCKETS.fetch(kind.to_s) { raise ArgumentError, "Unknown rate limit kind: #{kind.inspect}" }
       end
 
+      # Not positive falls back. `positive?` matches that: 0 and negatives use the shared limit.
       def positive_or(specific, fallback)
-        specific.to_i.nonzero? || fallback.to_i
+        value = specific.to_i
+        value.positive? ? value : fallback.to_i
+      end
+
+      def resolve_fail_closed(value)
+        return RecordingStudioApi.configuration.rate_limit_check_fail_closed if value.nil?
+
+        value
+      end
+
+      def closed_decision(limit, period, moment, counter_key)
+        Decision.new(
+          allowed: false,
+          count: 0,
+          limit: limit,
+          remaining: 0,
+          retry_after: period,
+          reset_at: moment + period,
+          key: counter_key
+        )
       end
     end
   end

@@ -15,13 +15,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   allowed, plus the count, limit, remaining, retry-after, and reset time.
   `key` builds the counter key. `limits` reads the configured window for a
   policy. The HTTP limiter uses this same counter.
+- `RateLimit.check` takes `fail_closed:`. It defaults to
+  `config.rate_limit_check_fail_closed`, which defaults to false. When it is
+  true and Redis is missing or raises, `check` returns a limited decision
+  (`allowed?` false, `count` 0, `remaining` 0) instead of nil or an error.
+  A limit or period that is not positive still returns nil. This setting is
+  separate from `rate_limit_fail_closed`, which stays the HTTP limiter's
+  bucket policy.
+
+### Deprecated
+- `RecordingStudioApi::Concerns::RateLimiting::RATE_LIMIT_INCR_EXPIRE_SCRIPT`
+  remains as an alias of `RecordingStudioApi::RateLimit::INCR_EXPIRE_SCRIPT`.
+  Call `RateLimit.check` instead of evaluating the script.
 
 ### Upgrade notes
 - Bump to `0.21.5`. No host migration.
 - Redis keys stay `{namespace}:{kind}:{identifier}:{window}`. The default
   namespace is still `recording_studio_api`. Existing counters keep working.
 - Gems that copied the private key layout or Redis script should call
-  `RecordingStudioApi::RateLimit.check` instead.
+  `RecordingStudioApi::RateLimit.check` instead. The old script constant
+  still resolves.
+- `check` returns nil when Redis is missing and fail closed is off. That
+  nil means the counter did not move. Allow the call, or reject it, in the
+  caller. Set `fail_closed: true` or `config.rate_limit_check_fail_closed`
+  when a missing Redis should count as limited. The default is false, so
+  current callers keep the nil result.
 
 ## [0.21.4] - 2026-11-12
 

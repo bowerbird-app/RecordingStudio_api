@@ -59,6 +59,7 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "config.rate_limit_api_write_requests = 60"
     assert_includes response.body, "config.rate_limit_fail_closed = Rails.env.production?"
     assert_includes response.body, "config.rate_limit_fail_closed_buckets = %w[oauth api_pre_auth api]"
+    assert_includes response.body, "config.rate_limit_check_fail_closed = false"
     assert_includes response.body, "config.api_request_logging_enabled = true"
     assert_includes response.body, "config.api_request_logging_payload_mode ="
     assert_includes response.body, "metadata_only"
