@@ -8,13 +8,15 @@ class RecordingStudioApiTest < Minitest::Test
   end
 
   def test_version_pin
-    assert_equal "0.23.3", ::RecordingStudioApi::VERSION
+    assert_equal "0.23.4", ::RecordingStudioApi::VERSION
   end
 
   def test_metrics_dependency_pins
     root = File.expand_path("..", __dir__)
     gemspec = File.read(File.join(root, "recording_studio_api.gemspec"))
-    assert_includes gemspec, '"recording_studio", ">= 6.1.0"'
+    assert_includes gemspec, '"recording_studio", ">= 6.14.0"'
+    assert_includes gemspec, '"recording_studio_trashable", ">= 0.16.0"'
+    assert_includes gemspec, '"recording_studio_accessible", ">= 0.42.0"'
     assert_includes gemspec, '"flat_pack", ">= 0.1.341"'
     assert_includes gemspec, '"view_component", ">= 4.14", "< 5"'
     %w[Gemfile.lock test/dummy/Gemfile.lock].each do |path|
@@ -31,10 +33,10 @@ class RecordingStudioApiTest < Minitest::Test
     assert_includes gemspec, '"recording_studio_moveable", "~> 4.0"'
     %w[Gemfile test/dummy/Gemfile].each do |path|
       contents = File.read(File.join(root, path))
-      assert_includes contents, 'RecordingStudio", tag: "v6.7.0"', path
+      assert_includes contents, 'RecordingStudio", tag: "v6.14.0"', path
       assert_includes contents, 'flatpack", tag: "v0.1.356"', path
-      assert_includes contents, 'RecordingStudio_accessible", tag: "v0.32.0"', path
-      assert_includes contents, 'RecordingStudio_trashable", tag: "v0.14.0"', path
+      assert_includes contents, 'RecordingStudio_accessible", ref: "75f1958a5b098b28666cd3c7fe661cc3f5971649"', path
+      assert_includes contents, 'RecordingStudio_trashable", tag: "v0.16.0"', path
       assert_includes contents, 'RecordingStudio_root_switchable", tag: "v0.15.0"', path
       assert_includes contents, 'RecordingStudio_moveable", tag: "v4.1.1"', path
       assert_includes contents, 'RecordingStudio_cache", tag: "v0.6.3"', path
@@ -138,7 +140,7 @@ class RecordingStudioApiTest < Minitest::Test
 
     assert_includes readme_source, "preserved in this repository under `docs/gem_template/`"
     assert_includes readme_source, "not packaged gem docs"
-    assert_includes readme_source, "| RecordingStudio | v6.7.0 (pinned in `test/dummy/Gemfile`) |"
+    assert_includes readme_source, "| RecordingStudio | v6.14.0 (pinned in `test/dummy/Gemfile`) |"
     assert_includes readme_source, "| FlatPack        | v0.1.356 (pinned in `test/dummy/Gemfile`) |"
   end
 

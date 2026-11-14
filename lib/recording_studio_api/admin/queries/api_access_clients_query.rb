@@ -132,7 +132,7 @@ module RecordingStudioApi
             scope = RecordingStudio::Recording.unscoped
                                               .where(id: RecordingStudioApi::ApiClient.select(:access_recording_id))
                                               .where(recordable_type: "RecordingStudio::Access")
-                                              .where(RecordingStudio::Recording.recording_studio_trashable_kept_sql)
+                                              .kept
                                               .where(parent_recording_id: accessible_access_point_recordings.select(:id))
             scope = scope.where(root_recording_id: scoped_root_recording.id) if scoped_root_recording
             scope = scope.where(root_recording_id: root_recordings_for_type.select(:id)) if root_type_filter.present?
@@ -161,7 +161,7 @@ module RecordingStudioApi
                 ON #{accesses_table}.id = #{recordings_table}.recordable_id
               WHERE #{recordings_table}.recordable_type = 'RecordingStudio::Access'
                 AND #{recordings_table}.parent_recording_id IS NOT NULL
-                AND #{RecordingStudio::Recording.recording_studio_trashable_kept_sql(recordings_table)}
+                AND #{RecordingStudio.kept_sql(recordings_table)}
                 AND #{accesses_table}.actor_type = #{actor_type}
                 AND #{accesses_table}.actor_id = #{actor_id}
                 AND #{accesses_table}.role IN (#{matching_roles})
@@ -171,7 +171,7 @@ module RecordingStudioApi
               SELECT child.id
               FROM #{recordings_table} child
               INNER JOIN access_scope parent ON child.parent_recording_id = parent.id
-              WHERE #{RecordingStudio::Recording.recording_studio_trashable_kept_sql('child')}
+              WHERE #{RecordingStudio.kept_sql('child')}
             )
             SELECT id FROM access_scope WHERE id IS NOT NULL
           SQL
@@ -224,7 +224,7 @@ module RecordingStudioApi
               SELECT child.id
               FROM #{recordings_table} child
               INNER JOIN scoped_tree parent ON child.parent_recording_id = parent.id
-              WHERE #{RecordingStudio::Recording.recording_studio_trashable_kept_sql('child')}
+              WHERE #{RecordingStudio.kept_sql('child')}
             )
             SELECT id FROM scoped_tree
           SQL
@@ -244,7 +244,7 @@ module RecordingStudioApi
         def root_recordings_for_type
           RecordingStudio::Recording.unscoped
                                     .where(parent_recording_id: nil, recordable_type: root_type_filter)
-                                    .where(RecordingStudio::Recording.recording_studio_trashable_kept_sql)
+                                    .kept
         end
 
         def recordings_table

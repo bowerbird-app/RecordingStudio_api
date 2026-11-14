@@ -20,16 +20,20 @@ class TrashableSiblingApiParityTest < ActiveSupport::TestCase
 
   test "query helpers expose kept sql and predicates without lifecycle methods" do
     assert defined?(RecordingStudioTrashable)
-    assert_equal "0.14.0", RecordingStudioTrashable::VERSION
+    assert_equal "0.16.0", RecordingStudioTrashable::VERSION
     refute defined?(RecordingStudioTrashable::Engine)
 
     recording = RecordingStudio::Recording
-    assert_respond_to recording, :recording_studio_trashable_kept_sql
-    assert_respond_to recording, :recording_studio_trashable_active
+    assert_respond_to recording, :kept
+    assert_respond_to RecordingStudio, :kept_sql
+    refute_respond_to recording, :recording_studio_trashable_kept_sql
+    refute_respond_to recording, :recording_studio_trashable_active
+    refute_respond_to recording, :recording_studio_trashable_including_trashed
+    refute_respond_to recording, :recording_studio_trashable_trashed_sql
 
     connection = recording.connection
-    child_kept = "#{connection.quote_table_name('child')}.#{connection.quote_column_name('trashed_at')} IS NULL"
-    assert_equal child_kept, recording.recording_studio_trashable_kept_sql("child")
+    child_kept = "(#{connection.quote_table_name('child')}.trashed_at IS NULL)"
+    assert_equal child_kept, RecordingStudio.kept_sql("child")
 
     root_recording, = create_access_recording_for(user: @user, role: :edit)
     page = create_page_recording(root_recording: root_recording)
@@ -48,7 +52,7 @@ class TrashableSiblingApiParityTest < ActiveSupport::TestCase
     )
 
     sql = scope.send(:accessible_recording_ids_sql)
-    kept_sql = RecordingStudio::Recording.recording_studio_trashable_kept_sql("child")
+    kept_sql = RecordingStudio.kept_sql("child")
 
     assert_includes sql, "WHERE #{kept_sql}"
     refute_includes sql, "WHERE child.trashed_at IS NULL"
@@ -64,7 +68,7 @@ class TrashableSiblingApiParityTest < ActiveSupport::TestCase
                                            recordable_type: "RecordingStudio::Access",
                                            recordable_id: RecordingStudio::Access.where(actor: @user).select(:id)
                                          )
-                                         .where(RecordingStudio::Recording.recording_studio_trashable_kept_sql)
+                                         .kept
                                          .pluck(:id)
                                          .sort
     assert_equal main_ids, kept_ids
@@ -100,20 +104,18 @@ class TrashableSiblingApiParityTest < ActiveSupport::TestCase
 
     install_hostile_recording_default_scope!
 
-    # Prior only-trashed relation: active would unscope and return kept siblings;
-    # kept_sql (and main's where(trashed_at: nil)) stay empty.
+    # A relation that already excludes kept rows stays empty. kept and
+    # kept_sql add the kept condition. They do not unscope trashed_at.
     only_trashed = RecordingStudio::Recording
                    .unscope(where: :trashed_at)
                    .where(parent_recording_id: folder_recording.id)
                    .where.not(trashed_at: nil)
-    main_style = only_trashed.where(trashed_at: nil).pluck(:id).sort
-    kept_sql_style = only_trashed.where(RecordingStudio::Recording.recording_studio_trashable_kept_sql).pluck(:id).sort
-    active_style = only_trashed.recording_studio_trashable_active.pluck(:id).sort
+    kept_style = only_trashed.kept.pluck(:id).sort
+    kept_sql_style = only_trashed.where(RecordingStudio.kept_sql).pluck(:id).sort
 
-    assert_equal main_style, kept_sql_style
+    assert_equal kept_style, kept_sql_style
     assert_empty kept_sql_style
-    refute_equal main_style, active_style
-    assert_includes active_style, kept_page.id
+    refute_includes kept_style, kept_page.id
 
     # Integration actor lookup (real call site) matches additive kept_sql.
     access_recording.update_column(:trashed_at, Time.current)
@@ -123,7 +125,7 @@ class TrashableSiblingApiParityTest < ActiveSupport::TestCase
                                            recordable_type: "RecordingStudio::Access",
                                            recordable_id: RecordingStudio::Access.where(actor: @user).select(:id)
                                          )
-                                         .where(RecordingStudio::Recording.recording_studio_trashable_kept_sql)
+                                         .kept
                                          .pluck(:id)
                                          .sort
     assert_equal expected, actor_ids
@@ -142,7 +144,7 @@ class TrashableSiblingApiParityTest < ActiveSupport::TestCase
     query = RecordingStudioApi::Admin::Queries::ApiAccessClientsQuery.new(context)
     root_scope = query.send(:root_recordings_for_type)
     refute_includes root_scope.pluck(:id), trashed_page.id
-    assert_includes root_scope.to_sql, RecordingStudio::Recording.recording_studio_trashable_kept_sql
+    assert_includes root_scope.to_sql, "\"trashed_at\" IS NULL"
   end
 
   test "credential authentication rejects trashed access via kept predicate" do
@@ -254,7 +256,11 @@ class TrashableSiblingApiParityTest < ActiveSupport::TestCase
     refute grant.authorized?(recording: page_recording, role: :view, include_trashed: false)
     assert grant.authorized?(recording: page_recording, role: :view, include_trashed: true)
 
-    duck = Struct.new(:trashed_at, :parent_recording).new(Time.current, root_recording)
+    duck = Struct.new(:parent_recording) do
+      def recording_studio_trashable_kept?
+        false
+      end
+    end.new(root_recording)
     checked = grant.send(:recording_for_accessible_check, duck, include_trashed: true)
     assert_equal root_recording, checked
   end

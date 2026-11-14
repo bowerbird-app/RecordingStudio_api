@@ -4,11 +4,11 @@
 
 `RecordingStudioApi` is a mountable Rails engine that provides authenticated, capability-backed JSON APIs for Recording Studio addons.
 
-Companion pins on current main: Trashable `~> 0.10` / `v0.14.0`
+Companion pins on current main: Trashable `>= 0.16.0` / `v0.16.0`
 (query-only), Admin `v2.13.0`, Moveable `~> 4.0` / `v4.1.1`, Root Switchable
-`v0.15.0`, Cache `v0.6.3` (development/test), Accessible `~> 0.11` /
-`v0.32.0`, RecordingStudio `v6.7.0`
-(`>= 6.1.0`), Flatpack `0.1.356`
+`v0.15.0`, Cache `v0.6.3` (development/test), Accessible `>= 0.42.0`
+(commit `75f1958a5b098b28666cd3c7fe661cc3f5971649`, not tagged yet), RecordingStudio `v6.14.0`
+(`>= 6.14.0`), Flatpack `0.1.356`
 (`tag: v0.1.356`, `>= 0.1.341`),
 Metrics `v0.8.0` (`>= 0.3.0, < 1.0`), Logs `v0.7.4` (`>= 0.4.1, < 1.0`). Recording Studio MCP `v0.17.0`
 allows this gem at `>= 0.11.0, < 0.12`, so it cannot take `0.12.0` or `0.13.0` until
@@ -1004,7 +1004,7 @@ Token-record contract (if provided):
 - `active_for_authentication?`
 - writable `last_used_at` column (updated with `update_column`)
 
-Both credential and token record must have active, non-trashed RecordingStudio recordables so scope resolution can derive the root recording. Kept/trashed predicates use Recording Studio Trashable (`recording_studio_trashable_kept?` / `recording_studio_trashable_trashed?`); relation filters use additive `where(recording_studio_trashable_kept_sql)`. Pin `recording_studio_trashable` `~> 0.10` and load `recording_studio_trashable/query` only.
+Both credential and token record must have active, non-trashed RecordingStudio recordables so scope resolution can derive the root recording. Kept/trashed predicates use Recording Studio Trashable (`recording_studio_trashable_kept?` / `recording_studio_trashable_trashed?`). Relation filters use additive `Recording.kept`. SQL and recursive walks use `RecordingStudio.kept_sql`. Pin `recording_studio` `>= 6.14.0` and `recording_studio_trashable` `>= 0.16.0`, and load `recording_studio_trashable/query` only.
 
 ### OAuth resource server
 
@@ -1248,7 +1248,7 @@ with Draft off to load a new pack. See
 | Rails           | ~> 8.1.1 |
 | PostgreSQL      | 16      |
 | TailwindCSS     | 4       |
-| RecordingStudio | v6.7.0 (pinned in `test/dummy/Gemfile`) |
+| RecordingStudio | v6.14.0 (pinned in `test/dummy/Gemfile`) |
 | FlatPack        | v0.1.356 (pinned in `test/dummy/Gemfile`) |
 | Devise          | latest  |
 
