@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.3] - 2026-11-14
+
+### Changed
+- The v1 resources controller no longer keeps unused private helpers for
+  destroy, method dispatch, and capability actions. Member actions stay on
+  the member actions controller. Destroy stays on the resource operation.
+
+### Upgrade notes
+- Bump to `0.23.3`. No host migration.
+- No public API change. The removed methods were private and had no callers.
+
 ## [0.23.2] - 2026-11-14
 
 ### Fixed
@@ -1205,7 +1216,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.2...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.3...HEAD
+[0.23.3]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.2...v0.23.3
 [0.23.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.1...v0.23.2
 [0.23.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.0...v0.23.1
 [0.23.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.22.1...v0.23.0
