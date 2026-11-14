@@ -164,10 +164,11 @@ class ApiMetricsTest < ActionDispatch::IntegrationTest
 
   test "api key health counts active keys expiring soon and stale keys" do
     freeze_time do
+      soon, stale = RecordingStudioApi::ApiCredential.active.order(:created_at, :id).last(2)
+      soon.update_columns(expires_at: 90.days.from_now, last_used_at: Time.current)
+      stale.update_columns(expires_at: nil, last_used_at: Time.current)
       base_expiring = execute("api_keys.expiring_soon").value
       base_stale = execute("api_keys.stale").value
-      credentials = RecordingStudioApi::ApiCredential.active.order(:created_at).last(2)
-      soon, stale = credentials
       soon.update_columns(expires_at: 10.days.from_now)
       stale.update_columns(last_used_at: 120.days.ago, expires_at: nil)
       revoked = RecordingStudioApi::ApiCredential.where.not(revoked_at: nil).first

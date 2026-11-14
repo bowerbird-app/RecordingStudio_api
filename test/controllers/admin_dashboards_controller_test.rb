@@ -488,6 +488,93 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
     assert_select "h1", text: "Recording Studio API demo"
   end
 
+  test "admin requests json reports grouped counts and names the api client" do
+    RecordingStudioApi::ApiRequestLog.delete_all
+    api_client = RecordingStudioApi::ApiClient.create!(name: "Counted request client", api_key: "public")
+    RecordingStudioApi::ApiRequestLog.create!(
+      occurred_at: Time.current,
+      request_id: "named-client-request",
+      request_method: "GET",
+      request_path: "/recording_studio_api/api/v1/pages",
+      status_code: 200,
+      duration_ms: 12,
+      api_client_id: api_client.id,
+      rate_limited: false
+    )
+    RecordingStudioApi::ApiRequestLog.create!(
+      occurred_at: 1.week.ago,
+      request_id: "older-client-error",
+      request_method: "POST",
+      request_path: "/recording_studio_api/api/v1/pages",
+      status_code: 422,
+      duration_ms: 18,
+      rate_limited: false
+    )
+
+    get admin_api_requests_path, params: {
+      status: "success",
+      group_by: "week",
+      start_date: 1.week.ago.to_date.iso8601,
+      end_date: Date.current.iso8601
+    }, headers: { "Accept" => "application/json" }
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert(payload.fetch("categories").any? { |label| label.start_with?("Week of ") })
+    assert_equal 1, payload.dig("summary", "total_count")
+    assert_equal payload.fetch("series").sum, payload.dig("summary", "total_count")
+
+    get admin_api_requests_path, params: { status: "success" }
+
+    assert_response :success
+    assert_includes response.body, "Counted request client"
+
+    get admin_api_requests_path, params: {
+      status: "client_error",
+      group_by: "month",
+      start_date: "not-a-date",
+      end_date: Date.current.iso8601
+    }
+
+    assert_response :success
+    assert_includes response.body, "422"
+
+    get admin_api_requests_path, params: { group_by: "year", status: "nope" }
+
+    assert_response :success
+    assert_includes response.body, Time.current.year.to_s
+  end
+
+  test "admin errors chart groups by week month and year and can hide captured exceptions" do
+    RecordingStudioApi::ApiRequestLog.create!(
+      occurred_at: Time.current,
+      request_id: "admin-error-blank",
+      request_method: "GET",
+      request_path: "/recording_studio_api/admin_api/requests",
+      status_code: 500,
+      duration_ms: 20,
+      error_class: ""
+    )
+
+    get admin_api_errors_path, params: {
+      group_by: "week",
+      error_type: "__none__",
+      start_date: Date.current.iso8601,
+      end_date: 1.day.ago.to_date.iso8601
+    }
+
+    assert_response :success
+    assert_includes response.body, "Week of "
+
+    get admin_api_errors_path, params: { group_by: "month", start_date: "not-a-date" }
+    assert_response :success
+    assert_includes response.body, Time.current.strftime("%b %Y")
+
+    get admin_api_errors_path, params: { group_by: "year" }
+    assert_response :success
+    assert_includes response.body, Time.current.year.to_s
+  end
+
   test "forbids the dashboard when accessed directly from a non-admin root" do
     workspace = Workspace.create!(name: "Workspace root")
     workspace_root_recording = RecordingStudio::Recording.create!(recordable: workspace)

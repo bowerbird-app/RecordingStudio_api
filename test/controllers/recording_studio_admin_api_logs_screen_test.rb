@@ -1158,6 +1158,100 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     RecordingStudioApi.configuration.logs_summaries_enabled = false
   end
 
+  test "workspace and site request screens filter status and group the chart" do
+    workspace_root_recording, access_recording = create_access_recording_for(
+      user: @user,
+      workspace_name: "Chart filter workspace",
+      role: :admin
+    )
+    payload = provision_api_client_for(access_recording: access_recording, name: "Chart filter key")
+    api_client = payload.fetch(:api_client)
+    credential = payload.fetch(:credential)
+    expired_payload = provision_api_client_for(access_recording: access_recording, name: "Expired chart key")
+    expired_payload.fetch(:credential).update_columns(expires_at: 1.day.ago, updated_at: Time.current)
+    RecordingStudioApi::ApiClient.create!(
+      name: "Missing chart key",
+      api_key: "public",
+      access_recording: access_recording
+    )
+
+    [
+      ["chart-success", "/recording_studio_api/api/v1/chart-success", 200, false],
+      ["chart-redirect", "/recording_studio_api/api/v1/chart-redirect", 302, false],
+      ["chart-client", "/recording_studio_api/api/v1/chart-client", 404, true]
+    ].each do |request_id, path, status_code, rate_limited|
+      RecordingStudioApi::ApiRequestLog.create!(
+        occurred_at: Time.current,
+        request_id: request_id,
+        request_method: "GET",
+        request_path: path,
+        status_code: status_code,
+        duration_ms: 15,
+        rate_limited: rate_limited,
+        api_client_id: api_client.id,
+        api_credential_id: credential.id,
+        access_recording_id: access_recording.id,
+        root_recording_id: workspace_root_recording.id
+      )
+    end
+
+    switch_to_root(workspace_root_recording)
+
+    get "/api/screens/api_keys/table", params: { status: "expired", search: "expired" }
+    assert_response :success
+    assert_includes response.body, "Expired chart key"
+    assert_not_includes response.body, "Chart filter key"
+
+    get "/api/screens/api_keys/table", params: { status: "missing", search: "missing" }
+    assert_response :success
+    assert_includes response.body, "Missing chart key"
+    assert_not_includes response.body, "Chart filter key"
+
+    get "/api/screens/api_keys/table", params: { status: "other" }
+    assert_response :success
+    assert_includes response.body, "Chart filter key"
+
+    get "/api/screens/api_requests/table", params: { status: "success", group_by: "week" }
+    assert_response :success
+    assert_includes response.body, "/recording_studio_api/api/v1/chart-success"
+    assert_not_includes response.body, "/recording_studio_api/api/v1/chart-client"
+
+    get "/api/screens/api_requests/table", params: { status: "redirect", group_by: "hour" }
+    assert_response :success
+    assert_includes response.body, "/recording_studio_api/api/v1/chart-redirect"
+    assert_not_includes response.body, "/recording_studio_api/api/v1/chart-success"
+
+    get "/api/screens/api_requests/chart", params: { group_by: "week", status: "success" }
+    assert_response :success
+    assert_includes CGI.unescapeHTML(response.body), "Week of "
+
+    get "/api/screens/api_requests/chart", params: { group_by: "month", status: "server_error" }
+    assert_response :success
+
+    get "/api/screens/api_requests/chart", params: { group_by: "hour", status: "nope" }
+    assert_response :success
+
+    switch_to_root(@admin_root_recording)
+
+    get "/admin/api/screens/admin_api_requests/table", params: {
+      status: "success",
+      rate_limited: "false",
+      api_client_name: "Chart filter key",
+      search: "chart-success"
+    }
+    assert_response :success
+    assert_includes response.body, "/recording_studio_api/api/v1/chart-success"
+    assert_not_includes response.body, "/recording_studio_api/api/v1/chart-redirect"
+
+    get "/admin/api/screens/admin_api_requests/table", params: { status: "redirect", rate_limited: "other" }
+    assert_response :success
+    assert_includes response.body, "/recording_studio_api/api/v1/chart-redirect"
+
+    get "/admin/api/screens/admin_api_requests/chart", params: { group_by: "week", status: "success" }
+    assert_response :success
+    assert_includes CGI.unescapeHTML(response.body), "Week of "
+  end
+
   private
 
   def switch_to_root(root_recording)

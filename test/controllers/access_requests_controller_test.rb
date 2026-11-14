@@ -1007,6 +1007,131 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     )
   end
 
+  test "requests chart counts client and server errors and swaps a reversed date range" do
+    api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Status chart client")
+    credential = api_client.credentials.max_by(&:created_at)
+    ensure_api_request_logs_table!
+
+    {
+      "chart-client-error" => 404,
+      "chart-server-error" => 500,
+      "chart-success" => 200
+    }.each do |request_id, status_code|
+      RecordingStudioApi::ApiRequestLog.create!(
+        occurred_at: Date.current.in_time_zone.change(hour: 11),
+        request_id: request_id,
+        request_method: "GET",
+        request_path: "/api/v1/recordings",
+        status_code: status_code,
+        duration_ms: 30,
+        api_client_id: api_client.id,
+        api_credential_id: credential.id,
+        access_recording_id: api_client.access_recording_id,
+        root_recording_id: @workspace_root_recording.id
+      )
+    end
+
+    today = Date.current.iso8601
+    yesterday = 1.day.ago.to_date.iso8601
+
+    get "/recording_studio_api/api_clients/requests_chart", params: {
+      root_recording_id: @workspace_root_recording.id,
+      api_client_id: api_client.id,
+      start_date: today,
+      end_date: yesterday,
+      status: "client_error"
+    }
+
+    assert_response :success
+    assert_includes response.body, "value=\"client_error\""
+    assert_match(/\[\s*0\s*,\s*1\s*\]/, response.body)
+
+    get "/recording_studio_api/api_clients/requests_chart", params: {
+      root_recording_id: @workspace_root_recording.id,
+      api_client_id: api_client.id,
+      start_date: yesterday,
+      end_date: today,
+      status: "server_error"
+    }
+
+    assert_response :success
+    assert_includes response.body, "value=\"server_error\""
+    assert_match(/\[\s*0\s*,\s*1\s*\]/, response.body)
+
+    get "/recording_studio_api/api_clients/requests_chart", params: {
+      root_recording_id: @workspace_root_recording.id,
+      start_date: "not-a-date",
+      end_date: today
+    }
+
+    assert_response :success
+    assert_includes response.body, "API requests"
+  end
+
+  test "index shows never and no credentials in the expires column" do
+    never_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Never expires client")
+    never_client.credentials.max_by(&:created_at).update_columns(expires_at: nil, updated_at: Time.current)
+
+    missing_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Missing credential client")
+    missing_client.credentials.delete_all
+
+    get "/recording_studio_api/api_clients", params: { root_recording_id: @workspace_root_recording.id }
+
+    assert_response :success
+    assert_includes response.body, "Never expires client"
+    assert_includes response.body, "Missing credential client"
+    assert_includes response.body, "Never"
+    assert_includes response.body, "No credentials"
+  end
+
+  test "index forbids a parent scope from a different root" do
+    other_root_recording, = create_access_recording_for(
+      user: @user,
+      workspace_name: "Other scope workspace",
+      role: :admin
+    )
+    other_folder = RecordingStudio::Recording.create!(
+      recordable: Folder.create!(name: "Other scope folder"),
+      parent_recording: other_root_recording
+    )
+    grant_or_bootstrap_access!(recording: other_folder, actor: @user, role: :admin)
+
+    get "/recording_studio_api/api_clients", params: {
+      root_recording_id: @workspace_root_recording.id,
+      parent_recording_id: other_folder.id
+    }
+
+    assert_response :forbidden
+  end
+
+  test "create and update reject an expiry that is not a time" do
+    post "/recording_studio_api/api_clients", params: {
+      api_client: {
+        root_type: "Workspace",
+        access_point_recording_id: @workspace_root_recording.id,
+        role: "admin",
+        api_client_name: "Broken expiry client",
+        expires_at: "2026-99-99T99:99"
+      }
+    }
+
+    assert_response :unprocessable_entity
+    assert_includes response.body, "Expiry must be a valid date and time"
+
+    api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Edit expiry client")
+
+    patch "/recording_studio_api/api_clients/#{api_client.id}", params: {
+      api_client: {
+        role: "admin",
+        api_client_name: "Edit expiry client",
+        expires_at: "2026-99-99T99:99"
+      }
+    }
+
+    assert_response :unprocessable_entity
+    assert_includes response.body, "Expiry must be a valid date and time"
+  end
+
   test "update changes api client name and latest credential expiry" do
     api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Original API client")
     latest_credential = api_client.credentials.max_by(&:created_at)

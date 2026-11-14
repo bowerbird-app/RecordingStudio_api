@@ -65,3 +65,8 @@ jobs:
 
     - name: Run tests
       run: bundle exec rake app:test
+      env:
+        COVERAGE_COMMAND_NAME: Gem
+
+    - name: Run dummy app tests
+      run: bundle exec rake test:dummy

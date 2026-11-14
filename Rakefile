@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "bundler/gem_tasks"
+require "fileutils"
 require "rake/testtask"
 
 DUMMY_TEST_FILE = File.expand_path("test/controllers/docs_controller_test.rb", __dir__)
@@ -18,32 +19,28 @@ def run_command!(env, *command)
   raise "Command failed (#{Process.last_status.exitstatus}): #{command.join(' ')}"
 end
 
-def dummy_bundle_env
-  dummy_bundle_base_env.merge(dummy_bundle_cleared_env)
+# The docs pages render the default layout, which links tailwind.css.
+# Propshaft raises when that build artifact is missing. The file is gitignored.
+def write_dummy_tailwind_placeholder!
+  builds = File.join(DUMMY_APP_ROOT, "app/assets/builds")
+  FileUtils.mkdir_p(builds)
+  path = File.join(builds, "tailwind.css")
+  return if File.exist?(path)
+
+  File.write(path, "/* Present so docs pages can render before Tailwind is built. */\n")
 end
 
-def dummy_bundle_base_env
-  {
-    "BUNDLE_APP_CONFIG" => ENV.fetch("BUNDLE_APP_CONFIG", nil),
-    "BUNDLE_GEMFILE" => DUMMY_GEMFILE,
-    "BUNDLE_PATH" => ENV.fetch("BUNDLE_PATH", nil),
-    "DISABLE_SIMPLECOV" => "true",
-    "RAILS_ENV" => "test",
-    "GEM_HOME" => ENV.fetch("BUNDLER_ORIG_GEM_HOME", ENV.fetch("GEM_HOME", nil)),
-    "GEM_PATH" => ENV.fetch("BUNDLER_ORIG_GEM_PATH", nil)
-  }
-end
+def with_dummy_bundle(&block)
+  github_token = ENV.fetch("BUNDLE_GITHUB__COM", nil)
+  coverage_command = ENV.fetch("COVERAGE_COMMAND_NAME", "Dummy")
 
-def dummy_bundle_cleared_env
-  {
-    "BUNDLE_BIN_PATH" => nil,
-    "BUNDLE_GEMFILE" => DUMMY_GEMFILE,
-    "BUNDLE_LOCKFILE" => nil,
-    "BUNDLER_SETUP" => nil,
-    "BUNDLER_VERSION" => nil,
-    "RUBYLIB" => nil,
-    "RUBYOPT" => nil
-  }
+  Bundler.with_unbundled_env do
+    ENV["BUNDLE_GITHUB__COM"] = github_token if github_token
+    ENV["BUNDLE_GEMFILE"] = DUMMY_GEMFILE
+    ENV["RAILS_ENV"] = "test"
+    ENV["COVERAGE_COMMAND_NAME"] = coverage_command
+    Dir.chdir(DUMMY_APP_ROOT, &block)
+  end
 end
 
 Rake::TestTask.new(:test) do |t|
@@ -65,11 +62,16 @@ namespace :test do
 
   desc "Run dummy app integration tests under the dummy app bundle"
   task :dummy do
-    Dir.chdir(DUMMY_APP_ROOT) do
-      env = dummy_bundle_env
-
-      run_command!(env, "bin/rails", "db:prepare")
-      run_command!(env, "bundle", "exec", "ruby", "-I/workspace/test", DUMMY_TEST_FILE)
+    with_dummy_bundle do
+      ENV["COVERAGE_COMMAND_NAME"] = "Dummy"
+      run_command!({}, "bin/rails", "db:prepare")
+      run_command!({}, "bundle", "exec", "rails", "test", "test")
+      write_dummy_tailwind_placeholder!
+      ENV["COVERAGE_COMMAND_NAME"] = "Dummy docs"
+      run_command!(
+        {},
+        "bundle", "exec", "ruby", "-I#{File.expand_path('test', __dir__)}", DUMMY_TEST_FILE
+      )
     end
   end
 

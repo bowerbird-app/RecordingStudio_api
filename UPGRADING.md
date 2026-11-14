@@ -1,5 +1,14 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.23.3
+
+No migration. No public API change.
+
+1. Bump the host gem to `0.23.3`.
+2. Capability actions are still called through the member actions route.
+   Resource destroy is still the resource operation. Private helpers that
+   duplicated those paths are gone.
+
 ## Upgrading to 0.23.2
 
 API creates and API client access edits use Recording Studio's record flow

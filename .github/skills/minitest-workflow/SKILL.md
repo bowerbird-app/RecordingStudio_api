@@ -20,7 +20,8 @@ user-invocable: false
 3. Prefer unit tests for POROs and services, and minimal integration tests for engine wiring and generator behavior.
 4. Preserve public behavior; do not bypass production code to make tests pass.
 5. Run `bundle exec rake test` from the repository root.
-6. If the change affects dummy app boot, assets, or migrations, also validate the dummy app setup used in CI.
+6. Run `bundle exec rake test:dummy` as well. CI runs both. SimpleCov merges them and prints line and branch coverage for `app/` and `lib/`. There is no coverage minimum.
+7. If the change affects dummy app boot, assets, or migrations, also validate the dummy app setup used in CI.
 
 ## Repository Expectations
 

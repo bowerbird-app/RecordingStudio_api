@@ -61,35 +61,6 @@ module RecordingStudioApi
           )
         end
 
-        def destroy_resource!(recording)
-          recordable = recording.recordable
-
-          RecordingStudio::Recording.transaction do
-            recording.destroy!
-
-            if recordable.respond_to?(:destroy!) && recordable.respond_to?(:persisted?) && recordable.persisted?
-              begin
-                recordable.destroy!
-              rescue ActiveRecord::ReadOnlyRecord
-                # Immutable recordables are removed from API scope by deleting their recording.
-              end
-            end
-          end
-        end
-
-        def invoke_resource_method(target, method_name, **kwargs)
-          target.public_send(method_name, **kwargs)
-        rescue ArgumentError
-          target.public_send(method_name)
-        end
-
-        def serialize_delete_result(serialized_recording, deleted_via:)
-          serialized_recording.merge(
-            deleted: true,
-            deleted_via: deleted_via
-          )
-        end
-
         def render_dispatched_resource_action!(operation_name)
           operation = resolve_resource_action!(operation_name)
           recordable_type = resolve_recordable_type!
@@ -122,26 +93,6 @@ module RecordingStudioApi
           end
         end
 
-        def render_dispatched_capability_action!(action_name, recording:)
-          action = resolve_capability_action!(action_name, recordable_type: recording.recordable_type)
-          context = resource_operation_context(recording: recording, recordable_type: recording.recordable_type)
-          authorize_capability_action!(action, context)
-          result = action.handler.call(context)
-          render json: result.fetch(:json), status: result.fetch(:status, :ok)
-        end
-
-        def authorize_capability_action!(action, context)
-          required_role = RecordingStudioApi.configuration.capability_action_role_for(
-            action: action,
-            recording: context.recording,
-            api_client: context.api_client,
-            access_grant: context.access_grant
-          )
-          return if required_role.nil?
-
-          context.access_grant.authorize!(recording: context.recording, role: required_role, include_trashed: true)
-        end
-
         def resolve_resource_action!(operation_name)
           operation = RecordingStudioApi.resource_action(operation_name, version: current_api_version, api: current_api_key)
           raise RecordingStudioApi::UnsupportedActionError, "Unknown API resource operation #{operation_name}" if operation.nil?
@@ -153,15 +104,6 @@ module RecordingStudioApi
           raise RecordingStudioApi::UnsupportedActionError, "#{operation.name} is not enabled for #{recordable_type}" unless operation.applicable_to?(recordable_type)
 
           operation
-        end
-
-        def resolve_capability_action!(action_name, recordable_type:)
-          action = RecordingStudioApi.capability_action(action_name, version: current_api_version, api: current_api_key)
-          raise RecordingStudioApi::UnsupportedActionError, "Unknown API action #{action_name}" if action.nil?
-          raise RecordingStudioApi::UnsupportedActionError, "#{action.name} is not enabled for #{recordable_type}" unless action.applicable_to?(recordable_type)
-          raise RecordingStudioApi::UnsupportedActionError, "#{action.name} is not enabled for #{recordable_type}" unless RecordingStudioApi.capability_action_enabled_for?(action, recordable_type, api: current_api_key)
-
-          action
         end
 
         def resource_operation_context(recording: nil, recordable_type: resolve_recordable_type!)
