@@ -13,14 +13,11 @@ module RecordingStudioApi
           raise RecordingStudioApi::NotFoundError, "Unknown API resource #{resource_name}" if recordable_class.nil?
 
           parent_recording = parent_recording_for_create
-          authorize_access!(parent_recording, role: :edit)
+          raise missing_parent_error if parent_recording.nil?
 
-          created_recording = nil
-          RecordingStudio::Recording.transaction do
-            assert_parent_allowed!(parent_recording)
-            recordable = recordable_class.create!(resource_attributes)
-            created_recording = RecordingStudio::Recording.create!(recordable: recordable, parent_recording: parent_recording)
-          end
+          authorize_access!(parent_recording, role: :edit)
+          assert_parent_allowed!(parent_recording)
+          created_recording = record_child!(recordable_class, parent_recording)
 
           result = {
             json: serialize_recording(created_recording, context: relationship_context_for([created_recording])),
@@ -64,8 +61,36 @@ module RecordingStudioApi
           )
         end
 
+        def record_child!(recordable_class, parent_recording)
+          impersonator = write_impersonator
+          RecordingStudio.root_recording_or_self(parent_recording).record(
+            recordable_class,
+            actor: write_actor,
+            metadata: context.with_authorized_by,
+            parent_recording: parent_recording,
+            **(impersonator ? { impersonator: impersonator } : {})
+          ) do |recordable|
+            recordable.assign_attributes(resource_attributes)
+          end
+        end
+
         def assert_parent_allowed!(parent_recording)
           RecordingStudio.assert_parent_allowed!(child_type: recordable_type, parent_recording: parent_recording)
+        end
+
+        def missing_parent_error
+          message = "A parent recording is required to create #{recordable_type}"
+          RecordingStudioApi::InvalidActionInputError.new(
+            message,
+            details: [
+              {
+                attribute: :parent_id,
+                message: "is required",
+                full_message: message,
+                type: :blank
+              }
+            ]
+          )
         end
 
         def invalid_parent_input_error(message)
