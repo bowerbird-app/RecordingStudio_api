@@ -9,8 +9,8 @@ GIT
 
 GIT
   remote: https://github.com/bowerbird-app/RecordingStudio_accessible.git
-  revision: 75f1958a5b098b28666cd3c7fe661cc3f5971649
-  ref: 75f1958a5b098b28666cd3c7fe661cc3f5971649
+  revision: 721787a4d07a38e5e4341146f8e6ff990f94fa4c
+  tag: v0.42.0
   specs:
     recording_studio_accessible (0.42.0)
       rails (~> 8.1.0)

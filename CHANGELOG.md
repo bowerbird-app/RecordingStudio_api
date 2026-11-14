@@ -19,9 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Development and dummy Gemfiles pin tag `v0.16.0`. The query-only require
   stays `recording_studio_trashable/query`.
 - Runtime dependency `recording_studio_accessible` is `>= 0.42.0`.
-  Tag `v0.42.0` is not published. Development and dummy Gemfiles pin
-  commit `75f1958a5b098b28666cd3c7fe661cc3f5971649` (Accessible PR 81),
-  which is the first revision that calls `kept` / `kept_sql`.
+  Development and dummy Gemfiles pin tag `v0.42.0`.
 
 ### Upgrade notes
 - Bump to `0.23.4`. No migration in this gem.

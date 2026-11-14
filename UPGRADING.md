@@ -8,9 +8,7 @@ No migration in this gem.
 1. Bump the host gem to `0.23.4`.
 2. Require `recording_studio` `>= 6.14.0` (tag `v6.14.0`),
    `recording_studio_trashable` `>= 0.16.0` (tag `v0.16.0`), and
-   `recording_studio_accessible` `>= 0.42.0`. Accessible `0.42.0` is not
-   tagged yet. Until it is, pin commit
-   `75f1958a5b098b28666cd3c7fe661cc3f5971649`. Keep
+   `recording_studio_accessible` `>= 0.42.0` (tag `v0.42.0`). Keep
    `require "recording_studio_trashable/query"` so the Trashable engine
    stays unloaded.
 3. Relation filters call `Recording.kept`. SQL fragments and recursive

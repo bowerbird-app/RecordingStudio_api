@@ -7,7 +7,7 @@
 Companion pins on current main: Trashable `>= 0.16.0` / `v0.16.0`
 (query-only), Admin `v2.13.0`, Moveable `~> 4.0` / `v4.1.1`, Root Switchable
 `v0.15.0`, Cache `v0.6.3` (development/test), Accessible `>= 0.42.0`
-(commit `75f1958a5b098b28666cd3c7fe661cc3f5971649`, not tagged yet), RecordingStudio `v6.14.0`
+(`tag: v0.42.0`), RecordingStudio `v6.14.0`
 (`>= 6.14.0`), Flatpack `0.1.356`
 (`tag: v0.1.356`, `>= 0.1.341`),
 Metrics `v0.8.0` (`>= 0.3.0, < 1.0`), Logs `v0.7.4` (`>= 0.4.1, < 1.0`). Recording Studio MCP `v0.17.0`
