@@ -38,7 +38,7 @@ module RecordingStudioApi
 
       RecordingStudio::Recording.unscoped
                                 .where(recordable_type: "RecordingStudio::Access", recordable_id: access_ids)
-                                .where(RecordingStudio::Recording.recording_studio_trashable_kept_sql)
+                                .kept
                                 .order(:created_at, :id)
                                 .to_a
     end

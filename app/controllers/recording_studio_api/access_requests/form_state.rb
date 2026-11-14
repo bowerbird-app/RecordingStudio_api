@@ -92,7 +92,7 @@ module RecordingStudioApi
           available_root_recording.subtree_recordings(include_self: true)
             .includes(:recordable)
             .where(recordable_type: access_point_types)
-            .where(RecordingStudio::Recording.recording_studio_trashable_kept_sql)
+            .kept
             .reorder(:created_at, :id)
             .to_a
         end

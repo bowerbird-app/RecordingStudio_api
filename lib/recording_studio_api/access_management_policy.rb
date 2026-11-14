@@ -154,7 +154,7 @@ module RecordingStudioApi
         RecordingStudio::Recording.unscoped
                                   .includes(:recordable)
                                   .where(recordable_type: "RecordingStudio::Access", recordable_id: access_ids)
-                                  .where(RecordingStudio::Recording.recording_studio_trashable_kept_sql)
+                                  .kept
                                   .to_a
       end
     end
@@ -163,7 +163,7 @@ module RecordingStudioApi
       @api_client_access_recordings ||= RecordingStudio::Recording.unscoped
                                                                   .includes(:recordable)
                                                                   .where(id: RecordingStudioApi::ApiClient.select(:access_recording_id), recordable_type: "RecordingStudio::Access")
-                                                                  .where(RecordingStudio::Recording.recording_studio_trashable_kept_sql)
+                                                                  .kept
                                                                   .to_a
     end
   end

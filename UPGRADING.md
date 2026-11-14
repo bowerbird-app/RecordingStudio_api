@@ -1,5 +1,24 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.23.4
+
+Kept and trashed filtering uses Recording Studio `kept` and `kept_sql`.
+No migration in this gem.
+
+1. Bump the host gem to `0.23.4`.
+2. Require `recording_studio` `>= 6.14.0` (tag `v6.14.0`),
+   `recording_studio_trashable` `>= 0.16.0` (tag `v0.16.0`), and
+   `recording_studio_accessible` `>= 0.42.0` (tag `v0.42.0`). Keep
+   `require "recording_studio_trashable/query"` so the Trashable engine
+   stays unloaded.
+3. Relation filters call `Recording.kept`. SQL fragments and recursive
+   walks call `RecordingStudio.kept_sql`. `include_trashed: true` still
+   returns trashed rows. A trashed recording authorized with
+   `include_trashed: true` is still checked through its kept parent.
+4. Recording Studio 6.9+ stores `root_recording_id` on events. Copy core
+   migration `20261114090000_add_root_recording_id_to_recording_studio_events`
+   into the host if that column is not there yet.
+
 ## Upgrading to 0.23.3
 
 No migration. No public API change.

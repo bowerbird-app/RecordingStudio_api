@@ -12,7 +12,7 @@ RecordingStudioAdmin.configure do |config|
     next unless admin_root
 
     RecordingStudio::Recording
-      .where(RecordingStudio::Recording.recording_studio_trashable_kept_sql)
+      .kept
       .find_by(recordable: admin_root)
   end
   config.site_admin_recording_resolver = config.access_recording_resolver
