@@ -38,6 +38,19 @@ The current codebase still ships the template engine mechanics (configuration, h
 
 See Recording Studio core's own documentation (RecordingStudio core, write authorization).
 
+Resource create calls `Recording#record` on the parent root. It passes the same
+actor, impersonator, and metadata as an update, so core authorises the write
+and runs `before_record` / `after_record` plus the created event. A create with
+no parent is rejected. `RecordingStudio.root_recording_for` inserts a root row
+without that flow.
+
+API client role edits call `RecordingStudioAccessible::Services::UpdateRecordingAccess`.
+Moving the access point grants on the new access point, re-links
+`ApiClient#access_recording_id`, and revokes the old access in one transaction.
+A refused grant or revoke leaves the previous access in place. Revoke voids
+dependent grants on the old access. The client name and credential expiry are
+columns on this gem's tables.
+
 ## Versioning Model
 
 RecordingStudioApi separates public API versions from addon contribution contract versions.

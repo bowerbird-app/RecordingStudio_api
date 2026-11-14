@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.2] - 2026-11-14
+
+### Fixed
+- Resource create goes through `Recording#record` on the parent's root
+  recording. The write records the same actor, impersonator, and metadata
+  as an update, and it runs core's write authorisation, record hooks, and
+  the created event. Idempotency and parent checks stay in place.
+- A create with no parent recording is rejected. Core's `root_recording_for`
+  inserts a root row without that record flow, so the API does not use it.
+- Editing an API client's role calls `UpdateRecordingAccess` with the
+  manager actor. Moving the access point grants a new access recording,
+  re-links the API client, and revokes the old access in one transaction.
+  A refused grant or revoke rolls the change back and shows the service
+  error on the form. The move voids dependent grants on the old access.
+  The API client name and credential expiry stay on this gem's tables.
+
+### Upgrade notes
+- Bump to `0.23.2`. No host migration.
+- Create requests need a parent recording. A root type with no parent id
+  still uses the caller's access scope when that scope is a legal parent.
+  A create with no parent at all returns an input error.
+- Role and access-point edits now require Accessible to accept the grant,
+  update, or revoke. A refusal is shown on the edit form and nothing is saved.
+
 ## [0.23.1] - 2026-11-13
 
 ### Fixed
@@ -1181,7 +1205,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.1...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.2...HEAD
+[0.23.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.1...v0.23.2
 [0.23.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.0...v0.23.1
 [0.23.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.22.1...v0.23.0
 [0.22.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.22.0...v0.22.1

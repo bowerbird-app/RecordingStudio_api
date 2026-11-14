@@ -1,5 +1,21 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.23.2
+
+API creates and API client access edits use Recording Studio's record flow
+and Accessible's grant services. No migration.
+
+1. Bump the host gem to `0.23.2`.
+2. A create needs a parent recording. Pass `parent_id`, or omit it for a
+   root type whose access scope is a legal parent. A create with no parent
+   returns an input error. `RecordingStudio.root_recording_for` does not
+   run the record flow, so the API does not call it for a new root.
+3. Changing an API client's role or access point goes through Accessible.
+   The signed-in manager is the actor on those events. A refused change
+   stays on the edit form and does not save the name or expiry either.
+4. Moving an API client voids dependent grants that hung off the old access
+   after the request commits.
+
 ## Upgrading to 0.23.1
 
 OpenAPI content-type overrides stay on the generated string key. No migration.
