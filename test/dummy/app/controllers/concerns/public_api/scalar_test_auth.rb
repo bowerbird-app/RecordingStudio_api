@@ -50,7 +50,7 @@ module PublicApi::ScalarTestAuth
       root_recording.subtree_recordings(include_self: true)
         .includes(:recordable)
         .where(recordable_type: allowed_types)
-        .where(RecordingStudio::Recording.recording_studio_trashable_kept_sql)
+        .kept
         .reorder(:created_at, :id)
         .map { |recording| { id: recording.id, label: scalar_test_auth_recording_label(recording) } }
     end.uniq { |entry| entry.fetch(:id) }

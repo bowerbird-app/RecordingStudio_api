@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.4] - 2026-11-14
+
+### Changed
+- Kept-recording filters use `Recording.kept` and `RecordingStudio.kept_sql`.
+  `include_trashed: true` still includes trashed rows. A trashed recording
+  authorized that way is still checked through its kept parent.
+- Runtime dependency `recording_studio` is `>= 6.14.0`. Development and
+  dummy Gemfiles pin tag `v6.14.0`.
+- Runtime dependency `recording_studio_trashable` is `>= 0.16.0`.
+  Development and dummy Gemfiles pin tag `v0.16.0`. The query-only require
+  stays `recording_studio_trashable/query`.
+- Runtime dependency `recording_studio_accessible` is `>= 0.42.0`.
+  Tag `v0.42.0` is not published. Development and dummy Gemfiles pin
+  commit `75f1958a5b098b28666cd3c7fe661cc3f5971649` (Accessible PR 81),
+  which is the first revision that calls `kept` / `kept_sql`.
+
+### Upgrade notes
+- Bump to `0.23.4`. No migration in this gem.
+- Require Recording Studio `>= 6.14.0`, Trashable `>= 0.16.0`, and
+  Accessible `>= 0.42.0`. Accessible `0.41.0` and earlier still call
+  `recording_studio_trashable_kept_sql`, which Trashable `0.16.0` removed.
+  `recording_studio_trashable_kept_sql`, `recording_studio_trashable_active`,
+  `recording_studio_trashable_including_trashed`, and
+  `recording_studio_trashable_trashed_sql` are gone. Call `Recording.kept`
+  or `RecordingStudio.kept_sql`.
+- Copy core migration
+  `20261114090000_add_root_recording_id_to_recording_studio_events` when
+  the host events table has no `root_recording_id`.
+
 ## [0.23.3] - 2026-11-14
 
 ### Changed
@@ -1216,7 +1245,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.3...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.4...HEAD
+[0.23.4]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.3...v0.23.4
 [0.23.3]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.2...v0.23.3
 [0.23.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.1...v0.23.2
 [0.23.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.0...v0.23.1

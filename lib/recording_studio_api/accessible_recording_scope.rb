@@ -40,7 +40,7 @@ module RecordingStudioApi
         trashed_filter = if include_trashed
                            ""
                          else
-                           "WHERE #{RecordingStudio::Recording.recording_studio_trashable_kept_sql('child')}"
+                           "WHERE #{RecordingStudio.kept_sql('child')}"
                          end
 
         <<~SQL.squish
