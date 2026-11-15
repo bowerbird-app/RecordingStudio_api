@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `AccessGrant#accessible_recordings` filters through the accessible-recording subquery, so the id list stays in the database. `accessible_recording_ids` still returns the same ids.
 - List responses preload each row's recordable before serialization. The JSON body is unchanged.
-- `meta.total_count` uses `COUNT(*)` when the list query has no join and is not already distinct. Search, attribute filters, and any other join still use `COUNT(DISTINCT id)`.
+- `meta.total_count` uses `COUNT(*)` when the list query has no join, no eager load, no referenced include, no custom `FROM`, and is not already distinct. Search, attribute filters, and any other join still use `COUNT(DISTINCT id)`.
 
 ### Upgrade notes
 - No request or response change. No migration.

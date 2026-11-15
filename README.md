@@ -766,8 +766,9 @@ and `updated_at`; serializer output keys, always-included fields, and expanded r
 sit beside those keys. There are no `data`, `attributes`, or `relationships` wrappers. Collections
 use `records` plus `meta`. `meta.total_count` is the number of matching
 recordings across every page. The count is `COUNT(*)` when that query has no
-join and is not already distinct. Search, attribute filters, and any other
-join keep `COUNT(DISTINCT id)`, so a joined row is not counted twice.
+join, no eager load, no referenced include, no custom `FROM`, and is not
+already distinct. Search, attribute filters, and any other join keep
+`COUNT(DISTINCT id)`, so a joined row is not counted twice.
 `count=true` returns only `{ "total_count": N }`
 and does not load records. A record's `_meta` reports `limit` and `has_more` for emitted collection
 relationships.

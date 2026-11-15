@@ -99,7 +99,14 @@ module RecordingStudioApi
       end
 
       def plain_count?(counted)
-        counted.joins_values.empty? && counted.left_outer_joins_values.empty? && !counted.distinct_value
+        return false if counted.joins_values.any?
+        return false if counted.left_outer_joins_values.any?
+        return false if counted.distinct_value
+        return false if counted.eager_load_values.any?
+        return false if counted.includes_values.any? && counted.references_values.any?
+        return false unless counted.from_clause.empty?
+
+        true
       end
 
       def preload_page_recordables(items)

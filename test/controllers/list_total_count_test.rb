@@ -265,7 +265,10 @@ class ListTotalCountTest < ActionDispatch::IntegrationTest
 
     sorted = list_folders(sort: "name", order: "asc")
     sorted_names = sorted.fetch("records").map { |row| row.fetch("name") }
-    assert_equal ["Archive", "Market notes", "Marketing"], sorted_names
+    sort_names = ["Archive", "Market notes", "Marketing"]
+    database_order = Folder.where(name: sort_names).order(:name).pluck(:name)
+    assert_equal database_order, sorted_names
+    assert_equal sort_names.sort, sorted_names.sort
     assert_equal sorted.fetch("records").length, sorted.fetch("meta").fetch("total_count")
     assert_count_sql('SELECT COUNT(*) FROM "recording_studio_recordings"', params: { sort: "name", order: "asc" })
     assert_page_sql(/INNER JOIN folders recordable_sort_folders/, params: { sort: "name", order: "asc" })
@@ -299,6 +302,23 @@ class ListTotalCountTest < ActionDispatch::IntegrationTest
     assert_equal [recording.id], body.fetch(:ids)
     assert_equal 1, body.fetch(:meta).fetch(:total_count)
     assert_match(/COUNT\(DISTINCT/, count_sql)
+  end
+
+  test "referenced includes, eager loads, and a custom from keep a distinct count" do
+    recording = create_folder("Marketing")
+    base = RecordingStudio::Recording.where(id: recording.id)
+
+    referenced = base.includes(:parent_recording).references(:parent_recording)
+    assert_match(/COUNT\(DISTINCT/, count_sql_for_relation(referenced, "referenced-include"))
+
+    eager = base.eager_load(:parent_recording)
+    assert_match(/COUNT\(DISTINCT/, count_sql_for_relation(eager, "eager-load"))
+
+    custom_from = base.from(RecordingStudio::Recording.table_name)
+    assert_match(/COUNT\(DISTINCT/, count_sql_for_relation(custom_from, "custom-from"))
+
+    preloaded = base.includes(:parent_recording)
+    assert_match(/SELECT COUNT\(\*\)/, count_sql_for_relation(preloaded, "preload-include"))
   end
 
   test "a left outer join keeps a distinct count" do
@@ -432,6 +452,33 @@ class ListTotalCountTest < ActionDispatch::IntegrationTest
 
   def count_sql_for(params)
     queries_for(params).find { |sql| sql.match?(/COUNT/i) }
+  end
+
+  def count_sql_for_relation(relation, scope_key)
+    count_sql = nil
+    subscriber = lambda do |_name, _start, _finish, _id, payload|
+      count_sql = payload[:sql].squish if payload[:sql].to_s.match?(/COUNT/i)
+    end
+
+    pagination = nil
+    ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
+      pagination = RecordingStudioApi::Services::PaginateResourceCollection.call(
+        relation: relation,
+        resource: "folders",
+        recordable_type: "Folder",
+        limit: 50,
+        pagination_token: nil,
+        sort: nil,
+        order: nil,
+        api: :public,
+        scope_key: "client:#{scope_key}"
+      )
+    end
+
+    assert pagination.success?
+    counted_total = pagination.value.response_body { |_rows, meta| meta.fetch(:total_count) }
+    assert_equal 1, counted_total
+    count_sql
   end
 
   def queries_for(params)
