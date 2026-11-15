@@ -21,6 +21,7 @@ class AuthorizedWriteGateTest < ActiveSupport::TestCase
     authorizer = RecordingStudio.configuration.authorize_write
 
     assert authorizer
+    refute RecordingStudio.configuration.allow_unauthorized_writes
     assert authorizer.call(actor: @user, action: "created")
     assert authorizer.call(actor: RecordingStudioApi::ApiClient.new(name: "Bot", api_key: "public"), action: "updated")
     refute authorizer.call(actor: @user, action: "")

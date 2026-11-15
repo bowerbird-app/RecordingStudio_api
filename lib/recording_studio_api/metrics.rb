@@ -6,7 +6,6 @@ module RecordingStudioApi
   module Metrics
     API = :operations
     EXPOSE = { api: [API] }.freeze
-    ResolverContext = Struct.new(:controller)
     SERVER_ERRORS_DESCRIPTION = "API responses with a 5xx status per day, from the daily request rollup. " \
                                 "Client (4xx) errors are not counted."
     SERVER_ERROR_GROUP_BY = %i[route_name request_method].freeze
@@ -42,12 +41,9 @@ module RecordingStudioApi
 
     def site_admin_recording
       return unless defined?(RecordingStudioAdmin)
+      return unless defined?(RecordingStudioAccessible)
 
-      config = RecordingStudioAdmin.configuration
-      resolver = config.site_admin_recording_resolver || config.access_recording_resolver
-      return unless resolver
-
-      resolver.call(ResolverContext.new(nil))
+      RecordingStudioAccessible.admin_root
     rescue StandardError
       nil
     end

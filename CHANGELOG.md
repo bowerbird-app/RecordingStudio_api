@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-11-15
+
+### Changed
+- Require `recording_studio` `>= 7.0`, `< 8.0`. Development and dummy Gemfiles pin tag `v7.0.0`.
+- Runtime dependencies use an open lower bound and a cap: Accessible `>= 0.44.0`, `< 1.0`; Logs `>= 0.8.0`, `< 1.0`; Metrics `>= 0.9.0`, `< 1.0`; Moveable `>= 5.0`, `< 6.0`; Trashable `>= 0.17.0`, `< 1.0`.
+- Development and dummy pins that accept core 7: Accessible `v0.44.0`, Trashable `v0.17.0`, Root Switchable `v0.16.0`, Moveable `v5.0.0`, Admin `v2.16.0`, Metrics `v0.9.0`, and Logs `v0.8.0`. Icons stay `v0.2.1`. Cache stays `v0.6.3`. FlatPack stays `v0.1.356`.
+- The dummy metrics setup creates an admin root with `RecordingStudio.create_root_recording!(recordable, actor:)`. `root_recording_for` only finds a root.
+- The dummy `authorize_write` callback checks the actor and the action. The dummy does not set `allow_unauthorized_writes`.
+- Site metrics authorize through `RecordingStudioAccessible.admin_root`. The dummy names that root with `config.admin_root_resolver`. `RecordingStudioAdmin` `site_admin_recording_resolver` is gone.
+
+### Upgrade notes
+- Bump to `0.24.0`. No migration in this gem.
+- Require Recording Studio `>= 7.0`, `< 8.0` (tag `v7.0.0`), Accessible `>= 0.44.0`, `< 1.0` (tag `v0.44.0`), Logs `>= 0.8.0`, `< 1.0` (tag `v0.8.0`), Metrics `>= 0.9.0`, `< 1.0` (tag `v0.9.0`), Moveable `>= 5.0`, `< 6.0` (tag `v5.0.0`), and Trashable `>= 0.17.0`, `< 1.0` (tag `v0.17.0`). Keep `require "recording_studio_trashable/query"`.
+- `RecordingStudio.root_recording_for` only finds a root and returns nil when there is none. Create a root with `RecordingStudio.create_root_recording!(recordable, actor:)`. API creates still need a parent and still go through `Recording#record`.
+- Set `config.authorize_write`. Do not set `allow_unauthorized_writes`.
+- Moveable `move_to!` still takes `new_parent:`, `actor:`, and `metadata:`, and still locks with `RecordingStudio.lock_for_move!`. This gem does not call `move_to!`. The registered move action is still Moveable's handler. Core raises `SlotTaken` from that lock only when the moved type is a declared single child. This gem does not declare one.
+- Set `RecordingStudioAccessible` `config.admin_root_resolver` to the site admin root. Site metrics call `RecordingStudioAccessible.admin_root`. Do not set `site_admin_recording_resolver`.
+
 ## [0.23.4] - 2026-11-14
 
 ### Changed
@@ -1243,7 +1261,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.4...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.24.0...HEAD
+[0.24.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.4...v0.24.0
 [0.23.4]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.3...v0.23.4
 [0.23.3]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.2...v0.23.3
 [0.23.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.1...v0.23.2
