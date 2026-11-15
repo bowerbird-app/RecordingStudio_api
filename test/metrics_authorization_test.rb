@@ -43,20 +43,16 @@ class MetricsAuthorizationTest < ActiveSupport::TestCase
     viewer = create_user
     _admin_root, admin_recording = site_admin_recording
     create_access_recording(parent_recording: admin_recording, user: viewer, role: :view)
-    config = RecordingStudioAdmin.configuration
-    original_site = config.site_admin_recording_resolver
-    original_access = config.access_recording_resolver
-    config.site_admin_recording_resolver = ->(*) { raise NoMethodError, "undefined method `controller' for nil" }
+    config = RecordingStudioAccessible.configuration
+    original_resolver = config.admin_root_resolver
+    config.admin_root_resolver = ->(*) { raise NoMethodError, "undefined method `controller' for nil" }
 
     assert_nothing_raised do
       assert_equal false, authorize_metric(:api_requests, viewer, root_recording: admin_recording)
       assert_equal false, authorize_metric(:api_keys, viewer, root_recording: admin_recording)
     end
   ensure
-    if defined?(config) && config
-      config.site_admin_recording_resolver = original_site if defined?(original_site)
-      config.access_recording_resolver = original_access if defined?(original_access)
-    end
+    config.admin_root_resolver = original_resolver if defined?(config) && config && defined?(original_resolver)
   end
 
   private

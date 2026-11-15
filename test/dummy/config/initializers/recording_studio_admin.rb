@@ -15,7 +15,6 @@ RecordingStudioAdmin.configure do |config|
       .kept
       .find_by(recordable: admin_root)
   end
-  config.site_admin_recording_resolver = config.access_recording_resolver
   config.layout = "recording_studio/default_layout"
 end
 

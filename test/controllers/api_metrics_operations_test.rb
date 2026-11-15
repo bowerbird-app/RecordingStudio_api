@@ -293,8 +293,8 @@ class ApiMetricsOperationsTest < ActionDispatch::IntegrationTest
   end
 
   test "a site admin resolver that raises denies nested metrics routes" do
-    original = RecordingStudioAdmin.configuration.site_admin_recording_resolver
-    RecordingStudioAdmin.configuration.site_admin_recording_resolver = ->(*) { raise "resolver failed" }
+    original = RecordingStudioAccessible.configuration.admin_root_resolver
+    RecordingStudioAccessible.configuration.admin_root_resolver = ->(*) { raise "resolver failed" }
     headers = bearer_headers(@authorized_token)
 
     get "#{operations_root}/api_keys/metrics", headers: headers
@@ -305,7 +305,7 @@ class ApiMetricsOperationsTest < ActionDispatch::IntegrationTest
     assert_response :forbidden
     assert_equal "Not authorized to run this metric", JSON.parse(response.body).dig("error", "message")
   ensure
-    RecordingStudioAdmin.configuration.site_admin_recording_resolver = original
+    RecordingStudioAccessible.configuration.admin_root_resolver = original
   end
 
   test "public folders/metrics stays on the resource route" do

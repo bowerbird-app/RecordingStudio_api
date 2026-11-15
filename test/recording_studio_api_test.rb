@@ -8,15 +8,15 @@ class RecordingStudioApiTest < Minitest::Test
   end
 
   def test_version_pin
-    assert_equal "0.23.4", ::RecordingStudioApi::VERSION
+    assert_equal "0.24.0", ::RecordingStudioApi::VERSION
   end
 
   def test_metrics_dependency_pins
     root = File.expand_path("..", __dir__)
     gemspec = File.read(File.join(root, "recording_studio_api.gemspec"))
-    assert_includes gemspec, '"recording_studio", ">= 6.14.0"'
-    assert_includes gemspec, '"recording_studio_trashable", ">= 0.16.0"'
-    assert_includes gemspec, '"recording_studio_accessible", ">= 0.42.0"'
+    assert_includes gemspec, '"recording_studio", ">= 7.0", "< 8.0"'
+    assert_includes gemspec, '"recording_studio_trashable", ">= 0.17.0", "< 1.0"'
+    assert_includes gemspec, '"recording_studio_accessible", ">= 0.44.0", "< 1.0"'
     assert_includes gemspec, '"flat_pack", ">= 0.1.341"'
     assert_includes gemspec, '"view_component", ">= 4.14", "< 5"'
     %w[Gemfile.lock test/dummy/Gemfile.lock].each do |path|
@@ -28,22 +28,23 @@ class RecordingStudioApiTest < Minitest::Test
              "#{path} locks view_component #{match[1]}, need >= 4.14.0 for GHSA-8qw7-6phv-7q6p"
       assert major < 5, "#{path} locks view_component #{match[1]}, need < 5"
     end
-    assert_includes gemspec, '"recording_studio_metrics", ">= 0.3.0", "< 1.0"'
-    assert_includes gemspec, '"recording_studio_logs", ">= 0.4.1", "< 1.0"'
-    assert_includes gemspec, '"recording_studio_moveable", "~> 4.0"'
+    assert_includes gemspec, '"recording_studio_metrics", ">= 0.9.0", "< 1.0"'
+    assert_includes gemspec, '"recording_studio_logs", ">= 0.8.0", "< 1.0"'
+    assert_includes gemspec, '"recording_studio_moveable", ">= 5.0", "< 6.0"'
     %w[Gemfile test/dummy/Gemfile].each do |path|
       contents = File.read(File.join(root, path))
-      assert_includes contents, 'RecordingStudio", tag: "v6.14.0"', path
+      assert_includes contents, 'RecordingStudio", tag: "v7.0.0"', path
       assert_includes contents, 'flatpack", tag: "v0.1.356"', path
-      assert_includes contents, 'RecordingStudio_accessible", tag: "v0.42.0"', path
-      assert_includes contents, 'RecordingStudio_trashable", tag: "v0.16.0"', path
-      assert_includes contents, 'RecordingStudio_root_switchable", tag: "v0.15.0"', path
-      assert_includes contents, 'RecordingStudio_moveable", tag: "v4.1.1"', path
+      assert_includes contents, 'RecordingStudio_accessible", tag: "v0.44.0"', path
+      assert_includes contents, 'RecordingStudio_trashable", tag: "v0.17.0"', path
+      assert_includes contents, 'RecordingStudio_root_switchable", tag: "v0.16.0"', path
+      assert_includes contents, 'RecordingStudio_moveable", tag: "v5.0.0"', path
       assert_includes contents, 'RecordingStudio_cache", tag: "v0.6.3"', path
-      assert_includes contents, 'RecordingStudio_metrics", tag: "v0.8.0"', path
-      assert_includes contents, 'RecordingStudio_logs", tag: "v0.7.4"', path
+      assert_includes contents, 'RecordingStudio_metrics", tag: "v0.9.0"', path
+      assert_includes contents, 'RecordingStudio_logs", tag: "v0.8.0"', path
       assert_includes contents, 'RecordingStudio_icons", tag: "v0.2.1"', path
-      assert_includes contents, 'RecordingStudio_admin", tag: "v2.13.0"', path
+      assert_includes contents, 'RecordingStudio_admin", tag: "v2.16.0"', path
+      refute_includes contents, "allow_unauthorized_writes", path
     end
     %w[test/dummy/db/schema.rb test/dummy/db/api_logging_schema.rb].each do |path|
       contents = File.read(File.join(root, path))
@@ -140,7 +141,7 @@ class RecordingStudioApiTest < Minitest::Test
 
     assert_includes readme_source, "preserved in this repository under `docs/gem_template/`"
     assert_includes readme_source, "not packaged gem docs"
-    assert_includes readme_source, "| RecordingStudio | v6.14.0 (pinned in `test/dummy/Gemfile`) |"
+    assert_includes readme_source, "| RecordingStudio | v7.0.0 (pinned in `test/dummy/Gemfile`) |"
     assert_includes readme_source, "| FlatPack        | v0.1.356 (pinned in `test/dummy/Gemfile`) |"
   end
 
@@ -317,7 +318,17 @@ class RecordingStudioApiTest < Minitest::Test
 
     assert_includes initializer_source, "config.access_recording_resolver"
     assert_includes initializer_source, 'AdminRoot.find_by(name: "Admin")'
-    assert_includes initializer_source, "config.site_admin_recording_resolver = config.access_recording_resolver"
+    refute_includes initializer_source, "site_admin_recording_resolver"
+  end
+
+  def test_dummy_accessible_initializer_names_the_admin_root
+    initializer_path = File.expand_path("dummy/config/initializers/recording_studio_accessible.rb", __dir__)
+    initializer_source = File.read(initializer_path)
+
+    assert_includes initializer_source, "config.admin_root_resolver"
+    assert_includes initializer_source, "RecordingStudio.root_recording_for(admin_root)"
+    refute_includes initializer_source, "allow_unauthorized_writes"
+    refute_includes initializer_source, "create_root_recording!"
   end
 
   def test_dummy_api_initializer_configures_admin_dashboard_path_resolver

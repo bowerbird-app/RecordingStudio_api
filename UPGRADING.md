@@ -1,5 +1,36 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.24.0
+
+Recording Studio 7. `root_recording_for` only finds a root. No migration in this gem.
+
+1. Bump the host gem to `0.24.0`.
+2. Require `recording_studio` `>= 7.0`, `< 8.0` (tag `v7.0.0`),
+   `recording_studio_accessible` `>= 0.44.0`, `< 1.0` (tag `v0.44.0`),
+   `recording_studio_logs` `>= 0.8.0`, `< 1.0` (tag `v0.8.0`),
+   `recording_studio_metrics` `>= 0.9.0`, `< 1.0` (tag `v0.9.0`),
+   `recording_studio_moveable` `>= 5.0`, `< 6.0` (tag `v5.0.0`), and
+   `recording_studio_trashable` `>= 0.17.0`, `< 1.0` (tag `v0.17.0`).
+   Keep `require "recording_studio_trashable/query"` so the Trashable engine
+   stays unloaded.
+3. Lookup call sites keep `RecordingStudio.root_recording_for` and handle
+   `nil`. A path that created a root by looking it up calls
+   `RecordingStudio.create_root_recording!(recordable, actor:)`.
+4. API creates still need a parent recording and still call `Recording#record`
+   on that parent's root. A create with no parent returns an input error.
+5. Set `config.authorize_write`. Do not set `allow_unauthorized_writes`.
+   The callback receives the actor and the action. Users and API clients
+   both write.
+6. Moveable `move_to!(new_parent:, actor:, metadata:)` is unchanged. It
+   still locks with `RecordingStudio.lock_for_move!`. Core raises
+   `SlotTaken` from that lock only when the moved type is a declared
+   single child. This gem does not declare one, and it does not call
+   `move_to!`. The move action stays Moveable's handler.
+7. Site metrics read `RecordingStudioAccessible.admin_root`. Set
+   `RecordingStudioAccessible` `config.admin_root_resolver` to that
+   kept root. `RecordingStudioAdmin.configuration.site_admin_recording_resolver`
+   is gone. A resolver that raises, or a missing root, denies the metric.
+
 ## Upgrading to 0.23.4
 
 Kept and trashed filtering uses Recording Studio `kept` and `kept_sql`.
