@@ -6,7 +6,7 @@ module RecordingStudioApi
   # Key layout, unchanged from the HTTP limiter:
   #   {namespace}:{kind}:{identifier}:{window}
   #
-  # `kind` is `api_read`, `api_write`, `oauth`, or `api_pre_auth`.
+  # `kind` is `api_read`, `api_write`, `oauth`, `api_pre_auth`, or `api_failed_auth`.
   # `window` is `now.to_i / period`. The default namespace is
   # `recording_studio_api`.
   class RateLimit
@@ -36,13 +36,16 @@ module RecordingStudioApi
       def limited? = !allowed
     end
 
+    class StoreUnavailable < StandardError; end
+
     BUCKETS = {
       "read" => "api_read",
       "api_read" => "api_read",
       "write" => "api_write",
       "api_write" => "api_write",
       "oauth" => "oauth",
-      "api_pre_auth" => "api_pre_auth"
+      "api_pre_auth" => "api_pre_auth",
+      "api_failed_auth" => "api_failed_auth"
     }.freeze
 
     class << self
@@ -61,6 +64,8 @@ module RecordingStudioApi
           [policy.rate_limit_oauth_requests.to_i, policy.rate_limit_oauth_period_seconds.to_i]
         when "api_pre_auth"
           [policy.rate_limit_api_pre_auth_requests.to_i, policy.rate_limit_api_pre_auth_period_seconds.to_i]
+        when "api_failed_auth"
+          [policy.rate_limit_api_failed_auth_requests.to_i, policy.rate_limit_api_failed_auth_period_seconds.to_i]
         when "api_read"
           [
             positive_or(policy.rate_limit_api_read_requests, policy.rate_limit_api_requests),
@@ -123,6 +128,12 @@ module RecordingStudioApi
           reset_at: moment + retry_after,
           key: counter_key
         )
+      end
+
+      def store_error?(error)
+        return true if error.is_a?(StoreUnavailable)
+
+        redis_unavailable?(error)
       end
 
       private

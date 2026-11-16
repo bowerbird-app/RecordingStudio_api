@@ -15,6 +15,7 @@ module RecordingStudioApi
       def validate_enabled_rate_limits!
         validate_rate_limit!(:oauth, rate_limit_oauth_requests, rate_limit_oauth_period_seconds) if rate_limit_oauth_enabled
         validate_rate_limit!(:api_pre_auth, rate_limit_api_pre_auth_requests, rate_limit_api_pre_auth_period_seconds) if rate_limit_api_pre_auth_enabled
+        validate_rate_limit!(:api_failed_auth, rate_limit_api_failed_auth_requests, rate_limit_api_failed_auth_period_seconds) if rate_limit_api_failed_auth_enabled
         return unless rate_limit_api_enabled
 
         validate_rate_limit!(:api_read, effective_rate_limit_value(rate_limit_api_read_requests, rate_limit_api_requests), effective_rate_limit_value(rate_limit_api_read_period_seconds, rate_limit_api_period_seconds))

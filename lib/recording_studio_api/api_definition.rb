@@ -24,10 +24,13 @@ module RecordingStudioApi
                   :rate_limit_oauth_enabled,
                   :rate_limit_api_enabled,
                   :rate_limit_api_pre_auth_enabled,
+                  :rate_limit_api_failed_auth_enabled,
                   :rate_limit_oauth_requests,
                   :rate_limit_oauth_period_seconds,
                   :rate_limit_api_pre_auth_requests,
                   :rate_limit_api_pre_auth_period_seconds,
+                  :rate_limit_api_failed_auth_requests,
+                  :rate_limit_api_failed_auth_period_seconds,
                   :rate_limit_api_requests,
                   :rate_limit_api_period_seconds,
                   :rate_limit_api_read_requests,
@@ -143,8 +146,10 @@ module RecordingStudioApi
         api_management_authorization_required
         credential_ttl access_token_ttl
         rate_limit_oauth_enabled rate_limit_api_enabled rate_limit_api_pre_auth_enabled
+        rate_limit_api_failed_auth_enabled
         rate_limit_oauth_requests rate_limit_oauth_period_seconds
         rate_limit_api_pre_auth_requests rate_limit_api_pre_auth_period_seconds
+        rate_limit_api_failed_auth_requests rate_limit_api_failed_auth_period_seconds
         rate_limit_api_requests rate_limit_api_period_seconds
         rate_limit_api_read_requests rate_limit_api_read_period_seconds
         rate_limit_api_write_requests rate_limit_api_write_period_seconds

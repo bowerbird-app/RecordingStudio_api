@@ -65,6 +65,14 @@ class RateLimitingTest < ActiveSupport::TestCase
       @ttl
     end
 
+    def get(key)
+      @counts.key?(key) ? @counts[key] : nil
+    end
+
+    def store(key, count)
+      @counts[key] = count
+    end
+
     def eval(script, keys:, argv:)
       eval_calls << { script: script, keys: keys, argv: argv }
       key = keys.fetch(0)
@@ -117,11 +125,13 @@ class RateLimitingTest < ActiveSupport::TestCase
     RecordingStudioApi.instance_variable_set(:@configuration, RecordingStudioApi::Configuration.new)
     RecordingStudioApi::Concerns::RateLimiting.decider = nil
     RecordingStudioApi::Concerns::RateLimiting.reset_redis_client!
+    RecordingStudioApi::RateLimit::ProcessWindow.reset!
   end
 
   def teardown
     RecordingStudioApi::Concerns::RateLimiting.decider = nil
     RecordingStudioApi::Concerns::RateLimiting.reset_redis_client!
+    RecordingStudioApi::RateLimit::ProcessWindow.reset!
     RecordingStudioApi.instance_variable_set(:@configuration, @original_configuration)
   end
 
@@ -359,17 +369,29 @@ class RateLimitingTest < ActiveSupport::TestCase
     assert_equal({ limited: true, limit: 120, remaining: 0, retry_after: 60 }, decision)
   end
 
-  test "resolved decision still fails open for authenticated api bucket by default" do
+  test "resolved decision uses the in-process window for api read when redis is missing" do
     RecordingStudioApi.configuration.rate_limit_api_enabled = true
     RecordingStudioApi.configuration.rate_limit_fail_closed = true
-    RecordingStudioApi.configuration.rate_limit_fail_closed_buckets = %w[oauth api_pre_auth]
+    RecordingStudioApi.configuration.rate_limit_fail_closed_buckets = %w[oauth api_pre_auth api]
+    RecordingStudioApi.configuration.rate_limit_api_read_requests = 1
+    RecordingStudioApi.configuration.rate_limit_api_read_period_seconds = 30
     harness = Harness.new(path: "/recording_studio_api/api/v1/pages", method: :get)
+    logger = FakeLogger.new
+    reports = []
 
-    decision = harness.stub(:rate_limit_redis_client, nil) do
-      harness.send(:resolved_rate_limit_decision)
+    decisions = with_fallback_reporter(logger, reports) do
+      harness.stub(:rate_limit_redis_client, nil) do
+        Array.new(2) { harness.send(:resolved_rate_limit_decision) }
+      end
     end
 
-    assert_equal({ limited: false, limit: 0, remaining: 0, retry_after: 0 }, decision)
+    assert_equal false, decisions.first.fetch(:limited)
+    assert_equal true, decisions.last.fetch(:limited)
+    assert_equal 1, decisions.last.fetch(:limit)
+    assert_equal 0, decisions.last.fetch(:remaining)
+    assert(reports.any? { |error, details| details[:context][:bucket] == "api_read" && error.is_a?(RecordingStudioApi::RateLimit::StoreUnavailable) })
+    assert(logger.messages.any? { |message| message.include?("fell back to the in-process window") })
+    assert(logger.messages.none? { |message| message.include?("Bearer") })
   end
 
   test "enforce_rate_limit renders too many requests response with headers" do
@@ -435,29 +457,65 @@ class RateLimitingTest < ActiveSupport::TestCase
     assert_equal 1, redis.expire_calls.length
   end
 
-  test "http limiter ignores rate_limit_check_fail_closed when redis fails" do
+  test "http limiter keeps throttling api write in process when redis raises" do
     RecordingStudioApi.configuration.rate_limit_api_enabled = true
     RecordingStudioApi.configuration.rate_limit_check_fail_closed = true
     RecordingStudioApi.configuration.rate_limit_fail_closed = true
-    RecordingStudioApi.configuration.rate_limit_fail_closed_buckets = %w[oauth api_pre_auth]
-    RecordingStudioApi.configuration.rate_limit_api_read_requests = 2
-    RecordingStudioApi.configuration.rate_limit_api_read_period_seconds = 30
+    RecordingStudioApi.configuration.rate_limit_fail_closed_buckets = %w[oauth api_pre_auth api]
+    RecordingStudioApi.configuration.rate_limit_api_write_requests = 2
+    RecordingStudioApi.configuration.rate_limit_api_write_period_seconds = 30
 
-    harness = Harness.new(path: "/recording_studio_api/api/v1/pages", method: :get)
+    harness = Harness.new(path: "/recording_studio_api/api/v1/pages", method: :post)
     broken = Object.new
     def broken.eval(*)
       raise Redis::BaseError, "offline"
     end
     logger = FakeLogger.new
-    RecordingStudioApi::Concerns::RateLimiting.instance_variable_set(:@redis_client, broken)
+    reports = []
 
-    decision = Rails.stub(:logger, logger) do
-      harness.send(:resolved_rate_limit_decision)
+    decisions = harness.stub(:rate_limit_redis_client, broken) do
+      with_fallback_reporter(logger, reports) do
+        Array.new(3) { harness.send(:resolved_rate_limit_decision) }
+      end
     end
 
-    assert_equal({ limited: false, limit: 0, remaining: 0, retry_after: 0 }, decision)
-    assert_nil RecordingStudioApi::Concerns::RateLimiting.instance_variable_get(:@redis_client)
+    assert_equal([false, false, true], decisions.map { |decision| decision.fetch(:limited) })
     assert_includes logger.messages.first, "rate limiter unavailable"
+    assert_equal 3, reports.length
+    assert(reports.all? { |_error, details| details[:context][:bucket] == "api_write" })
+    assert(logger.messages.none? { |message| message.include?("offline-token") })
+  end
+
+  test "oauth and ip limits fail closed when redis raises" do
+    RecordingStudioApi.configuration.rate_limit_oauth_enabled = true
+    RecordingStudioApi.configuration.rate_limit_api_pre_auth_enabled = true
+    RecordingStudioApi.configuration.rate_limit_fail_closed = true
+    RecordingStudioApi.configuration.rate_limit_fail_closed_buckets = %w[oauth api_pre_auth api]
+    RecordingStudioApi.configuration.rate_limit_oauth_requests = 10
+    RecordingStudioApi.configuration.rate_limit_oauth_period_seconds = 60
+    RecordingStudioApi.configuration.rate_limit_api_pre_auth_requests = 120
+    RecordingStudioApi.configuration.rate_limit_api_pre_auth_period_seconds = 60
+    broken = Object.new
+    def broken.eval(*)
+      raise Redis::BaseError, "offline"
+    end
+    oauth = Harness.new(path: "/recording_studio_api/oauth/token", method: :post)
+    ip_limit = Harness.new(path: "/recording_studio_api/api/v1/pages", method: :get)
+
+    oauth_decision = nil
+    ip_decision = nil
+    Rails.stub(:logger, FakeLogger.new) do
+      oauth_decision = oauth.stub(:rate_limit_redis_client, broken) do
+        oauth.send(:resolved_rate_limit_decision)
+      end
+      ip_decision = ip_limit.stub(:rate_limit_redis_client, broken) do
+        ip_limit.send(:with_rate_limit_bucket, "api_pre_auth") { ip_limit.send(:resolved_rate_limit_decision) }
+      end
+    end
+
+    assert_equal({ limited: true, limit: 10, remaining: 0, retry_after: 60 }, oauth_decision)
+    assert_equal({ limited: true, limit: 120, remaining: 0, retry_after: 60 }, ip_decision)
+    assert_equal 0, RecordingStudioApi::RateLimit::ProcessWindow.entry_count
   end
 
   test "resets memoized redis client after a redis error" do
@@ -482,35 +540,123 @@ class RateLimitingTest < ActiveSupport::TestCase
     assert_nil RecordingStudioApi::Concerns::RateLimiting.instance_variable_get(:@redis_client)
   end
 
-  test "skips pre-auth rate limit for bearer requests when authenticated api limits are enabled" do
+  test "a request with no token counts against the ip limit" do
     RecordingStudioApi.configuration.rate_limit_api_pre_auth_enabled = true
-    RecordingStudioApi.configuration.rate_limit_api_enabled = true
+    RecordingStudioApi.configuration.rate_limit_api_pre_auth_requests = 2
+    RecordingStudioApi.configuration.rate_limit_api_pre_auth_period_seconds = 20
+    harness = Harness.new(path: "/recording_studio_api/api/v1/pages", method: :get, remote_ip: "203.0.113.9")
+    redis = FakeRedis.new(incr_values: [1], ttl: 18)
 
-    harness = Harness.new(
-      path: "/recording_studio_api/api/v1/pages",
-      method: :get,
-      headers: { "Authorization" => "Bearer rsapi_at_token" }
-    )
-
-    assert harness.send(:skip_api_pre_auth_rate_limit_for_bearer?)
-
-    called = false
-    harness.stub(:enforce_rate_limit!, -> { called = true }) do
-      harness.send(:enforce_api_pre_auth_rate_limit!)
+    harness.stub(:rate_limit_redis_client, redis) do
+      refute harness.send(:enforce_api_pre_auth_rate_limit!)
     end
-    refute called
+
+    assert_includes redis.incr_calls.first, ":api_pre_auth:ip:203.0.113.9:"
   end
 
-  test "keeps pre-auth rate limit for bearer requests when authenticated api limits are disabled" do
+  test "a bearer header does not count against the ip limit before authentication" do
     RecordingStudioApi.configuration.rate_limit_api_pre_auth_enabled = true
-    RecordingStudioApi.configuration.rate_limit_api_enabled = false
-
+    RecordingStudioApi.configuration.rate_limit_api_enabled = true
     harness = Harness.new(
       path: "/recording_studio_api/api/v1/pages",
       method: :get,
-      headers: { "Authorization" => "Bearer rsapi_at_token" }
+      headers: { "Authorization" => "Bearer rsapi_at_secret" }
+    )
+    redis = FakeRedis.new(incr_values: [1], ttl: 18)
+
+    harness.stub(:rate_limit_redis_client, redis) do
+      harness.send(:enforce_api_pre_auth_rate_limit!)
+    end
+
+    assert_empty redis.incr_calls
+  end
+
+  test "a rejected bearer counts against the ip limit and the failed-auth limit" do
+    RecordingStudioApi.configuration.rate_limit_api_pre_auth_enabled = true
+    RecordingStudioApi.configuration.rate_limit_api_pre_auth_requests = 10
+    RecordingStudioApi.configuration.rate_limit_api_pre_auth_period_seconds = 60
+    RecordingStudioApi.configuration.rate_limit_api_failed_auth_enabled = true
+    RecordingStudioApi.configuration.rate_limit_api_failed_auth_requests = 2
+    RecordingStudioApi.configuration.rate_limit_api_failed_auth_period_seconds = 60
+    harness = Harness.new(
+      path: "/recording_studio_api/api/v1/pages",
+      method: :get,
+      remote_ip: "203.0.113.9",
+      headers: { "Authorization" => "Bearer rsapi_at_secret" }
+    )
+    redis = FakeRedis.new(incr_values: [], ttl: 50)
+
+    blocked = harness.stub(:rate_limit_redis_client, redis) do
+      results = Array.new(3) { harness.send(:count_failed_authentication!) }
+      results
+    end
+
+    assert_equal [false, false, true], blocked
+    assert_equal :too_many_requests, harness.rendered_payload.fetch(:status)
+    assert_equal(3, redis.incr_calls.count { |key| key.include?(":api_pre_auth:ip:203.0.113.9:") })
+    assert_equal(3, redis.incr_calls.count { |key| key.include?(":api_failed_auth:ip:203.0.113.9:") })
+    assert(redis.incr_calls.none? { |key| key.include?("rsapi_at_secret") })
+  end
+
+  test "failed-auth gate returns 429 before another authentication once the window is full" do
+    RecordingStudioApi.configuration.rate_limit_api_failed_auth_enabled = true
+    RecordingStudioApi.configuration.rate_limit_api_failed_auth_requests = 2
+    RecordingStudioApi.configuration.rate_limit_api_failed_auth_period_seconds = 60
+    harness = Harness.new(
+      path: "/recording_studio_api/api/v1/pages",
+      method: :get,
+      remote_ip: "203.0.113.9",
+      headers: { "Authorization" => "Bearer rsapi_at_secret" }
+    )
+    redis = FakeRedis.new(incr_values: [], ttl: 40)
+    window = Time.current.to_i / 60
+    key = RecordingStudioApi::RateLimit.key(kind: "api_failed_auth", identifier: "ip:203.0.113.9", window: window)
+    redis.store(key, 2)
+
+    harness.stub(:rate_limit_redis_client, redis) do
+      harness.send(:enforce_api_failed_auth_gate!)
+    end
+
+    assert_equal :too_many_requests, harness.rendered_payload.fetch(:status)
+    assert_empty redis.incr_calls
+  end
+
+  test "a rejected bearer fails closed when redis cannot count the failed-auth limit" do
+    RecordingStudioApi.configuration.rate_limit_api_failed_auth_enabled = true
+    RecordingStudioApi.configuration.rate_limit_api_pre_auth_enabled = true
+    RecordingStudioApi.configuration.rate_limit_fail_closed = true
+    RecordingStudioApi.configuration.rate_limit_fail_closed_buckets = %w[oauth api_pre_auth api]
+    RecordingStudioApi.configuration.rate_limit_api_failed_auth_requests = 20
+    RecordingStudioApi.configuration.rate_limit_api_failed_auth_period_seconds = 60
+    harness = Harness.new(
+      path: "/recording_studio_api/api/v1/pages",
+      method: :get,
+      headers: { "Authorization" => "Bearer rsapi_at_secret" }
     )
 
-    refute harness.send(:skip_api_pre_auth_rate_limit_for_bearer?)
+    blocked = harness.stub(:rate_limit_redis_client, nil) do
+      harness.send(:count_failed_authentication!)
+    end
+
+    assert_equal true, blocked
+    assert_equal :too_many_requests, harness.rendered_payload.fetch(:status)
+    assert_equal 0, RecordingStudioApi::RateLimit::ProcessWindow.entry_count
+  end
+
+  def with_fallback_reporter(logger, reports, &)
+    subscriber = Class.new do
+      def initialize(reports)
+        @reports = reports
+      end
+
+      def report(error, handled:, severity:, context:, source:)
+        @reports << [error, { handled: handled, severity: severity, context: context, source: source }]
+      end
+    end.new(reports)
+
+    Rails.error.subscribe(subscriber)
+    Rails.stub(:logger, logger, &)
+  ensure
+    Rails.error.unsubscribe(subscriber) if subscriber
   end
 end

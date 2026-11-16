@@ -36,8 +36,10 @@ RecordingStudioApi.configure do |config|
   # Disable only for intentionally open access-point delegation on an API.
   # config.api_management_authorization_required = true
 
-  # OAuth, API pre-auth, and authenticated API buckets are rate-limited by default
-  # and fail closed when Redis is unavailable for those buckets.
+  # OAuth, unauthenticated IP, and failed-authentication IP buckets are rate-limited
+  # by default and fail closed when Redis is unavailable. Authenticated read and
+  # write limits fall back to an in-process window, including when an older
+  # initializer still lists the unused "api" bucket.
   config.rate_limit_redis_url = ENV.fetch("RECORDING_STUDIO_API_RATE_LIMIT_REDIS_URL", nil)
   config.rate_limit_redis_namespace = "recording_studio_api"
   # config.rate_limit_oauth_enabled = true
@@ -46,13 +48,16 @@ RecordingStudioApi.configure do |config|
   # config.rate_limit_api_pre_auth_enabled = true
   config.rate_limit_api_pre_auth_requests = 120
   config.rate_limit_api_pre_auth_period_seconds = 60
+  # config.rate_limit_api_failed_auth_enabled = true
+  config.rate_limit_api_failed_auth_requests = 20
+  config.rate_limit_api_failed_auth_period_seconds = 60
   # config.rate_limit_api_enabled = true
   config.rate_limit_api_read_requests = 300
   config.rate_limit_api_read_period_seconds = 60
   config.rate_limit_api_write_requests = 60
   config.rate_limit_api_write_period_seconds = 60
   # config.rate_limit_fail_closed = true
-  config.rate_limit_fail_closed_buckets = %w[oauth api_pre_auth api]
+  config.rate_limit_fail_closed_buckets = %w[oauth api_pre_auth api_failed_auth]
   # RateLimit.check returns nil when Redis is missing unless this is true.
   # config.rate_limit_check_fail_closed = false
 

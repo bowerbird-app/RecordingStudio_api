@@ -1,5 +1,22 @@
 # Upgrading RecordingStudioApi
 
+## Unreleased
+
+No migration. The gem version is unchanged on this branch.
+
+1. Rejected bearer tokens use `rate_limit_api_failed_auth_requests` and
+   `rate_limit_api_failed_auth_period_seconds`. Defaults are 20 and 60.
+   `rate_limit_api_failed_auth_enabled` defaults to true. A named API can
+   override the three settings on its definition.
+2. `rate_limit_fail_closed_buckets` defaults to
+   `%w[oauth api_pre_auth api_failed_auth]`. Delete the unused `api` name
+   from a copied initializer. Leaving `api` in the list does not turn off
+   the in-process read and write fallback. `api_failed_auth` fails closed
+   when `rate_limit_fail_closed` is true, even if the list omits it.
+3. While Redis is down, read and write limits are counted once per process.
+4. Set `config.action_dispatch.trusted_proxies` to the proxies this host
+   runs. IP buckets use `request.remote_ip`.
+
 ## Upgrading to 0.24.0
 
 Recording Studio 7. `root_recording_for` only finds a root. No migration in this gem.

@@ -167,6 +167,7 @@ class RateLimitTest < ActiveSupport::TestCase
 
     policy = RecordingStudioApi::ApiRuntimePolicy.for(:public)
     assert_equal [1, 45], RecordingStudioApi::RateLimit.limits(kind: :write, policy: policy)
+    assert_equal [20, 60], RecordingStudioApi::RateLimit.limits(kind: "api_failed_auth", policy: policy)
 
     first = RecordingStudioApi::RateLimit.check(kind: :write, identifier: "client:client-7", redis: redis)
     second = RecordingStudioApi::RateLimit.check(kind: :write, identifier: "client:client-7", redis: redis)
