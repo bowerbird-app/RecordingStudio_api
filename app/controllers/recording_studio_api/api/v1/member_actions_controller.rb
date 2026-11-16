@@ -54,26 +54,34 @@ module RecordingStudioApi
         end
 
         def member_handler_context(action, recordable_type, registration)
-          return handler_action_context(action, recordable_type, recording: nil) if registration.owns_scoping? && dispatch_read?(action)
-
-          include_trashed = include_trashed_for?(registration, action)
-          recording = resource_recording(include_trashed: include_trashed)
-          context = handler_action_context(action, recordable_type, recording: recording)
-          authorize_action!(action, context, include_trashed: include_trashed)
+          context = nil
+          RecordingStudioApi::HandlerGuard.capability!(
+            access_grant: current_access_grant,
+            api_client: current_api_client,
+            recordable_type: recordable_type,
+            action: action,
+            id: params[:id],
+            registration: registration
+          ) do |recording|
+            context = handler_action_context(action, recordable_type, recording: recording)
+          end
           context
         end
 
         def capability_action_context(action)
-          if action.owns_scoping? && dispatch_read?(action)
-            assert_action_enabled!(action, resolve_recordable_type!)
-            return action_context(action, recording: nil)
+          recordable_type = resolve_recordable_type!
+          context = nil
+          RecordingStudioApi::HandlerGuard.capability!(
+            access_grant: current_access_grant,
+            api_client: current_api_client,
+            recordable_type: recordable_type,
+            action: action,
+            id: params[:id],
+            registration: nil
+          ) do |recording|
+            assert_action_enabled!(action, recording&.recordable_type || recordable_type)
+            context = action_context(action, recording: recording)
           end
-
-          include_trashed = include_trashed_for?(action, action)
-          recording = resource_recording(include_trashed: include_trashed)
-          assert_action_enabled!(action, recording.recordable_type)
-          context = action_context(action, recording: recording)
-          authorize_action!(action, context, include_trashed: include_trashed)
           context
         end
 
@@ -120,63 +128,9 @@ module RecordingStudioApi
           )
         end
 
-        def dispatch_read?(action)
-          RecordingStudioApi::HandlerScope.dispatch_read?(action: action, role: effective_action_role(action))
-        end
-
-        def include_trashed_for?(source, action)
-          return source.include_trashed if source.trashed_semantics.nil?
-          return false unless source.include_trashed
-
-          candidate = resource_recording(include_trashed: true)
-          RecordingStudioApi::HandlerScope.dispatch_include_trashed?(
-            include_trashed: true,
-            trashed_semantics: source.trashed_semantics,
-            role: effective_action_role(action, candidate)
-          )
-        end
-
-        def effective_action_role(action, recording = nil)
-          RecordingStudioApi.configuration.capability_action_role_for(
-            action: action,
-            recording: recording,
-            api_client: current_api_client,
-            access_grant: current_access_grant
-          )
-        end
-
-        def authorize_action!(action, context, include_trashed: false)
-          required_role = RecordingStudioApi.configuration.capability_action_role_for(
-            action: action,
-            recording: context.recording,
-            api_client: context.api_client,
-            access_grant: context.access_grant
-          )
-          return if required_role.nil?
-
-          context.access_grant.authorize!(
-            recording: context.recording,
-            role: required_role,
-            include_trashed: include_trashed
-          )
-        end
-
         def assert_action_enabled!(action, recordable_type)
           raise UnsupportedActionError, "#{action.name} is not enabled for #{recordable_type}" unless action.applicable_to?(recordable_type)
           raise UnsupportedActionError, "#{action.name} is not enabled for #{recordable_type}" unless RecordingStudioApi.capability_action_enabled_for?(action, recordable_type, api: current_api_key)
-        end
-
-        def resource_recording(include_trashed: false)
-          @resource_recordings ||= {}
-          @resource_recordings[include_trashed] ||= begin
-            recordable_type = resolve_recordable_type!
-            RecordingStudioApi::ScopedRecording.find!(
-              access_grant: current_access_grant,
-              id: params[:id],
-              recordable_type: recordable_type,
-              include_trashed: include_trashed
-            )
-          end
         end
 
         def scoped_recordings(include_trashed: false)

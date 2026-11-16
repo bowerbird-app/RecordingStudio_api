@@ -1,5 +1,20 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.2.0
+
+Additive. No migration. REST responses stay the same.
+
+1. Bump the host gem to `1.2.0`.
+2. A dispatcher that runs a handler outside the REST controllers calls `RecordingStudioApi::HandlerGuard` before the handler.
+
+`resource!` covers a flat resource handler. `capability!` covers a member action. Pass the resource-handler registration when a per-type handler supplies `include_trashed`, `owns_scoping`, or `trashed_semantics`; pass `registration: nil` when the capability action itself carries those flags. `endpoint!` covers a registered endpoint. Pass the id the endpoint captured.
+
+Each method returns `recording` and `parent_recording`. Flat routes leave `parent_recording` nil. An `owns_scoping` read, a flat index or create, and an endpoint with `scope_id: false` or no recording id return a nil recording. `show`, `update`, `destroy`, capability actions, and id-scoped endpoints load through `ScopedRecording.find!` and `authorize!`. A blank id on those paths raises `NotFoundError`.
+
+`capability!` accepts an optional block. The block runs after the recording is resolved and before `authorize!`. The member-action controller uses it so enablement and input validation still happen before authorization. A raise from the block skips `authorize!`.
+
+Nested relationship handlers still resolve the parent and child in `RelationshipResourcesController`. That path also authorizes the relationship.
+
 ## Upgrading to 1.1.1
 
 No migration. Payloads, auth, and routes stay the same.

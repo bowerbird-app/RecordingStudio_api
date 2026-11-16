@@ -84,26 +84,14 @@ module RecordingStudioApi
         end
 
         def registered_resource_context(operation_name, recordable_type, registration)
-          recording = registered_resource_recording(operation_name, registration)
+          recording = RecordingStudioApi::HandlerGuard.resource!(
+            access_grant: current_access_grant,
+            recordable_type: recordable_type,
+            action_name: operation_name,
+            id: params[:id],
+            registration: registration
+          ).recording
           resource_operation_context(recording: recording, recordable_type: recordable_type)
-        end
-
-        def registered_resource_recording(operation_name, registration)
-          return if RecordingStudioApi::HandlerScope.resource_opt_out?(registration.owns_scoping?, operation_name)
-          return unless %i[show update destroy].include?(operation_name.to_sym)
-
-          include_trashed = RecordingStudioApi::HandlerScope.dispatch_include_trashed?(
-            include_trashed: registration.include_trashed,
-            trashed_semantics: registration.trashed_semantics,
-            role: RecordingStudioApi::HandlerScope.resource_role(operation_name)
-          )
-          recording = resource_recording(include_trashed: include_trashed)
-          current_access_grant.authorize!(
-            recording: recording,
-            role: RecordingStudioApi::HandlerScope.resource_role(operation_name),
-            include_trashed: include_trashed
-          )
-          recording
         end
 
         def builtin_member_recording_for(operation_name)

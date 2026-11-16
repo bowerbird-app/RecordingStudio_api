@@ -17,7 +17,11 @@ module RecordingStudioApi
         def invoke
           match = resolve_match!
           endpoint = match.endpoint
-          recording = endpoint_recording(endpoint, match.captures)
+          recording = RecordingStudioApi::HandlerGuard.endpoint!(
+            access_grant: current_access_grant,
+            endpoint: endpoint,
+            id: endpoint.recording_id_from(match.captures)
+          ).recording
           result = endpoint.handler.call(endpoint_context(endpoint, match.captures, recording))
           render json: serialize_result(endpoint, result)
         end
@@ -35,29 +39,6 @@ module RecordingStudioApi
             "#{request.request_method} is not allowed. Allowed: #{allowed.map { |verb| verb.to_s.upcase }.join(', ')}",
             allowed_http_verbs: allowed
           )
-        end
-
-        def endpoint_recording(endpoint, captures)
-          return if RecordingStudioApi::HandlerScope.endpoint_opt_out?(endpoint)
-          return unless endpoint.scopes_recording?
-
-          include_trashed = RecordingStudioApi::HandlerScope.dispatch_include_trashed?(
-            include_trashed: endpoint.include_trashed,
-            trashed_semantics: endpoint.trashed_semantics,
-            role: endpoint.authorization_role
-          )
-          recording = RecordingStudioApi::ScopedRecording.find!(
-            access_grant: current_access_grant,
-            id: endpoint.recording_id_from(captures),
-            recordable_type: endpoint.recordable_type,
-            include_trashed: include_trashed
-          )
-          current_access_grant.authorize!(
-            recording: recording,
-            role: endpoint.authorization_role,
-            include_trashed: include_trashed
-          )
-          recording
         end
 
         def endpoint_context(endpoint, captures, recording)
