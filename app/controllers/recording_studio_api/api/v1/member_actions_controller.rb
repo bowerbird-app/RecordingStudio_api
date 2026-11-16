@@ -25,18 +25,13 @@ module RecordingStudioApi
           recordable_type = resolve_recordable_type!
           handler = RecordingStudioApi.resource_handler(recordable_type, action.name, api: current_api_key)
           if handler
+            registration = RecordingStudioApi.resource_handler_registration(recordable_type, action.name, api: current_api_key)
             assert_action_enabled!(action, recordable_type)
-            handler_context = handler_action_context(action, recordable_type)
-            authorize_action!(
-              action,
-              handler_context.with(recording: recording_for_handler_authorization)
-            )
+            handler_context = member_handler_context(action, recordable_type, registration)
             result = handler.call(handler_context)
             render json: result.fetch(:json), status: result.fetch(:status, :ok)
           else
-            assert_action_enabled!(action, resource_recording.recordable_type)
-            context = action_context(action)
-            authorize_action!(action, context)
+            context = capability_action_context(action)
             result = action.handler.call(context)
             render json: serialize_result(action, result)
           end
@@ -58,9 +53,31 @@ module RecordingStudioApi
           recordable_type
         end
 
-        def handler_action_context(action, recordable_type)
+        def member_handler_context(action, recordable_type, registration)
+          return handler_action_context(action, recordable_type, recording: nil) if registration.owns_scoping?
+
+          recording = resource_recording(include_trashed: registration.include_trashed)
+          context = handler_action_context(action, recordable_type, recording: recording)
+          authorize_action!(action, context, include_trashed: registration.include_trashed)
+          context
+        end
+
+        def capability_action_context(action)
+          if action.owns_scoping?
+            assert_action_enabled!(action, resolve_recordable_type!)
+            return action_context(action, recording: nil)
+          end
+
+          recording = resource_recording(include_trashed: action.include_trashed)
+          assert_action_enabled!(action, recording.recordable_type)
+          context = action_context(action, recording: recording)
+          authorize_action!(action, context, include_trashed: action.include_trashed)
+          context
+        end
+
+        def handler_action_context(action, recordable_type, recording:)
           RecordingStudioApi::ActionContext.new(
-            recording: nil,
+            recording: recording,
             api_client: current_api_client,
             credential: current_api_credential,
             access_recording: current_access_recording,
@@ -72,15 +89,16 @@ module RecordingStudioApi
           )
         end
 
-        def action_context(action, ignored_keys: [])
+        def action_context(action, recording:, ignored_keys: [])
           RecordingStudioApi::ActionContext.new(
-            recording: resource_recording,
+            recording: recording,
             api_client: current_api_client,
             credential: current_api_credential,
             access_recording: current_access_recording,
             access_grant: current_access_grant,
             root_recording: current_root_recording,
-            params: action_params(action, ignored_keys: ignored_keys)
+            params: action_params(action, ignored_keys: ignored_keys),
+            id: params[:id]
           )
         end
 
@@ -100,7 +118,7 @@ module RecordingStudioApi
           )
         end
 
-        def authorize_action!(action, context)
+        def authorize_action!(action, context, include_trashed: false)
           required_role = RecordingStudioApi.configuration.capability_action_role_for(
             action: action,
             recording: context.recording,
@@ -109,11 +127,11 @@ module RecordingStudioApi
           )
           return if required_role.nil?
 
-          context.access_grant.authorize!(recording: context.recording, role: required_role)
-        end
-
-        def recording_for_handler_authorization
-          scoped_recordings.find_by(id: params[:id]) || current_root_recording || current_access_recording
+          context.access_grant.authorize!(
+            recording: context.recording,
+            role: required_role,
+            include_trashed: include_trashed
+          )
         end
 
         def assert_action_enabled!(action, recordable_type)
@@ -121,21 +139,22 @@ module RecordingStudioApi
           raise UnsupportedActionError, "#{action.name} is not enabled for #{recordable_type}" unless RecordingStudioApi.capability_action_enabled_for?(action, recordable_type, api: current_api_key)
         end
 
-        def resource_recording
-          @resource_recording ||= begin
-            recordable_type = RecordingStudioApi.recordable_type_for_resource(params[:resource], api: current_api_key)
-            raise RecordingStudioApi::NotFoundError, "Unknown API resource #{params[:resource]}" if recordable_type.blank?
-
-            recording = scoped_recordings.find_by(id: params[:id])
-            raise RecordingStudioApi::NotFoundError, "Resource was not found in this API scope" if recording.nil?
-            raise RecordingStudioApi::NotFoundError, "Resource type does not match #{recordable_type}" unless recording.recordable_type == recordable_type
-
-            recording
+        def resource_recording(include_trashed: false)
+          @resource_recordings ||= {}
+          @resource_recordings[include_trashed] ||= begin
+            recordable_type = resolve_recordable_type!
+            RecordingStudioApi::ScopedRecording.find!(
+              access_grant: current_access_grant,
+              id: params[:id],
+              recordable_type: recordable_type,
+              include_trashed: include_trashed
+            )
           end
         end
 
-        def scoped_recordings
-          @scoped_recordings ||= current_access_grant.accessible_recordings
+        def scoped_recordings(include_trashed: false)
+          @scoped_recordings ||= {}
+          @scoped_recordings[include_trashed] ||= current_access_grant.accessible_recordings(include_trashed: include_trashed)
         end
 
         def serialize_result(action, result)

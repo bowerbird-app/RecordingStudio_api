@@ -4,6 +4,7 @@ require "date"
 require "rubygems/version"
 
 require_relative "action_input_contract"
+require_relative "handler_scope"
 require_relative "ui_widget_id"
 
 module RecordingStudioApi
@@ -11,7 +12,7 @@ module RecordingStudioApi
     ALLOWED_HTTP_VERBS = %i[get post patch put delete].freeze
     ALLOWED_SCOPES = %i[collection resource member].freeze
 
-    attr_reader :name, :capability, :version, :version_notes, :deprecation, :http_verb, :handler, :serializer, :scope, :openapi, :input_contract, :required_role, :ui
+    attr_reader :name, :capability, :version, :version_notes, :deprecation, :http_verb, :handler, :serializer, :scope, :openapi, :input_contract, :required_role, :ui, :include_trashed, :owns_scoping
 
     def initialize(name:, capability:, http_verb:, handler:, version: nil, version_notes: nil, deprecation: nil, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil, **options)
       @name = name.to_s
@@ -27,6 +28,8 @@ module RecordingStudioApi
       @per_type_openapi = options.delete(:openapi_for)
       @input_contract = normalize_input_contract(input_contract)
       @required_role = normalize_required_role(required_role)
+      @include_trashed = HandlerScope.flag(options.delete(:include_trashed) { false }, name: :include_trashed)
+      @owns_scoping = HandlerScope.flag(options.delete(:owns_scoping) { false }, name: :owns_scoping)
       @ui = UiWidgetId.normalize(options.delete(:ui), name: name)
       raise ArgumentError, "unknown keywords: #{options.keys.join(', ')}" if options.any?
     end
@@ -44,8 +47,18 @@ module RecordingStudioApi
       validate_openapi_for!
       raise ConfigurationError, "Input contract must be a RecordingStudioApi::ActionInputContract for #{name}" if input_contract && !input_contract.is_a?(ActionInputContract)
       raise ConfigurationError, "required_role must be one of: #{valid_access_roles.join(', ')} for #{name}" if required_role && !valid_access_roles.include?(required_role)
+
+      HandlerScope.assert_read_opt_out!(name: name, http_verb: http_verb, required_role: required_role) if owns_scoping
       raise ConfigurationError, "version_notes must be a string or array of strings for #{name}" unless version_notes.is_a?(Array)
       raise ConfigurationError, "deprecation must be a hash for #{name}" unless deprecation.is_a?(Hash)
+    end
+
+    def read_action?
+      HandlerScope.read_action?(http_verb: http_verb, required_role: required_role)
+    end
+
+    def owns_scoping?
+      owns_scoping
     end
 
     def applicable_to?(recordable_type)

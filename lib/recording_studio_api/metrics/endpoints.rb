@@ -81,8 +81,8 @@ module RecordingStudioApi
 
       module_function
 
-      def expand(name:, http_verb:, path:, handler:, serializer:, openapi:, input_contract:, ui:)
-        registration = { name:, http_verb:, path:, handler:, serializer:, openapi:, input_contract:, ui: }
+      def expand(name:, http_verb:, path:, handler:, serializer:, openapi:, input_contract:, ui:, **scope)
+        registration = { name:, http_verb:, path:, handler:, serializer:, openapi:, input_contract:, ui:, **scope }
         return catalog_registrations(registration) if handler.equal?(RecordingStudioMetrics::Api::DiscoveryHandler)
         return metric_registrations(registration) if handler.equal?(RecordingStudioMetrics::Api::ExecuteHandler)
 

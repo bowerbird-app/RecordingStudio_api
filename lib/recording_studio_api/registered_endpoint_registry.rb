@@ -9,7 +9,7 @@ module RecordingStudioApi
       @registrations = {}
     end
 
-    def register(name, http_verb:, path:, handler:, serializer: nil, openapi: nil, input_contract: nil, ui: nil)
+    def register(name, http_verb:, path:, handler:, serializer: nil, openapi: nil, input_contract: nil, ui: nil, recordable_type: nil, include_trashed: false, owns_scoping: false)
       registration = RegisteredEndpoint.new(
         name: name,
         http_verb: http_verb,
@@ -18,7 +18,10 @@ module RecordingStudioApi
         serializer: serializer,
         openapi: openapi,
         input_contract: input_contract,
-        ui: ui
+        ui: ui,
+        recordable_type: recordable_type,
+        include_trashed: include_trashed,
+        owns_scoping: owns_scoping
       )
       registration.validate!
 

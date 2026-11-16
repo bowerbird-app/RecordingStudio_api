@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Registered handlers no longer run for a route id outside the token's scope.
+  Resource, member, nested, and registered-endpoint handlers resolve that id
+  through `accessible_recordings` before the handler runs. A foreign id, a
+  wrong type, or a trashed recording returns 404. The handler does not run.
+- The root fallback in member-handler authorization is gone. A missing member
+  id is 404, not a check against the token's root.
+- This gem calls `access_grant.authorize!` on the resolved recording.
+  `index` and `show` require `:view`. `create`, `update`, and `destroy`
+  require `:edit`. A member action keeps its `required_role`. A registered
+  endpoint uses `:view` for GET and `:edit` for every other verb.
+- A nested index or create scopes `parent_id` from the route. A flat create
+  does not scope `parent_id` from the body. Move destinations and other body
+  ids stay the handler's job.
+
+### Added
+- `include_trashed: true` on `register_resource_handler`,
+  `register_capability_action`, and `register_endpoint`. The route lookup
+  and `authorize!` include trashed recordings. The default is kept
+  recordings only.
+- `owns_scoping: true` skips that lookup and `authorize!`. Registration
+  rejects the flag unless the action is a read action. Support uses it for
+  public published help pages. The handler then owns scoping.
+- `recordable_type:` on `register_endpoint`. A path `:id` is scoped to that
+  type. An endpoint with no `recordable_type` is unchanged, and `recording`
+  on the context is nil.
+- Handler contexts now include the resolved `recording` and, on nested
+  routes, `parent_recording`. `id`, `parent_id`, `relationship_id`, and
+  `params` stay set.
+
+### Upgrade notes
+- Read `context.recording` or `context.parent_recording`. Do not load a
+  route id with `Recording.find`.
+- A handler that previously loaded an arbitrary id now gets 404 before it
+  runs. Pass `include_trashed: true` for restore or destroy. Pass
+  `owns_scoping: true` only on a read action that must cross roots, and
+  scope inside the handler.
+- An endpoint whose `:id` is a recording passes `recordable_type:`.
+- These notes are for 0.26.0. This change does not bump the gem version
+  and does not add a migration.
+
 ## [0.25.0] - 2026-11-16
 
 ### Fixed

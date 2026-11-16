@@ -13,6 +13,8 @@ require "recording_studio_api/routing"
 require "recording_studio_api/authorized_by"
 require "recording_studio_api/authenticated_client"
 require "recording_studio_api/access_grant"
+require "recording_studio_api/handler_scope"
+require "recording_studio_api/scoped_recording"
 require "recording_studio_api/integration"
 require "recording_studio_api/progress_reporting"
 require "recording_studio_api/action_context"
@@ -155,7 +157,7 @@ module RecordingStudioApi
       Integration.oauth_error_status(error)
     end
 
-    def register_endpoint(name, api: :public, http_verb:, path:, handler:, serializer: nil, openapi: nil, input_contract: nil, ui: nil)
+    def register_endpoint(name, api: :public, http_verb:, path:, handler:, serializer: nil, openapi: nil, input_contract: nil, ui: nil, recordable_type: nil, include_trashed: false, owns_scoping: false)
       registry = configuration.api(api).registered_endpoint_registry
       Metrics::Endpoints.expand(
         name:,
@@ -165,7 +167,10 @@ module RecordingStudioApi
         serializer:,
         openapi:,
         input_contract:,
-        ui:
+        ui:,
+        recordable_type:,
+        include_trashed:,
+        owns_scoping:
       ).map do |registration|
         registry.register(registration.fetch(:name), **registration.except(:name))
       end.first
@@ -193,15 +198,26 @@ module RecordingStudioApi
       end || []
     end
 
-    def register_resource_handler(recordable_type, action, api: :public, handler:)
-      configuration.api(api).resource_handler_registry.register(recordable_type, action, handler: handler)
+    def register_resource_handler(recordable_type, action, api: :public, handler:, include_trashed: false, owns_scoping: false)
+      configuration.api(api).resource_handler_registry.register(
+        recordable_type,
+        action,
+        handler: handler,
+        include_trashed: include_trashed,
+        owns_scoping: owns_scoping,
+        api: api
+      )
     end
 
     def resource_handler(recordable_type, action, api: :public)
       configuration.fetch_api(api).resource_handler_registry.fetch(recordable_type, action)
     end
 
-    def register_capability_action(name, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil, ui: nil, api: :public, **)
+    def resource_handler_registration(recordable_type, action, api: :public)
+      configuration.fetch_api(api).resource_handler_registry.registration(recordable_type, action)
+    end
+
+    def register_capability_action(name, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil, ui: nil, include_trashed: false, owns_scoping: false, api: :public, **)
       configuration.api(api).action_registry.register(
         name,
         capability: capability,
@@ -216,6 +232,8 @@ module RecordingStudioApi
         input_contract: input_contract,
         required_role: required_role,
         ui: ui,
+        include_trashed: include_trashed,
+        owns_scoping: owns_scoping,
         **
       )
     end

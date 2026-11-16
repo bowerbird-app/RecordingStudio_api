@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "action_input_contract"
+require_relative "handler_scope"
 require_relative "ui_widget_id"
 
 module RecordingStudioApi
@@ -12,9 +13,9 @@ module RecordingStudioApi
 
     Match = Data.define(:endpoint, :captures)
 
-    attr_reader :name, :http_verb, :path, :handler, :serializer, :openapi, :input_contract, :ui
+    attr_reader :name, :http_verb, :path, :handler, :serializer, :openapi, :input_contract, :ui, :recordable_type, :include_trashed, :owns_scoping
 
-    def initialize(name:, http_verb:, path:, handler:, serializer: nil, openapi: nil, input_contract: nil, ui: nil)
+    def initialize(name:, http_verb:, path:, handler:, serializer: nil, openapi: nil, input_contract: nil, ui: nil, recordable_type: nil, include_trashed: false, owns_scoping: false)
       @name = name.to_s
       @http_verb = http_verb.to_sym
       @path = normalize_path(path)
@@ -23,6 +24,14 @@ module RecordingStudioApi
       @openapi = normalize_openapi(openapi)
       @input_contract = normalize_input_contract(input_contract)
       @ui = UiWidgetId.normalize(ui, name: name)
+      raw_recordable_type = recordable_type.to_s.strip
+      @recordable_type = raw_recordable_type.empty? ? nil : raw_recordable_type
+      @include_trashed = HandlerScope.flag(include_trashed, name: :include_trashed)
+      @owns_scoping = HandlerScope.flag(owns_scoping, name: :owns_scoping)
+    end
+
+    def owns_scoping?
+      owns_scoping
     end
 
     def validate!
@@ -32,6 +41,8 @@ module RecordingStudioApi
       raise ConfigurationError, "Serializer must respond to call for #{name}" if serializer && !serializer.respond_to?(:call)
       raise ConfigurationError, "OpenAPI metadata must be a hash for #{name}" unless openapi.is_a?(Hash)
       raise ConfigurationError, "Input contract must be a RecordingStudioApi::ActionInputContract for #{name}" if input_contract && !input_contract.is_a?(ActionInputContract)
+
+      HandlerScope.assert_read_opt_out!(name: name, http_verb: http_verb) if owns_scoping
     end
 
     def path_segments

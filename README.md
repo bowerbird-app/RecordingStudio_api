@@ -713,14 +713,14 @@ RecordingStudioApi.register_resource_handler(
 
 Collection actions take the recordable type from the resource name. Nested
 relationship routes use the relationship's child type. When a handler is
-registered, this gem does not load the recording or authorize the parent.
-The handler receives the same context class plus the raw ids from the
-route, and returns `{ json:, status: }`.
+registered, this gem loads the route recording from the token's scope and
+calls `access_grant.authorize!` before the handler runs. A missing, foreign,
+or wrong-type id is 404 and the handler does not run. The handler returns
+`{ json:, status: }`.
 
 Resource and nested handlers get a `ResourceOperationContext` with:
 
-- `id`, `parent_id`, `relationship_id` — raw route ids (`id` on member
-  routes, `parent_id` / `relationship_id` on nested routes)
+- `id`, `parent_id`, `relationship_id`. These are the raw route ids. `id` is set on member routes. `parent_id` and `relationship_id` are set on nested routes.
 - `params`, `request_params`, `api_client`, `access_grant`, `actor`
 - `recordable_type`, `resource_name`, `credential`, `access_recording`,
   `root_recording`, `api_version`, `scoped_recordings`, `idempotency_key`
@@ -734,19 +734,37 @@ Map a disallowed parent with
 `RecordingStudioApi::InvalidParentInput.call(message, recordable_type:)`.
 Builtin create raises that error. Access is unchanged.
 
-`recording` and `parent_recording` stay `nil` on that path. Look the
-record up yourself.
+Use `recording` and `parent_recording` from the context. Do not load a route
+id with `Recording.find`. `id`, `parent_id`, `relationship_id`, and `params`
+stay on the context so an existing handler still sees them.
 
-Member-action handlers (for example `move`) get an `ActionContext` with:
+`index` and `show` authorize `:view`. `create`, `update`, and `destroy`
+authorize `:edit`. A nested index or create authorizes the parent. A nested
+show, update, or destroy authorizes the child. A flat create does not scope
+`parent_id` from the body. A move destination and any other id in the body
+stay the handler's job.
+
+Pass `include_trashed: true` on `register_resource_handler` when the action
+must see a trashed recording, such as restore or destroy. The default lookup
+is kept recordings only.
+
+Pass `owns_scoping: true` only for a read action whose handler must see a
+recording outside the token's root. Registration rejects the flag on a write
+action. Support uses this for public published help pages. The handler then
+owns scoping, and this gem does not call `authorize!` for that action.
+
+Member-action handlers (for example `move`) get an `ActionContext` with the
+same scoped `recording`, plus:
 
 - `id`, `recordable_type`
 - `params`, `api_client`, `access_grant`, `actor`
 - `credential`, `access_recording`, `root_recording`
 
-`recording` stays `nil`. Route keys are omitted from a capability
-handler's params before the input contract runs. The handler owns access
-checks for that type and action. This gem only routes the call. Routes
-without a handler keep the shared lookup and operations.
+The member action's `required_role` is the role passed to `authorize!`.
+Route keys are omitted from a capability handler's params before the input
+contract runs. `include_trashed` and `owns_scoping` on
+`register_capability_action` follow the same rules. Routes without a
+per-type handler keep the shared lookup and operations.
 
 ### Fields, relationships, and includes
 
@@ -1164,13 +1182,19 @@ Routes use the same mount and version prefix as the tree API (`/recording_studio
 
 Dispatch matches **path and HTTP verb**. Register `GET users` and `POST users` (or `GET users/:id` and `PATCH users/:id`) as separate endpoints. A request whose path matches but whose verb does not returns **405 Method Not Allowed** with an `Allow` header. Recordable CRUD stays on its own routes (`GET` index/show, `POST` create, `PATCH` update, `DELETE` destroy). Capability actions keep the verb they registered (`POST` unless declared otherwise).
 
-Handlers receive `RecordingStudioApi::RegisteredEndpointContext`. That object has the client, credential, access recording, access grant, root, and params. It does not have `recording`. Check Accessible against the client's access recording inside the handler when you need it. The gem does not require a recording for these endpoints.
+Handlers receive `RecordingStudioApi::RegisteredEndpointContext`. That object has the client, credential, access recording, access grant, root, params, and `recording`.
+
+Pass `recordable_type:` when the path `:id` is a recording. This gem loads that id from the token's scope, checks the type, and calls `access_grant.authorize!` before the handler runs. GET requires `:view`. Every other verb requires `:edit`. A foreign or wrong-type id is 404 and the handler does not run. `include_trashed: true` includes a trashed recording in that lookup.
+
+Leave `recordable_type` unset when `:id` is not a recording. `people/:id` stays a path parameter and `recording` is nil.
+
+`owns_scoping: true` skips the lookup and `authorize!`. Registration allows it only for GET. The handler then owns scoping. Support uses that for public published help pages.
 
 OpenAPI and Scalar list these routes under the `Endpoints` tag.
 
 ### Capability-backed handlers
 
-Handlers receive `RecordingStudioApi::ActionContext` or `RecordingStudioApi::ResourceOperationContext`. Custom handlers should authorize through the grant before mutating or exposing sensitive data:
+Handlers receive `RecordingStudioApi::ActionContext` or `RecordingStudioApi::ResourceOperationContext`. The route recording is already scoped and authorized. Use `context.recording`. An id in the body is still the handler's job to scope and authorize.
 
 ```ruby
 class PublishRecording

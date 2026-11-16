@@ -25,7 +25,7 @@ class ApiV1RegisteredEndpointsControllerTest < ActionDispatch::IntegrationTest
       handler: lambda { |context|
         {
           ok: true,
-          has_recording: context.respond_to?(:recording),
+          recording_id: context.recording&.id,
           access_recording_id: context.access_recording&.id,
           progress_reporter_nil: context.progress_reporter.nil?,
           cancelled: context.cancelled?,
@@ -68,7 +68,7 @@ class ApiV1RegisteredEndpointsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     payload = JSON.parse(response.body)
     assert_equal true, payload.fetch("ok")
-    assert_equal false, payload.fetch("has_recording")
+    assert_nil payload.fetch("recording_id")
     assert_not_nil payload.fetch("access_recording_id")
     assert_not_equal @page_recording.id, payload.fetch("access_recording_id")
     assert_equal true, payload.fetch("progress_reporter_nil")

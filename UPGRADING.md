@@ -1,5 +1,27 @@
 # Upgrading RecordingStudioApi
 
+## Unreleased (0.26.0)
+
+Registered handlers receive the route recording already scoped to the token.
+No migration. The gem version is not bumped in this change.
+
+1. Read `context.recording` or `context.parent_recording` in a handler.
+   Do not load a route `id`, `parent_id`, or `relationship_id` with
+   `Recording.find`. Those raw ids are still on the context. An id in the
+   body, such as a move destination, is still yours to scope.
+2. A foreign id, a wrong type, or a trashed recording returns 404 before
+   the handler runs. `index` and `show` require a view grant. `create`,
+   `update`, and `destroy` require an edit grant. Member actions keep
+   `required_role`.
+3. For restore or destroy, pass `include_trashed: true` to
+   `register_resource_handler`, `register_capability_action`, or
+   `register_endpoint`.
+4. Pass `owns_scoping: true` only on a read action that must see another
+   root. Registration rejects the flag on a write action. The handler then
+   owns scoping. Support uses this for public published help pages.
+5. Pass `recordable_type:` when a registered endpoint path `:id` is a
+   recording. Leave it unset when `:id` is not a recording.
+
 ## Upgrading to 0.25.0
 
 Bump to `0.25.0`. No migration in this gem.
