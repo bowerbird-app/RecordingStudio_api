@@ -97,9 +97,7 @@ module RecordingStudioApi
       end
 
       def parameters_hash(params)
-        source = params.dup
-        source.permit! unless source.permitted?
-        source.to_h
+        params.to_unsafe_h
       end
 
       def params_hash(params)

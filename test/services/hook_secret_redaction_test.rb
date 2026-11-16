@@ -205,6 +205,23 @@ class HookSecretRedactionTest < ActiveSupport::TestCase
     end
   end
 
+  test "hook redaction leaves the caller's parameters unpermitted" do
+    nested = ActionController::Parameters.new("id_token" => "nested-id-token")
+    request = ActionController::Parameters.new("grant_type" => "authorization_code", "user" => nested)
+
+    capture_service_hooks do
+      RecordingStudioApi::Services::IssueOauthAccessToken.call(
+        grant_type: "client_credentials",
+        client_id: "missing-client",
+        client_secret: "presented-client-secret",
+        params: request
+      )
+    end
+
+    assert_not request.permitted?
+    assert_not nested.permitted?
+  end
+
   test "pagination hooks do not receive the pagination token" do
     token = "signed-pagination-token"
     seen = capture_service_hooks do
