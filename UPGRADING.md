@@ -1,5 +1,24 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.2.1
+
+No migration. Payloads, auth, and routes stay the same.
+
+1. Bump the host gem to `1.2.1`.
+2. Allow the runtime ranges below. Floors match the versions this gem tests.
+
+| Gem | Requirement |
+| --- | --- |
+| `flat_pack` | `>= 0.1.356`, `< 2.0` |
+| `recording_studio` | `>= 7.1.0`, `< 8.0` |
+| `recording_studio_accessible` | `>= 0.44.0`, `< 2.0` |
+| `recording_studio_logs` | `>= 0.8.0`, `< 2.0` |
+| `recording_studio_metrics` | `>= 0.9.0`, `< 2.0` |
+| `recording_studio_moveable` | `>= 5.0`, `< 7.0` |
+| `recording_studio_trashable` | `>= 0.17.0`, `< 2.0` |
+
+Development and dummy Gemfiles still check out the same tags.
+
 ## Upgrading to 1.2.0
 
 Additive. No migration. REST responses stay the same.
