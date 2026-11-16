@@ -4,12 +4,12 @@
 
 `RecordingStudioApi` is a mountable Rails engine that provides authenticated, capability-backed JSON APIs for Recording Studio addons.
 
-Companion pins on current main: Trashable `>= 0.17.0, < 2.0` / `v0.17.0`
-(query-only), Admin `v2.16.0`, Moveable `>= 5.0, < 7.0` / `v5.0.0`, Root Switchable
-`v0.16.0`, Cache `v0.6.3` (development/test), Accessible `>= 0.44.0, < 2.0`
-(`tag: v0.44.0`), RecordingStudio `v7.1.0`
-(`>= 7.1.0, < 8.0`), Flatpack `0.1.356`
-(`tag: v0.1.356`, `>= 0.1.356, < 2.0`),
+Companion pins on current main: Trashable `>= 0.17.0, < 2.0` / `v1.0.1`
+(query-only), Admin `v2.18.0`, Moveable `>= 5.0, < 7.0` / `v6.0.0`, Root Switchable
+`v0.16.0`, Cache `v0.7.0` (development/test), Accessible `>= 0.44.0, < 2.0`
+(`tag: v0.45.1`), RecordingStudio `v7.3.0`
+(`>= 7.1.0, < 8.0`), Flatpack `0.1.377`
+(`tag: v0.1.377`, `>= 0.1.356, < 2.0`),
 Metrics `v0.9.0` (`>= 0.9.0, < 2.0`), Logs `v0.8.0` (`>= 0.8.0, < 2.0`). Recording Studio MCP `v0.17.0`
 allows this gem at `>= 0.11.0, < 0.12`, so it cannot take `0.12.0` or `0.13.0` until
 MCP widens that pin. Recording Studio Oauth `v0.12.2`
@@ -1391,8 +1391,8 @@ with Draft off to load a new pack. See
 | Rails           | ~> 8.1.1 |
 | PostgreSQL      | 16      |
 | TailwindCSS     | 4       |
-| RecordingStudio | v7.1.0 (pinned in `test/dummy/Gemfile`) |
-| FlatPack        | v0.1.356 (pinned in `test/dummy/Gemfile`) |
+| RecordingStudio | v7.3.0 (pinned in `test/dummy/Gemfile`) |
+| FlatPack        | v0.1.377 (pinned in `test/dummy/Gemfile`) |
 | Devise          | latest  |
 
 ## Documentation
