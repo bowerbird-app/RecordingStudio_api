@@ -197,48 +197,38 @@ class ApiV1ResourceHandlersTest < ActionDispatch::IntegrationTest
     assert_equal "Page", JSON.parse(response.body).fetch("type")
   end
 
-  test "a registered member handler reaches a record outside the client's tree" do
+  test "a registered member handler does not run for a record outside the client's tree" do
     operations_headers, page_recording, folder_recording = operations_client_and_workspace_records
-    seen = {}
+    calls = []
     %i[show update destroy].each do |action|
       RecordingStudioApi.register_resource_handler("Page", action, api: :operations, handler: lambda { |context|
-        seen[action] = context
+        calls << action
         { json: { handled: action.to_s, id: context.id }, status: :ok }
       })
     end
     RecordingStudioApi.register_resource_handler("Page", :move, api: :operations, handler: lambda { |context|
-      seen[:move] = context
+      calls << :move
       { json: { handled: "move", id: context.id, parent_id: context.params[:parent_id] }, status: :accepted }
     })
 
     get "/recording_studio_api/apis/operations/v1/pages/#{page_recording.id}", headers: operations_headers
-    assert_response :success
-    assert_equal "show", JSON.parse(response.body).fetch("handled")
-    assert_equal page_recording.id.to_s, JSON.parse(response.body).fetch("id")
-    assert_nil seen.fetch(:show).recording
-    assert_equal page_recording.id.to_s, seen.fetch(:show).id
-    assert_equal seen.fetch(:show).access_grant.actor, seen.fetch(:show).actor
+    assert_response :not_found
+    assert_equal "Resource was not found in this API scope", JSON.parse(response.body).dig("error", "message")
 
     patch "/recording_studio_api/apis/operations/v1/pages/#{page_recording.id}",
           params: { title: "Should not write" },
           headers: operations_headers
-    assert_response :success
-    assert_equal "update", JSON.parse(response.body).fetch("handled")
+    assert_response :not_found
 
     delete "/recording_studio_api/apis/operations/v1/pages/#{page_recording.id}", headers: operations_headers
-    assert_response :success
-    assert_equal "destroy", JSON.parse(response.body).fetch("handled")
+    assert_response :not_found
     assert RecordingStudio::Recording.exists?(page_recording.id)
 
     post "/recording_studio_api/apis/operations/v1/pages/#{page_recording.id}/actions/move",
          params: { parent_id: folder_recording.id },
          headers: operations_headers
-    assert_response :accepted
-    assert_equal "move", JSON.parse(response.body).fetch("handled")
-    assert_nil seen.fetch(:move).recording
-    assert_equal page_recording.id.to_s, seen.fetch(:move).id
-    assert_equal "Page", seen.fetch(:move).recordable_type
-    assert_equal folder_recording.id, seen.fetch(:move).params[:parent_id]
+    assert_response :not_found
+    assert_empty calls
 
     get "/recording_studio_api/apis/operations/v1/folders/#{folder_recording.id}", headers: operations_headers
     assert_response :not_found

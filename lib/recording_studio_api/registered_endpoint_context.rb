@@ -8,7 +8,8 @@ module RecordingStudioApi
     :access_grant,
     :root_recording,
     :params,
-    :progress_reporter
+    :progress_reporter,
+    :recording
   ) do
     include ProgressReporting
     include AuthorizedBy::Context
@@ -20,7 +21,8 @@ module RecordingStudioApi
       access_grant:,
       root_recording:,
       params:,
-      progress_reporter: nil
+      progress_reporter: nil,
+      recording: nil
     )
       super
     end

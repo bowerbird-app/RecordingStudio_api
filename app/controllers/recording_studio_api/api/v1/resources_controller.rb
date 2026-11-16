@@ -30,14 +30,12 @@ module RecordingStudioApi
 
         def resource_recording(include_trashed: false)
           @resource_recordings ||= {}
-          @resource_recordings[include_trashed] ||= begin
-            recordable_type = resolve_recordable_type!
-            recording = scoped_recordings(include_trashed: include_trashed).find_by(id: params[:id])
-            raise RecordingStudioApi::NotFoundError, "Resource was not found in this API scope" if recording.nil?
-            raise RecordingStudioApi::NotFoundError, "Resource type does not match #{recordable_type}" unless recording.recordable_type == recordable_type
-
-            recording
-          end
+          @resource_recordings[include_trashed] ||= RecordingStudioApi::ScopedRecording.find!(
+            access_grant: current_access_grant,
+            id: params[:id],
+            recordable_type: resolve_recordable_type!,
+            include_trashed: include_trashed
+          )
         end
 
         def scoped_recordings(include_trashed: false)
@@ -66,9 +64,10 @@ module RecordingStudioApi
           recordable_type = resolve_recordable_type!
           handler = RecordingStudioApi.resource_handler(recordable_type, operation_name, api: current_api_key)
           if handler
+            registration = RecordingStudioApi.resource_handler_registration(recordable_type, operation_name, api: current_api_key)
             render_registered_resource_handler!(
               handler,
-              resource_operation_context(recording: nil, recordable_type: recordable_type)
+              registered_resource_context(operation_name, recordable_type, registration)
             )
             return
           end
@@ -82,6 +81,24 @@ module RecordingStudioApi
         def render_registered_resource_handler!(handler, context)
           result = handler.call(context)
           render json: result.fetch(:json), status: result.fetch(:status, :ok)
+        end
+
+        def registered_resource_context(operation_name, recordable_type, registration)
+          recording = registered_resource_recording(operation_name, registration)
+          resource_operation_context(recording: recording, recordable_type: recordable_type)
+        end
+
+        def registered_resource_recording(operation_name, registration)
+          return if RecordingStudioApi::HandlerScope.resource_opt_out?(registration.owns_scoping?, operation_name)
+          return unless %i[show update destroy].include?(operation_name.to_sym)
+
+          recording = resource_recording(include_trashed: registration.include_trashed)
+          current_access_grant.authorize!(
+            recording: recording,
+            role: RecordingStudioApi::HandlerScope.resource_role(operation_name),
+            include_trashed: registration.include_trashed
+          )
+          recording
         end
 
         def builtin_member_recording_for(operation_name)

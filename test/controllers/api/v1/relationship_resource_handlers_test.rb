@@ -34,7 +34,7 @@ class ApiV1RelationshipResourceHandlersTest < ActionDispatch::IntegrationTest
     Current.actor = nil if defined?(Current)
   end
 
-  test "nested collection and member actions call a registered handler with raw ids" do
+  test "nested handlers receive scoped recordings and the raw route ids" do
     calls = []
     %i[index show create update destroy].each do |action|
       RecordingStudioApi.register_resource_handler("Folder", action, handler: lambda { |context|
@@ -43,8 +43,8 @@ class ApiV1RelationshipResourceHandlersTest < ActionDispatch::IntegrationTest
           context.recordable_type,
           context.parent_id,
           context.relationship_id,
-          context.recording,
-          context.parent_recording,
+          context.recording&.id,
+          context.parent_recording&.id,
           context.class
         ]
         { json: { handled: action.to_s, parent_id: context.parent_id }, status: (action == :create ? :created : :ok) }
@@ -86,11 +86,11 @@ class ApiV1RelationshipResourceHandlersTest < ActionDispatch::IntegrationTest
     assert RecordingStudio::Recording.exists?(@folder_recording.id)
 
     assert_equal [
-      [:index, "Folder", @root_recording.id.to_s, nil, nil, nil, RecordingStudioApi::ResourceOperationContext],
-      [:show, "Folder", @root_recording.id.to_s, @folder_recording.id.to_s, nil, nil, RecordingStudioApi::ResourceOperationContext],
-      [:create, "Folder", @root_recording.id.to_s, nil, nil, nil, RecordingStudioApi::ResourceOperationContext],
-      [:update, "Folder", @root_recording.id.to_s, @folder_recording.id.to_s, nil, nil, RecordingStudioApi::ResourceOperationContext],
-      [:destroy, "Folder", @root_recording.id.to_s, @folder_recording.id.to_s, nil, nil, RecordingStudioApi::ResourceOperationContext]
+      [:index, "Folder", @root_recording.id.to_s, nil, nil, @root_recording.id, RecordingStudioApi::ResourceOperationContext],
+      [:show, "Folder", @root_recording.id.to_s, @folder_recording.id.to_s, @folder_recording.id, @root_recording.id, RecordingStudioApi::ResourceOperationContext],
+      [:create, "Folder", @root_recording.id.to_s, nil, nil, @root_recording.id, RecordingStudioApi::ResourceOperationContext],
+      [:update, "Folder", @root_recording.id.to_s, @folder_recording.id.to_s, @folder_recording.id, @root_recording.id, RecordingStudioApi::ResourceOperationContext],
+      [:destroy, "Folder", @root_recording.id.to_s, @folder_recording.id.to_s, @folder_recording.id, @root_recording.id, RecordingStudioApi::ResourceOperationContext]
     ], calls
   end
 
@@ -144,22 +144,24 @@ class ApiV1RelationshipResourceHandlersTest < ActionDispatch::IntegrationTest
     assert RecordingStudio::Recording.exists?(@folder_recording.id)
   end
 
-  test "a nested handler owns access while unregistered nested routes still authorize the parent" do
+  test "a nested write handler requires edit on the parent and an unregistered route still does" do
     view_user = create_user
     view_root, view_access = create_access_recording_for(user: view_user, role: :view)
     view_folder = create_page_recording(root_recording: view_root).parent_recording
     view_token = issue_oauth_access_token_for(access_recording: view_access, name: "View nested token")
     view_headers = { "Authorization" => "Bearer #{view_token}" }
+    calls = []
     RecordingStudioApi.register_resource_handler("Folder", :create, handler: lambda { |context|
+      calls << context.parent_id
       { json: { handled: "create", parent_id: context.parent_id }, status: :created }
     })
 
     post "/recording_studio_api/api/v1/workspaces/#{view_root.id}/folders",
          params: { name: "Handler owns this" },
          headers: view_headers
-    assert_response :created
-    assert_equal "create", JSON.parse(response.body).fetch("handled")
-    assert_equal view_root.id.to_s, JSON.parse(response.body).fetch("parent_id")
+    assert_response :forbidden
+    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
+    assert_empty calls
 
     patch "/recording_studio_api/api/v1/workspaces/#{view_root.id}/folders/#{view_folder.id}",
           params: { name: "Blocked rename" },
@@ -167,45 +169,40 @@ class ApiV1RelationshipResourceHandlersTest < ActionDispatch::IntegrationTest
     assert_response :forbidden
   end
 
-  test "a nested handler reaches a child outside the client's tree and an unregistered type still 404s" do
+  test "a nested handler does not run for a parent outside the client's tree" do
     operations_headers = operations_admin_headers
     workspace_root, folder_recording = out_of_tree_workspace_folder
     seen = []
     %i[index show create update destroy].each do |action|
       RecordingStudioApi.register_resource_handler("Folder", action, api: :operations, handler: lambda { |context|
-        seen << [action, context.parent_id, context.relationship_id, context.recording, context.parent_recording]
+        seen << action
         { json: { handled: action.to_s, parent_id: context.parent_id, relationship_id: context.relationship_id }, status: :ok }
       })
     end
 
     get "/recording_studio_api/apis/operations/v1/workspaces/#{workspace_root.id}/folders",
         headers: operations_headers
-    assert_response :success
-    assert_equal "index", JSON.parse(response.body).fetch("handled")
+    assert_response :not_found
+    assert_equal "Parent resource was not found in this API scope", JSON.parse(response.body).dig("error", "message")
 
     get "/recording_studio_api/apis/operations/v1/workspaces/#{workspace_root.id}/folders/#{folder_recording.id}",
         headers: operations_headers
-    assert_response :success
-    assert_equal "show", JSON.parse(response.body).fetch("handled")
-    assert_equal folder_recording.id.to_s, JSON.parse(response.body).fetch("relationship_id")
+    assert_response :not_found
 
     post "/recording_studio_api/apis/operations/v1/workspaces/#{workspace_root.id}/folders",
          params: { name: "Outside tree" },
          headers: operations_headers
-    assert_response :success
-    assert_equal "create", JSON.parse(response.body).fetch("handled")
+    assert_response :not_found
 
     patch "/recording_studio_api/apis/operations/v1/workspaces/#{workspace_root.id}/folders/#{folder_recording.id}",
           params: { name: "Outside rename" },
           headers: operations_headers
-    assert_response :success
-    assert_equal "update", JSON.parse(response.body).fetch("handled")
+    assert_response :not_found
 
     delete "/recording_studio_api/apis/operations/v1/workspaces/#{workspace_root.id}/folders/#{folder_recording.id}",
            headers: operations_headers
-    assert_response :success
-    assert_equal "destroy", JSON.parse(response.body).fetch("handled")
-    assert(seen.all? { |row| row[3].nil? && row[4].nil? })
+    assert_response :not_found
+    assert_empty seen
 
     get "/recording_studio_api/apis/operations/v1/workspaces/#{workspace_root.id}/pages",
         headers: operations_headers

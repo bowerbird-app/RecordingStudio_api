@@ -17,7 +17,8 @@ module RecordingStudioApi
         def invoke
           match = resolve_match!
           endpoint = match.endpoint
-          result = endpoint.handler.call(endpoint_context(endpoint, match.captures))
+          recording = endpoint_recording(endpoint, match.captures)
+          result = endpoint.handler.call(endpoint_context(endpoint, match.captures, recording))
           render json: serialize_result(endpoint, result)
         end
 
@@ -36,14 +37,33 @@ module RecordingStudioApi
           )
         end
 
-        def endpoint_context(endpoint, captures)
+        def endpoint_recording(endpoint, captures)
+          return if RecordingStudioApi::HandlerScope.endpoint_opt_out?(endpoint)
+          return unless endpoint.scopes_recording?
+
+          recording = RecordingStudioApi::ScopedRecording.find!(
+            access_grant: current_access_grant,
+            id: endpoint.recording_id_from(captures),
+            recordable_type: endpoint.recordable_type,
+            include_trashed: endpoint.include_trashed
+          )
+          current_access_grant.authorize!(
+            recording: recording,
+            role: endpoint.authorization_role,
+            include_trashed: endpoint.include_trashed
+          )
+          recording
+        end
+
+        def endpoint_context(endpoint, captures, recording)
           RecordingStudioApi::RegisteredEndpointContext.new(
             api_client: current_api_client,
             credential: current_api_credential,
             access_recording: current_access_recording,
             access_grant: current_access_grant,
             root_recording: current_root_recording,
-            params: endpoint_params(endpoint, captures)
+            params: endpoint_params(endpoint, captures),
+            recording: recording
           )
         end
 

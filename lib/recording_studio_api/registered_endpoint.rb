@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "action_input_contract"
+require_relative "handler_scope"
 require_relative "ui_widget_id"
 
 module RecordingStudioApi
@@ -12,9 +13,11 @@ module RecordingStudioApi
 
     Match = Data.define(:endpoint, :captures)
 
-    attr_reader :name, :http_verb, :path, :handler, :serializer, :openapi, :input_contract, :ui
+    RECORDING_ID_TOKENS = %w[:id :recording_id].freeze
 
-    def initialize(name:, http_verb:, path:, handler:, serializer: nil, openapi: nil, input_contract: nil, ui: nil)
+    attr_reader :name, :http_verb, :path, :handler, :serializer, :openapi, :input_contract, :ui, :recordable_type, :include_trashed, :owns_scoping, :required_role, :scopes_recording
+
+    def initialize(name:, http_verb:, path:, handler:, serializer: nil, openapi: nil, input_contract: nil, ui: nil, recordable_type: nil, include_trashed: false, owns_scoping: false, required_role: nil, scope_id: nil)
       @name = name.to_s
       @http_verb = http_verb.to_sym
       @path = normalize_path(path)
@@ -23,6 +26,32 @@ module RecordingStudioApi
       @openapi = normalize_openapi(openapi)
       @input_contract = normalize_input_contract(input_contract)
       @ui = UiWidgetId.normalize(ui, name: name)
+      raw_recordable_type = recordable_type.to_s.strip
+      @recordable_type = raw_recordable_type.empty? ? nil : raw_recordable_type
+      @include_trashed = HandlerScope.flag(include_trashed, name: :include_trashed)
+      @owns_scoping = HandlerScope.flag(owns_scoping, name: :owns_scoping)
+      @required_role = normalize_required_role(required_role)
+      @scope_id = scope_id.nil? ? nil : HandlerScope.flag(scope_id, name: :scope_id)
+      @scopes_recording = false
+    end
+
+    def owns_scoping?
+      owns_scoping
+    end
+
+    def scopes_recording?
+      scopes_recording
+    end
+
+    def authorization_role
+      required_role || (http_verb == :get ? :view : :edit)
+    end
+
+    def recording_id_from(captures)
+      recording_id = captures[:recording_id]
+      return recording_id if recording_id.present?
+
+      captures[:id]
     end
 
     def validate!
@@ -32,6 +61,9 @@ module RecordingStudioApi
       raise ConfigurationError, "Serializer must respond to call for #{name}" if serializer && !serializer.respond_to?(:call)
       raise ConfigurationError, "OpenAPI metadata must be a hash for #{name}" unless openapi.is_a?(Hash)
       raise ConfigurationError, "Input contract must be a RecordingStudioApi::ActionInputContract for #{name}" if input_contract && !input_contract.is_a?(ActionInputContract)
+      raise ConfigurationError, "required_role must be one of: #{valid_access_roles.join(', ')} for #{name}" if required_role && !valid_access_roles.include?(required_role)
+
+      validate_handler_scope!
     end
 
     def path_segments
@@ -92,6 +124,37 @@ module RecordingStudioApi
     end
 
     private
+
+    def validate_handler_scope!
+      resolve_recording_scope!
+      HandlerScope.assert_include_trashed!(name: name, http_verb: http_verb, action_name: trashed_action_name) if include_trashed
+      HandlerScope.assert_read_opt_out!(name: name, http_verb: http_verb, required_role: authorization_role) if owns_scoping
+    end
+
+    def resolve_recording_scope!
+      captures = path_segments & RECORDING_ID_TOKENS
+      raise ConfigurationError, "#{name} cannot capture both :id and :recording_id" if captures.size > 1
+      raise ConfigurationError, "scope_id requires a path :id or :recording_id for #{name}" if @scope_id == true && captures.empty?
+      raise ConfigurationError, "recordable_type is required when #{name} captures :id or :recording_id, or pass scope_id: false" if @scope_id != false && captures.any? && recordable_type.blank?
+
+      @scopes_recording = @scope_id != false && captures.any? && recordable_type.present?
+    end
+
+    def trashed_action_name
+      return name if %w[restore destroy].include?(name)
+
+      nil
+    end
+
+    def normalize_required_role(value)
+      return if value.nil?
+
+      value.to_s.strip.to_sym
+    end
+
+    def valid_access_roles
+      RecordingStudio::AccessRoles::ORDER.keys.map(&:to_sym)
+    end
 
     def normalize_path(value)
       raw = value.to_s.strip.sub(%r{\A/}, "").sub(%r{/\z}, "")

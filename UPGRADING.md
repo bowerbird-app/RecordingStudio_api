@@ -1,5 +1,45 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 0.26.0
+
+Registered handlers receive the route recording already scoped to the token.
+Bump to `0.26.0`. No migration. The API stays strict. There is no write
+opt-out. Support re-registers its operations writes (help page update,
+destroy, move, publish, ticket update) as admin-root-scoped endpoints
+with recordable_type.
+
+1. Read `context.recording` or `context.parent_recording` in a handler.
+   Do not load a route `id`, `parent_id`, or `relationship_id` with
+   `Recording.find`. Those raw ids are still on the context. An id in the
+   body, such as a move destination, is still yours to scope.
+2. A foreign id, a wrong type, or a trashed recording returns 404 before
+   the handler runs. `index` and `show` require a view grant. `create`,
+   `update`, and `destroy` require an edit grant. Member actions keep
+   `required_role`. Nested handlers also run `authorize_relationship!`.
+   The relationship must be a direct child collection, and its endpoints
+   must include the operation.
+3. Pass `include_trashed: true` only for a read, restore, or destroy
+   action. Registration rejects it on other actions.
+4. Pass `owns_scoping: true` only for a GET, or built-in index or show,
+   whose effective role is `:view`. A POST with `required_role: :view` is
+   rejected. Dispatch checks the effective role again.
+5. An endpoint path that captures `:id` or `:recording_id` must pass
+   `recordable_type:`. Pass `scope_id: false` when that capture is not a
+   recording. A path cannot capture both `:id` and `:recording_id`.
+   `:recording_id` is scoped like `:id`. Pass `required_role:`
+   when the verb default is wrong. GET defaults to `:view`. Other verbs
+   default to `:edit`.
+
+Addons that must change for this release:
+
+- Support re-registers its operations writes (help page update, destroy,
+  move, publish, ticket update) as admin-root-scoped endpoints with
+  recordable_type. There is no write opt-out.
+- Support public help page show and public ticket show pass
+  `owns_scoping: true` on the GET.
+- Trashable restore passes `include_trashed: true`.
+- Commentable destroy passes `include_trashed: true`.
+
 ## Upgrading to 0.25.0
 
 Bump to `0.25.0`. No migration in this gem.

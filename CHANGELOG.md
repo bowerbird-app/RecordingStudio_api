@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-11-16
+
+### Fixed
+- Registered handlers no longer run for a route id outside the token's scope.
+  Resource, member, nested, and registered-endpoint handlers resolve that id
+  through `accessible_recordings` before the handler runs. A foreign id, a
+  wrong type, or a trashed recording returns 404. The handler does not run.
+- The root fallback in member-handler authorization is gone. A missing member
+  id is 404, not a check against the token's root.
+- This gem calls `access_grant.authorize!` on the resolved recording.
+  `index` and `show` require `:view`. `create`, `update`, and `destroy`
+  require `:edit`. A member action keeps its `required_role`. A registered
+  endpoint uses `:view` for GET and `:edit` for every other verb.
+- A nested index or create scopes `parent_id` from the route. A flat create
+  does not scope `parent_id` from the body. Move destinations and other body
+  ids stay the handler's job.
+
+### Added
+- `include_trashed: true` on `register_resource_handler`,
+  `register_capability_action`, and `register_endpoint`. The route lookup
+  and `authorize!` include trashed recordings. The default is kept
+  recordings only.
+- `owns_scoping: true` skips that lookup and `authorize!` only for a GET,
+  or built-in index or show, whose effective role is `:view`. A POST with
+  `required_role: :view` is rejected. Dispatch checks the effective role
+  again. Support uses it for public published help pages. There is no
+  write opt-out.
+- `include_trashed: true` is rejected unless the action is a read, restore,
+  or destroy.
+- `recordable_type:` on `register_endpoint`. A path `:id` or `:recording_id`
+  is scoped to that type. Registration raises when the path captures one of
+  those ids and `recordable_type` is missing. Pass `scope_id: false` when
+  the capture is not a recording.
+- `required_role:` on `register_endpoint`. GET defaults to `:view`. Every
+  other verb defaults to `:edit`.
+- Registered nested handlers call `authorize_relationship!` before the
+  handler runs.
+- Handler contexts now include the resolved `recording` and, on nested
+  routes, `parent_recording`. `id`, `parent_id`, `relationship_id`, and
+  `params` stay set.
+
+### Upgrade notes
+- Read `context.recording` or `context.parent_recording`. Do not load a
+  route id with `Recording.find`.
+- A handler that previously loaded an arbitrary id now gets 404 before it
+  runs. Trashable restore and Commentable destroy pass
+  `include_trashed: true`. Support public reads pass `owns_scoping: true`.
+  Support operations writes now 404 outside the token. There is no write
+  opt-out.
+- An endpoint whose `:id` or `:recording_id` is a recording passes
+  `recordable_type:`. Pass `scope_id: false` when the capture is not a
+  recording.
+- Bump to `0.26.0`. No migration in this gem.
+
 ## [0.25.0] - 2026-11-16
 
 ### Fixed
@@ -1285,7 +1339,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.25.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.26.0...HEAD
+[0.26.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.25.0...v0.26.0
 [0.25.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.24.1...v0.25.0
 [0.24.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.24.0...v0.24.1
 [0.24.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.4...v0.24.0

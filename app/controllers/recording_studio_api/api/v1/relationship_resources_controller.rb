@@ -9,7 +9,7 @@ module RecordingStudioApi
       class RelationshipResourcesController < ResourcesController
         def index
           if (handler = nested_resource_handler(:index))
-            render_registered_resource_handler!(handler, nested_handler_context)
+            render_registered_resource_handler!(handler, nested_handler_context(:index))
             return
           end
 
@@ -42,7 +42,7 @@ module RecordingStudioApi
 
         def show
           if (handler = nested_resource_handler(:show))
-            render_registered_resource_handler!(handler, nested_handler_context)
+            render_registered_resource_handler!(handler, nested_handler_context(:show))
             return
           end
 
@@ -56,7 +56,7 @@ module RecordingStudioApi
         def create
           if (handler = nested_resource_handler(:create))
             reject_nested_type_or_parent_input!
-            render_registered_resource_handler!(handler, nested_handler_context)
+            render_registered_resource_handler!(handler, nested_handler_context(:create))
             return
           end
 
@@ -72,7 +72,7 @@ module RecordingStudioApi
         def update
           if (handler = nested_resource_handler(:update))
             reject_nested_parent_input!
-            render_registered_resource_handler!(handler, nested_handler_context)
+            render_registered_resource_handler!(handler, nested_handler_context(:update))
             return
           end
 
@@ -89,7 +89,7 @@ module RecordingStudioApi
 
         def destroy
           if (handler = nested_resource_handler(:destroy))
-            render_registered_resource_handler!(handler, nested_handler_context)
+            render_registered_resource_handler!(handler, nested_handler_context(:destroy))
             return
           end
 
@@ -105,15 +105,16 @@ module RecordingStudioApi
 
         private
 
-        def parent_recording
-          @parent_recording ||= begin
-            recordable_type = resolve_recordable_type!
-            recording = scoped_recordings.find_by(id: params[:parent_id])
-            raise RecordingStudioApi::NotFoundError, "Parent resource was not found in this API scope" if recording.nil?
-            raise RecordingStudioApi::NotFoundError, "Parent resource type does not match #{recordable_type}" unless recording.recordable_type == recordable_type
-
-            recording
-          end
+        def parent_recording(include_trashed: false)
+          @parent_recordings ||= {}
+          @parent_recordings[include_trashed] ||= RecordingStudioApi::ScopedRecording.find!(
+            access_grant: current_access_grant,
+            id: params[:parent_id],
+            recordable_type: resolve_recordable_type!,
+            include_trashed: include_trashed,
+            missing: "Parent resource was not found in this API scope",
+            type_mismatch: "Parent resource type does not match #{resolve_recordable_type!}"
+          )
         end
 
         def relationship_name = params[:relationship].to_s
@@ -174,14 +175,19 @@ module RecordingStudioApi
 
         def assert_nested_operation!(operation, role:, include_trashed: false)
           current_access_grant.authorize!(recording: parent_recording, role: role, include_trashed: include_trashed)
-          unless relationship.source == :children && relationship.many
+          assert_direct_child_endpoint!(operation)
+          assert_operation_enabled!(relationship.child_type, operation)
+          relationship_context.authorize_relationship!(parent_recording, relationship_name, relationship)
+        end
+
+        def assert_direct_child_endpoint!(operation, target = relationship)
+          unless target.source == :children && target.many
             raise RecordingStudioApi::UnsupportedActionError,
                   "#{relationship_name} is not a direct child collection"
           end
-          raise RecordingStudioApi::UnsupportedActionError, "#{operation} is not enabled for #{relationship_name}" unless relationship.endpoints.include?(operation)
+          return if target.endpoints.include?(operation.to_sym)
 
-          assert_operation_enabled!(relationship.child_type, operation)
-          relationship_context.authorize_relationship!(parent_recording, relationship_name, relationship)
+          raise RecordingStudioApi::UnsupportedActionError, "#{operation} is not enabled for #{relationship_name}"
         end
 
         def reject_nested_type_or_parent_input!
@@ -212,8 +218,7 @@ module RecordingStudioApi
 
         def nested_resource_handler(operation_name)
           relationship = declared_parent_relationship
-          return unless relationship&.source == :children && relationship.many
-          return unless relationship.endpoints.include?(operation_name.to_sym)
+          return unless relationship&.child_type
 
           registration = RecordingStudioApi.recordable_registration_for(relationship.child_type, api: current_api_key)
           return unless registration&.supports_operation?(operation_name)
@@ -228,13 +233,55 @@ module RecordingStudioApi
                             &.[](relationship_name)
         end
 
-        def nested_handler_context
+        def nested_handler_context(operation_name)
           relationship = declared_parent_relationship
+          registration = RecordingStudioApi.resource_handler_registration(
+            relationship.child_type,
+            operation_name,
+            api: current_api_key
+          )
+          parent, child = nested_handler_targets(operation_name, registration)
           build_relationship_operation_context(
             recordable_type: relationship.child_type,
-            recording: nil,
-            parent_recording: nil
+            recording: child,
+            parent_recording: parent
           )
+        end
+
+        def nested_handler_targets(operation_name, registration)
+          if RecordingStudioApi::HandlerScope.resource_opt_out?(registration&.owns_scoping?, operation_name)
+            assert_direct_child_endpoint!(operation_name, declared_parent_relationship)
+            return [nil, nil]
+          end
+
+          assert_direct_child_endpoint!(operation_name)
+          include_trashed = registration.include_trashed
+          role = RecordingStudioApi::HandlerScope.resource_role(operation_name)
+          if %i[show update destroy].include?(operation_name.to_sym)
+            parent = parent_recording
+            child = child_recording(include_trashed: include_trashed)
+            current_access_grant.authorize!(recording: child, role: role, include_trashed: include_trashed)
+            authorize_nested_relationship!(parent, include_trashed: false)
+            authorize_child!(child)
+            [parent, child]
+          else
+            parent = parent_recording(include_trashed: include_trashed)
+            current_access_grant.authorize!(recording: parent, role: role, include_trashed: include_trashed)
+            authorize_nested_relationship!(parent, include_trashed: include_trashed)
+            [parent, nil]
+          end
+        end
+
+        def authorize_nested_relationship!(parent, include_trashed:)
+          RecordingStudioApi::RelationshipContext.for(
+            recordings: [parent],
+            include_values: nil,
+            scoped_recordings: scoped_recordings(include_trashed: include_trashed),
+            api_key: current_api_key,
+            api_version: current_api_version,
+            access_grant: current_access_grant,
+            params: {}
+          ).authorize_relationship!(parent, relationship_name, relationship)
         end
 
         def relationship_operation_context(recordable_type:, recording: nil)
