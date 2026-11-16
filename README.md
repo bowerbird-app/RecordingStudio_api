@@ -788,6 +788,58 @@ contract runs. `include_trashed`, `owns_scoping`, and `trashed_semantics` on
 `register_capability_action` follow the same rules. Routes without a
 per-type handler keep the shared lookup and operations.
 
+### Pre-handler guard
+
+`RecordingStudioApi::HandlerGuard` is the check those routes run before a
+handler. REST controllers call it. Recording Studio MCP, or any other
+dispatcher that runs a handler itself, calls the same methods and then calls
+the handler. The guard returns the recordings and leaves the handler to the
+caller.
+
+```ruby
+RecordingStudioApi::HandlerGuard.resource!(
+  access_grant:,
+  recordable_type:,
+  action_name:,
+  id:,
+  registration:
+)
+
+RecordingStudioApi::HandlerGuard.capability!(
+  access_grant:,
+  api_client:,
+  recordable_type:,
+  action:,
+  id:,
+  registration:
+)
+
+RecordingStudioApi::HandlerGuard.endpoint!(
+  access_grant:,
+  endpoint:,
+  id:
+)
+```
+
+Each call returns `recording` and `parent_recording`. Flat routes leave
+`parent_recording` nil. Pass the resource-handler registration into
+`capability!` when a per-type handler supplies the scope flags. Pass
+`registration: nil` when the capability action carries them. `capability!`
+takes an optional block that runs after the recording is resolved and before
+`authorize!`.
+
+An `owns_scoping` read, a flat index or create, and an endpoint with
+`scope_id: false` or no recording id return a nil recording. `show`,
+`update`, `destroy`, capability actions, and id-scoped endpoints load through
+`ScopedRecording.find!` and `authorize!`. The role is `:view` for index, show,
+and GET, and `:edit` otherwise, unless `required_role:` or
+`capability_action_role_for` says otherwise. `include_trashed` and
+`trashed_semantics` go through `HandlerScope.dispatch_include_trashed?`. A
+blank id on a scoped path raises `NotFoundError`.
+
+Nested relationship handlers still resolve the parent and child in
+`RelationshipResourcesController`, which also authorizes the relationship.
+
 ### Fields, relationships, and includes
 
 Resource registration declares the flat fields and named relationships an API may expose.

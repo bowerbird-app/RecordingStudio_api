@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-16
+
+### Added
+- `RecordingStudioApi::HandlerGuard` scopes and authorizes a recording before a custom resource handler, capability action, or registered endpoint runs. REST controllers call it. A dispatcher that runs those handlers itself calls the same methods. `resource!`, `capability!`, and `endpoint!` return `recording` and `parent_recording`. They raise `NotFoundError` and `AuthorizationError` the same way those REST routes do.
+
+### Upgrade notes
+- Bump to `1.2.0`. No migration. REST payloads, auth, and routes stay the same.
+- Call `HandlerGuard` before a handler you dispatch yourself. Nested relationship handlers stay in `RelationshipResourcesController`. See [UPGRADING.md](UPGRADING.md).
+
 ## [1.1.1] - 2026-11-16
 
 ### Fixed
