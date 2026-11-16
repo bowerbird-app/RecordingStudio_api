@@ -41,16 +41,21 @@ module RecordingStudioApi
           return if RecordingStudioApi::HandlerScope.endpoint_opt_out?(endpoint)
           return unless endpoint.scopes_recording?
 
+          include_trashed = RecordingStudioApi::HandlerScope.dispatch_include_trashed?(
+            include_trashed: endpoint.include_trashed,
+            trashed_semantics: endpoint.trashed_semantics,
+            role: endpoint.authorization_role
+          )
           recording = RecordingStudioApi::ScopedRecording.find!(
             access_grant: current_access_grant,
             id: endpoint.recording_id_from(captures),
             recordable_type: endpoint.recordable_type,
-            include_trashed: endpoint.include_trashed
+            include_trashed: include_trashed
           )
           current_access_grant.authorize!(
             recording: recording,
             role: endpoint.authorization_role,
-            include_trashed: endpoint.include_trashed
+            include_trashed: include_trashed
           )
           recording
         end

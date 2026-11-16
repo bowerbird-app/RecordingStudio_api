@@ -255,8 +255,12 @@ module RecordingStudioApi
           end
 
           assert_direct_child_endpoint!(operation_name)
-          include_trashed = registration.include_trashed
           role = RecordingStudioApi::HandlerScope.resource_role(operation_name)
+          include_trashed = RecordingStudioApi::HandlerScope.dispatch_include_trashed?(
+            include_trashed: registration.include_trashed,
+            trashed_semantics: registration.trashed_semantics,
+            role: role
+          )
           if %i[show update destroy].include?(operation_name.to_sym)
             parent = parent_recording
             child = child_recording(include_trashed: include_trashed)

@@ -747,8 +747,7 @@ show, update, or destroy authorizes the child. A flat create does not scope
 stay the handler's job.
 
 Pass `include_trashed: true` on `register_resource_handler` when the action
-must see a trashed recording, such as restore or destroy. The default lookup
-is kept recordings only.
+must see a trashed recording. The default lookup is kept recordings only.
 
 Pass `owns_scoping: true` only for a GET, or for built-in index or show, whose
 effective role is `:view`. Registration rejects the flag on a write, including
@@ -757,8 +756,20 @@ again. Support uses this for public published help pages. The handler then
 owns scoping, and this gem does not call `authorize!` for that action. There
 is no write opt-out.
 
-Pass `include_trashed: true` only for a read, restore, or destroy action.
-Registration rejects it on create, update, and other writes.
+Pass `include_trashed: true` for a read, for built-in restore or destroy, or
+with `trashed_semantics: :restore` or `:destroy`. Registration rejects it on
+create, update, and other writes.
+
+`trashed_semantics` lets a POST with a custom name, such as Trashable's
+`trashable_restore` or `trashable_purge`, see trashed recordings.
+The same keyword is on `register_capability_action`, `register_resource_handler`,
+and `register_endpoint`. The role must be `:edit` or higher. `:admin` qualifies.
+Registration rejects the declaration on a GET, with `required_role: :view`, and
+with `owns_scoping: true`. Register the capability action before a resource
+handler that uses the declaration, so the handler can see that verb and role.
+Dispatch checks the effective role again. A later `:view` role does not include
+trashed recordings. The lookup still goes through `ScopedRecording` and
+`authorize!`. A trashed recording outside the token's scope is 404.
 
 Member-action handlers (for example `move`) get an `ActionContext` with the
 same scoped `recording`, plus:
@@ -769,7 +780,7 @@ same scoped `recording`, plus:
 
 The member action's `required_role` is the role passed to `authorize!`.
 Route keys are omitted from a capability handler's params before the input
-contract runs. `include_trashed` and `owns_scoping` on
+contract runs. `include_trashed`, `owns_scoping`, and `trashed_semantics` on
 `register_capability_action` follow the same rules. Routes without a
 per-type handler keep the shared lookup and operations.
 
@@ -1067,7 +1078,7 @@ Token-record contract (if provided):
 - `active_for_authentication?`
 - writable `last_used_at` column (updated with `update_column`)
 
-Both credential and token record must have active, non-trashed RecordingStudio recordables so scope resolution can derive the root recording. Kept/trashed predicates use Recording Studio Trashable (`recording_studio_trashable_kept?` / `recording_studio_trashable_trashed?`). Relation filters use additive `Recording.kept`. SQL and recursive walks use `RecordingStudio.kept_sql`. Pin `recording_studio` `>= 7.1.0`, `< 8.0` and `recording_studio_trashable` `>= 0.17.0`, `< 1.0`, and load `recording_studio_trashable/query` only.
+Both credential and token record must have active, non-trashed RecordingStudio recordables so scope resolution can derive the root recording. Kept/trashed predicates use Recording Studio Trashable (`recording_studio_trashable_kept?` / `recording_studio_trashable_trashed?`). Relation filters use additive `Recording.kept`. SQL and recursive walks use `RecordingStudio.kept_sql`. Pin `recording_studio` `>= 7.1.0`, `< 8.0` and `recording_studio_trashable` `>= 0.17.0`, `< 2.0`, and load `recording_studio_trashable/query` only.
 
 ### OAuth resource server
 
@@ -1196,7 +1207,11 @@ A path that captures `:id` or `:recording_id` must pass `recordable_type:`. Regi
 
 Pass `scope_id: false` when the capture is not a recording, such as `people/:id`. `recording` stays nil and the handler owns that id.
 
-`include_trashed: true` is accepted on a read, on restore, and on destroy. Registration rejects it on other actions.
+`include_trashed: true` is accepted on a read, on restore, on destroy, and when
+the endpoint declares `trashed_semantics: :restore` or `:destroy`. Registration
+rejects it on other actions. The declaration is rejected on a GET, with
+`required_role: :view`, and with `owns_scoping`. Dispatch checks the endpoint
+role again before the lookup.
 
 `owns_scoping: true` skips the lookup and `authorize!` only while the action is still a GET, or a built-in index or show, and the effective role is still `:view`. `required_role: :view` on POST is not enough. Dispatch checks the effective role again, so a later edit role scopes the id. Support uses the opt-out for public published help pages. There is no write opt-out.
 

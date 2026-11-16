@@ -12,7 +12,7 @@ module RecordingStudioApi
     ALLOWED_HTTP_VERBS = %i[get post patch put delete].freeze
     ALLOWED_SCOPES = %i[collection resource member].freeze
 
-    attr_reader :name, :capability, :version, :version_notes, :deprecation, :http_verb, :handler, :serializer, :scope, :openapi, :input_contract, :required_role, :ui, :include_trashed, :owns_scoping
+    attr_reader :name, :capability, :version, :version_notes, :deprecation, :http_verb, :handler, :serializer, :scope, :openapi, :input_contract, :required_role, :ui, :include_trashed, :owns_scoping, :trashed_semantics
 
     def initialize(name:, capability:, http_verb:, handler:, version: nil, version_notes: nil, deprecation: nil, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil, **options)
       @name = name.to_s
@@ -30,6 +30,7 @@ module RecordingStudioApi
       @required_role = normalize_required_role(required_role)
       @include_trashed = HandlerScope.flag(options.delete(:include_trashed) { false }, name: :include_trashed)
       @owns_scoping = HandlerScope.flag(options.delete(:owns_scoping) { false }, name: :owns_scoping)
+      @trashed_semantics = HandlerScope.trashed_semantics(options.delete(:trashed_semantics), name: @name)
       @ui = UiWidgetId.normalize(options.delete(:ui), name: name)
       raise ArgumentError, "unknown keywords: #{options.keys.join(', ')}" if options.any?
     end
@@ -55,7 +56,14 @@ module RecordingStudioApi
     end
 
     def validate_handler_scope!
-      HandlerScope.assert_include_trashed!(name: name, http_verb: http_verb, action_name: name) if include_trashed
+      HandlerScope.assert_trashed_semantics!(
+        name: name,
+        trashed_semantics: trashed_semantics,
+        http_verb: http_verb,
+        required_role: required_role,
+        owns_scoping: owns_scoping
+      )
+      HandlerScope.assert_include_trashed!(name: name, http_verb: http_verb, action_name: name, trashed_semantics: trashed_semantics) if include_trashed
       HandlerScope.assert_read_opt_out!(name: name, http_verb: http_verb, required_role: required_role, action_name: name) if owns_scoping
     end
 

@@ -158,7 +158,7 @@ module RecordingStudioApi
       Integration.oauth_error_status(error)
     end
 
-    def register_endpoint(name, api: :public, http_verb:, path:, handler:, serializer: nil, openapi: nil, input_contract: nil, ui: nil, **)
+    def register_endpoint(name, api: :public, http_verb:, path:, handler:, serializer: nil, openapi: nil, input_contract: nil, ui: nil, trashed_semantics: nil, **)
       registry = configuration.api(api).registered_endpoint_registry
       Metrics::Endpoints.expand(
         name:,
@@ -169,6 +169,7 @@ module RecordingStudioApi
         openapi:,
         input_contract:,
         ui:,
+        trashed_semantics:,
         **
       ).map do |registration|
         registry.register(registration.fetch(:name), **registration.except(:name))
@@ -197,13 +198,14 @@ module RecordingStudioApi
       end || []
     end
 
-    def register_resource_handler(recordable_type, action, api: :public, handler:, include_trashed: false, owns_scoping: false)
+    def register_resource_handler(recordable_type, action, api: :public, handler:, include_trashed: false, owns_scoping: false, trashed_semantics: nil)
       configuration.api(api).resource_handler_registry.register(
         recordable_type,
         action,
         handler: handler,
         include_trashed: include_trashed,
         owns_scoping: owns_scoping,
+        trashed_semantics: trashed_semantics,
         api: api
       )
     end
@@ -216,7 +218,7 @@ module RecordingStudioApi
       configuration.fetch_api(api).resource_handler_registry.registration(recordable_type, action)
     end
 
-    def register_capability_action(name, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil, ui: nil, include_trashed: false, owns_scoping: false, api: :public, **)
+    def register_capability_action(name, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil, ui: nil, include_trashed: false, owns_scoping: false, trashed_semantics: nil, api: :public, **)
       configuration.api(api).action_registry.register(
         name,
         capability: capability,
@@ -233,6 +235,7 @@ module RecordingStudioApi
         ui: ui,
         include_trashed: include_trashed,
         owns_scoping: owns_scoping,
+        trashed_semantics: trashed_semantics,
         **
       )
     end

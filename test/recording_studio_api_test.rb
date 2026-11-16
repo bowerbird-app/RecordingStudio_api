@@ -8,14 +8,14 @@ class RecordingStudioApiTest < Minitest::Test
   end
 
   def test_version_pin
-    assert_equal "1.0.0", ::RecordingStudioApi::VERSION
+    assert_equal "1.1.0", ::RecordingStudioApi::VERSION
   end
 
   def test_metrics_dependency_pins
     root = File.expand_path("..", __dir__)
     gemspec = File.read(File.join(root, "recording_studio_api.gemspec"))
     assert_includes gemspec, '"recording_studio", ">= 7.1.0", "< 8.0"'
-    assert_includes gemspec, '"recording_studio_trashable", ">= 0.17.0", "< 1.0"'
+    assert_includes gemspec, '"recording_studio_trashable", ">= 0.17.0", "< 2.0"'
     assert_includes gemspec, '"recording_studio_accessible", ">= 0.44.0", "< 1.0"'
     assert_includes gemspec, '"flat_pack", ">= 0.1.341"'
     assert_includes gemspec, '"view_component", ">= 4.14", "< 5"'

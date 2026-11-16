@@ -15,9 +15,9 @@ module RecordingStudioApi
 
     RECORDING_ID_TOKENS = %w[:id :recording_id].freeze
 
-    attr_reader :name, :http_verb, :path, :handler, :serializer, :openapi, :input_contract, :ui, :recordable_type, :include_trashed, :owns_scoping, :required_role, :scopes_recording
+    attr_reader :name, :http_verb, :path, :handler, :serializer, :openapi, :input_contract, :ui, :recordable_type, :include_trashed, :owns_scoping, :required_role, :scopes_recording, :trashed_semantics
 
-    def initialize(name:, http_verb:, path:, handler:, serializer: nil, openapi: nil, input_contract: nil, ui: nil, recordable_type: nil, include_trashed: false, owns_scoping: false, required_role: nil, scope_id: nil)
+    def initialize(name:, http_verb:, path:, handler:, serializer: nil, openapi: nil, input_contract: nil, ui: nil, recordable_type: nil, include_trashed: false, owns_scoping: false, required_role: nil, **options)
       @name = name.to_s
       @http_verb = http_verb.to_sym
       @path = normalize_path(path)
@@ -31,6 +31,10 @@ module RecordingStudioApi
       @include_trashed = HandlerScope.flag(include_trashed, name: :include_trashed)
       @owns_scoping = HandlerScope.flag(owns_scoping, name: :owns_scoping)
       @required_role = normalize_required_role(required_role)
+      scope_id = options.delete(:scope_id)
+      @trashed_semantics = HandlerScope.trashed_semantics(options.delete(:trashed_semantics), name: @name)
+      raise ArgumentError, "unknown keywords: #{options.keys.join(', ')}" if options.any?
+
       @scope_id = scope_id.nil? ? nil : HandlerScope.flag(scope_id, name: :scope_id)
       @scopes_recording = false
     end
@@ -127,7 +131,14 @@ module RecordingStudioApi
 
     def validate_handler_scope!
       resolve_recording_scope!
-      HandlerScope.assert_include_trashed!(name: name, http_verb: http_verb, action_name: trashed_action_name) if include_trashed
+      HandlerScope.assert_trashed_semantics!(
+        name: name,
+        trashed_semantics: trashed_semantics,
+        http_verb: http_verb,
+        required_role: authorization_role,
+        owns_scoping: owns_scoping
+      )
+      HandlerScope.assert_include_trashed!(name: name, http_verb: http_verb, action_name: trashed_action_name, trashed_semantics: trashed_semantics) if include_trashed
       HandlerScope.assert_read_opt_out!(name: name, http_verb: http_verb, required_role: authorization_role) if owns_scoping
     end
 

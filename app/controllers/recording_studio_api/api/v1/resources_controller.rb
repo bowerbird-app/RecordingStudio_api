@@ -92,11 +92,16 @@ module RecordingStudioApi
           return if RecordingStudioApi::HandlerScope.resource_opt_out?(registration.owns_scoping?, operation_name)
           return unless %i[show update destroy].include?(operation_name.to_sym)
 
-          recording = resource_recording(include_trashed: registration.include_trashed)
+          include_trashed = RecordingStudioApi::HandlerScope.dispatch_include_trashed?(
+            include_trashed: registration.include_trashed,
+            trashed_semantics: registration.trashed_semantics,
+            role: RecordingStudioApi::HandlerScope.resource_role(operation_name)
+          )
+          recording = resource_recording(include_trashed: include_trashed)
           current_access_grant.authorize!(
             recording: recording,
             role: RecordingStudioApi::HandlerScope.resource_role(operation_name),
-            include_trashed: registration.include_trashed
+            include_trashed: include_trashed
           )
           recording
         end
