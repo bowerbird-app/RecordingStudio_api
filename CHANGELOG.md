@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.1] - 2026-11-16
+
+### Changed
+- `AccessGrant#accessible_recordings` filters through the accessible-recording subquery, so the id list stays in the database. `accessible_recording_ids` still returns the same ids.
+- List responses preload each row's recordable before serialization. The JSON body is unchanged.
+- `meta.total_count` uses `COUNT(*)` when the list query has no join, no eager load, no referenced include, no custom `FROM`, and is not already distinct. Search, attribute filters, and any other join still use `COUNT(DISTINCT id)`.
+
+### Upgrade notes
+- Bump to `0.24.1`. No migration in this gem.
+- No request or response change.
+- Callers of `accessible_recordings` still receive the same recordings. Callers of `accessible_recording_ids` still receive the id list.
+
 ## [0.24.0] - 2026-11-15
 
 ### Changed
@@ -1261,7 +1273,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.24.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.24.1...HEAD
+[0.24.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.24.0...v0.24.1
 [0.24.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.4...v0.24.0
 [0.23.4]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.3...v0.23.4
 [0.23.3]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.2...v0.23.3

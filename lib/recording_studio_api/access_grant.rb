@@ -45,9 +45,10 @@ module RecordingStudioApi
     end
 
     def accessible_recordings(include_trashed: false)
-      @accessible_recordings[include_trashed] ||= RecordingStudio::Recording.unscoped.where(
-        id: accessible_recording_ids(include_trashed: include_trashed)
-      )
+      @accessible_recordings[include_trashed] ||= begin
+        scope = accessible_scope(include_trashed: include_trashed)
+        RecordingStudio::Recording.unscoped.where(id: scope.relation.select(:id))
+      end
     end
 
     def accessible_recording_ids(include_trashed: false)
