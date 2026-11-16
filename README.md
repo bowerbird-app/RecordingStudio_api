@@ -748,10 +748,15 @@ Pass `include_trashed: true` on `register_resource_handler` when the action
 must see a trashed recording, such as restore or destroy. The default lookup
 is kept recordings only.
 
-Pass `owns_scoping: true` only for a read action whose handler must see a
-recording outside the token's root. Registration rejects the flag on a write
-action. Support uses this for public published help pages. The handler then
-owns scoping, and this gem does not call `authorize!` for that action.
+Pass `owns_scoping: true` only for a GET, or for built-in index or show, whose
+effective role is `:view`. Registration rejects the flag on a write, including
+a POST whose `required_role` is `:view`. Dispatch checks the effective role
+again. Support uses this for public published help pages. The handler then
+owns scoping, and this gem does not call `authorize!` for that action. There
+is no write opt-out.
+
+Pass `include_trashed: true` only for a read, restore, or destroy action.
+Registration rejects it on create, update, and other writes.
 
 Member-action handlers (for example `move`) get an `ActionContext` with the
 same scoped `recording`, plus:
@@ -1157,6 +1162,7 @@ RecordingStudioApi.register_endpoint(
   "presskits.edit",
   http_verb: :patch,
   path: "presskits/:id",
+  scope_id: false,
   handler: Presskits::Edit,
   ui: "presskits.editor"
 )
@@ -1184,11 +1190,13 @@ Dispatch matches **path and HTTP verb**. Register `GET users` and `POST users` (
 
 Handlers receive `RecordingStudioApi::RegisteredEndpointContext`. That object has the client, credential, access recording, access grant, root, params, and `recording`.
 
-Pass `recordable_type:` when the path `:id` is a recording. This gem loads that id from the token's scope, checks the type, and calls `access_grant.authorize!` before the handler runs. GET requires `:view`. Every other verb requires `:edit`. A foreign or wrong-type id is 404 and the handler does not run. `include_trashed: true` includes a trashed recording in that lookup.
+A path that captures `:id` or `:recording_id` must pass `recordable_type:`. Registration raises when that type is missing. This gem loads the capture from the token's scope, checks the type, and calls `access_grant.authorize!` before the handler runs. `:recording_id` is scoped the same way as `:id`. GET defaults to `:view`. Every other verb defaults to `:edit`. Pass `required_role:` to override that default, so a POST search can require `:view`. A foreign or wrong-type id is 404 and the handler does not run.
 
-Leave `recordable_type` unset when `:id` is not a recording. `people/:id` stays a path parameter and `recording` is nil.
+Pass `scope_id: false` when the capture is not a recording, such as `people/:id`. `recording` stays nil and the handler owns that id.
 
-`owns_scoping: true` skips the lookup and `authorize!`. Registration allows it only for GET. The handler then owns scoping. Support uses that for public published help pages.
+`include_trashed: true` is accepted on a read, on restore, and on destroy. Registration rejects it on other actions.
+
+`owns_scoping: true` skips the lookup and `authorize!` only while the action is still a GET, or a built-in index or show, and the effective role is still `:view`. `required_role: :view` on POST is not enough. Dispatch checks the effective role again, so a later edit role scopes the id. Support uses the opt-out for public published help pages. There is no write opt-out.
 
 OpenAPI and Scalar list these routes under the `Endpoints` tag.
 

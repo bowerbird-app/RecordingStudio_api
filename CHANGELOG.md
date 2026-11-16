@@ -27,12 +27,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `register_capability_action`, and `register_endpoint`. The route lookup
   and `authorize!` include trashed recordings. The default is kept
   recordings only.
-- `owns_scoping: true` skips that lookup and `authorize!`. Registration
-  rejects the flag unless the action is a read action. Support uses it for
-  public published help pages. The handler then owns scoping.
-- `recordable_type:` on `register_endpoint`. A path `:id` is scoped to that
-  type. An endpoint with no `recordable_type` is unchanged, and `recording`
-  on the context is nil.
+- `owns_scoping: true` skips that lookup and `authorize!` only for a GET,
+  or built-in index or show, whose effective role is `:view`. A POST with
+  `required_role: :view` is rejected. Dispatch checks the effective role
+  again. Support uses it for public published help pages. There is no
+  write opt-out.
+- `include_trashed: true` is rejected unless the action is a read, restore,
+  or destroy.
+- `recordable_type:` on `register_endpoint`. A path `:id` or `:recording_id`
+  is scoped to that type. Registration raises when the path captures one of
+  those ids and `recordable_type` is missing. Pass `scope_id: false` when
+  the capture is not a recording.
+- `required_role:` on `register_endpoint`. GET defaults to `:view`. Every
+  other verb defaults to `:edit`.
+- Registered nested handlers call `authorize_relationship!` before the
+  handler runs.
 - Handler contexts now include the resolved `recording` and, on nested
   routes, `parent_recording`. `id`, `parent_id`, `relationship_id`, and
   `params` stay set.
@@ -41,10 +50,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Read `context.recording` or `context.parent_recording`. Do not load a
   route id with `Recording.find`.
 - A handler that previously loaded an arbitrary id now gets 404 before it
-  runs. Pass `include_trashed: true` for restore or destroy. Pass
-  `owns_scoping: true` only on a read action that must cross roots, and
-  scope inside the handler.
-- An endpoint whose `:id` is a recording passes `recordable_type:`.
+  runs. Trashable restore and Commentable destroy pass
+  `include_trashed: true`. Support public reads pass `owns_scoping: true`.
+  Support operations writes now 404 outside the token. There is no write
+  opt-out.
+- An endpoint whose `:id` or `:recording_id` is a recording passes
+  `recordable_type:`. Pass `scope_id: false` when the capture is not a
+  recording.
 - These notes are for 0.26.0. This change does not bump the gem version
   and does not add a migration.
 

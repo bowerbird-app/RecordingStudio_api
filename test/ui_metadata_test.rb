@@ -17,6 +17,7 @@ class UiMetadataTest < Minitest::Test
       "presskits.edit",
       http_verb: :patch,
       path: "presskits/:id",
+      scope_id: false,
       handler: ->(_context) { :ok },
       ui: "presskits.editor"
     )
@@ -71,6 +72,7 @@ class UiMetadataTest < Minitest::Test
       "presskits.edit",
       http_verb: :patch,
       path: "presskits/:id",
+      scope_id: false,
       handler: ->(_context) { :ok },
       ui: "presskits.editor"
     )
@@ -79,6 +81,7 @@ class UiMetadataTest < Minitest::Test
       api: :operations,
       http_verb: :patch,
       path: "presskits/:id",
+      scope_id: false,
       handler: ->(_context) { :ok },
       ui: "operations.presskits.editor"
     )
@@ -129,6 +132,7 @@ class UiMetadataTest < Minitest::Test
       "presskits.edit",
       http_verb: :patch,
       path: "presskits/:id",
+      scope_id: false,
       handler: ->(_context) { :ok },
       ui: "presskits.editor"
     )

@@ -48,13 +48,19 @@ module RecordingStudioApi
       raise ConfigurationError, "Input contract must be a RecordingStudioApi::ActionInputContract for #{name}" if input_contract && !input_contract.is_a?(ActionInputContract)
       raise ConfigurationError, "required_role must be one of: #{valid_access_roles.join(', ')} for #{name}" if required_role && !valid_access_roles.include?(required_role)
 
-      HandlerScope.assert_read_opt_out!(name: name, http_verb: http_verb, required_role: required_role) if owns_scoping
+      validate_handler_scope!
+
       raise ConfigurationError, "version_notes must be a string or array of strings for #{name}" unless version_notes.is_a?(Array)
       raise ConfigurationError, "deprecation must be a hash for #{name}" unless deprecation.is_a?(Hash)
     end
 
+    def validate_handler_scope!
+      HandlerScope.assert_include_trashed!(name: name, http_verb: http_verb, action_name: name) if include_trashed
+      HandlerScope.assert_read_opt_out!(name: name, http_verb: http_verb, required_role: required_role, action_name: name) if owns_scoping
+    end
+
     def read_action?
-      HandlerScope.read_action?(http_verb: http_verb, required_role: required_role)
+      HandlerScope.real_read?(http_verb: http_verb, required_role: required_role, action_name: name)
     end
 
     def owns_scoping?

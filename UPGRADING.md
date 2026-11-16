@@ -3,7 +3,9 @@
 ## Unreleased (0.26.0)
 
 Registered handlers receive the route recording already scoped to the token.
-No migration. The gem version is not bumped in this change.
+No migration. The gem version is not bumped in this change. There is no
+write opt-out. A write that must cross roots is a product decision still
+pending.
 
 1. Read `context.recording` or `context.parent_recording` in a handler.
    Do not load a route `id`, `parent_id`, or `relationship_id` with
@@ -12,15 +14,26 @@ No migration. The gem version is not bumped in this change.
 2. A foreign id, a wrong type, or a trashed recording returns 404 before
    the handler runs. `index` and `show` require a view grant. `create`,
    `update`, and `destroy` require an edit grant. Member actions keep
-   `required_role`.
-3. For restore or destroy, pass `include_trashed: true` to
-   `register_resource_handler`, `register_capability_action`, or
-   `register_endpoint`.
-4. Pass `owns_scoping: true` only on a read action that must see another
-   root. Registration rejects the flag on a write action. The handler then
-   owns scoping. Support uses this for public published help pages.
-5. Pass `recordable_type:` when a registered endpoint path `:id` is a
-   recording. Leave it unset when `:id` is not a recording.
+   `required_role`. Nested handlers also run `authorize_relationship!`.
+3. Pass `include_trashed: true` only for a read, restore, or destroy
+   action. Registration rejects it on other actions.
+4. Pass `owns_scoping: true` only for a GET, or built-in index or show,
+   whose effective role is `:view`. A POST with `required_role: :view` is
+   rejected. Dispatch checks the effective role again.
+5. An endpoint path that captures `:id` or `:recording_id` must pass
+   `recordable_type:`. Pass `scope_id: false` when that capture is not a
+   recording. `:recording_id` is scoped like `:id`. Pass `required_role:`
+   when the verb default is wrong. GET defaults to `:view`. Other verbs
+   default to `:edit`.
+
+Addons that must change for this release:
+
+- Support operations writes now 404 for a route id outside the token.
+  There is no write opt-out.
+- Support public reads that serve published help pages pass
+  `owns_scoping: true` on the GET or show registration.
+- Trashable restore passes `include_trashed: true`.
+- Commentable destroy passes `include_trashed: true`.
 
 ## Upgrading to 0.25.0
 

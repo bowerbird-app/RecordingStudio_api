@@ -38,21 +38,18 @@ module RecordingStudioApi
         end
 
         def endpoint_recording(endpoint, captures)
-          return if endpoint.owns_scoping?
-          return if endpoint.recordable_type.blank?
-
-          id = captures[:id]
-          return if id.blank?
+          return if RecordingStudioApi::HandlerScope.endpoint_opt_out?(endpoint)
+          return unless endpoint.scopes_recording?
 
           recording = RecordingStudioApi::ScopedRecording.find!(
             access_grant: current_access_grant,
-            id: id,
+            id: endpoint.recording_id_from(captures),
             recordable_type: endpoint.recordable_type,
             include_trashed: endpoint.include_trashed
           )
           current_access_grant.authorize!(
             recording: recording,
-            role: endpoint.http_verb == :get ? :view : :edit,
+            role: endpoint.authorization_role,
             include_trashed: endpoint.include_trashed
           )
           recording

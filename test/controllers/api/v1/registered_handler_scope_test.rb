@@ -303,6 +303,166 @@ class ApiV1RegisteredHandlerScopeTest < ActionDispatch::IntegrationTest
     assert_equal @foreign_folder.id.to_s, @calls.last[:params_parent_id].to_s
   end
 
+  test "an endpoint id requires a recordable type unless scope_id is false" do
+    missing = assert_raises(RecordingStudioApi::ConfigurationError) do
+      RecordingStudioApi.register_endpoint(
+        :person,
+        http_verb: :get,
+        path: "people/:id",
+        handler: endpoint_probe("person")
+      )
+    end
+    assert_includes missing.message, "scope_id: false"
+
+    RecordingStudioApi.register_endpoint(
+      :person,
+      http_verb: :get,
+      path: "people/:id",
+      scope_id: false,
+      handler: endpoint_probe("person")
+    )
+    RecordingStudioApi.register_endpoint(
+      :recording_page,
+      http_verb: :get,
+      path: "recordings/:recording_id",
+      recordable_type: "Page",
+      handler: endpoint_probe("recording")
+    )
+
+    get "/recording_studio_api/api/v1/people/#{@foreign_page.id}", headers: headers
+    assert_response :success
+    assert_nil @calls.last[:recording_id]
+    assert_equal @foreign_page.id.to_s, @calls.last[:params_id]
+
+    get "/recording_studio_api/api/v1/recordings/#{@foreign_page.id}", headers: headers
+    assert_response :not_found
+    assert_equal 1, @calls.size
+
+    get "/recording_studio_api/api/v1/recordings/#{@page_recording.id}", headers: headers
+    assert_response :success
+    assert_equal @page_recording.id, @calls.last[:recording_id]
+  end
+
+  test "a post endpoint can require view and a post read cannot opt out of scoping" do
+    view_headers, view_page = view_client
+    RecordingStudioApi.register_endpoint(
+      :search_page,
+      http_verb: :post,
+      path: "search-pages/:id",
+      recordable_type: "Page",
+      required_role: :view,
+      handler: endpoint_probe("search")
+    )
+    RecordingStudioApi.register_endpoint(
+      :edit_page,
+      http_verb: :post,
+      path: "edit-pages/:id",
+      recordable_type: "Page",
+      handler: endpoint_probe("edit")
+    )
+
+    post "/recording_studio_api/api/v1/search-pages/#{view_page.id}", headers: view_headers
+    assert_response :success
+    assert_equal view_page.id, @calls.last[:recording_id]
+
+    post "/recording_studio_api/api/v1/edit-pages/#{view_page.id}", headers: view_headers
+    assert_response :forbidden
+    assert_equal 1, @calls.size
+
+    view_opt_out = assert_raises(RecordingStudioApi::ConfigurationError) do
+      RecordingStudioApi.register_capability_action(
+        :search,
+        capability: :echoable,
+        http_verb: :post,
+        required_role: :view,
+        owns_scoping: true,
+        handler: ->(_context) { {} }
+      )
+    end
+    assert_includes view_opt_out.message, "owns_scoping is only allowed on a read action"
+  end
+
+  test "a later edit role revokes owns_scoping before the handler runs" do
+    enable_echo
+    RecordingStudioApi.register_capability_action(
+      :published,
+      capability: :echoable,
+      http_verb: :get,
+      required_role: :view,
+      owns_scoping: true,
+      handler: ->(context) { { recording_id: context.recording&.id } },
+      serializer: ->(result) { result }
+    )
+    RecordingStudioApi.register_recordable_type_api("Page", capability_actions: %i[published])
+    RecordingStudioApi.configuration.capability_action_roles = { "published" => :edit }
+
+    get "/recording_studio_api/api/v1/pages/#{@foreign_page.id}/actions/published", headers: headers
+    assert_response :not_found
+
+    get "/recording_studio_api/api/v1/pages/#{@page_recording.id}/actions/published", headers: headers
+    assert_response :success
+    assert_equal @page_recording.id, JSON.parse(response.body).fetch("recording_id")
+
+    view_headers, view_page = view_client
+    get "/recording_studio_api/api/v1/pages/#{view_page.id}/actions/published", headers: view_headers
+    assert_response :forbidden
+  end
+
+  test "include_trashed is rejected on a write that is not restore or destroy" do
+    update_handler = assert_raises(RecordingStudioApi::ConfigurationError) do
+      RecordingStudioApi.register_resource_handler("Page", :update, include_trashed: true, handler: probe("update"))
+    end
+    enable_echo
+    echo_handler = assert_raises(RecordingStudioApi::ConfigurationError) do
+      RecordingStudioApi.register_capability_action(
+        :echo,
+        capability: :echoable,
+        http_verb: :post,
+        include_trashed: true,
+        handler: ->(_context) { {} }
+      )
+    end
+    endpoint = assert_raises(RecordingStudioApi::ConfigurationError) do
+      RecordingStudioApi.register_endpoint(
+        :write_page,
+        http_verb: :post,
+        path: "write-pages/:id",
+        recordable_type: "Page",
+        include_trashed: true,
+        handler: endpoint_probe("write")
+      )
+    end
+    RecordingStudioApi.register_resource_handler("Page", :destroy, include_trashed: true, handler: probe("destroy"))
+
+    assert_includes update_handler.message, "include_trashed is only allowed on a read, restore, or destroy action"
+    assert_includes echo_handler.message, "include_trashed is only allowed on a read, restore, or destroy action"
+    assert_includes endpoint.message, "include_trashed is only allowed on a read, restore, or destroy action"
+  end
+
+  test "a nested handler authorizes the relationship before it runs" do
+    RecordingStudioApi.register_recordable_type_api(
+      "Workspace",
+      relationships: {
+        folders: {
+          source: :children,
+          child_type: "Folder",
+          many: true,
+          serializer: ->(recordable, **) { { name: recordable.name } },
+          output_keys: %i[name],
+          limit: 20,
+          endpoints: %i[show],
+          authorize: ->(_context) { false }
+        }
+      }
+    )
+    RecordingStudioApi.register_resource_handler("Folder", :show, handler: probe("nested-show"))
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders/#{@folder_recording.id}", headers: headers
+    assert_response :forbidden
+    assert_equal "Not authorized to read relationship folders", JSON.parse(response.body).dig("error", "message")
+    assert_empty @calls
+  end
+
   private
 
   def headers

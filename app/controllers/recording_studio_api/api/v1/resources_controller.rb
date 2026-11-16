@@ -89,7 +89,7 @@ module RecordingStudioApi
         end
 
         def registered_resource_recording(operation_name, registration)
-          return if registration.owns_scoping?
+          return if RecordingStudioApi::HandlerScope.resource_opt_out?(registration.owns_scoping?, operation_name)
           return unless %i[show update destroy].include?(operation_name.to_sym)
 
           recording = resource_recording(include_trashed: registration.include_trashed)

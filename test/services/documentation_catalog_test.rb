@@ -96,6 +96,7 @@ module RecordingStudioApi
           :show_item,
           http_verb: :get,
           path: "items/:id",
+          scope_id: false,
           handler: ->(_context) { { ok: true } },
           openapi: {
             parameters: [

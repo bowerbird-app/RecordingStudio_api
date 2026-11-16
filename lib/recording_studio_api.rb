@@ -157,7 +157,7 @@ module RecordingStudioApi
       Integration.oauth_error_status(error)
     end
 
-    def register_endpoint(name, api: :public, http_verb:, path:, handler:, serializer: nil, openapi: nil, input_contract: nil, ui: nil, recordable_type: nil, include_trashed: false, owns_scoping: false)
+    def register_endpoint(name, api: :public, http_verb:, path:, handler:, serializer: nil, openapi: nil, input_contract: nil, ui: nil, **)
       registry = configuration.api(api).registered_endpoint_registry
       Metrics::Endpoints.expand(
         name:,
@@ -168,9 +168,7 @@ module RecordingStudioApi
         openapi:,
         input_contract:,
         ui:,
-        recordable_type:,
-        include_trashed:,
-        owns_scoping:
+        **
       ).map do |registration|
         registry.register(registration.fetch(:name), **registration.except(:name))
       end.first

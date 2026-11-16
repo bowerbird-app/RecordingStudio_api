@@ -55,8 +55,8 @@ class RegisteredEndpointRegistryTest < Minitest::Test
   def test_match_same_path_with_different_verbs
     @registry.register(:list_users, http_verb: :get, path: "users", handler: ->(_context) { :list })
     @registry.register(:create_user, http_verb: :post, path: "users", handler: ->(_context) { :create })
-    @registry.register(:show_user, http_verb: :get, path: "users/:id", handler: ->(_context) { :show })
-    @registry.register(:update_user, http_verb: :patch, path: "users/:id", handler: ->(_context) { :update })
+    @registry.register(:show_user, http_verb: :get, path: "users/:id", scope_id: false, handler: ->(_context) { :show })
+    @registry.register(:update_user, http_verb: :patch, path: "users/:id", scope_id: false, handler: ->(_context) { :update })
 
     list = @registry.match(path: "users", http_verb: :get)
     create = @registry.match(path: "users", http_verb: :POST)
@@ -164,6 +164,7 @@ class RegisteredEndpointRegistryTest < Minitest::Test
       :show_item,
       http_verb: :get,
       path: "items/:id",
+      scope_id: false,
       handler: ->(_context) { :ok },
       openapi: {
         parameters: [
@@ -226,7 +227,7 @@ class RegisteredEndpointRegistryTest < Minitest::Test
   end
 
   def test_equal_specificity_keeps_registration_order
-    @registry.register(:first, http_verb: :get, path: "widgets/:id", handler: ->(_) { :first })
+    @registry.register(:first, http_verb: :get, path: "widgets/:id", scope_id: false, handler: ->(_) { :first })
     @registry.register(:second, http_verb: :get, path: "widgets/:key", handler: ->(_) { :second })
 
     match = @registry.match(path: "widgets/button", http_verb: :get)

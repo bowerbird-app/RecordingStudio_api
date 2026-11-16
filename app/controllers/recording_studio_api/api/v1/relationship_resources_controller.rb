@@ -245,7 +245,7 @@ module RecordingStudioApi
         end
 
         def nested_handler_targets(operation_name, registration)
-          return [nil, nil] if registration&.owns_scoping?
+          return [nil, nil] if RecordingStudioApi::HandlerScope.resource_opt_out?(registration&.owns_scoping?, operation_name)
 
           include_trashed = registration.include_trashed
           role = RecordingStudioApi::HandlerScope.resource_role(operation_name)
@@ -253,12 +253,27 @@ module RecordingStudioApi
             parent = parent_recording
             child = child_recording(include_trashed: include_trashed)
             current_access_grant.authorize!(recording: child, role: role, include_trashed: include_trashed)
+            authorize_nested_relationship!(parent, include_trashed: false)
+            authorize_child!(child)
             [parent, child]
           else
             parent = parent_recording(include_trashed: include_trashed)
             current_access_grant.authorize!(recording: parent, role: role, include_trashed: include_trashed)
+            authorize_nested_relationship!(parent, include_trashed: include_trashed)
             [parent, nil]
           end
+        end
+
+        def authorize_nested_relationship!(parent, include_trashed:)
+          RecordingStudioApi::RelationshipContext.for(
+            recordings: [parent],
+            include_values: nil,
+            scoped_recordings: scoped_recordings(include_trashed: include_trashed),
+            api_key: current_api_key,
+            api_version: current_api_version,
+            access_grant: current_access_grant,
+            params: {}
+          ).authorize_relationship!(parent, relationship_name, relationship)
         end
 
         def relationship_operation_context(recordable_type:, recording: nil)

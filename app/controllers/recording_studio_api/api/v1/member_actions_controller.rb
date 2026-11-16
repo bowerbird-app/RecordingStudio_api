@@ -54,7 +54,7 @@ module RecordingStudioApi
         end
 
         def member_handler_context(action, recordable_type, registration)
-          return handler_action_context(action, recordable_type, recording: nil) if registration.owns_scoping?
+          return handler_action_context(action, recordable_type, recording: nil) if registration.owns_scoping? && dispatch_read?(action)
 
           recording = resource_recording(include_trashed: registration.include_trashed)
           context = handler_action_context(action, recordable_type, recording: recording)
@@ -63,7 +63,7 @@ module RecordingStudioApi
         end
 
         def capability_action_context(action)
-          if action.owns_scoping?
+          if action.owns_scoping? && dispatch_read?(action)
             assert_action_enabled!(action, resolve_recordable_type!)
             return action_context(action, recording: nil)
           end
@@ -115,6 +115,19 @@ module RecordingStudioApi
           raise InvalidActionInputError.new(
             "Invalid input for action #{action.name}",
             details: contract_result.errors
+          )
+        end
+
+        def dispatch_read?(action)
+          RecordingStudioApi::HandlerScope.dispatch_read?(action: action, role: effective_action_role(action))
+        end
+
+        def effective_action_role(action)
+          RecordingStudioApi.configuration.capability_action_role_for(
+            action: action,
+            recording: nil,
+            api_client: current_api_client,
+            access_grant: current_access_grant
           )
         end
 

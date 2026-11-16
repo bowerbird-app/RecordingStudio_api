@@ -205,12 +205,14 @@ class ApiV1RegisteredEndpointsControllerTest < ActionDispatch::IntegrationTest
       :show_person,
       http_verb: :get,
       path: "people/:id",
+      scope_id: false,
       handler: ->(context) { { operation: "show", id: context.params[:id] } }
     )
     RecordingStudioApi.register_endpoint(
       :update_person,
       http_verb: :patch,
       path: "people/:id",
+      scope_id: false,
       handler: ->(context) { { operation: "update", id: context.params[:id], name: context.params[:name] } }
     )
 
