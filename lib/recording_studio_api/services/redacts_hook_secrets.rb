@@ -3,7 +3,30 @@
 module RecordingStudioApi
   module Services
     module RedactsHookSecrets
-      SECRET_KEYS = %w[token access_token client_secret].freeze
+      SECRET_KEYS = %w[
+        token
+        access_token
+        refresh_token
+        client_secret
+        code
+        code_verifier
+        id_token
+        password
+        assertion
+        client_assertion
+        device_code
+        user_code
+        authorization_code
+      ].freeze
+      PARAM_KEYS = %w[
+        grant_type
+        client_id
+        redirect_uri
+        scope
+        resource
+        token_type_hint
+        response_type
+      ].freeze
       SECRET_IVARS = %i[@client_secret @token @authorization_header].freeze
 
       private
@@ -21,23 +44,33 @@ module RecordingStudioApi
 
       def hook_subject
         copy = dup
-        redact_subject_params(copy)
+        allowlist_subject_params(copy)
         SECRET_IVARS.each do |name|
           copy.remove_instance_variable(name) if copy.instance_variable_defined?(name)
         end
         copy
       end
 
-      def redact_subject_params(copy)
+      def allowlist_subject_params(copy)
         return unless copy.instance_variable_defined?(:@params)
 
         params = copy.instance_variable_get(:@params)
-        copy.instance_variable_set(:@params, redact_hook_value(params))
+        copy.instance_variable_set(:@params, allowlisted_params(params))
+      end
+
+      def allowlisted_params(params)
+        hash = params_hash(params)
+        hash.each_with_object({}) do |(key, value), kept|
+          next unless PARAM_KEYS.include?(key.to_s)
+
+          kept[key] = value
+        end
       end
 
       def redact_hook_value(object)
         return nil if credential_record?(object)
-        return object.with(credential: nil) if object.is_a?(RecordingStudioApi::AuthenticatedClient)
+        return object.with(credential: nil) if authenticated_client?(object)
+        return redact_hash(hash_for_redaction(object)) if hash_source?(object)
 
         case object
         when Hash then redact_hash(object)
@@ -45,6 +78,41 @@ module RecordingStudioApi
         when String then known_secret?(object) ? nil : object
         else object
         end
+      end
+
+      def hash_source?(object)
+        parameters?(object) || object.is_a?(Struct) || object.is_a?(Data)
+      end
+
+      def hash_for_redaction(object)
+        return parameters_hash(object) if parameters?(object)
+
+        object.to_h
+      end
+
+      def parameters?(object)
+        return false unless defined?(ActionController::Parameters)
+
+        object.is_a?(ActionController::Parameters)
+      end
+
+      def parameters_hash(params)
+        source = params.dup
+        source.permit! unless source.permitted?
+        source.to_h
+      end
+
+      def params_hash(params)
+        return parameters_hash(params) if parameters?(params)
+        return params if params.is_a?(Hash)
+
+        {}
+      end
+
+      def authenticated_client?(object)
+        return false unless defined?(RecordingStudioApi::AuthenticatedClient)
+
+        object.is_a?(RecordingStudioApi::AuthenticatedClient)
       end
 
       def credential_record?(object)

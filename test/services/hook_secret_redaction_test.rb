@@ -96,7 +96,13 @@ class HookSecretRedactionTest < ActiveSupport::TestCase
         grant_type: "client_credentials",
         client_id: "missing-client",
         client_secret: client_secret,
-        params: { "client_secret" => client_secret, "code" => "leave-this" }
+        params: {
+          "grant_type" => "authorization_code",
+          "client_secret" => client_secret,
+          "code" => "presented-code",
+          "redirect_uri" => "https://app.example/callback",
+          "note" => "drop-this"
+        }
       )
     end
 
@@ -104,9 +110,124 @@ class HookSecretRedactionTest < ActiveSupport::TestCase
     assert subject.is_a?(RecordingStudioApi::Services::IssueOauthAccessToken)
     assert subject.kind_of?(RecordingStudioApi::Services::IssueOauthAccessToken) # rubocop:disable Style/ClassCheck
     assert_not subject.instance_variable_defined?(:@client_secret)
-    assert_nil subject.instance_variable_get(:@params).fetch("client_secret")
-    assert_equal "leave-this", subject.instance_variable_get(:@params).fetch("code")
+    kept = subject.instance_variable_get(:@params)
+    assert_equal "authorization_code", kept.fetch("grant_type")
+    assert_equal "https://app.example/callback", kept.fetch("redirect_uri")
+    assert_equal %w[grant_type redirect_uri], kept.keys
     assert_hooks_hide([[:around, subject, around_value, subject]], client_secret)
+    assert_hooks_hide([[:around, subject, around_value, subject]], "presented-code")
+  end
+
+  test "a delegated grant refresh token stays with the caller and out of the hooks" do
+    access_token = "rsapi_at_delegated"
+    refresh_token = "rsapi_rt_delegated"
+    RecordingStudioApi.register_oauth_grant("refresh_token", handler: lambda { |**|
+      RecordingStudio::Services::BaseService::Result.new(
+        success: true,
+        value: {
+          access_token: access_token,
+          refresh_token: refresh_token,
+          token_type: "Bearer",
+          expires_in: 3600
+        },
+        error: nil,
+        errors: []
+      )
+    })
+
+    seen = capture_service_hooks do
+      @issued = RecordingStudioApi::Services::IssueOauthAccessToken.call(
+        grant_type: "refresh_token",
+        client_id: "delegated-client",
+        client_secret: "delegated-secret",
+        params: {
+          "grant_type" => "refresh_token",
+          "refresh_token" => refresh_token,
+          "code" => "presented-code",
+          "code_verifier" => "presented-verifier",
+          "id_token" => "presented-id-token"
+        }
+      )
+    end
+
+    assert @issued.success?, @issued.error
+    assert_equal access_token, @issued.value.fetch(:access_token)
+    assert_equal refresh_token, @issued.value.fetch(:refresh_token)
+    assert_hooks_hide(seen, access_token)
+    assert_hooks_hide(seen, refresh_token)
+    assert_hooks_hide(seen, "presented-code")
+    assert_hooks_hide(seen, "presented-verifier")
+    assert_hooks_hide(seen, "presented-id-token")
+
+    after = seen.find { |event, service_class,| event == :after && service_class == RecordingStudioApi::Services::IssueOauthAccessToken }
+    assert_nil after[2].value.fetch(:access_token)
+    assert_nil after[2].value.fetch(:refresh_token)
+    assert_equal "Bearer", after[2].value.fetch(:token_type)
+    subject = seen.find { |event,| event == :around }.last
+    assert_equal({ "grant_type" => "refresh_token" }, subject.instance_variable_get(:@params))
+  end
+
+  test "hook results redact structs data and request parameters" do
+    pair = Data.define(:access_token, :token_type).new(access_token: "data-access", token_type: "Bearer")
+    legacy = Struct.new(:refresh_token, :expires_in).new("struct-refresh", 60)
+    request = ActionController::Parameters.new("id_token" => "param-id-token", "token_type" => "Bearer")
+    probe = Class.new(RecordingStudio::Services::BaseService) do
+      include RecordingStudioApi::Services::RedactsHookSecrets
+
+      def initialize(value)
+        @value = value
+      end
+
+      def perform
+        success(@value)
+      end
+    end
+
+    seen = capture_service_hooks do
+      @shaped = probe.call({ pair: pair, legacy: legacy, request: request })
+    end
+
+    assert_equal "data-access", @shaped.value.fetch(:pair).access_token
+    assert_equal "struct-refresh", @shaped.value.fetch(:legacy).refresh_token
+    assert_equal "param-id-token", @shaped.value.fetch(:request)["id_token"]
+    after = seen.find { |event,| event == :after }
+    value = after[2].value
+    assert_nil value.fetch(:pair).fetch(:access_token)
+    assert_equal "Bearer", value.fetch(:pair).fetch(:token_type)
+    assert_nil value.fetch(:legacy).fetch(:refresh_token)
+    assert_equal 60, value.fetch(:legacy).fetch(:expires_in)
+    assert_nil value.fetch(:request).fetch("id_token")
+    assert_equal "Bearer", value.fetch(:request).fetch("token_type")
+    %w[data-access struct-refresh param-id-token].each do |secret|
+      seen.each do |event, service_class, payload,|
+        assert_not hook_text(payload).include?(secret), "#{event} on #{service_class} saw a secret"
+      end
+    end
+  end
+
+  test "pagination hooks do not receive the pagination token" do
+    token = "signed-pagination-token"
+    seen = capture_service_hooks do
+      @page = RecordingStudioApi::Services::PaginateResourceCollection.call(
+        relation: RecordingStudioApi::ApiClient.none,
+        resource: "api_clients",
+        recordable_type: "RecordingStudioApi::ApiClient",
+        limit: 1,
+        pagination_token: token,
+        sort: "created_at",
+        order: "desc",
+        scope_key: "client-1"
+      )
+    end
+
+    subjects = seen.select { |event,| event == :around }.map(&:last)
+    assert_predicate subjects, :any?
+    subjects.each do |subject|
+      assert_not subject.instance_variable_defined?(:@pagination_token)
+    end
+    seen.each do |event, service_class, payload,|
+      assert_not hook_text(payload).include?(token), "#{event} on #{service_class} saw the pagination token"
+    end
   end
 
   test "revoke and bearer hooks omit the plaintext token and client secret" do

@@ -12,7 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Services inherit `RecordingStudio::Services::BaseService`. `call` still returns `RecordingStudio::Services::BaseService::Result`.
 - `before_service`, `after_service`, and `around_service` run on `RecordingStudio.configuration.hooks`.
-- Issued tokens, client secrets, and credential records are left out of those hook payloads. The caller still receives them.
+- Issued tokens, refresh tokens, authorization codes, client secrets, and credential records are left out of those hook payloads. The caller still receives them.
+- A registered Core `around_service` hook wraps API authentication. A hook that raises returns 500 and fails closed.
 - `RecordingStudioApi.configuration.hooks` is a `RecordingStudio::Hooks` instance for lifecycle hooks and model or controller extensions.
 
 ### Removed

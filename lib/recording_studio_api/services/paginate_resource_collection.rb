@@ -234,6 +234,12 @@ module RecordingStudioApi
         Rails.application.message_verifier(PAGINATION_TOKEN_PURPOSE)
       end
 
+      def hook_subject
+        copy = dup
+        copy.remove_instance_variable(:@pagination_token) if copy.instance_variable_defined?(:@pagination_token)
+        copy
+      end
+
       def service_args
         {
           resource: resource,

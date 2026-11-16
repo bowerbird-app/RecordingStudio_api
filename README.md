@@ -576,7 +576,7 @@ The runtime should fail fast when:
 
 Host apps and addon gems use these entrypoints for configuration, resource exposure, and capability registration.
 
-Service calls report through Recording Studio's own hooks. Register `before_service`, `after_service`, and `around_service` on `RecordingStudio.configuration.hooks`. `after_service` and `around_service` see a result that omits issued tokens, client secrets, and credential records. `around_service` receives a copy of the service. The caller still receives the secret once. Model and controller extensions, including Moveable's conflict handler, stay on `RecordingStudioApi.configuration.hooks`.
+Service calls report through Recording Studio's own hooks. Register `before_service`, `after_service`, and `around_service` on `RecordingStudio.configuration.hooks`. `after_service` and `around_service` see a result that omits issued tokens, refresh tokens, authorization codes, client secrets, and credential records. `around_service` receives a copy of the service. The caller still receives the secret once. A hook that raises during API authentication returns 500. Model and controller extensions, including Moveable's conflict handler, stay on `RecordingStudioApi.configuration.hooks`.
 
 ```ruby
 RecordingStudioApi.configure do |config|
