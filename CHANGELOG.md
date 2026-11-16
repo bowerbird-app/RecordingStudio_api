@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-16
+
+### Added
+- `trashed_semantics: :restore` or `:destroy` on `register_capability_action`, `register_resource_handler`, and `register_endpoint`. A custom-named POST can pass `include_trashed: true` when it declares that. Registration rejects the declaration on a GET, with `required_role: :view`, and with `owns_scoping: true`. Dispatch checks the effective role again. The lookup still uses `ScopedRecording` and `authorize!`, and the role must be `:edit` or higher.
+
+### Changed
+- `recording_studio_trashable` is `>= 0.17.0`, `< 2.0`.
+
+### Upgrade notes
+- Bump to `1.1.0`. No migration. Payloads, auth, and routes for existing registrations stay the same.
+- Trashable `trashable_restore` passes `trashed_semantics: :restore` and `required_role: :edit`. `trashable_purge` passes `trashed_semantics: :destroy` and `required_role: :admin`. Pass the same declaration on the resource handler. Register the capability action first. See [UPGRADING.md](UPGRADING.md).
+
 ## [1.0.0] - 2026-11-16
 
 ### Changed
@@ -69,8 +81,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Read `context.recording` or `context.parent_recording`. Do not load a
   route id with `Recording.find`.
 - A handler that previously loaded an arbitrary id now gets 404 before it
-  runs. Trashable restore and Commentable destroy pass
-  `include_trashed: true`. Support public reads pass `owns_scoping: true`.
+  runs. Commentable destroy passes `include_trashed: true` on the destroy
+  action. Trashable's custom POST names cannot until 1.1.0. Support public
+  reads pass `owns_scoping: true`.
   Support operations writes now 404 outside the token. There is no write
   opt-out.
 - An endpoint whose `:id` or `:recording_id` is a recording passes

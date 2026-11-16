@@ -1,5 +1,69 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.1.0
+
+Additive. No migration. Existing registrations keep the same payloads, auth, and routes.
+
+1. Bump the host gem to `1.1.0`.
+2. Widen `recording_studio_trashable` to `>= 0.17.0`, `< 2.0`. Other dependency pins stay the same. Trashable 1.0.0 fits this range. The development Gemfile still checks out tag `v0.17.0` until that release is tagged.
+3. A custom-named POST that must see a trashed recording declares `trashed_semantics`.
+
+`:restore` and `:destroy` are the only values. The role must be `:edit` or higher, so purge keeps `required_role: :admin`. Registration rejects the declaration on a GET, with `required_role: :view`, and with `owns_scoping: true`. Dispatch checks the effective role again. A token whose role is only `:view` is refused. A trashed recording outside the token's scope is 404.
+
+Trashable registers `trashable_restore` and `trashable_purge` as POST capability actions, then registers the same handlers on each trashable type. Register the capability action first. Pass the declaration on both calls.
+
+```ruby
+RecordingStudioApi.register_capability_action(
+  :trashable_restore,
+  capability: :trashable,
+  version: RecordingStudioTrashable::Api::Catalog::ACTION_VERSION,
+  http_verb: :post,
+  required_role: :edit,
+  handler: RecordingStudioTrashable::Api::Actions::Restore,
+  serializer: nil,
+  input_contract: RecordingStudioTrashable::Api::Catalog.contract_for(:trashable_restore),
+  openapi: RecordingStudioTrashable::Api::Catalog.openapi_for(:trashable_restore),
+  include_trashed: true,
+  trashed_semantics: :restore,
+  api: api_name
+)
+
+RecordingStudioApi.register_capability_action(
+  :trashable_purge,
+  capability: :trashable,
+  version: RecordingStudioTrashable::Api::Catalog::ACTION_VERSION,
+  http_verb: :post,
+  required_role: :admin,
+  handler: RecordingStudioTrashable::Api::Actions::Purge,
+  serializer: nil,
+  input_contract: RecordingStudioTrashable::Api::Catalog.contract_for(:trashable_purge),
+  openapi: RecordingStudioTrashable::Api::Catalog.openapi_for(:trashable_purge),
+  include_trashed: true,
+  trashed_semantics: :destroy,
+  api: api_name
+)
+
+RecordingStudioApi.register_resource_handler(
+  recordable_type,
+  :trashable_restore,
+  api: api_name,
+  handler: RecordingStudioTrashable::Api::Actions::Restore,
+  include_trashed: true,
+  trashed_semantics: :restore
+)
+
+RecordingStudioApi.register_resource_handler(
+  recordable_type,
+  :trashable_purge,
+  api: api_name,
+  handler: RecordingStudioTrashable::Api::Actions::Purge,
+  include_trashed: true,
+  trashed_semantics: :destroy
+)
+```
+
+`ACTION_VERSION` is `"1.0.0"`. `contract_for` and `openapi_for` are the catalog methods Trashable already passes.
+
 ## Upgrading to 1.0.0
 
 Breaking. No migration in this gem.
@@ -69,7 +133,7 @@ Addons that must change for this release:
   recordable_type. There is no write opt-out.
 - Support public help page show and public ticket show pass
   `owns_scoping: true` on the GET.
-- Trashable restore passes `include_trashed: true`.
+- Trashable `trashable_restore` and `trashable_purge` are POST actions with custom names. 0.26 rejects `include_trashed: true` on them. Declare `trashed_semantics` in 1.1.0.
 - Commentable destroy passes `include_trashed: true`.
 
 ## Upgrading to 0.25.0

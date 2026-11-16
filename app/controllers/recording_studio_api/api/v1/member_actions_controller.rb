@@ -56,9 +56,10 @@ module RecordingStudioApi
         def member_handler_context(action, recordable_type, registration)
           return handler_action_context(action, recordable_type, recording: nil) if registration.owns_scoping? && dispatch_read?(action)
 
-          recording = resource_recording(include_trashed: registration.include_trashed)
+          include_trashed = include_trashed_for?(registration, action)
+          recording = resource_recording(include_trashed: include_trashed)
           context = handler_action_context(action, recordable_type, recording: recording)
-          authorize_action!(action, context, include_trashed: registration.include_trashed)
+          authorize_action!(action, context, include_trashed: include_trashed)
           context
         end
 
@@ -68,10 +69,11 @@ module RecordingStudioApi
             return action_context(action, recording: nil)
           end
 
-          recording = resource_recording(include_trashed: action.include_trashed)
+          include_trashed = include_trashed_for?(action, action)
+          recording = resource_recording(include_trashed: include_trashed)
           assert_action_enabled!(action, recording.recordable_type)
           context = action_context(action, recording: recording)
-          authorize_action!(action, context, include_trashed: action.include_trashed)
+          authorize_action!(action, context, include_trashed: include_trashed)
           context
         end
 
@@ -122,10 +124,22 @@ module RecordingStudioApi
           RecordingStudioApi::HandlerScope.dispatch_read?(action: action, role: effective_action_role(action))
         end
 
-        def effective_action_role(action)
+        def include_trashed_for?(source, action)
+          return source.include_trashed if source.trashed_semantics.nil?
+          return false unless source.include_trashed
+
+          candidate = resource_recording(include_trashed: true)
+          RecordingStudioApi::HandlerScope.dispatch_include_trashed?(
+            include_trashed: true,
+            trashed_semantics: source.trashed_semantics,
+            role: effective_action_role(action, candidate)
+          )
+        end
+
+        def effective_action_role(action, recording = nil)
           RecordingStudioApi.configuration.capability_action_role_for(
             action: action,
-            recording: nil,
+            recording: recording,
             api_client: current_api_client,
             access_grant: current_access_grant
           )

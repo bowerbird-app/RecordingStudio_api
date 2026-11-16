@@ -507,6 +507,252 @@ class ApiV1RegisteredHandlerScopeTest < ActionDispatch::IntegrationTest
     assert_includes endpoint.message, "include_trashed is only allowed on a read, restore, or destroy action"
   end
 
+  test "a custom post with trashed_semantics resolves an in-scope trashed recording" do
+    @page_recording.update_column(:trashed_at, Time.current)
+    @foreign_page.update_column(:trashed_at, Time.current)
+    register_restore_action
+
+    post restore_path(@page_recording), headers: headers
+    assert_response :success
+    assert_equal @page_recording.id, JSON.parse(response.body).fetch("recording_id")
+
+    post restore_path(@foreign_page), headers: headers
+    assert_response :not_found
+    assert_equal "Resource was not found in this API scope", JSON.parse(response.body).dig("error", "message")
+
+    view_headers, view_page = view_client
+    view_page.update_column(:trashed_at, Time.current)
+    post restore_path(view_page), headers: view_headers
+    assert_response :forbidden
+    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
+    recording_ids = @calls.map { |call| call[:recording_id] }
+    assert_equal [@page_recording.id], recording_ids
+  end
+
+  test "trashed_semantics is required for a custom post and rejected for view, owns_scoping, or get" do
+    enable_echo
+    missing = assert_raises(RecordingStudioApi::ConfigurationError) do
+      register_capability_action(:trashable_restore, include_trashed: true)
+    end
+    view_role = assert_raises(RecordingStudioApi::ConfigurationError) do
+      register_capability_action(:trashable_restore, required_role: :view, include_trashed: true, trashed_semantics: :restore)
+    end
+    scoping = assert_raises(RecordingStudioApi::ConfigurationError) do
+      register_capability_action(:trashable_restore, required_role: :edit, owns_scoping: true, trashed_semantics: :restore)
+    end
+    get_action = assert_raises(RecordingStudioApi::ConfigurationError) do
+      register_capability_action(:trashable_restore, http_verb: :get, required_role: :edit, include_trashed: true, trashed_semantics: :restore)
+    end
+    unknown = assert_raises(RecordingStudioApi::ConfigurationError) do
+      register_capability_action(:trashable_restore, trashed_semantics: :purge)
+    end
+    endpoint_get = assert_raises(RecordingStudioApi::ConfigurationError) do
+      RecordingStudioApi.register_endpoint(
+        :get_restore,
+        http_verb: :get,
+        path: "get-restore/:id",
+        recordable_type: "Page",
+        required_role: :edit,
+        include_trashed: true,
+        trashed_semantics: :restore,
+        handler: endpoint_probe("get")
+      )
+    end
+    endpoint_view = assert_raises(RecordingStudioApi::ConfigurationError) do
+      RecordingStudioApi.register_endpoint(
+        :view_restore,
+        http_verb: :post,
+        path: "view-restore/:id",
+        recordable_type: "Page",
+        required_role: :view,
+        include_trashed: true,
+        trashed_semantics: :restore,
+        handler: endpoint_probe("view")
+      )
+    end
+    endpoint_scope = assert_raises(RecordingStudioApi::ConfigurationError) do
+      RecordingStudioApi.register_endpoint(
+        :scoped_restore,
+        http_verb: :post,
+        path: "scoped-restore/:id",
+        recordable_type: "Page",
+        owns_scoping: true,
+        trashed_semantics: :restore,
+        handler: endpoint_probe("scoped")
+      )
+    end
+    show_handler = assert_raises(RecordingStudioApi::ConfigurationError) do
+      RecordingStudioApi.register_resource_handler("Page", :show, trashed_semantics: :restore, handler: probe("show"))
+    end
+    RecordingStudioApi.register_capability_action(
+      :peek,
+      capability: :echoable,
+      http_verb: :post,
+      required_role: :view,
+      handler: ->(_context) { {} }
+    )
+    handler_view = assert_raises(RecordingStudioApi::ConfigurationError) do
+      RecordingStudioApi.register_resource_handler(
+        "Page",
+        :peek,
+        include_trashed: true,
+        trashed_semantics: :restore,
+        handler: probe("peek")
+      )
+    end
+    register_capability_action(:trashable_restore)
+    handler_missing = assert_raises(RecordingStudioApi::ConfigurationError) do
+      RecordingStudioApi.register_resource_handler(
+        "Page",
+        :trashable_restore,
+        include_trashed: true,
+        handler: probe("restore")
+      )
+    end
+    unregistered = assert_raises(RecordingStudioApi::ConfigurationError) do
+      RecordingStudioApi.register_resource_handler(
+        "Page",
+        :not_registered,
+        trashed_semantics: :destroy,
+        handler: probe("missing")
+      )
+    end
+
+    assert_includes missing.message, "include_trashed is only allowed on a read, restore, or destroy action"
+    assert_includes view_role.message, "trashed_semantics requires a role of :edit or higher"
+    assert_includes scoping.message, "trashed_semantics is not allowed with owns_scoping"
+    assert_includes get_action.message, "trashed_semantics is not allowed on a GET"
+    assert_includes unknown.message, "trashed_semantics must be :restore or :destroy"
+    assert_includes endpoint_get.message, "trashed_semantics is not allowed on a GET"
+    assert_includes endpoint_view.message, "trashed_semantics requires a role of :edit or higher"
+    assert_includes endpoint_scope.message, "trashed_semantics is not allowed with owns_scoping"
+    assert_includes show_handler.message, "trashed_semantics is not allowed on a GET"
+    assert_includes handler_view.message, "trashed_semantics requires a role of :edit or higher"
+    assert_includes handler_missing.message, "include_trashed is only allowed on a read, restore, or destroy action"
+    assert_includes unregistered.message, "trashed_semantics requires a registered non-GET action"
+
+    register_capability_action(
+      :trashable_purge,
+      required_role: :admin,
+      include_trashed: true,
+      trashed_semantics: :destroy
+    )
+  end
+
+  test "a resource handler and endpoint with trashed_semantics return a trashed recording" do
+    @page_recording.update_column(:trashed_at, Time.current)
+    @foreign_page.update_column(:trashed_at, Time.current)
+    enable_echo
+    RecordingStudioApi.register_capability_action(
+      :trashable_restore,
+      capability: :echoable,
+      http_verb: :post,
+      include_trashed: true,
+      trashed_semantics: :restore,
+      handler: ->(_context) { { via: "action" } },
+      serializer: ->(result) { result }
+    )
+    RecordingStudioApi.register_recordable_type_api("Page", capability_actions: %i[trashable_restore])
+    RecordingStudioApi.register_resource_handler(
+      "Page",
+      :trashable_restore,
+      include_trashed: true,
+      trashed_semantics: :restore,
+      handler: probe("restore")
+    )
+    RecordingStudioApi.register_endpoint(
+      :purge_page,
+      http_verb: :post,
+      path: "purge-pages/:id",
+      recordable_type: "Page",
+      include_trashed: true,
+      trashed_semantics: :destroy,
+      handler: endpoint_probe("purge")
+    )
+
+    post restore_path(@page_recording), headers: headers
+    assert_response :success
+    assert_equal "restore", @calls.last[:name]
+    assert_equal @page_recording.id, @calls.last[:recording_id]
+
+    post "/recording_studio_api/api/v1/purge-pages/#{@foreign_page.id}", headers: headers
+    assert_response :not_found
+    names_after_foreign = @calls.map { |call| call[:name] }
+    assert_equal ["restore"], names_after_foreign
+
+    post "/recording_studio_api/api/v1/purge-pages/#{@page_recording.id}", headers: headers
+    assert_response :success
+    assert_equal @page_recording.id, @calls.last[:recording_id]
+    assert_equal "purge", @calls.last[:name]
+
+    view_headers, view_page = view_client
+    view_page.update_column(:trashed_at, Time.current)
+    post "/recording_studio_api/api/v1/purge-pages/#{view_page.id}", headers: view_headers
+    assert_response :forbidden
+    names_after_view = @calls.map { |call| call[:name] }
+    assert_equal %w[restore purge], names_after_view
+  end
+
+  test "a later view role does not include trashed recordings for a declared restore" do
+    register_restore_action
+    RecordingStudioApi.configuration.capability_action_roles = { "trashable_restore" => :view }
+    @page_recording.update_column(:trashed_at, Time.current)
+
+    post restore_path(@page_recording), headers: headers
+    assert_response :not_found
+    assert_empty @calls
+
+    @page_recording.update_column(:trashed_at, nil)
+    post restore_path(@page_recording), headers: headers
+    assert_response :success
+    assert_equal @page_recording.id, JSON.parse(response.body).fetch("recording_id")
+  end
+
+  test "a role resolver that returns view does not run a declared restore on a trashed recording" do
+    @page_recording.update_column(:trashed_at, Time.current)
+    register_restore_action
+    seen_recordings = []
+    RecordingStudioApi.configuration.capability_action_role_resolver = lambda do |recording:, **|
+      seen_recordings << recording
+      :view
+    end
+
+    post restore_path(@page_recording), headers: headers
+    assert_response :not_found
+    assert_empty @calls
+    assert_equal [@page_recording.id], seen_recordings.map(&:id)
+
+    @page_recording.update_column(:trashed_at, nil)
+    post restore_path(@page_recording), headers: headers
+    assert_response :success
+    assert_equal @page_recording.id, JSON.parse(response.body).fetch("recording_id")
+  end
+
+  test "a declared destroy action with an admin role resolves a trashed recording" do
+    @page_recording.update_column(:trashed_at, Time.current)
+    enable_echo
+    RecordingStudioApi.register_capability_action(
+      :trashable_purge,
+      capability: :echoable,
+      http_verb: :post,
+      required_role: :admin,
+      include_trashed: true,
+      trashed_semantics: :destroy,
+      handler: ->(context) { { recording_id: context.recording&.id } },
+      serializer: ->(result) { result }
+    )
+    RecordingStudioApi.register_recordable_type_api("Page", capability_actions: %i[trashable_purge])
+
+    post purge_path(@page_recording), headers: headers
+    assert_response :forbidden
+
+    admin_headers, admin_page = admin_client
+    admin_page.update_column(:trashed_at, Time.current)
+    post purge_path(admin_page), headers: admin_headers
+    assert_response :success
+    assert_equal admin_page.id, JSON.parse(response.body).fetch("recording_id")
+  end
+
   test "a nested handler authorizes the relationship before it runs" do
     RecordingStudioApi.register_recordable_type_api(
       "Workspace",
@@ -611,10 +857,51 @@ class ApiV1RegisteredHandlerScopeTest < ActionDispatch::IntegrationTest
   end
 
   def view_client
-    view_user = create_user
-    view_root, view_access = create_access_recording_for(user: view_user, role: :view)
-    view_page = create_page_recording(root_recording: view_root)
-    token = issue_oauth_access_token_for(access_recording: view_access, name: "View scope token")
-    [{ "Authorization" => "Bearer #{token}" }, view_page]
+    role_client(:view, "View scope token")
+  end
+
+  def admin_client
+    role_client(:admin, "Admin scope token")
+  end
+
+  def role_client(role, token_name)
+    user = create_user
+    root, access = create_access_recording_for(user: user, role: role)
+    page = create_page_recording(root_recording: root)
+    token = issue_oauth_access_token_for(access_recording: access, name: token_name)
+    [{ "Authorization" => "Bearer #{token}" }, page]
+  end
+
+  def register_restore_action
+    enable_echo
+    register_capability_action(
+      :trashable_restore,
+      include_trashed: true,
+      trashed_semantics: :restore,
+      handler: lambda { |context|
+        @calls << { name: "restore", recording_id: context.recording&.id }
+        { recording_id: context.recording&.id }
+      }
+    )
+    RecordingStudioApi.register_recordable_type_api("Page", capability_actions: %i[trashable_restore])
+  end
+
+  def register_capability_action(name, **)
+    RecordingStudioApi.register_capability_action(
+      name,
+      capability: :echoable,
+      http_verb: :post,
+      handler: ->(_context) { {} },
+      serializer: ->(result) { result },
+      **
+    )
+  end
+
+  def restore_path(recording)
+    "/recording_studio_api/api/v1/pages/#{recording.id}/actions/trashable_restore"
+  end
+
+  def purge_path(recording)
+    "/recording_studio_api/api/v1/pages/#{recording.id}/actions/trashable_purge"
   end
 end

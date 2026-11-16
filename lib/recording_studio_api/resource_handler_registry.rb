@@ -4,12 +4,13 @@ require_relative "handler_scope"
 
 module RecordingStudioApi
   class ResourceHandlerRegistration
-    attr_reader :handler, :include_trashed, :owns_scoping
+    attr_reader :handler, :include_trashed, :owns_scoping, :trashed_semantics
 
-    def initialize(handler:, include_trashed:, owns_scoping:)
+    def initialize(handler:, include_trashed:, owns_scoping:, trashed_semantics:)
       @handler = handler
       @include_trashed = include_trashed
       @owns_scoping = owns_scoping
+      @trashed_semantics = trashed_semantics
     end
 
     def call(context)
@@ -26,7 +27,7 @@ module RecordingStudioApi
       @handlers = {}
     end
 
-    def register(recordable_type, action, handler:, include_trashed: false, owns_scoping: false, api: :public)
+    def register(recordable_type, action, handler:, include_trashed: false, owns_scoping: false, trashed_semantics: nil, api: :public)
       type_name = normalize_recordable_type(recordable_type)
       action_name = normalize_action(action)
       raise ConfigurationError, "recordable type is required" if type_name.blank?
@@ -37,13 +38,25 @@ module RecordingStudioApi
       include_trashed = HandlerScope.flag(include_trashed, name: :include_trashed)
       owns_scoping = HandlerScope.flag(owns_scoping, name: :owns_scoping)
       label = "#{type_name} #{action_name}"
-      HandlerScope.assert_include_trashed!(name: label, action_name: action_name, api: api) if include_trashed
+      trashed_semantics = HandlerScope.trashed_semantics(trashed_semantics, name: label)
+      if trashed_semantics
+        verb, role = HandlerScope.resource_handler_verb_and_role(action_name, api: api)
+        HandlerScope.assert_trashed_semantics!(
+          name: label,
+          trashed_semantics: trashed_semantics,
+          http_verb: verb,
+          required_role: role,
+          owns_scoping: owns_scoping
+        )
+      end
+      HandlerScope.assert_include_trashed!(name: label, action_name: action_name, api: api, trashed_semantics: trashed_semantics) if include_trashed
       HandlerScope.assert_read_opt_out!(name: label, action_name: action_name, api: api) if owns_scoping
 
       @handlers[[type_name, action_name]] = ResourceHandlerRegistration.new(
         handler: handler,
         include_trashed: include_trashed,
-        owns_scoping: owns_scoping
+        owns_scoping: owns_scoping,
+        trashed_semantics: trashed_semantics
       )
       handler
     end
