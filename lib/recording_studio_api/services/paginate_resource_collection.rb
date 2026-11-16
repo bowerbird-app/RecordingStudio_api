@@ -60,6 +60,7 @@ module RecordingStudioApi
         rows = paged_relation.limit(normalized_limit + 1).to_a
         has_more = rows.length > normalized_limit
         items = has_more ? rows.first(normalized_limit) : rows
+        preload_page_recordables(items)
 
         success(
           Page.new(
@@ -87,7 +88,31 @@ module RecordingStudioApi
       end
 
       def total_count
-        @total_count ||= relation.unscope(:order).distinct.count(relation.klass.arel_table[relation.klass.primary_key])
+        @total_count ||= begin
+          counted = relation.unscope(:order)
+          if plain_count?(counted)
+            counted.count
+          else
+            counted.distinct.count(counted.klass.arel_table[counted.klass.primary_key])
+          end
+        end
+      end
+
+      def plain_count?(counted)
+        return false if counted.joins_values.any?
+        return false if counted.left_outer_joins_values.any?
+        return false if counted.distinct_value
+        return false if counted.eager_load_values.any?
+        return false if counted.includes_values.any? && counted.references_values.any?
+        return false unless counted.from_clause.empty?
+
+        true
+      end
+
+      def preload_page_recordables(items)
+        return if items.empty?
+
+        ActiveRecord::Associations::Preloader.new(records: items, associations: :recordable).call
       end
 
       def ordered_relation(normalized_sort, normalized_order, sortable_context)

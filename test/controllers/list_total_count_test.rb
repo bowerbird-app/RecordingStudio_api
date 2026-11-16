@@ -239,6 +239,148 @@ class ListTotalCountTest < ActionDispatch::IntegrationTest
     assert_equal({ "handled" => "index" }, JSON.parse(response.body))
   end
 
+  test "total_count matches the rows for an unfiltered list, a filter, a search, and a sort join" do
+    create_folder("Marketing")
+    create_folder("Archive")
+    create_folder("Market notes")
+
+    unfiltered = list_folders
+    assert_equal unfiltered.fetch("records").length, unfiltered.fetch("meta").fetch("total_count")
+    assert_equal 3, unfiltered.fetch("meta").fetch("total_count")
+    assert_count_sql('SELECT COUNT(*) FROM "recording_studio_recordings"', params: {})
+    refute_count_sql(/COUNT\(DISTINCT/, params: {})
+
+    filtered = list_folders(filter: { name: "Marketing" })
+    filtered_names = filtered.fetch("records").map { |row| row.fetch("name") }
+    assert_equal ["Marketing"], filtered_names
+    assert_equal filtered.fetch("records").length, filtered.fetch("meta").fetch("total_count")
+    assert_count_sql(/COUNT\(DISTINCT/, params: { filter: { name: "Marketing" } })
+
+    searched = list_folders(q: "Market")
+    searched_names = searched.fetch("records").map { |row| row.fetch("name") }
+    assert_equal ["Market notes", "Marketing"], searched_names.sort
+    assert_equal searched.fetch("records").length, searched.fetch("meta").fetch("total_count")
+    assert_equal 2, searched.fetch("meta").fetch("total_count")
+    assert_count_sql(/COUNT\(DISTINCT/, params: { q: "Market" })
+
+    sorted = list_folders(sort: "name", order: "asc")
+    sorted_names = sorted.fetch("records").map { |row| row.fetch("name") }
+    sort_names = ["Archive", "Market notes", "Marketing"]
+    database_order = Folder.where(name: sort_names).order(:name).pluck(:name)
+    assert_equal database_order, sorted_names
+    assert_equal sort_names.sort, sorted_names.sort
+    assert_equal sorted.fetch("records").length, sorted.fetch("meta").fetch("total_count")
+    assert_count_sql('SELECT COUNT(*) FROM "recording_studio_recordings"', params: { sort: "name", order: "asc" })
+    assert_page_sql(/INNER JOIN folders recordable_sort_folders/, params: { sort: "name", order: "asc" })
+  end
+
+  test "a distinct list with no join keeps a distinct count" do
+    recording = create_folder("Marketing")
+    relation = RecordingStudio::Recording.where(id: recording.id).distinct
+    count_sql = nil
+    subscriber = lambda do |_name, _start, _finish, _id, payload|
+      count_sql = payload[:sql].squish if payload[:sql].to_s.match?(/COUNT/i)
+    end
+
+    pagination = nil
+    ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
+      pagination = RecordingStudioApi::Services::PaginateResourceCollection.call(
+        relation: relation,
+        resource: "folders",
+        recordable_type: "Folder",
+        limit: 50,
+        pagination_token: nil,
+        sort: nil,
+        order: nil,
+        api: :public,
+        scope_key: "client:already-distinct"
+      )
+    end
+
+    assert pagination.success?
+    body = pagination.value.response_body { |rows, meta| { ids: rows.map(&:id), meta: meta } }
+    assert_equal [recording.id], body.fetch(:ids)
+    assert_equal 1, body.fetch(:meta).fetch(:total_count)
+    assert_match(/COUNT\(DISTINCT/, count_sql)
+  end
+
+  test "referenced includes, eager loads, and a custom from keep a distinct count" do
+    recording = create_folder("Marketing")
+    base = RecordingStudio::Recording.where(id: recording.id)
+
+    referenced = base.includes(:parent_recording).references(:parent_recording)
+    assert_match(/COUNT\(DISTINCT/, count_sql_for_relation(referenced, "referenced-include"))
+
+    eager = base.eager_load(:parent_recording)
+    assert_match(/COUNT\(DISTINCT/, count_sql_for_relation(eager, "eager-load"))
+
+    custom_from = base.from(RecordingStudio::Recording.table_name)
+    assert_match(/COUNT\(DISTINCT/, count_sql_for_relation(custom_from, "custom-from"))
+
+    preloaded = base.includes(:parent_recording)
+    assert_match(/SELECT COUNT\(\*\)/, count_sql_for_relation(preloaded, "preload-include"))
+  end
+
+  test "a left outer join keeps a distinct count" do
+    recording = create_folder("Marketing")
+    relation = RecordingStudio::Recording.where(id: recording.id).left_outer_joins(:parent_recording)
+    count_sql = nil
+    subscriber = lambda do |_name, _start, _finish, _id, payload|
+      count_sql = payload[:sql].squish if payload[:sql].to_s.match?(/COUNT/i)
+    end
+
+    pagination = nil
+    ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
+      pagination = RecordingStudioApi::Services::PaginateResourceCollection.call(
+        relation: relation,
+        resource: "folders",
+        recordable_type: "Folder",
+        limit: 50,
+        pagination_token: nil,
+        sort: nil,
+        order: nil,
+        api: :public,
+        scope_key: "client:left-join"
+      )
+    end
+
+    assert pagination.success?
+    counted_total = pagination.value.response_body { |_rows, meta| meta.fetch(:total_count) }
+    assert_equal 1, counted_total
+    assert_match(/COUNT\(DISTINCT/, count_sql)
+    assert_match(/LEFT OUTER JOIN/i, count_sql)
+  end
+
+  test "the folder list body matches an unpreloaded serializer and loads recordables once" do
+    first = create_folder("Marketing")
+    second = create_folder("Archive")
+    third = create_folder("Notes")
+    queries = []
+    subscriber = lambda do |_name, _start, _finish, _id, payload|
+      sql = payload[:sql].to_s
+      next if payload[:name] == "SCHEMA"
+
+      queries << sql.squish
+    end
+
+    ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
+      get "/recording_studio_api/api/v1/folders", headers: authorization_headers
+    end
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    expected = [first, second, third].sort_by { |recording| [recording.created_at, recording.id] }.map do |recording|
+      fresh = RecordingStudio::Recording.find(recording.id)
+      refute fresh.association(:recordable).loaded?
+      RecordingStudioApi::Serializers::ResourceRecordingSerializer.call(fresh, version: "v1", api: :public)
+    end
+
+    assert_equal expected.map { |record| JSON.parse(record.except("_meta").to_json) }, payload.fetch("records")
+    folder_selects = queries.count { |sql| sql.match?(/\ASELECT/i) && sql.match?(/FROM "?folders"?/i) }
+    assert_equal 1, folder_selects
+    assert_operator folder_selects, :<, payload.fetch("records").length
+  end
+
   test "a multiplying join counts distinct recordings" do
     recording = create_folder("Marketing")
     relation = RecordingStudio::Recording.where(id: recording.id).joins(
@@ -285,6 +427,73 @@ class ListTotalCountTest < ActionDispatch::IntegrationTest
 
   def authorization_headers
     { "Authorization" => "Bearer #{@access_token}" }
+  end
+
+  def list_folders(params = {})
+    get "/recording_studio_api/api/v1/folders", params: params, headers: authorization_headers
+    assert_response :success
+    JSON.parse(response.body)
+  end
+
+  def assert_count_sql(pattern, params:)
+    sql = count_sql_for(params)
+    assert_match pattern, sql
+  end
+
+  def refute_count_sql(pattern, params:)
+    sql = count_sql_for(params)
+    refute_match pattern, sql
+  end
+
+  def assert_page_sql(pattern, params:)
+    queries = queries_for(params)
+    assert queries.any? { |sql| sql.match?(pattern) }, "expected #{pattern} in #{queries.grep(/JOIN/i)}"
+  end
+
+  def count_sql_for(params)
+    queries_for(params).find { |sql| sql.match?(/COUNT/i) }
+  end
+
+  def count_sql_for_relation(relation, scope_key)
+    count_sql = nil
+    subscriber = lambda do |_name, _start, _finish, _id, payload|
+      count_sql = payload[:sql].squish if payload[:sql].to_s.match?(/COUNT/i)
+    end
+
+    pagination = nil
+    ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
+      pagination = RecordingStudioApi::Services::PaginateResourceCollection.call(
+        relation: relation,
+        resource: "folders",
+        recordable_type: "Folder",
+        limit: 50,
+        pagination_token: nil,
+        sort: nil,
+        order: nil,
+        api: :public,
+        scope_key: "client:#{scope_key}"
+      )
+    end
+
+    assert pagination.success?
+    counted_total = pagination.value.response_body { |_rows, meta| meta.fetch(:total_count) }
+    assert_equal 1, counted_total
+    count_sql
+  end
+
+  def queries_for(params)
+    queries = []
+    subscriber = lambda do |_name, _start, _finish, _id, payload|
+      sql = payload[:sql].to_s
+      next if payload[:name] == "SCHEMA"
+
+      queries << sql.squish
+    end
+    ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
+      get "/recording_studio_api/api/v1/folders", params: params, headers: authorization_headers
+    end
+    assert_response :success
+    queries
   end
 
   def create_folder(name)

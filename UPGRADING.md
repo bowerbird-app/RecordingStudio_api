@@ -1,8 +1,8 @@
 # Upgrading RecordingStudioApi
 
-## Unreleased
+## Upgrading to 0.25.0
 
-No migration. The gem version is unchanged on this branch.
+Bump to `0.25.0`. No migration in this gem.
 
 1. Rejected bearer tokens use `rate_limit_api_failed_auth_requests` and
    `rate_limit_api_failed_auth_period_seconds`. Defaults are 20 and 60.

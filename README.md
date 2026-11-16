@@ -556,6 +556,7 @@ Each action declares its verb, capability mapping, handler, and serializer so ad
 - `RecordingStudioApi::AccessGrant` carries `api_client`, `credential`, `access_recording`, `root_recording`, and the access actor into handlers
 - capability handlers own authorization and should call `context.access_grant.authorize!` or `RecordingStudioAccessible.authorized?` before doing work
 - the built-in resource and move handlers already perform their own grant checks
+- `AccessGrant#accessible_recordings` is the subtree under the access recording's parent. Collection and member lookups keep that subtree in SQL. Trashed descendants stay out unless the caller passes `include_trashed: true`. The walk stops at a trashed parent, so a kept recording under that parent stays out of the default subtree. `accessible_recording_ids` still returns those ids when a caller asks for the list.
 - `ApiClient` is the API credential principal for audit metadata, while the `RecordingStudio::Access` actor remains the Recording Studio authorization actor
 - each access recording owns at most one active API credential record
 - raw secrets should only be revealed at creation or rotation time
@@ -795,7 +796,11 @@ Responses are flat. A record always includes `id`, `type`, `root_id`, `parent_id
 and `updated_at`; serializer output keys, always-included fields, and expanded relationship names
 sit beside those keys. There are no `data`, `attributes`, or `relationships` wrappers. Collections
 use `records` plus `meta`. `meta.total_count` is the number of matching
-recordings across every page. `count=true` returns only `{ "total_count": N }`
+recordings across every page. The count is `COUNT(*)` when that query has no
+join, no eager load, no referenced include, no custom `FROM`, and is not
+already distinct. Search, attribute filters, and any other join keep
+`COUNT(DISTINCT id)`, so a joined row is not counted twice.
+`count=true` returns only `{ "total_count": N }`
 and does not load records. A record's `_meta` reports `limit` and `has_more` for emitted collection
 relationships.
 
@@ -805,7 +810,8 @@ Nested creates take their parent from the URL, and updates do not accept `parent
 registered move action to change a record's parent. The legacy `{ attributes: { ... } }` envelope
 is rejected.
 
-The engine fetches requested `children` relationships in one scoped query per response,
+The engine preloads the recordable for each list row before serialization, and it
+fetches requested `children` relationships in one scoped query per response,
 preventing serializer-driven N+1 queries. A custom resolver is application code and may issue
 queries; preload its associations where needed and use `context.scoped_recordings` when resolving
 Recording Studio records. Custom relationships must declare a serializer and output keys, so
