@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-11-16
+
+### Changed
+- Runtime Recording Studio and Flatpack gemspec ranges use the tested floor and a major cap. `flat_pack` is `>= 0.1.356`, `< 2.0`. Accessible, Logs, and Metrics caps are `< 2.0`. Moveable is `>= 5.0`, `< 7.0`. Core stays `>= 7.1.0`, `< 8.0`. Trashable stays `>= 0.17.0`, `< 2.0`.
+
+### Upgrade notes
+- Bump to `1.2.1`. No migration. Payloads, auth, and routes stay the same.
+- Development and dummy Gemfiles still check out the same tags. See [UPGRADING.md](UPGRADING.md).
+
 ## [1.2.0] - 2026-11-16
 
 ### Added

@@ -8,7 +8,7 @@ class RecordingStudioApiTest < Minitest::Test
   end
 
   def test_version_pin
-    assert_equal "1.2.0", ::RecordingStudioApi::VERSION
+    assert_equal "1.2.1", ::RecordingStudioApi::VERSION
   end
 
   def test_metrics_dependency_pins
@@ -16,8 +16,8 @@ class RecordingStudioApiTest < Minitest::Test
     gemspec = File.read(File.join(root, "recording_studio_api.gemspec"))
     assert_includes gemspec, '"recording_studio", ">= 7.1.0", "< 8.0"'
     assert_includes gemspec, '"recording_studio_trashable", ">= 0.17.0", "< 2.0"'
-    assert_includes gemspec, '"recording_studio_accessible", ">= 0.44.0", "< 1.0"'
-    assert_includes gemspec, '"flat_pack", ">= 0.1.341"'
+    assert_includes gemspec, '"recording_studio_accessible", ">= 0.44.0", "< 2.0"'
+    assert_includes gemspec, '"flat_pack", ">= 0.1.356", "< 2.0"'
     assert_includes gemspec, '"view_component", ">= 4.14", "< 5"'
     %w[Gemfile.lock test/dummy/Gemfile.lock].each do |path|
       lock = File.read(File.join(root, path))
@@ -28,9 +28,9 @@ class RecordingStudioApiTest < Minitest::Test
              "#{path} locks view_component #{match[1]}, need >= 4.14.0 for GHSA-8qw7-6phv-7q6p"
       assert major < 5, "#{path} locks view_component #{match[1]}, need < 5"
     end
-    assert_includes gemspec, '"recording_studio_metrics", ">= 0.9.0", "< 1.0"'
-    assert_includes gemspec, '"recording_studio_logs", ">= 0.8.0", "< 1.0"'
-    assert_includes gemspec, '"recording_studio_moveable", ">= 5.0", "< 6.0"'
+    assert_includes gemspec, '"recording_studio_metrics", ">= 0.9.0", "< 2.0"'
+    assert_includes gemspec, '"recording_studio_logs", ">= 0.8.0", "< 2.0"'
+    assert_includes gemspec, '"recording_studio_moveable", ">= 5.0", "< 7.0"'
     %w[Gemfile test/dummy/Gemfile].each do |path|
       contents = File.read(File.join(root, path))
       assert_includes contents, 'RecordingStudio", tag: "v7.1.0"', path
