@@ -7,6 +7,8 @@ require "minitest/autorun"
 require "rails"
 require "recording_studio_api"
 
+Time.zone = "UTC" if Time.zone.nil?
+
 class Object
   unless method_defined?(:stub)
     def stub(method_name, callable_or_value)

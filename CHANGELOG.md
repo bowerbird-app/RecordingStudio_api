@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-16
+
+### Changed
+- Services inherit `RecordingStudio::Services::BaseService`. `call` still returns `RecordingStudio::Services::BaseService::Result`.
+- `before_service`, `after_service`, and `around_service` run on `RecordingStudio.configuration.hooks`.
+- Issued tokens, refresh tokens, authorization codes, client secrets, and credential records are left out of those hook payloads. The caller still receives them.
+- A registered Core `around_service` hook wraps API authentication. A hook that raises returns 500 and fails closed.
+- `RecordingStudioApi.configuration.hooks` is a `RecordingStudio::Hooks` instance for lifecycle hooks and model or controller extensions.
+
+### Removed
+- `RecordingStudioApi::Hooks` and `RecordingStudioApi::Services::BaseService`.
+
+### Upgrade notes
+- Bump to `1.0.0`. No migration in this gem.
+- Require `recording_studio` `>= 7.1.0`, `< 8.0` (tag `v7.1.0`).
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [0.26.0] - 2026-11-16
 
 ### Fixed
@@ -1339,7 +1356,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.26.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.26.0...v1.0.0
 [0.26.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.25.0...v0.26.0
 [0.25.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.24.1...v0.25.0
 [0.24.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.24.0...v0.24.1

@@ -2,7 +2,9 @@
 
 module RecordingStudioApi
   module Services
-    class IssueOauthAccessToken < BaseService
+    class IssueOauthAccessToken < RecordingStudio::Services::BaseService
+      include RedactsHookSecrets
+
       SUPPORTED_GRANT_TYPE = "client_credentials"
       DUMMY_CLIENT_SECRET = "recording-studio-api.oauth.dummy-client-secret"
 

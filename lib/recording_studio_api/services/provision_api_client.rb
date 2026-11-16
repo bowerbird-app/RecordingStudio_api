@@ -4,7 +4,9 @@ require "securerandom"
 
 module RecordingStudioApi
   module Services
-    class ProvisionApiClient < BaseService
+    class ProvisionApiClient < RecordingStudio::Services::BaseService
+      include RedactsHookSecrets
+
       def initialize(name:, access_recording: nil, access_point_recording: nil, manager_actor: nil, role: nil, expires_at: nil, api: :public)
         @access_recording = access_recording
         @access_point_recording = access_point_recording

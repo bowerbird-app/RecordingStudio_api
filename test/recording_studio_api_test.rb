@@ -8,13 +8,13 @@ class RecordingStudioApiTest < Minitest::Test
   end
 
   def test_version_pin
-    assert_equal "0.26.0", ::RecordingStudioApi::VERSION
+    assert_equal "1.0.0", ::RecordingStudioApi::VERSION
   end
 
   def test_metrics_dependency_pins
     root = File.expand_path("..", __dir__)
     gemspec = File.read(File.join(root, "recording_studio_api.gemspec"))
-    assert_includes gemspec, '"recording_studio", ">= 7.0", "< 8.0"'
+    assert_includes gemspec, '"recording_studio", ">= 7.1.0", "< 8.0"'
     assert_includes gemspec, '"recording_studio_trashable", ">= 0.17.0", "< 1.0"'
     assert_includes gemspec, '"recording_studio_accessible", ">= 0.44.0", "< 1.0"'
     assert_includes gemspec, '"flat_pack", ">= 0.1.341"'
@@ -33,7 +33,7 @@ class RecordingStudioApiTest < Minitest::Test
     assert_includes gemspec, '"recording_studio_moveable", ">= 5.0", "< 6.0"'
     %w[Gemfile test/dummy/Gemfile].each do |path|
       contents = File.read(File.join(root, path))
-      assert_includes contents, 'RecordingStudio", tag: "v7.0.0"', path
+      assert_includes contents, 'RecordingStudio", tag: "v7.1.0"', path
       assert_includes contents, 'flatpack", tag: "v0.1.356"', path
       assert_includes contents, 'RecordingStudio_accessible", tag: "v0.44.0"', path
       assert_includes contents, 'RecordingStudio_trashable", tag: "v0.17.0"', path
@@ -141,7 +141,7 @@ class RecordingStudioApiTest < Minitest::Test
 
     assert_includes readme_source, "preserved in this repository under `docs/gem_template/`"
     assert_includes readme_source, "not packaged gem docs"
-    assert_includes readme_source, "| RecordingStudio | v7.0.0 (pinned in `test/dummy/Gemfile`) |"
+    assert_includes readme_source, "| RecordingStudio | v7.1.0 (pinned in `test/dummy/Gemfile`) |"
     assert_includes readme_source, "| FlatPack        | v0.1.356 (pinned in `test/dummy/Gemfile`) |"
   end
 

@@ -43,13 +43,11 @@ module RecordingStudioApi
 
     class << self
       def apply_model_extensions(target)
-        apply_extensions(target,
-                         RecordingStudioApi.configuration.hooks.model_extensions_for(extension_keys_for(target)))
+        apply_extensions(target, collected_extensions(target, :model_extensions_for))
       end
 
       def apply_controller_extensions(target)
-        apply_extensions(target,
-                         RecordingStudioApi.configuration.hooks.controller_extensions_for(extension_keys_for(target)))
+        apply_extensions(target, collected_extensions(target, :controller_extensions_for))
       end
 
       private
@@ -69,6 +67,12 @@ module RecordingStudioApi
         target.instance_variable_set(:@recording_studio_api_applied_extensions, applied)
       end
 
+      def collected_extensions(target, reader)
+        extension_keys_for(target).flat_map do |name|
+          RecordingStudioApi.configuration.hooks.public_send(reader, name)
+        end
+      end
+
       def extension_keys_for(target)
         names = [target.name, target.name&.demodulize].compact.uniq
         names.map(&:to_sym)
@@ -81,7 +85,7 @@ module RecordingStudioApi
 
     # Run before_initialize hooks
     initializer "recording_studio_api.before_initialize", before: "recording_studio_api.load_config" do |_app|
-      RecordingStudioApi::Hooks.run(:before_initialize, self)
+      RecordingStudioApi.configuration.hooks.run(:before_initialize, self)
     end
 
     initializer "recording_studio_api.load_config" do |app|
@@ -117,7 +121,7 @@ module RecordingStudioApi
       end
 
       # Run on_configuration hooks after config is loaded
-      RecordingStudioApi::Hooks.run(:on_configuration, RecordingStudioApi.configuration)
+      RecordingStudioApi.configuration.hooks.run(:on_configuration, RecordingStudioApi.configuration)
     end
 
     initializer "recording_studio_api.assets" do |app|
@@ -143,7 +147,7 @@ module RecordingStudioApi
       RecordingStudioApi.register_default_capability_actions!
       RecordingStudioApi.register_default_resource_actions!
       RecordingStudioApi.configuration.validate!
-      RecordingStudioApi::Hooks.run(:after_initialize, self)
+      RecordingStudioApi.configuration.hooks.run(:after_initialize, self)
     end
 
     initializer "recording_studio_api.flush_request_log_batches" do

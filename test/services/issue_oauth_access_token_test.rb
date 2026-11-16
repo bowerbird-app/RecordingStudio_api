@@ -103,7 +103,7 @@ class IssueOauthAccessTokenTest < ActiveSupport::TestCase
       "authorization_code",
       handler: lambda do |**kwargs|
         captured = kwargs
-        RecordingStudioApi::Services::BaseService::Result.new(
+        RecordingStudio::Services::BaseService::Result.new(
           success: true,
           value: {
             access_token: "rsapi_at_double",

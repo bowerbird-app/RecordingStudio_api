@@ -7,8 +7,8 @@
 Companion pins on current main: Trashable `>= 0.17.0, < 1.0` / `v0.17.0`
 (query-only), Admin `v2.16.0`, Moveable `>= 5.0, < 6.0` / `v5.0.0`, Root Switchable
 `v0.16.0`, Cache `v0.6.3` (development/test), Accessible `>= 0.44.0, < 1.0`
-(`tag: v0.44.0`), RecordingStudio `v7.0.0`
-(`>= 7.0, < 8.0`), Flatpack `0.1.356`
+(`tag: v0.44.0`), RecordingStudio `v7.1.0`
+(`>= 7.1.0, < 8.0`), Flatpack `0.1.356`
 (`tag: v0.1.356`, `>= 0.1.341`),
 Metrics `v0.9.0` (`>= 0.9.0, < 1.0`), Logs `v0.8.0` (`>= 0.8.0, < 1.0`). Recording Studio MCP `v0.17.0`
 allows this gem at `>= 0.11.0, < 0.12`, so it cannot take `0.12.0` or `0.13.0` until
@@ -574,7 +574,9 @@ The runtime should fail fast when:
 
 ## Ruby Integration Surface
 
-Host apps and addon gems use these entrypoints for configuration, resource exposure, and capability registration:
+Host apps and addon gems use these entrypoints for configuration, resource exposure, and capability registration.
+
+Service calls report through Recording Studio's own hooks. Register `before_service`, `after_service`, and `around_service` on `RecordingStudio.configuration.hooks`. `after_service` and `around_service` see a result that omits issued tokens, refresh tokens, authorization codes, client secrets, and credential records. `around_service` receives a copy of the service. The caller still receives the secret once. A hook that raises during API authentication returns 500. Model and controller extensions, including Moveable's conflict handler, stay on `RecordingStudioApi.configuration.hooks`.
 
 ```ruby
 RecordingStudioApi.configure do |config|
@@ -584,7 +586,7 @@ RecordingStudioApi.configure do |config|
 end
 
 RecordingStudioApi.configuration
-RecordingStudioApi::Hooks.run(:before_initialize)
+RecordingStudioApi.configuration.hooks.run(:before_initialize)
 RecordingStudioApi.register_recordable_type_api(
   "Page",
   serializer: ->(recordable, **) { { title: recordable.title } },
@@ -1065,7 +1067,7 @@ Token-record contract (if provided):
 - `active_for_authentication?`
 - writable `last_used_at` column (updated with `update_column`)
 
-Both credential and token record must have active, non-trashed RecordingStudio recordables so scope resolution can derive the root recording. Kept/trashed predicates use Recording Studio Trashable (`recording_studio_trashable_kept?` / `recording_studio_trashable_trashed?`). Relation filters use additive `Recording.kept`. SQL and recursive walks use `RecordingStudio.kept_sql`. Pin `recording_studio` `>= 7.0`, `< 8.0` and `recording_studio_trashable` `>= 0.17.0`, `< 1.0`, and load `recording_studio_trashable/query` only.
+Both credential and token record must have active, non-trashed RecordingStudio recordables so scope resolution can derive the root recording. Kept/trashed predicates use Recording Studio Trashable (`recording_studio_trashable_kept?` / `recording_studio_trashable_trashed?`). Relation filters use additive `Recording.kept`. SQL and recursive walks use `RecordingStudio.kept_sql`. Pin `recording_studio` `>= 7.1.0`, `< 8.0` and `recording_studio_trashable` `>= 0.17.0`, `< 1.0`, and load `recording_studio_trashable/query` only.
 
 ### OAuth resource server
 
@@ -1318,7 +1320,7 @@ with Draft off to load a new pack. See
 | Rails           | ~> 8.1.1 |
 | PostgreSQL      | 16      |
 | TailwindCSS     | 4       |
-| RecordingStudio | v7.0.0 (pinned in `test/dummy/Gemfile`) |
+| RecordingStudio | v7.1.0 (pinned in `test/dummy/Gemfile`) |
 | FlatPack        | v0.1.356 (pinned in `test/dummy/Gemfile`) |
 | Devise          | latest  |
 

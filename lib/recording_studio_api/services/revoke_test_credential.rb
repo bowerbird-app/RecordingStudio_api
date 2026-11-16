@@ -2,7 +2,9 @@
 
 module RecordingStudioApi
   module Services
-    class RevokeTestCredential < BaseService
+    class RevokeTestCredential < RecordingStudio::Services::BaseService
+      include RedactsHookSecrets
+
       def initialize(api:, credential_id:, access_token_id:)
         @api_key = RecordingStudioApi.configuration.fetch_api(api).name
         @credential_id = credential_id

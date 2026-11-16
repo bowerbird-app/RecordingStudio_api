@@ -5,7 +5,7 @@ require "bigdecimal"
 
 module RecordingStudioApi
   module Services
-    class PaginateResourceCollection < BaseService
+    class PaginateResourceCollection < RecordingStudio::Services::BaseService
       Page = Data.define(:rows, :meta) do
         def response_body
           yield rows, meta
@@ -232,6 +232,12 @@ module RecordingStudioApi
 
       def pagination_token_verifier
         Rails.application.message_verifier(PAGINATION_TOKEN_PURPOSE)
+      end
+
+      def hook_subject
+        copy = dup
+        copy.remove_instance_variable(:@pagination_token) if copy.instance_variable_defined?(:@pagination_token)
+        copy
       end
 
       def service_args
