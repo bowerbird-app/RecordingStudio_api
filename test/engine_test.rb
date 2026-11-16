@@ -241,6 +241,69 @@ class EngineTest < Minitest::Test
     assert_equal :applied, instance.template_controller_extension
   end
 
+  def test_apply_model_extensions_loads_every_name
+    model_class = Class.new do
+      def self.name
+        "Admin::ExampleRecord"
+      end
+    end
+
+    RecordingStudioApi.configuration.hooks.extend_model(:"Admin::ExampleRecord") do
+      def full_name_extension
+        :full
+      end
+    end
+    RecordingStudioApi.configuration.hooks.extend_model(:ExampleRecord) do
+      def short_name_extension
+        :short
+      end
+    end
+
+    RecordingStudioApi::Engine.apply_model_extensions(model_class)
+
+    instance = model_class.new
+    assert_equal :full, instance.full_name_extension
+    assert_equal :short, instance.short_name_extension
+  end
+
+  def test_moveable_conflict_extension_installs_on_api_controller
+    move = RecordingStudio::Moveable::Api::MoveRecording
+    previous = move.instance_variable_get(:@conflict_response_installed)
+    move.instance_variable_set(:@conflict_response_installed, false)
+    move.install_conflict_response!
+
+    controller = Class.new do
+      def self.name
+        "RecordingStudioApi::ApiController"
+      end
+
+      def self.rescue_from(exception_class, &handler)
+        @handlers ||= []
+        @handlers << [exception_class, handler]
+      end
+
+      def self.handlers
+        @handlers || []
+      end
+    end
+
+    RecordingStudioApi::Engine.apply_controller_extensions(controller)
+    exception_class, handler = controller.handlers.assoc(RecordingStudio::Moveable::Api::Conflict)
+    assert_equal RecordingStudio::Moveable::Api::Conflict, exception_class
+
+    rendered = nil
+    target = controller.new
+    target.define_singleton_method(:render_error) { |**kwargs| rendered = kwargs }
+    error = RecordingStudio::Moveable::Api::Conflict.new("Tree changed", details: ["Tree changed"])
+    target.instance_exec(error, &handler)
+
+    assert_equal "conflict", rendered.fetch(:code)
+    assert_equal :conflict, rendered.fetch(:status)
+    assert_equal 409, Rack::Utils.status_code(rendered.fetch(:status))
+  ensure
+    move.instance_variable_set(:@conflict_response_installed, previous)
+  end
+
   def test_apply_extensions_flattens_compacts_and_tracks_identity
     target = Class.new
     extension = proc do

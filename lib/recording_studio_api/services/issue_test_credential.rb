@@ -2,7 +2,9 @@
 
 module RecordingStudioApi
   module Services
-    class IssueTestCredential < BaseService
+    class IssueTestCredential < RecordingStudio::Services::BaseService
+      include RedactsHookSecrets
+
       def initialize(api:, actor:, access_point_recording:, role:, name: nil)
         @api_key = RecordingStudioApi.configuration.fetch_api(api).name
         @actor = actor

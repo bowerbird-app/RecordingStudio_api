@@ -4,7 +4,9 @@ module RecordingStudioApi
   module Services
     # RFC 7009-style OAuth token revocation for issued access tokens.
     # Unknown or already-revoked tokens still succeed once the client authenticates.
-    class RevokeOauthAccessToken < BaseService
+    class RevokeOauthAccessToken < RecordingStudio::Services::BaseService
+      include RedactsHookSecrets
+
       def initialize(token:, client_id:, client_secret:, token_type_hint: nil, api: :public)
         @token = token.to_s
         @client_id = client_id.to_s

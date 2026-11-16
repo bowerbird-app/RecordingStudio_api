@@ -2,7 +2,6 @@
 
 require_relative "configuration/layout_setting"
 require_relative "configuration/rate_limit_validation"
-require_relative "hooks"
 require_relative "action_registry"
 require_relative "registered_endpoint_registry"
 require_relative "api_version_profile"
@@ -149,7 +148,7 @@ module RecordingStudioApi
       @api_request_log_retention_days = 30
       @api_daily_metric_retention_days = nil
       @logs_summaries_enabled = false
-      @hooks = Hooks.new
+      @hooks = RecordingStudio::Hooks.new
       @action_registry = ActionRegistry.new
       @registered_endpoint_registry = RegisteredEndpointRegistry.new
       @recordable_registry = RecordableRegistry.new

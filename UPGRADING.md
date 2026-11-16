@@ -1,5 +1,26 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.0.0
+
+Breaking. No migration in this gem.
+
+1. Bump the host gem to `1.0.0`.
+2. Require `recording_studio` `>= 7.1.0`, `< 8.0` (tag `v7.1.0`).
+3. Delete references to the removed constants.
+
+   | Removed | Use |
+   | --- | --- |
+   | `RecordingStudioApi::Hooks` | `RecordingStudio::Hooks` |
+   | `RecordingStudioApi::Hooks::HookError` | `RecordingStudio::Hooks::HookError` |
+   | `RecordingStudioApi::Hooks.run` | `RecordingStudioApi.configuration.hooks.run` |
+   | `RecordingStudioApi::Hooks.run_around` | `RecordingStudioApi.configuration.hooks.run_around` |
+   | `RecordingStudioApi::Hooks.trigger` | `RecordingStudioApi.configuration.hooks.run` |
+   | `RecordingStudioApi::Services::BaseService` | `RecordingStudio::Services::BaseService` |
+   | `RecordingStudioApi::Services::BaseService::Result` | `RecordingStudio::Services::BaseService::Result` |
+
+4. `RecordingStudioApi.configuration.hooks` is still there. It is a separate `RecordingStudio::Hooks` instance. Lifecycle hooks and `extend_model` / `extend_controller` stay on it. Moveable's `extend_controller(:ApiController)` call is unchanged.
+5. Service hooks moved. Register `before_service`, `after_service`, and `around_service` on `RecordingStudio.configuration.hooks`. `after_service` and the `around_service` block receive a result with issued tokens, client secrets, and credential records removed. `around_service` receives a copy of the service that answers `is_a?` and `kind_of?` for the real service class and does not carry those secrets. `call` still returns the real result, including the secret, once.
+
 ## Upgrading to 0.26.0
 
 Registered handlers receive the route recording already scoped to the token.

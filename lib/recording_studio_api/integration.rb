@@ -24,7 +24,7 @@ module RecordingStudioApi
       auth_result = authenticate_authorization_header(authorization_header: authorization_header, api: api)
       return auth_result if auth_result.failure?
 
-      RecordingStudioApi::Services::BaseService::Result.new(
+      RecordingStudio::Services::BaseService::Result.new(
         success: true,
         value: build_access_grant(authenticated_client: auth_result.value)
       )

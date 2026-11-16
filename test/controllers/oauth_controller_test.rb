@@ -298,7 +298,7 @@ class OauthControllerTest < ActionDispatch::IntegrationTest
     RecordingStudioApi.register_oauth_grant(
       "authorization_code",
       handler: lambda do |**kwargs|
-        RecordingStudioApi::Services::BaseService::Result.new(
+        RecordingStudio::Services::BaseService::Result.new(
           success: true,
           value: {
             access_token: "rsapi_at_double",
@@ -331,7 +331,7 @@ class OauthControllerTest < ActionDispatch::IntegrationTest
     RecordingStudioApi.register_oauth_grant(
       "refresh_token",
       handler: lambda do |**kwargs|
-        RecordingStudioApi::Services::BaseService::Result.new(
+        RecordingStudio::Services::BaseService::Result.new(
           success: true,
           value: {
             access_token: "rsapi_at_refresh",
@@ -358,7 +358,7 @@ class OauthControllerTest < ActionDispatch::IntegrationTest
     RecordingStudioApi.register_oauth_grant(
       "authorization_code",
       handler: lambda do |**|
-        RecordingStudioApi::Services::BaseService::Result.new(
+        RecordingStudio::Services::BaseService::Result.new(
           success: true,
           value: { access_token: "rsapi_at_double", token_type: "Bearer", expires_in: 3600 }
         )

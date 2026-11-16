@@ -2,7 +2,9 @@
 
 module RecordingStudioApi
   module Services
-    class TokenAuthenticationBase < BaseService
+    class TokenAuthenticationBase < RecordingStudio::Services::BaseService
+      include RedactsHookSecrets
+
       def initialize(authorization_header:, api: :public)
         @authorization_header = authorization_header
         @api_key = RecordingStudioApi.configuration.fetch_api(api).name

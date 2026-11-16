@@ -2,7 +2,9 @@
 
 module RecordingStudioApi
   module Services
-    class ProvisionAccessRequest < BaseService
+    class ProvisionAccessRequest < RecordingStudio::Services::BaseService
+      include RedactsHookSecrets
+
       def initialize(access_point_recording:, actor:, role:, api_client_name:, expires_at: nil, api: :public)
         @access_point_recording = access_point_recording
         @actor = actor

@@ -5,7 +5,7 @@ require "bigdecimal"
 
 module RecordingStudioApi
   module Services
-    class PaginateResourceCollection < BaseService
+    class PaginateResourceCollection < RecordingStudio::Services::BaseService
       Page = Data.define(:rows, :meta) do
         def response_body
           yield rows, meta

@@ -99,7 +99,7 @@ class PublicOauthClientNamedApiTest < ActionDispatch::IntegrationTest
     RecordingStudioApi.register_oauth_grant(
       "authorization_code",
       handler: lambda do |**|
-        RecordingStudioApi::Services::BaseService::Result.new(
+        RecordingStudio::Services::BaseService::Result.new(
           success: true,
           value: {
             access_token: access_token,

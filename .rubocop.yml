@@ -24,7 +24,6 @@ Layout/LineLength:
 Metrics/ClassLength:
   Exclude:
     - 'test/**/*'
-    - 'lib/recording_studio_api/hooks.rb'
 
 Metrics/BlockLength:
   Exclude:

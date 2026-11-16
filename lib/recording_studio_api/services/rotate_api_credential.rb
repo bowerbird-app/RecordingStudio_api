@@ -2,7 +2,9 @@
 
 module RecordingStudioApi
   module Services
-    class RotateApiCredential < BaseService
+    class RotateApiCredential < RecordingStudio::Services::BaseService
+      include RedactsHookSecrets
+
       def initialize(api_client:, actor:, expires_at: nil)
         @api_client = api_client
         @actor = actor
