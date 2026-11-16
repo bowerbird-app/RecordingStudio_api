@@ -268,11 +268,11 @@ HTTP requests and other gems share one fixed-window counter,
 `{namespace}:{kind}:{identifier}:{window}`.
 
 `kind` is `:read` or `:write`, stored as `api_read` or `api_write`. The HTTP
-limiter also counts `oauth` and `api_pre_auth` on this counter. `window` is
-`now.to_i / period`. The default namespace is `recording_studio_api`
-(`rate_limit_redis_namespace`). A named API prefixes that namespace with the
-API name (`recording_studio_api:operations`). Pass `namespace:` when the
-prefix is already built.
+limiter also counts `oauth`, `api_pre_auth`, and `api_failed_auth` on this
+counter. `window` is `now.to_i / period`. The default namespace is
+`recording_studio_api` (`rate_limit_redis_namespace`). A named API prefixes
+that namespace with the API name (`recording_studio_api:operations`). Pass
+`namespace:` when the prefix is already built.
 
 Use the same identifier the HTTP limiter would, so the counters stay shared:
 
@@ -280,6 +280,12 @@ Use the same identifier the HTTP limiter would, so the counters stay shared:
 - `client:{id}`
 - `ip:{remote_ip}`
 - `actor:{ActorType}:{id}` for an in-process actor with no API client
+
+`ip:{remote_ip}` uses `request.remote_ip`. Rails sets that from the socket
+address unless the peer is in `config.action_dispatch.trusted_proxies`. Set
+`trusted_proxies` to the proxies this host runs. Leave a real proxy off that
+list and every client behind it shares one IP bucket. Trust a proxy you do
+not run and the client can choose the address that becomes the bucket.
 
 ```ruby
 decision = RecordingStudioApi::RateLimit.check(
@@ -315,9 +321,34 @@ period. The counter still did not move. `fail_closed:` must be nil, true,
 or false. nil reads `config.rate_limit_check_fail_closed`, which must be
 true or false and defaults to false, so existing callers keep the nil
 result. Turn it on for a caller that must not proceed without a counter.
-The HTTP limiter always passes `fail_closed: false`, so this setting does
-not change request limiting. It is separate from
-`config.rate_limit_fail_closed`, which is the HTTP limiter's bucket policy.
+The HTTP limiter always passes `fail_closed: false` into `RateLimit.check`,
+so `rate_limit_check_fail_closed` does not change request limiting. It is
+separate from `config.rate_limit_fail_closed`, which is the HTTP limiter's
+bucket policy for `oauth`, `api_pre_auth`, and `api_failed_auth`.
+
+A request with no bearer token counts on `api_pre_auth`. A bearer token that
+fails authentication counts on `api_pre_auth` and on `api_failed_auth`. The
+failed-auth default is 20 requests per 60 seconds
+(`rate_limit_api_failed_auth_requests`,
+`rate_limit_api_failed_auth_period_seconds`,
+`rate_limit_api_failed_auth_enabled`). The limiter reads that counter before
+authentication and returns 429 when the window is already full. It increments
+the counter when authentication rejects the bearer. A bearer token that
+authenticates skips both IP buckets and uses `api_read` or `api_write`.
+Keys stay `credential:{id}`, `client:{id}`, or `ip:{remote_ip}`. The limiter
+does not put the raw token in the key or in the fallback log.
+
+When Redis is missing or raises a connection error, `api_read` and `api_write`
+use `RecordingStudioApi::RateLimit::ProcessWindow`. That window lives in the
+process, guards its counts with a mutex, expires each window on the first
+hit's deadline, and keeps at most 10,000 keys in a `MemoryStore`. Every
+fallback is logged and sent to `Rails.error.report`. `oauth`, `api_pre_auth`,
+and `api_failed_auth` stay fail-closed and do not use the process window.
+The bucket name `api` matches nothing. An initializer that still lists `api`
+keeps this fallback for read and write. `api_failed_auth` fails closed
+whenever `rate_limit_fail_closed` is true, including when an older bucket
+list does not name it. During a Redis outage the read and write limits apply
+once per process.
 
 ```ruby
 RecordingStudioApi::RateLimit.check(

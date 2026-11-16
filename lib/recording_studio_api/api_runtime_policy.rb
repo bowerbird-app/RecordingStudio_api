@@ -95,6 +95,18 @@ module RecordingStudioApi
       integer_override("rate_limit_api_pre_auth_period_seconds") { definition.rate_limit_api_pre_auth_period_seconds }
     end
 
+    def rate_limit_api_failed_auth_enabled
+      definition.rate_limit_api_failed_auth_enabled
+    end
+
+    def rate_limit_api_failed_auth_requests
+      definition.rate_limit_api_failed_auth_requests
+    end
+
+    def rate_limit_api_failed_auth_period_seconds
+      definition.rate_limit_api_failed_auth_period_seconds
+    end
+
     def rate_limit_api_requests
       definition.rate_limit_api_requests
     end

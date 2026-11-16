@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-11-16
+
+### Fixed
+- Rejected bearer tokens count on an IP limit. The failed-authentication limit defaults to 20 requests in 60 seconds. A request with no token still counts on the unauthenticated IP limit. A token that authenticates skips both IP limits.
+- `api_read` and `api_write` stay limited when Redis is unavailable. The HTTP limiter counts them on a per-process window, logs that fallback, and reports it. OAuth, unauthenticated IP, and failed-authentication limits still fail closed.
+
+### Upgrade notes
+- Bump to `0.25.0`. No migration in this gem.
+- New settings and defaults are `rate_limit_api_failed_auth_enabled` true, `rate_limit_api_failed_auth_requests` 20, and `rate_limit_api_failed_auth_period_seconds` 60. A named API inherits them from the public configuration and can override them on its definition.
+- `rate_limit_fail_closed_buckets` defaults to `%w[oauth api_pre_auth api_failed_auth]`. The previous `api` entry matched no bucket. An initializer that still lists `api` keeps the in-process fallback for read and write. `api_failed_auth` fails closed when `rate_limit_fail_closed` is true, even if the host list omits that name.
+- While Redis is down, each process enforces its own read and write limit. Set `config.action_dispatch.trusted_proxies` to the proxies the host runs. The IP buckets use `request.remote_ip`.
+
 ## [0.24.1] - 2026-11-16
 
 ### Changed
@@ -1273,7 +1285,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.24.1...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.25.0...HEAD
+[0.25.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.24.1...v0.25.0
 [0.24.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.24.0...v0.24.1
 [0.24.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.4...v0.24.0
 [0.23.4]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.23.3...v0.23.4

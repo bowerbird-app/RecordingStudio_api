@@ -24,11 +24,13 @@ module ApiDummyHelpers # rubocop:disable Metrics/ModuleLength
     # Deterministic tests: disable unauthenticated rate limits and open public management auth.
     configuration.rate_limit_oauth_enabled = false
     configuration.rate_limit_api_pre_auth_enabled = false
+    configuration.rate_limit_api_failed_auth_enabled = false
     configuration.rate_limit_api_enabled = false
     configuration.rate_limit_fail_closed = false
     configuration.api_management_authorization_required = false
     RecordingStudioApi.instance_variable_set(:@configuration, configuration)
     RecordingStudioApi::Concerns::RateLimiting.reset_redis_client!
+    RecordingStudioApi::RateLimit::ProcessWindow.reset!
     RecordingStudioApi::IdempotencyStore.reset_fallback_notice!
     RecordingStudioApi::Admin::Queries::AdminApiCredentialsQuery.clear_cache!
     RecordingStudioApi::ApiRequestLogBatch.clear!

@@ -11,6 +11,8 @@ module RecordingStudioApi
     API_WWW_AUTHENTICATE = 'Bearer realm="RecordingStudioApi"'
 
     rescue_from RecordingStudioApi::AuthenticationError do |error|
+      next if count_failed_authentication!
+
       response.set_header("WWW-Authenticate", API_WWW_AUTHENTICATE)
       render_error(code: "authentication_failed", message: error.message, status: :unauthorized)
     end

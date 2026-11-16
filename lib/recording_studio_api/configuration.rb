@@ -43,6 +43,7 @@ module RecordingStudioApi
                   :rate_limit_oauth_enabled,
                   :rate_limit_api_enabled,
                   :rate_limit_api_pre_auth_enabled,
+                  :rate_limit_api_failed_auth_enabled,
                   :rate_limit_fail_closed,
                   :rate_limit_fail_closed_buckets,
                   :rate_limit_check_fail_closed,
@@ -52,6 +53,8 @@ module RecordingStudioApi
                   :rate_limit_oauth_period_seconds,
                   :rate_limit_api_pre_auth_requests,
                   :rate_limit_api_pre_auth_period_seconds,
+                  :rate_limit_api_failed_auth_requests,
+                  :rate_limit_api_failed_auth_period_seconds,
                   :rate_limit_api_requests,
                   :rate_limit_api_period_seconds,
                   :rate_limit_api_read_requests,
@@ -120,8 +123,9 @@ module RecordingStudioApi
       @rate_limit_oauth_enabled = true
       @rate_limit_api_enabled = true
       @rate_limit_api_pre_auth_enabled = true
+      @rate_limit_api_failed_auth_enabled = true
       @rate_limit_fail_closed = true
-      @rate_limit_fail_closed_buckets = %w[oauth api_pre_auth api]
+      @rate_limit_fail_closed_buckets = %w[oauth api_pre_auth api_failed_auth]
       @rate_limit_check_fail_closed = false
       @rate_limit_redis_url = ENV["RECORDING_STUDIO_API_RATE_LIMIT_REDIS_URL"].presence
       @rate_limit_redis_namespace = "recording_studio_api"
@@ -129,6 +133,8 @@ module RecordingStudioApi
       @rate_limit_oauth_period_seconds = 60
       @rate_limit_api_pre_auth_requests = 300
       @rate_limit_api_pre_auth_period_seconds = 60
+      @rate_limit_api_failed_auth_requests = 20
+      @rate_limit_api_failed_auth_period_seconds = 60
       @rate_limit_api_requests = 120
       @rate_limit_api_period_seconds = 60
       @rate_limit_api_read_requests = 120
@@ -188,6 +194,7 @@ module RecordingStudioApi
         rate_limit_oauth_enabled: rate_limit_oauth_enabled,
         rate_limit_api_enabled: rate_limit_api_enabled,
         rate_limit_api_pre_auth_enabled: rate_limit_api_pre_auth_enabled,
+        rate_limit_api_failed_auth_enabled: rate_limit_api_failed_auth_enabled,
         rate_limit_fail_closed: rate_limit_fail_closed,
         rate_limit_fail_closed_buckets: rate_limit_fail_closed_buckets,
         rate_limit_check_fail_closed: rate_limit_check_fail_closed,
@@ -197,6 +204,8 @@ module RecordingStudioApi
         rate_limit_oauth_period_seconds: rate_limit_oauth_period_seconds,
         rate_limit_api_pre_auth_requests: rate_limit_api_pre_auth_requests,
         rate_limit_api_pre_auth_period_seconds: rate_limit_api_pre_auth_period_seconds,
+        rate_limit_api_failed_auth_requests: rate_limit_api_failed_auth_requests,
+        rate_limit_api_failed_auth_period_seconds: rate_limit_api_failed_auth_period_seconds,
         rate_limit_api_requests: rate_limit_api_requests,
         rate_limit_api_period_seconds: rate_limit_api_period_seconds,
         rate_limit_api_read_requests: rate_limit_api_read_requests,

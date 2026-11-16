@@ -8,6 +8,8 @@ module RecordingStudioApi
       # Deprecated. Use RecordingStudioApi::RateLimit::INCR_EXPIRE_SCRIPT.
       # Kept so this patch release does not drop a constant other gems already call.
       RATE_LIMIT_INCR_EXPIRE_SCRIPT = RecordingStudioApi::RateLimit::INCR_EXPIRE_SCRIPT
+      IP_BUCKETS = %w[oauth api_pre_auth api_failed_auth].freeze
+      MEMORY_FALLBACK_BUCKETS = %w[api_read api_write].freeze
 
       class << self
         attr_accessor :decider
@@ -41,18 +43,57 @@ module RecordingStudioApi
 
       included do
         prepend_before_action :enforce_api_pre_auth_rate_limit!
+        prepend_before_action :enforce_api_failed_auth_gate!
         before_action :enforce_rate_limit!
       end
 
       private
 
+      def enforce_api_failed_auth_gate!
+        return unless failed_auth_rate_limit_enabled_for_request?
+        return unless bearer_authorization_header_present?
+
+        with_rate_limit_bucket("api_failed_auth") do
+          limit = rate_limit_window_limit.to_i
+          next unless limit.positive?
+          next if failed_auth_window_count < limit
+
+          render_limited_decision(
+            limited: true,
+            limit: limit,
+            remaining: 0,
+            retry_after: rate_limit_window_period
+          )
+        end
+      end
+
       def enforce_api_pre_auth_rate_limit!
         return unless api_pre_auth_rate_limit_enabled_for_request?
-        return if skip_api_pre_auth_rate_limit_for_bearer?
+        return if bearer_authorization_header_present?
 
         with_rate_limit_bucket("api_pre_auth") do
           enforce_rate_limit!
         end
+      end
+
+      # Returns true after rendering 429 so the caller can skip the 401.
+      # rubocop:disable-next Naming/PredicateMethod
+      def count_failed_authentication!
+        return false unless rejected_bearer_counts?
+
+        limited_decision = nil
+        if api_pre_auth_rate_limit_enabled_for_request?
+          decision = with_rate_limit_bucket("api_pre_auth") { resolved_rate_limit_decision }
+          limited_decision = decision if decision[:limited]
+        end
+        if failed_auth_rate_limit_enabled_for_request?
+          decision = with_rate_limit_bucket("api_failed_auth") { resolved_rate_limit_decision }
+          limited_decision = decision if decision[:limited]
+        end
+        return false unless limited_decision
+
+        render_limited_decision(limited_decision)
+        true
       end
 
       # rubocop:disable-next Naming/PredicateMethod
@@ -61,7 +102,11 @@ module RecordingStudioApi
       end
 
       def current_rate_limit_exceeded?
-        decision = resolved_rate_limit_decision
+        render_limited_decision(resolved_rate_limit_decision)
+      end
+
+      # rubocop:disable-next Naming/PredicateMethod
+      def render_limited_decision(decision)
         return false unless decision[:limited]
 
         response.set_header("Retry-After", decision[:retry_after].to_i.to_s) if decision[:retry_after].to_i.positive?
@@ -96,11 +141,14 @@ module RecordingStudioApi
 
         computed_decision = computed_rate_limit_decision
         return normalize_decision(computed_decision) if computed_decision.present?
+        return memory_fallback_decision(missing_store_error) if memory_fallback_for_missing_store?
 
         fail_closed_rate_limit_decision
       rescue StandardError => error
         Rails.logger.warn("[RecordingStudioApi] rate limiter unavailable: #{error.class}: #{error.message}")
         RateLimiting.reset_redis_client!
+        return memory_fallback_decision(error) if memory_fallback_for_store_error?(error)
+
         fail_closed_rate_limit_decision
       end
 
@@ -154,6 +202,8 @@ module RecordingStudioApi
         return false unless rate_limit_enabled_for_request?
         return false unless rate_limit_window_limit.to_i.positive? && rate_limit_window_period.to_i.positive?
 
+        return true if rate_limit_bucket == "api_failed_auth"
+
         Array(RecordingStudioApi.configuration.rate_limit_fail_closed_buckets).map(&:to_s).include?(rate_limit_bucket)
       end
 
@@ -167,12 +217,10 @@ module RecordingStudioApi
 
       def api_pre_auth_rate_limit_enabled_for_request? = rate_limit_api.rate_limit_api_pre_auth_enabled && api_rate_limited_path?
 
-      # Skip the IP pre-auth bucket when a Bearer token is present and authenticated API
-      # rate limits are enabled. Invalid Bearer traffic still hits pre-auth when API RL is off.
-      def skip_api_pre_auth_rate_limit_for_bearer?
-        return false unless rate_limit_api.rate_limit_api_enabled
+      def failed_auth_rate_limit_enabled_for_request? = rate_limit_api.rate_limit_api_failed_auth_enabled && api_rate_limited_path?
 
-        bearer_authorization_header_present?
+      def rejected_bearer_counts?
+        bearer_authorization_header_present? && api_rate_limited_path?
       end
 
       def bearer_authorization_header_present?
@@ -183,6 +231,9 @@ module RecordingStudioApi
       def rate_limit_enabled_for_request?
         if rate_limit_bucket_override == "api_pre_auth"
           return api_pre_auth_rate_limit_enabled_for_request?
+        end
+        if rate_limit_bucket_override == "api_failed_auth"
+          return failed_auth_rate_limit_enabled_for_request?
         end
         if oauth_rate_limited_path?
           return rate_limit_api.rate_limit_oauth_enabled
@@ -218,7 +269,7 @@ module RecordingStudioApi
       end
 
       def rate_limit_identifier
-        return "ip:#{request.remote_ip}" if %w[oauth api_pre_auth].include?(rate_limit_bucket)
+        return "ip:#{request.remote_ip}" if IP_BUCKETS.include?(rate_limit_bucket)
 
         if respond_to?(:current_api_credential, true) && current_api_credential.present?
           "credential:#{current_api_credential.id}"
@@ -268,6 +319,84 @@ module RecordingStudioApi
 
       def rate_limit_redis_client
         RateLimiting.redis_client
+      end
+
+      def memory_fallback_for_missing_store?
+        return false unless memory_fallback_bucket?
+        return false unless rate_limit_enabled_for_request?
+
+        limit, period = rate_limit_window
+        return false unless limit.to_i.positive? && period.to_i.positive?
+
+        rate_limit_redis_client.nil?
+      end
+
+      def memory_fallback_for_store_error?(error)
+        memory_fallback_bucket? && RecordingStudioApi::RateLimit.store_error?(error)
+      end
+
+      def memory_fallback_bucket?
+        MEMORY_FALLBACK_BUCKETS.include?(rate_limit_bucket)
+      end
+
+      def missing_store_error
+        RecordingStudioApi::RateLimit::StoreUnavailable.new("Redis client is missing")
+      end
+
+      def memory_fallback_decision(error)
+        limit, period = rate_limit_window
+        count, retry_after = RecordingStudioApi::RateLimit::ProcessWindow.increment(rate_limit_counter_key, period)
+        report_rate_limit_fallback(error)
+        {
+          limited: count > limit.to_i,
+          limit: limit.to_i,
+          remaining: [limit.to_i - count, 0].max,
+          retry_after: retry_after
+        }
+      end
+
+      def rate_limit_counter_key
+        period = rate_limit_window_period.to_i
+        RecordingStudioApi::RateLimit.key(
+          kind: rate_limit_bucket,
+          identifier: rate_limit_identifier,
+          window: Time.current.to_i / period,
+          namespace: rate_limit_scoped_namespace
+        )
+      end
+
+      def failed_auth_window_count
+        return 0 unless rate_limit_window_period.to_i.positive?
+
+        client = rate_limit_redis_client
+        raise RecordingStudioApi::RateLimit::StoreUnavailable, "Redis client is missing" if client.nil?
+
+        client.get(rate_limit_counter_key).to_i
+      rescue StandardError => error
+        raise unless RecordingStudioApi::RateLimit.store_error?(error)
+
+        # A failed read cannot tell a good token from a bad one. Let authentication
+        # run. A rejected bearer still fails closed below. A valid credential
+        # reaches the read or write limit, which uses the in-process window.
+        Rails.logger.warn("[RecordingStudioApi] rate limiter unavailable: #{error.class}: #{error.message}")
+        RateLimiting.reset_redis_client!
+        0
+      end
+
+      def report_rate_limit_fallback(error)
+        Rails.logger.warn(
+          "[RecordingStudioApi] rate limit #{rate_limit_bucket} fell back to the in-process window (#{error.class}: #{error.message})"
+        )
+        return unless defined?(Rails) && Rails.respond_to?(:error) && Rails.error.respond_to?(:report)
+
+        Rails.error.report(
+          error,
+          handled: true,
+          severity: :warning,
+          context: { bucket: rate_limit_bucket, fallback: "process_window" }
+        )
+      rescue StandardError
+        nil
       end
     end
   end
