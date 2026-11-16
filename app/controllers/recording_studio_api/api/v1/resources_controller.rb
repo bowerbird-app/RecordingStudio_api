@@ -72,9 +72,14 @@ module RecordingStudioApi
             return
           end
 
-          result = operation.handler.call(
-            resource_operation_context(recording: builtin_member_recording_for(operation_name))
-          )
+          context = resource_operation_context(recording: builtin_member_recording_for(operation_name))
+          result = if operation_name == :index
+                     RecordingStudioApi::CollectionHttp.with(self) { operation.handler.call(context) }
+                   else
+                     operation.handler.call(context)
+                   end
+          return if performed? || result[:not_modified]
+
           render json: result.fetch(:json), status: result.fetch(:status, :ok)
         end
 

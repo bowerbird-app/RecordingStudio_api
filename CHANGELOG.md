@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-16
+
+### Changed
+- List `meta.total_count` is omitted unless the request passes `include_total=true`. `count=true` still returns only `{ total_count }`.
+- Collection GETs send `ETag` and `Last-Modified` from one aggregate (`max(updated_at)` and count) plus the grant, filters, and page cursor. A matching `If-None-Match` or `If-Modified-Since` returns 304 after authentication and authorization, without the list query or includes. `Cache-Control` is `private, must-revalidate`.
+- Included child collections load from the current page's recording ids. Each parent returns at most 100 children, or the relationship `limit` when that is lower.
+
+### Upgrade notes
+- Bump to `1.3.0`. No migration.
+- Clients that read `meta.total_count` on every list pass `include_total=true`.
+- Store the `ETag` and send it as `If-None-Match`. A 304 body is empty. Do not share the response through a public cache.
+- Included relationships never return more than 100 children per parent.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.2.2] - 2026-11-16
 
 ### Fixed

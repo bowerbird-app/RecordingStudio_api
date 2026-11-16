@@ -1,5 +1,16 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.3.0
+
+No migration. List responses, conditional GET, and included children change.
+
+1. Bump the host gem to `1.3.0`.
+2. Pass `include_total=true` when a client needs `meta.total_count`. It is omitted by default. `count=true` still returns only `{ "total_count": N }`.
+3. Collection GETs send `ETag`, `Last-Modified`, and `Cache-Control: private, must-revalidate`. A matching `If-None-Match` or `If-Modified-Since` returns 304 with an empty body after authentication and authorization. The validator is `max(updated_at)` and the count of the filtered list, plus the grant, the filters, and the page cursor. It changes when a listed recording is created, updated, or removed, and when the filter, page cursor, or grant changes. An included child that does not move its parent recording is not part of that aggregate. `Last-Modified` is an HTTP date, so it has second resolution. `ETag` includes microseconds.
+4. Included child collections load from the current page's recording ids. Each parent returns at most 100 children, or the relationship `limit` when that is lower.
+
+Custom index handlers are unchanged. They do not gain `total_count`, `count=true`, or conditional GET.
+
 ## Upgrading to 1.2.2
 
 No migration. Routes stay the same. Member actions authorize before the input contract runs.

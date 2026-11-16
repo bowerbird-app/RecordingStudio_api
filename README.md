@@ -898,13 +898,23 @@ or arbitrary-name form.
 Responses are flat. A record always includes `id`, `type`, `root_id`, `parent_id`, `created_at`,
 and `updated_at`; serializer output keys, always-included fields, and expanded relationship names
 sit beside those keys. There are no `data`, `attributes`, or `relationships` wrappers. Collections
-use `records` plus `meta`. `meta.total_count` is the number of matching
-recordings across every page. The count is `COUNT(*)` when that query has no
-join, no eager load, no referenced include, no custom `FROM`, and is not
-already distinct. Search, attribute filters, and any other join keep
-`COUNT(DISTINCT id)`, so a joined row is not counted twice.
-`count=true` returns only `{ "total_count": N }`
-and does not load records. A record's `_meta` reports `limit` and `has_more` for emitted collection
+use `records` plus `meta`. `meta.total_count` is omitted unless the request
+passes `include_total=true`. It is the number of matching recordings across
+every page. The count is `COUNT(*)` when that query has no join, no eager
+load, no referenced include, no custom `FROM`, and is not already distinct.
+Search, attribute filters, and any other join keep `COUNT(DISTINCT id)`, so a
+joined row is not counted twice. `count=true` returns only `{ "total_count": N }`
+and does not load records.
+
+List responses send `ETag`, `Last-Modified`, and `Cache-Control: private, must-revalidate`.
+The validator is one aggregate, `max(updated_at)` and the count of the filtered
+scope, plus the grant, the filters, and the page cursor. A later GET with
+`If-None-Match` or `If-Modified-Since` returns 304 and an empty body when that
+validator still matches. Authentication and authorization run before the 304.
+`ETag` changes when any recording in the filtered scope changes. `Last-Modified`
+uses HTTP-date second resolution.
+
+A record's `_meta` reports `limit` and `has_more` for emitted collection
 relationships.
 
 Write bodies use the same flat field layout. Send registered writable fields at the request body
@@ -914,8 +924,12 @@ registered move action to change a record's parent. The legacy `{ attributes: { 
 is rejected.
 
 The engine preloads the recordable for each list row before serialization, and it
-fetches requested `children` relationships in one scoped query per response,
-preventing serializer-driven N+1 queries. A custom resolver is application code and may issue
+fetches requested `children` relationships from the current page's recording ids,
+one query per response, preventing serializer-driven N+1 queries. Each parent
+returns at most 100 children, or the relationship `limit` when that is lower.
+`_meta.has_more` is true when more children exist. A descendant-tree scope is
+not walked again for those direct children. A narrower scope still drops ids
+outside it. A custom resolver is application code and may issue
 queries; preload its associations where needed and use `context.scoped_recordings` when resolving
 Recording Studio records. Custom relationships must declare a serializer and output keys, so
 the engine never serializes arbitrary model attributes. Registered writable child relationships expose

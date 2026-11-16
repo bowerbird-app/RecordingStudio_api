@@ -43,7 +43,9 @@ module RecordingStudioApi
           fields_sentence("Each record includes"),
           filter_sentence,
           "Paginate with `limit` and `pagination_token`. Sort with `sort` and `order`.",
+          "Pass `include_total=true` to add `meta.total_count`.",
           "Set `count=true` to return only `{ total_count }` for the same filters.",
+          "Send the previous `ETag` as `If-None-Match` to get 304 when the page has not changed.",
           include_sentence
         )
       end

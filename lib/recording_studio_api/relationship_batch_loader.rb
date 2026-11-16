@@ -2,6 +2,12 @@
 
 module RecordingStudioApi
   class RelationshipBatchLoader
+    # Included child collections return at most this many rows per parent.
+    # A relationship limit lower than this still applies. Documented in the README.
+    def self.max_included_children
+      100
+    end
+
     def initialize(context:, entries:)
       @context = context
       @entries = entries
@@ -26,7 +32,7 @@ module RecordingStudioApi
           children = rows.fetch(parent.id, [])
           @context.authorize_relationship!(parent, name, entry_definition)
           values = @context.authorized_targets(children, parent, name, entry_definition)
-          limit = entry_definition.limit
+          limit = window_size(entry_definition)
           @prepared[[parent.id, name.to_s]] = {
             value: entry_definition.many ? values.first(limit) : values.first,
             meta: entry_definition.many && values.length > limit ? { limit: limit, has_more: true } : nil
@@ -54,19 +60,59 @@ module RecordingStudioApi
     end
 
     def bounded_children(parent_ids, definition)
-      table_name = @context.scoped_recordings.klass.table_name
-      quoted_table = @context.scoped_recordings.connection.quote_table_name(table_name)
-      order_sql = order_sql(definition, quoted_table)
-      limit = definition.limit
-      source = @context.scoped_recordings
-                       .where(parent_recording_id: parent_ids, recordable_type: definition.child_type)
-                       .reorder(Arel.sql(order_sql))
-                       .select("#{quoted_table}.*, ROW_NUMBER() OVER (PARTITION BY #{quoted_table}.parent_recording_id ORDER BY #{order_sql}) AS relationship_row_number")
-      @context.scoped_recordings.klass
-              .from("(#{source.to_sql}) #{quoted_table}")
-              .where("relationship_row_number <= ?", limit + 1)
-              .preload(:recordable)
-              .to_a
+      return [] if parent_ids.empty?
+
+      recordings = @context.scoped_recordings.klass
+      connection = recordings.connection
+      quoted_table = connection.quote_table_name(recordings.table_name)
+      order = order_sql(definition, quoted_table)
+      fetch_count = definition.many ? window_size(definition) + 1 : 1
+      values_sql = parent_ids.map { |id| "(#{connection.quote(id)}::uuid)" }.join(", ")
+      lateral = <<~SQL.squish
+        SELECT #{quoted_table}.*,
+               ROW_NUMBER() OVER (ORDER BY #{order}) AS relationship_row_number
+        FROM #{quoted_table}
+        WHERE #{quoted_table}.parent_recording_id = page_parent.id
+          AND #{quoted_table}.recordable_type = #{connection.quote(definition.child_type)}
+          #{scope_predicate(quoted_table)}
+        ORDER BY #{order}
+        LIMIT #{fetch_count.to_i}
+      SQL
+      source = <<~SQL.squish
+        SELECT page_child.*
+        FROM (VALUES #{values_sql}) AS page_parent(id)
+        JOIN LATERAL (#{lateral}) page_child ON TRUE
+      SQL
+
+      recordings.unscoped
+                .from("(#{source}) #{quoted_table}")
+                .preload(:recordable)
+                .to_a
+    end
+
+    # The page ids are already inside the caller's scope. A descendant-tree
+    # scope (AccessibleRecordingScope) is not walked again: kept direct
+    # children of those parents are the next step of that same tree. Any
+    # other scope is applied as an id filter on this page.
+    def scope_predicate(quoted_table)
+      scope = @context.scoped_recordings
+      scope_sql = scope.to_sql
+      if scope_sql.include?("scope_tree")
+        return "" unless scope_sql.include?("trashed_at")
+
+        "AND #{RecordingStudio.kept_sql(scope.klass.table_name)}"
+      else
+        allowed_ids = scope.unscope(:order, :limit, :offset).select(:id).to_sql
+        "AND #{quoted_table}.id IN (#{allowed_ids})"
+      end
+    end
+
+    def window_size(definition)
+      return 1 unless definition.many
+
+      requested = definition.limit.to_i
+      requested = 1 if requested < 1
+      [requested, self.class.max_included_children].min
     end
 
     def order_sql(definition, quoted_table)
@@ -100,7 +146,7 @@ module RecordingStudioApi
     end
 
     def child_key(definition)
-      [definition.child_type, definition.many, definition.limit, definition.order]
+      [definition.child_type, definition.many, window_size(definition), definition.order]
     end
   end
 end

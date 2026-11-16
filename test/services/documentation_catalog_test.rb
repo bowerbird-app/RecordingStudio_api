@@ -199,8 +199,9 @@ module RecordingStudioApi
         assert_equal "object", item_schema.fetch(:type)
         assert_equal true, item_schema.fetch(:properties).key?(:id)
         assert_equal true, list_branch.fetch(:properties).key?(:type)
-        assert_equal %w[limit sort order has_more next_pagination_token total_count],
+        assert_equal %w[limit sort order has_more next_pagination_token],
                      list_branch.fetch(:properties).fetch(:meta).fetch(:required)
+        assert_equal true, list_branch.fetch(:properties).fetch(:meta).fetch(:properties).key?(:total_count)
       end
 
       def test_generated_resource_docs_cover_filters_pagination_and_idempotency
@@ -225,6 +226,8 @@ module RecordingStudioApi
           assert_includes index_endpoint.fetch(:description), "Returns pages the caller can access."
           assert_includes index_endpoint.fetch(:description), "`filter[title]`"
           assert_includes index_endpoint.fetch(:description), "Set `count=true`"
+          assert_includes index_endpoint.fetch(:description), "include_total=true"
+          assert_includes index_endpoint.fetch(:description), "If-None-Match"
           assert_includes create_endpoint.fetch(:description), "`Idempotency-Key`"
           refute_includes create_endpoint.fetch(:description), "the caller can access"
         end

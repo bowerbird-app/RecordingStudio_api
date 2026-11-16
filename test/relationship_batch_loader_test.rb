@@ -132,6 +132,65 @@ class RelationshipBatchLoaderTest < ActiveSupport::TestCase
     end
   end
 
+  test "binds included children to the page ids and caps the window" do
+    children = create_children(@primary, 4, "Capped")
+    definition = relationship_definition(source: :children, child_type: "Folder", many: true, limit: 10,
+                                         order: { "created_at" => :asc })
+    queries = []
+    subscriber = lambda do |_name, _start, _finish, _id, payload|
+      queries << payload[:sql].squish if payload[:sql].include?("LATERAL")
+    end
+    context = nil
+
+    with_registration("folders" => definition) do
+      RecordingStudioApi::RelationshipBatchLoader.stub(:max_included_children, 2) do
+        ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
+          context = build_context(include_values: "folders", recordings: [@primary], scope: [@primary, *children], batch: true)
+        end
+      end
+    end
+
+    assert_equal 1, queries.length
+    assert_includes queries.first, @primary.id
+    assert_match(/LIMIT 3/, queries.first)
+    refute_includes queries.first, "scope_tree"
+    assert_equal children.sort_by { |child| [child.created_at, child.id] }.first(2), context.relationship_value(@primary, "folders")
+    assert_equal({ limit: 2, has_more: true }, context.relationship_metadata(@primary, "folders"))
+  end
+
+  test "does not walk the accessible scope tree for direct children of the page" do
+    child = create_children(@primary, 1, "Tree").first
+    trashed = create_children(@primary, 1, "Trashed").first
+    trashed.update_columns(trashed_at: Time.utc(2026, 2, 1))
+    tree_scope = RecordingStudio::Recording.unscoped.where(
+      "id IN (WITH RECURSIVE scope_tree AS (SELECT id FROM recording_studio_recordings WHERE trashed_at IS NULL) SELECT id FROM scope_tree)"
+    )
+    definition = relationship_definition(source: :children, child_type: "Folder", many: true, limit: 10,
+                                         order: { "created_at" => :asc })
+    queries = []
+    subscriber = lambda do |_name, _start, _finish, _id, payload|
+      queries << payload[:sql].squish if payload[:sql].include?("LATERAL")
+    end
+
+    with_registration("folders" => definition) do
+      context = nil
+      ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
+        context = build_context(
+          include_values: "folders",
+          recordings: [@primary],
+          scoped_recordings: tree_scope,
+          batch: true
+        )
+      end
+
+      assert_equal 1, queries.length
+      assert_includes queries.first, @primary.id
+      refute_includes queries.first, "scope_tree"
+      assert_includes queries.first, "trashed_at"
+      assert_equal [child], context.relationship_value(@primary, "folders")
+    end
+  end
+
   private
 
   BatchResolver = Struct.new(:implementation) do
@@ -152,11 +211,12 @@ class RelationshipBatchLoaderTest < ActiveSupport::TestCase
     end
   end
 
-  def build_context(include_values:, recordings: [@primary], scope: [@primary], batch: false)
+  def build_context(include_values:, recordings: [@primary], scope: [@primary], scoped_recordings: nil, batch: false)
+    relation = scoped_recordings || RecordingStudio::Recording.where(id: scope.map(&:id))
     RecordingStudioApi::RelationshipContext.for(
       recordings: recordings,
       include_values: include_values,
-      scoped_recordings: RecordingStudio::Recording.where(id: scope.map(&:id)),
+      scoped_recordings: relation,
       api_key: :public,
       api_version: "v1",
       access_grant: @access_grant,

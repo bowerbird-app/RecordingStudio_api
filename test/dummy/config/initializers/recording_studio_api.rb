@@ -131,8 +131,7 @@ RecordingStudioApi.register_recordable_type_api(
                       sort: "created_at",
                       order: "asc",
                       has_more: false,
-                      next_pagination_token: nil,
-                      total_count: 1
+                      next_pagination_token: nil
                     }
                   }
                 }
@@ -250,8 +249,7 @@ RecordingStudioApi.register_recordable_type_api(
                       sort: "created_at",
                       order: "asc",
                       has_more: false,
-                      next_pagination_token: nil,
-                      total_count: 1
+                      next_pagination_token: nil
                     }
                   }
                 }

@@ -16,6 +16,14 @@ module RecordingStudioApi
                      "limit, sort, order, and pagination_token are ignored.",
         schema: { type: "boolean", default: false }
       }.freeze
+      INCLUDE_TOTAL_PARAMETER = {
+        name: "include_total",
+        in: "query",
+        required: false,
+        description: "Set to true to add meta.total_count, the number of matching records on every page. " \
+                     "Omitted by default so list reads do not count the scope.",
+        schema: { type: "boolean", default: false }
+      }.freeze
 
       class << self
         def call(version: nil, mount_path: nil, api_mount_path: nil, api: :public)
@@ -815,7 +823,7 @@ module RecordingStudioApi
           total_count: {
             type: "integer",
             minimum: 0,
-            description: "Records matching this list's filters across all pages."
+            description: "Present when include_total=true. Records matching this list's filters across all pages."
           }
         }
         meta_example = {
@@ -823,8 +831,7 @@ module RecordingStudioApi
           sort: "created_at",
           order: "asc",
           has_more: false,
-          next_pagination_token: nil,
-          total_count: 2
+          next_pagination_token: nil
         }
         if filter_meta
           meta_properties[:filter] = { type: "object", additionalProperties: true }
@@ -846,7 +853,7 @@ module RecordingStudioApi
               type: "object",
               properties: meta_properties,
               example: meta_example,
-              required: %w[limit sort order has_more next_pagination_token total_count]
+              required: %w[limit sort order has_more next_pagination_token]
             }
           },
           required: %w[resource type records meta]
@@ -864,6 +871,7 @@ module RecordingStudioApi
         {
           "200" => {
             description: "List #{docs_resource_name} visible in scope.",
+            headers: collection_validators,
             content: {
               "application/json" => {
                 schema: { oneOf: [list_schema, count_schema] },
@@ -872,6 +880,27 @@ module RecordingStudioApi
                 )
               }
             }
+          },
+          "304" => {
+            description: "Not modified. If-None-Match or If-Modified-Since matched this page. " \
+                         "The body is empty. Authentication and authorization still run."
+          }
+        }
+      end
+
+      def collection_validators
+        {
+          "ETag" => {
+            description: "Weak validator for this grant, filter, page cursor, and the filtered scope.",
+            schema: { type: "string" }
+          },
+          "Last-Modified" => {
+            description: "Newest updated_at in the filtered scope. HTTP dates use second resolution; ETag is precise.",
+            schema: { type: "string" }
+          },
+          "Cache-Control" => {
+            description: "private, must-revalidate. Shared caches do not store the list.",
+            schema: { type: "string" }
           }
         }
       end
@@ -923,7 +952,8 @@ module RecordingStudioApi
               default: "asc"
             }
           },
-          COUNT_PARAMETER
+          COUNT_PARAMETER,
+          INCLUDE_TOTAL_PARAMETER
         ]
       end
 
@@ -1450,8 +1480,7 @@ module RecordingStudioApi
             sort: "created_at",
             order: "asc",
             has_more: false,
-            next_pagination_token: nil,
-            total_count: 1
+            next_pagination_token: nil
           }
         }
       end

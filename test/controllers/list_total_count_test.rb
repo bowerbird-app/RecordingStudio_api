@@ -33,11 +33,31 @@ class ListTotalCountTest < ActionDispatch::IntegrationTest
     Current.actor = nil if defined?(Current)
   end
 
-  test "folder list meta includes total_count for the whole filtered set" do
+  test "folder list meta omits total_count unless include_total is requested" do
     create_folder("Marketing")
     create_folder("Archive")
 
     get "/recording_studio_api/api/v1/folders", headers: authorization_headers
+
+    assert_response :success
+    payload = JSON.parse(response.body)
+    assert_equal %w[limit sort order has_more next_pagination_token filter], payload.fetch("meta").keys
+    refute payload.fetch("meta").key?("total_count")
+    assert_equal 2, payload.fetch("records").length
+
+    get "/recording_studio_api/api/v1/folders", params: { include_total: "true" }, headers: authorization_headers
+
+    assert_response :success
+    counted = JSON.parse(response.body)
+    assert_equal 2, counted.fetch("meta").fetch("total_count")
+    assert_equal %w[limit sort order has_more next_pagination_token total_count filter], counted.fetch("meta").keys
+  end
+
+  test "folder list meta includes total_count for the whole filtered set when asked" do
+    create_folder("Marketing")
+    create_folder("Archive")
+
+    get "/recording_studio_api/api/v1/folders", params: { include_total: "true" }, headers: authorization_headers
 
     assert_response :success
     payload = JSON.parse(response.body)
@@ -62,7 +82,7 @@ class ListTotalCountTest < ActionDispatch::IntegrationTest
     create_folder("Archive")
 
     get "/recording_studio_api/api/v1/folders",
-        params: { filter: { name: "Marketing" } },
+        params: { filter: { name: "Marketing" }, include_total: "true" },
         headers: authorization_headers
 
     assert_response :success
@@ -72,7 +92,7 @@ class ListTotalCountTest < ActionDispatch::IntegrationTest
     assert_equal({ "name" => "Marketing" }, filtered.fetch("meta").fetch("filter"))
 
     get "/recording_studio_api/api/v1/folders",
-        params: { q: "Archive" },
+        params: { q: "Archive", include_total: "true" },
         headers: authorization_headers
 
     assert_response :success
@@ -82,7 +102,7 @@ class ListTotalCountTest < ActionDispatch::IntegrationTest
     assert_equal "Archive", searched.fetch("meta").fetch("q")
 
     get "/recording_studio_api/api/v1/folders",
-        params: { filter: { name: "Marketing" }, q: "Market" },
+        params: { filter: { name: "Marketing" }, q: "Market", include_total: "true" },
         headers: authorization_headers
 
     assert_response :success
@@ -96,7 +116,7 @@ class ListTotalCountTest < ActionDispatch::IntegrationTest
     first = create_folder("First")
     second = create_folder("Second")
 
-    get "/recording_studio_api/api/v1/folders", params: { limit: 1 }, headers: authorization_headers
+    get "/recording_studio_api/api/v1/folders", params: { limit: 1, include_total: "true" }, headers: authorization_headers
 
     assert_response :success
     first_page = JSON.parse(response.body)
@@ -105,7 +125,7 @@ class ListTotalCountTest < ActionDispatch::IntegrationTest
     assert_equal 2, first_page.fetch("meta").fetch("total_count")
 
     get "/recording_studio_api/api/v1/folders",
-        params: { limit: 1, pagination_token: first_page.fetch("meta").fetch("next_pagination_token") },
+        params: { limit: 1, include_total: "true", pagination_token: first_page.fetch("meta").fetch("next_pagination_token") },
         headers: authorization_headers
 
     assert_response :success
@@ -147,7 +167,7 @@ class ListTotalCountTest < ActionDispatch::IntegrationTest
     assert_response :success
     listed = JSON.parse(response.body)
     assert_equal 2, listed.fetch("records").length
-    assert_equal 2, listed.fetch("meta").fetch("total_count")
+    refute listed.fetch("meta").key?("total_count")
     assert_equal %w[resource type records meta], listed.keys
 
     get "/recording_studio_api/api/v1/folders", params: { count: "0" }, headers: authorization_headers
@@ -186,6 +206,13 @@ class ListTotalCountTest < ActionDispatch::IntegrationTest
     get nested_folders_path, headers: authorization_headers
 
     assert_response :success
+    omitted = JSON.parse(response.body)
+    assert_equal %w[limit sort order has_more next_pagination_token], omitted.fetch("meta").keys
+    refute omitted.fetch("meta").key?("total_count")
+
+    get nested_folders_path, params: { include_total: "true" }, headers: authorization_headers
+
+    assert_response :success
     listed = JSON.parse(response.body)
     assert_equal %w[limit sort order has_more next_pagination_token total_count], listed.fetch("meta").keys
     refute listed.fetch("meta").key?("filter")
@@ -199,7 +226,7 @@ class ListTotalCountTest < ActionDispatch::IntegrationTest
       assert_equal '{"total_count":3}', response.body
       assert_empty calls
 
-      get nested_folders_path, headers: authorization_headers
+      get nested_folders_path, params: { include_total: "true" }, headers: authorization_headers
       assert_response :success
       hidden = JSON.parse(response.body)
       assert_equal [], hidden.fetch("records")
@@ -244,34 +271,35 @@ class ListTotalCountTest < ActionDispatch::IntegrationTest
     create_folder("Archive")
     create_folder("Market notes")
 
-    unfiltered = list_folders
+    unfiltered = list_folders(include_total: "true")
     assert_equal unfiltered.fetch("records").length, unfiltered.fetch("meta").fetch("total_count")
     assert_equal 3, unfiltered.fetch("meta").fetch("total_count")
-    assert_count_sql('SELECT COUNT(*) FROM "recording_studio_recordings"', params: {})
-    refute_count_sql(/COUNT\(DISTINCT/, params: {})
+    assert_equal 1, count_queries_for({ include_total: "true" }).length
+    assert_count_sql(/MAX\(.+updated_at.+\), COUNT\(\*\)/, params: { include_total: "true" })
+    refute_count_sql(/COUNT\(DISTINCT/, params: { include_total: "true" })
 
-    filtered = list_folders(filter: { name: "Marketing" })
+    filtered = list_folders(filter: { name: "Marketing" }, include_total: "true")
     filtered_names = filtered.fetch("records").map { |row| row.fetch("name") }
     assert_equal ["Marketing"], filtered_names
     assert_equal filtered.fetch("records").length, filtered.fetch("meta").fetch("total_count")
-    assert_count_sql(/COUNT\(DISTINCT/, params: { filter: { name: "Marketing" } })
+    assert_count_sql(/COUNT\(DISTINCT/, params: { filter: { name: "Marketing" }, include_total: "true" })
 
-    searched = list_folders(q: "Market")
+    searched = list_folders(q: "Market", include_total: "true")
     searched_names = searched.fetch("records").map { |row| row.fetch("name") }
     assert_equal ["Market notes", "Marketing"], searched_names.sort
     assert_equal searched.fetch("records").length, searched.fetch("meta").fetch("total_count")
     assert_equal 2, searched.fetch("meta").fetch("total_count")
-    assert_count_sql(/COUNT\(DISTINCT/, params: { q: "Market" })
+    assert_count_sql(/COUNT\(DISTINCT/, params: { q: "Market", include_total: "true" })
 
-    sorted = list_folders(sort: "name", order: "asc")
+    sorted = list_folders(sort: "name", order: "asc", include_total: "true")
     sorted_names = sorted.fetch("records").map { |row| row.fetch("name") }
     sort_names = ["Archive", "Market notes", "Marketing"]
     database_order = Folder.where(name: sort_names).order(:name).pluck(:name)
     assert_equal database_order, sorted_names
     assert_equal sort_names.sort, sorted_names.sort
     assert_equal sorted.fetch("records").length, sorted.fetch("meta").fetch("total_count")
-    assert_count_sql('SELECT COUNT(*) FROM "recording_studio_recordings"', params: { sort: "name", order: "asc" })
-    assert_page_sql(/INNER JOIN folders recordable_sort_folders/, params: { sort: "name", order: "asc" })
+    assert_count_sql(/MAX\(.+updated_at.+\), COUNT\(\*\)/, params: { sort: "name", order: "asc", include_total: "true" })
+    assert_page_sql(/INNER JOIN folders recordable_sort_folders/, params: { sort: "name", order: "asc", include_total: "true" })
   end
 
   test "a distinct list with no join keeps a distinct count" do
@@ -292,6 +320,7 @@ class ListTotalCountTest < ActionDispatch::IntegrationTest
         pagination_token: nil,
         sort: nil,
         order: nil,
+        include_total: true,
         api: :public,
         scope_key: "client:already-distinct"
       )
@@ -339,6 +368,7 @@ class ListTotalCountTest < ActionDispatch::IntegrationTest
         pagination_token: nil,
         sort: nil,
         order: nil,
+        include_total: true,
         api: :public,
         scope_key: "client:left-join"
       )
@@ -396,6 +426,7 @@ class ListTotalCountTest < ActionDispatch::IntegrationTest
       pagination_token: nil,
       sort: nil,
       order: nil,
+      include_total: true,
       api: :public,
       scope_key: "client:distinct"
     )
@@ -451,7 +482,11 @@ class ListTotalCountTest < ActionDispatch::IntegrationTest
   end
 
   def count_sql_for(params)
-    queries_for(params).find { |sql| sql.match?(/COUNT/i) }
+    count_queries_for(params).first
+  end
+
+  def count_queries_for(params)
+    queries_for(params).grep(/COUNT/i)
   end
 
   def count_sql_for_relation(relation, scope_key)
@@ -471,6 +506,7 @@ class ListTotalCountTest < ActionDispatch::IntegrationTest
         sort: nil,
         order: nil,
         api: :public,
+        include_total: true,
         scope_key: "client:#{scope_key}"
       )
     end
