@@ -303,6 +303,74 @@ class ApiV1RegisteredHandlerScopeTest < ActionDispatch::IntegrationTest
     assert_equal @foreign_folder.id.to_s, @calls.last[:params_parent_id].to_s
   end
 
+  test "an endpoint cannot capture both id and recording_id" do
+    error = assert_raises(RecordingStudioApi::ConfigurationError) do
+      RecordingStudioApi.register_endpoint(
+        :both_ids,
+        http_verb: :get,
+        path: "pages/:recording_id/copies/:id",
+        recordable_type: "Page",
+        handler: endpoint_probe("both")
+      )
+    end
+    assert_includes error.message, "cannot capture both :id and :recording_id"
+
+    opted_out = assert_raises(RecordingStudioApi::ConfigurationError) do
+      RecordingStudioApi.register_endpoint(
+        :both_ids,
+        http_verb: :get,
+        path: "pages/:id/copies/:recording_id",
+        scope_id: false,
+        handler: endpoint_probe("both")
+      )
+    end
+    assert_includes opted_out.message, "cannot capture both :id and :recording_id"
+  end
+
+  test "a nested handler rejects a relationship that is not a direct child collection" do
+    RecordingStudioApi.register_recordable_type_api(
+      "Workspace",
+      relationships: {
+        folder: {
+          source: :children,
+          child_type: "Folder",
+          many: false,
+          serializer: ->(recordable, **) { { name: recordable.name } },
+          output_keys: %i[name]
+        }
+      }
+    )
+    RecordingStudioApi.register_resource_handler("Folder", :show, handler: probe("nested-show"))
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folder/#{@folder_recording.id}", headers: headers
+    assert_response :unprocessable_entity
+    assert_equal "folder is not a direct child collection", JSON.parse(response.body).dig("error", "message")
+    assert_empty @calls
+  end
+
+  test "a nested handler rejects an operation the relationship does not enable" do
+    RecordingStudioApi.register_recordable_type_api(
+      "Workspace",
+      relationships: {
+        folders: {
+          source: :children,
+          child_type: "Folder",
+          many: true,
+          serializer: ->(recordable, **) { { name: recordable.name } },
+          output_keys: %i[name],
+          limit: 20,
+          endpoints: %i[index]
+        }
+      }
+    )
+    RecordingStudioApi.register_resource_handler("Folder", :show, handler: probe("nested-show"))
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders/#{@folder_recording.id}", headers: headers
+    assert_response :unprocessable_entity
+    assert_equal "show is not enabled for folders", JSON.parse(response.body).dig("error", "message")
+    assert_empty @calls
+  end
+
   test "an endpoint id requires a recordable type unless scope_id is false" do
     missing = assert_raises(RecordingStudioApi::ConfigurationError) do
       RecordingStudioApi.register_endpoint(

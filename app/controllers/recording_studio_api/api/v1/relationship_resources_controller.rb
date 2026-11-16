@@ -175,14 +175,19 @@ module RecordingStudioApi
 
         def assert_nested_operation!(operation, role:, include_trashed: false)
           current_access_grant.authorize!(recording: parent_recording, role: role, include_trashed: include_trashed)
-          unless relationship.source == :children && relationship.many
+          assert_direct_child_endpoint!(operation)
+          assert_operation_enabled!(relationship.child_type, operation)
+          relationship_context.authorize_relationship!(parent_recording, relationship_name, relationship)
+        end
+
+        def assert_direct_child_endpoint!(operation, target = relationship)
+          unless target.source == :children && target.many
             raise RecordingStudioApi::UnsupportedActionError,
                   "#{relationship_name} is not a direct child collection"
           end
-          raise RecordingStudioApi::UnsupportedActionError, "#{operation} is not enabled for #{relationship_name}" unless relationship.endpoints.include?(operation)
+          return if target.endpoints.include?(operation.to_sym)
 
-          assert_operation_enabled!(relationship.child_type, operation)
-          relationship_context.authorize_relationship!(parent_recording, relationship_name, relationship)
+          raise RecordingStudioApi::UnsupportedActionError, "#{operation} is not enabled for #{relationship_name}"
         end
 
         def reject_nested_type_or_parent_input!
@@ -213,8 +218,7 @@ module RecordingStudioApi
 
         def nested_resource_handler(operation_name)
           relationship = declared_parent_relationship
-          return unless relationship&.source == :children && relationship.many
-          return unless relationship.endpoints.include?(operation_name.to_sym)
+          return unless relationship&.child_type
 
           registration = RecordingStudioApi.recordable_registration_for(relationship.child_type, api: current_api_key)
           return unless registration&.supports_operation?(operation_name)
@@ -245,8 +249,12 @@ module RecordingStudioApi
         end
 
         def nested_handler_targets(operation_name, registration)
-          return [nil, nil] if RecordingStudioApi::HandlerScope.resource_opt_out?(registration&.owns_scoping?, operation_name)
+          if RecordingStudioApi::HandlerScope.resource_opt_out?(registration&.owns_scoping?, operation_name)
+            assert_direct_child_endpoint!(operation_name, declared_parent_relationship)
+            return [nil, nil]
+          end
 
+          assert_direct_child_endpoint!(operation_name)
           include_trashed = registration.include_trashed
           role = RecordingStudioApi::HandlerScope.resource_role(operation_name)
           if %i[show update destroy].include?(operation_name.to_sym)

@@ -133,6 +133,7 @@ module RecordingStudioApi
 
     def resolve_recording_scope!
       captures = path_segments & RECORDING_ID_TOKENS
+      raise ConfigurationError, "#{name} cannot capture both :id and :recording_id" if captures.size > 1
       raise ConfigurationError, "scope_id requires a path :id or :recording_id for #{name}" if @scope_id == true && captures.empty?
       raise ConfigurationError, "recordable_type is required when #{name} captures :id or :recording_id, or pass scope_id: false" if @scope_id != false && captures.any? && recordable_type.blank?
 
