@@ -386,6 +386,94 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
     assert_equal view_page_recording.id, JSON.parse(response.body).fetch("id")
   end
 
+  test "a view token gets forbidden for invalid input and the contract does not run" do
+    each_titled_action do |name, resource_handler|
+      contract, ran = register_titled_action(name, resource_handler: resource_handler)
+      token, page = access_for(:view, "view-invalid-#{name}")
+
+      post member_action_path(page, name), params: { title: "" }, as: :json, headers: bearer(token)
+
+      assert_response :forbidden, name
+      body = JSON.parse(response.body)
+      assert_equal "forbidden", body.dig("error", "code"), name
+      assert_equal "API access grant is not authorized for this capability", body.dig("error", "message"), name
+      assert_nil body.dig("error", "details"), name
+      assert_equal 0, contract.calls, name
+      assert_empty ran, name
+    end
+  end
+
+  test "an edit token gets invalid input when the contract rejects the body" do
+    each_titled_action do |name, resource_handler|
+      contract, ran = register_titled_action(name, resource_handler: resource_handler)
+      token, page = access_for(:edit, "edit-invalid-#{name}")
+
+      post member_action_path(page, name), params: { title: "" }, as: :json, headers: bearer(token)
+
+      assert_response :unprocessable_entity, name
+      body = JSON.parse(response.body)
+      assert_equal "invalid_input", body.dig("error", "code"), name
+      assert_equal "Invalid input for action #{name}", body.dig("error", "message"), name
+      assert_includes body.dig("error", "details"), "title cannot be blank", name
+      assert_equal 1, contract.calls, name
+      assert_empty ran, name
+    end
+  end
+
+  test "an edit token with valid input runs the handler" do
+    each_titled_action do |name, resource_handler|
+      contract, ran = register_titled_action(name, resource_handler: resource_handler)
+      token, page = access_for(:edit, "edit-valid-#{name}")
+
+      post member_action_path(page, name), params: { title: "Hello" }, as: :json, headers: bearer(token)
+
+      assert_response :success, name
+      assert_equal "Hello", JSON.parse(response.body).fetch("title"), name
+      assert_equal page.id, JSON.parse(response.body).fetch("id"), name
+      assert_equal 1, contract.calls, name
+      assert_equal ["Hello"], ran, name
+    end
+  end
+
+  test "a disabled action is rejected before the contract runs" do
+    each_titled_action do |name, resource_handler|
+      contract, ran = register_titled_action(name, resource_handler: resource_handler, enabled: false)
+      view_token, view_page = access_for(:view, "view-disabled-#{name}")
+      edit_token, edit_page = access_for(:edit, "edit-disabled-#{name}")
+      hidden = create_page_recording(root_recording: create_access_recording_for(user: create_user).first)
+
+      post member_action_path(view_page, name), params: { title: "" }, as: :json, headers: bearer(view_token)
+
+      assert_response :forbidden, name
+      forbidden = JSON.parse(response.body)
+      assert_equal "forbidden", forbidden.dig("error", "code"), name
+      assert_equal "API access grant is not authorized for this capability", forbidden.dig("error", "message"), name
+      assert_nil forbidden.dig("error", "details"), name
+      refute_includes response.body, "not enabled", name
+      refute_includes response.body, "cannot be blank", name
+
+      post member_action_path(hidden, name), params: { title: "" }, as: :json, headers: bearer(edit_token)
+
+      assert_response :not_found, name
+      missing = JSON.parse(response.body)
+      assert_equal "not_found", missing.dig("error", "code"), name
+      assert_equal "Resource was not found in this API scope", missing.dig("error", "message"), name
+      refute_includes response.body, "not enabled", name
+      refute_includes response.body, name.to_s, name
+
+      post member_action_path(edit_page, name), params: { title: "" }, as: :json, headers: bearer(edit_token)
+
+      assert_response :unprocessable_entity, name
+      disabled = JSON.parse(response.body)
+      assert_equal "unsupported_action", disabled.dig("error", "code"), name
+      assert_equal "#{name} is not enabled for Page", disabled.dig("error", "message"), name
+      assert_nil disabled.dig("error", "details"), name
+      refute_includes response.body, "cannot be blank", name
+      assert_equal 0, contract.calls, name
+      assert_empty ran, name
+    end
+  end
+
   test "uses a host action role resolver" do
     edit_user = create_user(email: "resolver-member-actions@example.com")
     edit_root_recording, edit_access_recording = create_access_recording_for(user: edit_user, role: :edit)
@@ -405,6 +493,51 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
 
   def authorization_headers
     { "Authorization" => "Bearer #{@access_token}" }
+  end
+
+  def bearer(token)
+    { "Authorization" => "Bearer #{token}" }
+  end
+
+  def member_action_path(page, action_name)
+    "/recording_studio_api/api/v1/pages/#{page.id}/actions/#{action_name}"
+  end
+
+  def each_titled_action
+    yield :rename, false
+    yield :handled_rename, true
+  end
+
+  def access_for(role, name)
+    root, access = create_access_recording_for(user: create_user, role: role)
+    page = create_page_recording(root_recording: root)
+    token = issue_oauth_access_token_for(access_recording: access, name: name)
+    [token, page]
+  end
+
+  def register_titled_action(name, resource_handler:, enabled: true)
+    contract = CountingInputContract.new
+    ran = []
+    RecordingStudioApi.register_capability_action(
+      name,
+      capability: :echoable,
+      http_verb: :post,
+      required_role: :edit,
+      input_contract: contract,
+      handler: lambda { |context|
+        ran << context.params[:title]
+        { id: context.recording.id, title: context.params[:title] }
+      },
+      serializer: ->(result) { result }
+    )
+    if resource_handler
+      RecordingStudioApi.register_resource_handler("Page", name, handler: lambda { |context|
+        ran << context.params[:title]
+        { json: { id: context.recording.id, title: context.params[:title] }, status: :ok }
+      })
+    end
+    RecordingStudioApi.register_recordable_type_api("Page", auto_capability_actions: false) unless enabled
+    [contract, ran]
   end
 
   def issue_named_api_token(api:, name:)
@@ -427,6 +560,20 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
     raise token_result.error unless token_result.success?
 
     token_result.value.fetch(:access_token)
+  end
+end
+
+class CountingInputContract < RecordingStudioApi::ActionInputContract
+  attr_reader :calls
+
+  def initialize
+    super(fields: { title: { type: :string, required: true, allow_blank: false } })
+    @calls = 0
+  end
+
+  def call(raw_params)
+    @calls += 1
+    super
   end
 end
 

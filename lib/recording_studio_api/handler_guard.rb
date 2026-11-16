@@ -19,8 +19,10 @@ module RecordingStudioApi
         result_for(recording)
       end
 
-      def capability!(access_grant:, api_client:, recordable_type:, action:, id:, registration:)
+      def capability!(access_grant:, api_client:, recordable_type:, action:, id:, registration:, before_authorize: nil)
         source = registration || action
+        # An owns_scoping read yields nil and returns. The handler owns scoping.
+        # Lookup, before_authorize, and authorize! do not run. The block still runs.
         if source.owns_scoping? && dispatch_read?(action, recording: nil, api_client:, access_grant:)
           yield nil if block_given?
           return empty_result
@@ -35,9 +37,12 @@ module RecordingStudioApi
           id:
         )
         recording = find_recording!(access_grant:, id:, recordable_type:, include_trashed:)
-        yield recording if block_given?
         role = action_role(action, recording:, api_client:, access_grant:)
+        disabled_action = disabled_action_error(before_authorize, recording)
         authorize_recording!(access_grant, recording, role, include_trashed)
+        raise disabled_action if disabled_action
+
+        yield recording if block_given?
         result_for(recording)
       end
 
@@ -57,6 +62,15 @@ module RecordingStudioApi
       end
 
       private
+
+      def disabled_action_error(check, recording)
+        return if check.nil?
+
+        check.call(recording)
+        nil
+      rescue UnsupportedActionError => e
+        e
+      end
 
       def include_trashed_for?(source:, action:, access_grant:, api_client:, recordable_type:, id:)
         return include_trashed?(source, role: nil) if source.trashed_semantics.nil?

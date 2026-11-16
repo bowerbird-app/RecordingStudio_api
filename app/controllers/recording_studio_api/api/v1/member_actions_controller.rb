@@ -26,7 +26,6 @@ module RecordingStudioApi
           handler = RecordingStudioApi.resource_handler(recordable_type, action.name, api: current_api_key)
           if handler
             registration = RecordingStudioApi.resource_handler_registration(recordable_type, action.name, api: current_api_key)
-            assert_action_enabled!(action, recordable_type)
             handler_context = member_handler_context(action, recordable_type, registration)
             result = handler.call(handler_context)
             render json: result.fetch(:json), status: result.fetch(:status, :ok)
@@ -54,22 +53,19 @@ module RecordingStudioApi
         end
 
         def member_handler_context(action, recordable_type, registration)
-          context = nil
-          RecordingStudioApi::HandlerGuard.capability!(
-            access_grant: current_access_grant,
-            api_client: current_api_client,
-            recordable_type: recordable_type,
-            action: action,
-            id: params[:id],
-            registration: registration
-          ) do |recording|
-            context = handler_action_context(action, recordable_type, recording: recording)
+          member_action_context(action, recordable_type, registration: registration) do |recording|
+            handler_action_context(action, recordable_type, recording: recording)
           end
-          context
         end
 
         def capability_action_context(action)
           recordable_type = resolve_recordable_type!
+          member_action_context(action, recordable_type, registration: nil) do |recording|
+            action_context(action, recording: recording, ignored_keys: ROUTE_PARAM_KEYS)
+          end
+        end
+
+        def member_action_context(action, recordable_type, registration:)
           context = nil
           RecordingStudioApi::HandlerGuard.capability!(
             access_grant: current_access_grant,
@@ -77,12 +73,18 @@ module RecordingStudioApi
             recordable_type: recordable_type,
             action: action,
             id: params[:id],
-            registration: nil
+            registration: registration,
+            before_authorize: ->(recording) { assert_member_action_enabled!(action, recording, recordable_type) }
           ) do |recording|
-            assert_action_enabled!(action, recording&.recordable_type || recordable_type)
-            context = action_context(action, recording: recording)
+            # owns_scoping reads yield nil before lookup and authorize!.
+            assert_member_action_enabled!(action, recording, recordable_type) if recording.nil?
+            context = yield(recording)
           end
           context
+        end
+
+        def assert_member_action_enabled!(action, recording, recordable_type)
+          assert_action_enabled!(action, recording&.recordable_type || recordable_type)
         end
 
         def handler_action_context(action, recordable_type, recording:)

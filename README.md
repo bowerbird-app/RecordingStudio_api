@@ -783,8 +783,9 @@ same scoped `recording`, plus:
 - `credential`, `access_recording`, `root_recording`
 
 The member action's `required_role` is the role passed to `authorize!`.
-Route keys are omitted from a capability handler's params before the input
-contract runs. `include_trashed`, `owns_scoping`, and `trashed_semantics` on
+`authorize!` runs before the input contract. Route keys are omitted from a
+capability handler's params before the contract runs. `include_trashed`,
+`owns_scoping`, and `trashed_semantics` on
 `register_capability_action` follow the same rules. Routes without a
 per-type handler keep the shared lookup and operations.
 
@@ -824,18 +825,28 @@ RecordingStudioApi::HandlerGuard.endpoint!(
 Each call returns `recording` and `parent_recording`. Flat routes leave
 `parent_recording` nil. Pass the resource-handler registration into
 `capability!` when a per-type handler supplies the scope flags. Pass
-`registration: nil` when the capability action carries them. `capability!`
-takes an optional block that runs after the recording is resolved and before
-`authorize!`.
+`registration: nil` when the capability action carries them.
 
-An `owns_scoping` read, a flat index or create, and an endpoint with
-`scope_id: false` or no recording id return a nil recording. `show`,
-`update`, `destroy`, capability actions, and id-scoped endpoints load through
-`ScopedRecording.find!` and `authorize!`. The role is `:view` for index, show,
-and GET, and `:edit` otherwise, unless `required_role:` or
-`capability_action_role_for` says otherwise. `include_trashed` and
-`trashed_semantics` go through `HandlerScope.dispatch_include_trashed?`. A
-blank id on a scoped path raises `NotFoundError`.
+`capability!` looks up the recording, runs an optional `before_authorize`
+check, calls `authorize!`, then yields. The block is where the handler
+context and the input contract run. A token that fails `authorize!` gets 403
+and the contract does not run. `before_authorize` checks that the action is
+enabled for `recording.recordable_type` after lookup and before `authorize!`.
+It raises `UnsupportedActionError` only when `authorize!` would succeed. When
+the token would get 403, that 403 is the response. A missing recording is 404
+from the lookup, before the check.
+
+An `owns_scoping` read is the exception. `capability!` yields nil and returns
+without lookup, `before_authorize`, or `authorize!`. The handler owns scoping,
+and the block still runs with a nil recording. A flat index or create, and an
+endpoint with `scope_id: false` or no recording id, also return a nil
+recording. `show`, `update`, `destroy`, capability actions, and id-scoped
+endpoints load through `ScopedRecording.find!` and `authorize!`. The role is
+`:view` for index, show, and GET, and `:edit` otherwise, unless
+`required_role:` or `capability_action_role_for` says otherwise.
+`include_trashed` and `trashed_semantics` go through
+`HandlerScope.dispatch_include_trashed?`. A blank id on a scoped path raises
+`NotFoundError`.
 
 Nested relationship handlers still resolve the parent and child in
 `RelationshipResourcesController`, which also authorizes the relationship.

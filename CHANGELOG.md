@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-11-16
+
+### Fixed
+- Member actions authorize before the input contract runs. A token in the same workspace that lacks the action's role gets 403. The contract does not run, so host contract code does not see that input. Route keys (`api_key`, `api_version`, `member_action`) are omitted before that contract on both the capability action and the per-type handler.
+- A disabled member action is checked after the recording is found and before `authorize!`. A token that would get 404 or 403 gets that response. An authorized token still gets `unsupported_action`.
+
+### Upgrade notes
+- Bump to `1.2.2`. No migration. Routes stay the same.
+- `HandlerGuard.capability!` order is lookup, optional `before_authorize`, `authorize!`, then the block. An `owns_scoping` read still yields nil and skips lookup, `before_authorize`, and `authorize!`. See [UPGRADING.md](UPGRADING.md).
+
 ## [1.2.1] - 2026-11-16
 
 ### Changed
