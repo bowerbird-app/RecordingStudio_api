@@ -220,25 +220,73 @@ class HandlerGuardTest < ActiveSupport::TestCase
     assert_equal page, guard_capability(grant, action, page.id).recording
   end
 
-  test "the capability block runs after lookup and before authorize" do
-    grant, page = open_grant(:view)
+  test "the capability block runs after authorize" do
+    view_grant, page = open_grant(:view)
+    edit_grant, edit_page = open_grant(:edit)
     action = register_action(:echo_block, required_role: :edit)
     seen = []
 
-    assert_raises(RuntimeError) do
-      guard_capability(grant, action, page.id) do |recording|
+    assert_forbidden do
+      guard_capability(view_grant, action, page.id) do |recording|
         seen << recording.id
-        raise "stop before authorize"
       end
     end
-    assert_equal [page.id], seen
+    assert_empty seen
+
+    result = guard_capability(edit_grant, action, edit_page.id) do |recording|
+      seen << recording.id
+    end
+    assert_equal [edit_page.id], seen
+    assert_equal edit_page, result.recording
+  end
+
+  test "before_authorize runs after lookup and a disabled action keeps the 403 or 404" do
+    view_grant, page = open_grant(:view)
+    edit_grant, edit_page = open_grant(:edit)
+    foreign = foreign_page
+    action = register_action(:echo_block, required_role: :edit)
+    checks = []
+    blocked = []
+    check = lambda do |recording|
+      checks << recording.id
+      raise RecordingStudioApi::UnsupportedActionError, "echo_block is not enabled for #{recording.recordable_type}"
+    end
 
     assert_forbidden do
-      guard_capability(grant, action, page.id) do |recording|
-        seen << recording.id
-      end
+      guard_capability(view_grant, action, page.id, before_authorize: check) { blocked << :ran }
     end
-    assert_equal [page.id, page.id], seen
+    assert_equal [page.id], checks
+    assert_empty blocked
+
+    error = assert_raises(RecordingStudioApi::UnsupportedActionError) do
+      guard_capability(edit_grant, action, edit_page.id, before_authorize: check) { blocked << :ran }
+    end
+    assert_equal "echo_block is not enabled for Page", error.message
+    assert_empty blocked
+
+    assert_missing { guard_capability(edit_grant, action, nil, before_authorize: check) }
+    assert_missing { guard_capability(edit_grant, action, foreign.id, before_authorize: check) }
+    assert_equal [page.id, edit_page.id], checks
+  end
+
+  test "an owns_scoping read yields nil and skips before_authorize" do
+    grant, = open_grant(:view)
+    action = register_action(:published, http_verb: :get, required_role: :view, owns_scoping: true)
+    yielded = []
+    checks = []
+
+    result = guard_capability(
+      grant,
+      action,
+      nil,
+      before_authorize: ->(recording) { checks << recording }
+    ) do |recording|
+      yielded << recording
+    end
+
+    assert_nil_guard result
+    assert_equal [nil], yielded
+    assert_empty checks
   end
 
   test "an endpoint with scope_id false or no recording id returns nil" do
@@ -378,7 +426,7 @@ class HandlerGuardTest < ActiveSupport::TestCase
     )
   end
 
-  def guard_capability(grant, action, id, registration: nil, recordable_type: "Page", &)
+  def guard_capability(grant, action, id, registration: nil, recordable_type: "Page", before_authorize: nil, &)
     RecordingStudioApi::HandlerGuard.capability!(
       access_grant: grant,
       api_client: nil,
@@ -386,6 +434,7 @@ class HandlerGuardTest < ActiveSupport::TestCase
       action: action,
       id: id,
       registration: registration,
+      before_authorize: before_authorize,
       &
     )
   end

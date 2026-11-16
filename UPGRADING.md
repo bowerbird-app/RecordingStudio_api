@@ -1,5 +1,23 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.2.2
+
+No migration. Routes stay the same. Member actions authorize before the input contract runs.
+
+1. Bump the host gem to `1.2.2`.
+2. Keep input validation and handler context in the `capability!` block, or after `capability!` returns. The block runs only after `authorize!` succeeds.
+3. Pass an enablement check as `before_authorize`. It runs after lookup and before `authorize!`. Use `recording.recordable_type` (falling back to the route type when the recording is nil).
+
+`capability!` order is lookup, `before_authorize`, `authorize!`, then the block. A token whose role is too low gets `AuthorizationError` (403). The block does not run. A missing id is `NotFoundError` (404) from the lookup, before the check and before the contract.
+
+`before_authorize` raises `UnsupportedActionError` when the action is disabled for the looked-up recording. If `authorize!` would fail, the response is that 403 instead, with the same error shape. If `authorize!` succeeds, the `UnsupportedActionError` is returned. A recording outside the token's scope never reaches the check.
+
+An `owns_scoping` read still yields nil and returns before lookup, `before_authorize`, and `authorize!`. The handler owns scoping. The block still runs, with a nil recording, so a caller can build context for that read. There is no write opt-out.
+
+A dispatcher that calls `capability!` without a block, then builds context from the returned recording, stays valid.
+
+Both member-action paths omit `api_key`, `api_version`, and `member_action` before the input contract. A handler that read those keys from `params` should use the context instead.
+
 ## Upgrading to 1.2.1
 
 No migration. Payloads, auth, and routes stay the same.
@@ -30,7 +48,7 @@ Additive. No migration. REST responses stay the same.
 
 Each method returns `recording` and `parent_recording`. Flat routes leave `parent_recording` nil. An `owns_scoping` read, a flat index or create, and an endpoint with `scope_id: false` or no recording id return a nil recording. `show`, `update`, `destroy`, capability actions, and id-scoped endpoints load through `ScopedRecording.find!` and `authorize!`. A blank id on those paths raises `NotFoundError`.
 
-`capability!` accepts an optional block. The block runs after the recording is resolved and before `authorize!`. The member-action controller uses it so enablement and input validation still happen before authorization. A raise from the block skips `authorize!`.
+`capability!` accepts an optional block. From 1.2.2 the block runs after `authorize!`. See Upgrading to 1.2.2.
 
 Nested relationship handlers still resolve the parent and child in `RelationshipResourcesController`. That path also authorizes the relationship.
 
