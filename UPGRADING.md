@@ -1,11 +1,10 @@
 # Upgrading RecordingStudioApi
 
-## Unreleased (0.26.0)
+## Upgrading to 0.26.0
 
 Registered handlers receive the route recording already scoped to the token.
-No migration. The gem version is not bumped in this change. There is no
-write opt-out. A write that must cross roots is a product decision still
-pending.
+Bump to `0.26.0`. No migration. There is no write opt-out. A write that
+must cross roots is a product decision still pending.
 
 1. Read `context.recording` or `context.parent_recording` in a handler.
    Do not load a route `id`, `parent_id`, or `relationship_id` with
