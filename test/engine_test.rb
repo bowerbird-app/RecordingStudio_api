@@ -345,6 +345,53 @@ class EngineTest < Minitest::Test
     assert_equal [:ReportsController], RecordingStudioApi::Engine.send(:extension_keys_for, plain)
   end
 
+  def test_complete_request_clears_admin_credential_cache_when_admin_is_loaded
+    require "recording_studio_api/admin/queries/admin_api_credentials_query"
+
+    cleared = false
+    RecordingStudioApi::Admin.stub(:available?, true) do
+      RecordingStudioApi::Admin::Queries::AdminApiCredentialsQuery.stub(:clear_cache!, -> { cleared = true }) do
+        RecordingStudioApi::Engine.complete_request!
+      end
+    end
+
+    assert cleared
+  end
+
+  def test_complete_request_skips_admin_queries_when_admin_is_absent
+    queries_defined = RecordingStudioApi::Admin.const_defined?(:Queries, false)
+    queries = RecordingStudioApi::Admin.send(:remove_const, :Queries) if queries_defined
+
+    RecordingStudioApi::Admin.stub(:available?, false) do
+      assert_nil RecordingStudioApi::Engine.complete_request!
+    end
+  ensure
+    RecordingStudioApi::Admin.const_set(:Queries, queries) if queries_defined
+  end
+
+  def test_complete_request_does_not_swallow_admin_cache_errors
+    require "recording_studio_api/admin/queries/admin_api_credentials_query"
+
+    RecordingStudioApi::Admin.stub(:available?, true) do
+      RecordingStudioApi::Admin::Queries::AdminApiCredentialsQuery.stub(:clear_cache!, -> { raise "cache failed" }) do
+        error = assert_raises(RuntimeError) { RecordingStudioApi::Engine.complete_request! }
+        assert_equal "cache failed", error.message
+      end
+    end
+  end
+
+  def test_request_completion_callback_runs_complete_request
+    require "active_support/executor"
+
+    calls = 0
+    RecordingStudioApi::Engine.stub(:complete_request!, -> { calls += 1 }) do
+      find_initializer("recording_studio_api.flush_request_log_batches").block.call
+      ActiveSupport::Executor.wrap { nil }
+    end
+
+    assert_operator calls, :>=, 1
+  end
+
   def test_register_default_capability_actions_delegates_move_to_moveable
     RecordingStudioApi.register_default_capability_actions!
 

@@ -1,5 +1,16 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.1.1
+
+No migration. Payloads, auth, and routes stay the same.
+
+1. Bump the host gem to `1.1.1`.
+2. Delete eager-load workarounds for `RecordingStudioApi::AdminApi`.
+
+API declares and registers `AdminApi` only when a configured admin root class is loaded. The default name is `AdminRoot`. A host with no admin root does not set `admin_root_recordable_type_names` to `[]` and does not add `RecordingStudioApi::AdminApi` to `recordable_types`. A type left in that list without a declaration fails `RecordingStudio.validate_recordable_declarations!`.
+
+Request completion clears the admin credential query cache only when Recording Studio Admin is loaded.
+
 ## Upgrading to 1.1.0
 
 Additive. No migration. Existing registrations keep the same payloads, auth, and routes.

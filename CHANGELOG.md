@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-11-16
+
+### Fixed
+- Request completion clears the admin credential query cache only when Recording Studio Admin is loaded. Hosts without that gem no longer rescue and log a missing constant on every request.
+- Eager load declares `RecordingStudioApi::AdminApi` only when a configured admin root class is loaded. Hosts without that root no longer clear `admin_root_recordable_type_names` or register the type themselves.
+
+### Upgrade notes
+- Bump to `1.1.1`. No migration.
+- Delete workarounds that set `admin_root_recordable_type_names` to `[]` and add `RecordingStudioApi::AdminApi` to `recordable_types` only to satisfy eager load. With no admin root class loaded, API does not declare or register `AdminApi`. Leaving it in `recordable_types` without a declaration fails `validate_recordable_declarations!`.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.1.0] - 2026-11-16
 
 ### Added

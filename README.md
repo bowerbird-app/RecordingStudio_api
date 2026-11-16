@@ -419,7 +419,11 @@ bin/rails generate recording_studio_api:admin_screens \
 
 This adds RecordingStudioAdmin routes and section declarations only. RecordingStudioApi owns and
 registers the shared screens, widgets, queries, and state-changing credential controllers, so gem
-upgrades do not leave copied host files behind. Named surfaces pass an API context into those shared
+upgrades do not leave copied host files behind. `RecordingStudioApi::AdminApi` is declared and added
+to `recordable_types` only when a configured admin root class is loaded. The default name is
+`AdminRoot` (`admin_root_recordable_type_names`). A host with no admin root leaves that setting
+alone and does not list `AdminApi` itself. Request completion clears the admin credential query
+cache only when Recording Studio Admin is loaded. Named surfaces pass an API context into those shared
 definitions and remain independently authorized, configured, and filtered. Keeping `operations` out
 of `--user-apis` makes it available only from the site administration root. Every recordable used as
 an API credential access point must enable Recording Studio's `api_access_point` capability; the gem

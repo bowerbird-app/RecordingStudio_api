@@ -154,10 +154,7 @@ module RecordingStudioApi
       next unless defined?(ActiveSupport::Executor)
 
       ActiveSupport::Executor.to_complete do
-        RecordingStudioApi::ApiRequestLogBatch.flush!
-        RecordingStudioApi::Admin::Queries::AdminApiCredentialsQuery.clear_cache!
-      rescue StandardError => e
-        Rails.logger.warn("[RecordingStudioApi] request completion cleanup failed: #{e.class}: #{e.message}")
+        RecordingStudioApi::Engine.complete_request!
       end
     end
 
@@ -197,6 +194,22 @@ module RecordingStudioApi
 
     initializer "recording_studio_api.metrics" do
       config.to_prepare { RecordingStudioApi::Metrics.register! }
+    end
+
+    def self.complete_request!
+      ApiRequestLogBatch.flush!
+      clear_admin_credentials_query_cache!
+    end
+
+    def self.clear_admin_credentials_query_cache!
+      return unless admin_loaded?
+
+      Admin::Queries::AdminApiCredentialsQuery.clear_cache!
+    end
+
+    def self.admin_loaded?
+      defined?(Admin) && Admin.respond_to?(:available?) && Admin.available? &&
+        defined?(Admin::Queries::AdminApiCredentialsQuery)
     end
 
     def self.register_recordable_types!
