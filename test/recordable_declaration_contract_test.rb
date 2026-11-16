@@ -40,4 +40,45 @@ class RecordableDeclarationContractTest < ActiveSupport::TestCase
     assert_equal ["RecordingStudioApi::ApiCredential"], RecordingStudio.allowed_parent_types_for("RecordingStudioApi::ApiAccessToken")
     assert_equal ["AdminRoot"], RecordingStudio.allowed_parent_types_for("RecordingStudioApi::AdminApi")
   end
+
+  test "admin api declares and registers when the admin root is loaded" do
+    previous = RecordingStudio::RecordableDeclarations.declarations
+    previous_types = RecordingStudio.configuration.recordable_types.dup
+    RecordingStudio::RecordableDeclarations.replace_declarations!(previous.except("RecordingStudioApi::AdminApi"))
+    RecordingStudio.configuration.recordable_types = previous_types.reject { |type| type.to_s == "RecordingStudioApi::AdminApi" }
+    RecordingStudioApi.configuration.admin_root_recordable_type_names = ["AdminRoot"]
+
+    assert AdminRoot
+    RecordingStudioApi::AdminApi.declare_recordable!
+    RecordingStudioApi::Engine.register_recordable_types!
+
+    assert_equal ["AdminRoot"], RecordingStudio.allowed_parent_types_for("RecordingStudioApi::AdminApi")
+    assert_includes RecordingStudio.configuration.recordable_types.map(&:to_s), "RecordingStudioApi::AdminApi"
+    assert RecordingStudio.validate_recordable_declarations!
+  ensure
+    RecordingStudio.configuration.recordable_types = previous_types if previous_types
+    RecordingStudioApi.configuration.admin_root_recordable_type_names = ["AdminRoot"]
+    RecordingStudio::RecordableDeclarations.replace_declarations!(previous) if previous
+    RecordingStudioApi::Engine.register_recordable_types!
+  end
+
+  test "admin api declaration is a no-op when the admin root is absent" do
+    previous = RecordingStudio::RecordableDeclarations.declarations
+    previous_types = RecordingStudio.configuration.recordable_types.dup
+    RecordingStudio::RecordableDeclarations.replace_declarations!(previous.except("RecordingStudioApi::AdminApi"))
+    RecordingStudio.configuration.recordable_types = previous_types.reject { |type| type.to_s == "RecordingStudioApi::AdminApi" }
+    RecordingStudioApi.configuration.admin_root_recordable_type_names = ["MissingAdminRoot"]
+
+    RecordingStudioApi::AdminApi.declare_recordable!
+    RecordingStudioApi::Engine.register_recordable_types!
+
+    refute RecordingStudio::RecordableDeclarations.declarations.key?("RecordingStudioApi::AdminApi")
+    refute_includes RecordingStudio.configuration.recordable_types.map(&:to_s), "RecordingStudioApi::AdminApi"
+    assert RecordingStudio.validate_recordable_declarations!
+  ensure
+    RecordingStudio.configuration.recordable_types = previous_types if previous_types
+    RecordingStudioApi.configuration.admin_root_recordable_type_names = ["AdminRoot"]
+    RecordingStudio::RecordableDeclarations.replace_declarations!(previous) if previous
+    RecordingStudioApi::Engine.register_recordable_types!
+  end
 end
