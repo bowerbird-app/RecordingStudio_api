@@ -26,8 +26,7 @@ RecordingStudioApi.configure do |config|
         actor: actor,
         api: api,
         root_recording: root_recording,
-        role: RecordingStudioApi.configuration.access_management_view_role,
-        create: true
+        role: RecordingStudioApi.configuration.access_management_view_role
       )
     end
     api.authentication = :oauth

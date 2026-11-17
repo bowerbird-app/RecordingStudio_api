@@ -84,6 +84,11 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
   test "operations test token page issues an operations-scoped token" do
     _, admin_root_recording = create_admin_root_recording
     create_access_recording(parent_recording: admin_root_recording, user: @user, role: :admin)
+    RecordingStudioApi::Admin::ApiAuthorization.provision!(
+      api: :operations,
+      root_recording: admin_root_recording,
+      actor: @user
+    )
 
     workspace = Workspace.create!(name: "Public-only token scope")
     workspace_recording = RecordingStudio::Recording.create!(recordable: workspace)
@@ -144,6 +149,11 @@ class HomeControllerTest < ActionDispatch::IntegrationTest
   test "operations Scalar docs require the operations admin workspace" do
     _, admin_root_recording = create_admin_root_recording
     create_access_recording(parent_recording: admin_root_recording, user: @user, role: :admin)
+    RecordingStudioApi::Admin::ApiAuthorization.provision!(
+      api: :operations,
+      root_recording: admin_root_recording,
+      actor: @user
+    )
 
     get "/admin/operations-api/docs/v1"
 

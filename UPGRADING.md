@@ -1,5 +1,15 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.13.0
+
+Behavior change. No migration. Authorization checks no longer write, and moving a key does not re-parent it.
+
+1. Bump the host gem to `1.13.0`. Stay on Recording Studio `>= 7.7.0`, `< 8.0` and Accessible `>= 0.50.0`, `< 2.0`.
+2. After the admin root recording exists, call `RecordingStudioApi::Admin::ApiAuthorization.provision!(api:, root_recording:, actor:)` once for each named API, including `public`. It records `RecordingStudioApi::AdminApi` under that root through `RecordingStudio.record!` with an idempotency key. Calling it again returns the same recording.
+3. `authorized?` and `recording_for` only read. A missing recording denies the check. Admin screens, section visibility, documentation access, and protected-API provisioning no longer create it. The admin screen responds 403 until `provision!` has run.
+4. Changing an API key's access point creates a new client with `ProvisionApiClient` on the selected access point and revokes the old client's credentials and access tokens. The previous Access recording is left in place. The edit form still saves with the same fields. The response shows the new secret once.
+5. `Recording#record` on Recording Studio `7.7.0` does not accept `idempotency_key`. Provisioning passes that key to `RecordingStudio.record!`, which is the write `Recording#record` wraps.
+
 ## Upgrading to 1.12.0
 
 Behavior change. No migration. Accessible owns the Access model, and the legacy token digest is gone.

@@ -49,14 +49,17 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
     @admin_root, @admin_root_recording = create_admin_root_recording
     create_access_recording(parent_recording: @admin_root_recording, user: @user, role: :admin)
 
-    @admin_api = RecordingStudioApi::AdminApi.find_or_create_by!(key: "api") do |record|
-      record.name = "Admin API"
-    end
-    @admin_api_recording = RecordingStudio::Recording.unscoped.find_or_create_by!(
-      recordable: @admin_api,
-      root_recording_id: @admin_root_recording.id,
-      parent_recording_id: @admin_root_recording.id
+    @admin_api_recording = RecordingStudioApi::Admin::ApiAuthorization.provision!(
+      api: :public,
+      root_recording: @admin_root_recording,
+      actor: @user
     )
+    RecordingStudioApi::Admin::ApiAuthorization.provision!(
+      api: :operations,
+      root_recording: @admin_root_recording,
+      actor: @user
+    )
+    @admin_api = @admin_api_recording.recordable
 
     ensure_api_request_logs_table!
     RecordingStudioApi::ApiRequestLog.delete_all
@@ -197,7 +200,7 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
     get admin_api_dashboard_path
 
     assert_response :success
-    assert_includes response.body, "Admin API"
+    assert_includes response.body, "Admin Public API"
     assert_includes response.body, "Manage API access"
     assert_includes response.body, "Settings"
     assert_includes response.body, "Rate limiting"
@@ -349,31 +352,28 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Occurred"
   end
 
-  test "creates the admin api section when it is missing for the current admin root" do
+  test "the admin screen does not create an admin api recording when it is missing" do
     admin_api_recordings = RecordingStudio::Recording.unscoped.where(
       parent_recording_id: @admin_root_recording.id,
       recordable_type: "RecordingStudioApi::AdminApi"
     )
+    RecordingStudio::Event.where(recording_id: admin_api_recordings.select(:id)).delete_all
     RecordingStudioApi::AdminApi.where(id: admin_api_recordings.select(:recordable_id)).delete_all
     admin_api_recordings.delete_all
 
+    assert_no_difference -> { RecordingStudioApi::AdminApi.count } do
+      assert_no_difference -> { RecordingStudio::Recording.count } do
+        assert_no_difference -> { RecordingStudio::Event.count } do
+          get admin_api_dashboard_path
+        end
+      end
+    end
+
+    assert_response :forbidden
     assert_nil RecordingStudio::Recording.unscoped.find_by(
       parent_recording_id: @admin_root_recording.id,
       recordable_type: "RecordingStudioApi::AdminApi"
     )
-
-    get admin_api_dashboard_path
-
-    assert_response :success
-
-    created_recording = RecordingStudio::Recording.unscoped.find_by(
-      parent_recording_id: @admin_root_recording.id,
-      recordable_type: "RecordingStudioApi::AdminApi"
-    )
-
-    assert_not_nil created_recording
-    assert_equal @admin_root_recording.id, created_recording.root_recording_id
-    assert_equal "api", created_recording.recordable.key
   end
 
   test "renders the admin api settings page from the configured host route" do

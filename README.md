@@ -46,11 +46,13 @@ existing root. `RecordingStudio.create_root_recording!(recordable, actor:)`
 creates one through the same write path.
 
 API client role edits call `RecordingStudioAccessible::Services::UpdateRecordingAccess`.
-Moving the access point grants on the new access point, re-links
-`ApiClient#access_recording_id`, and revokes the old access in one transaction.
-A refused grant or revoke leaves the previous access in place. Revoke voids
-dependent grants on the old access. The client name and credential expiry are
-columns on this gem's tables.
+Moving the access point creates a new client with `ProvisionApiClient` under a
+new Access grant on the selected recording, then revokes the old client's
+credentials and access tokens. The previous Access recording stays in place.
+A refused provision leaves the previous client, its tokens, and its Access
+unchanged. The edit form still uses Save changes. The response shows the new
+secret once. The client name and credential expiry are columns on this gem's
+tables.
 
 ## Versioning Model
 
@@ -402,8 +404,10 @@ not record an event.
 
 Set `api_management_authorization_required` for trusted APIs. Credential creation then requires both
 the requested RecordingStudioAccessible data grant and management access to that API's `AdminApi`
-recording beneath the configured admin root. Public and unprotected named APIs retain the existing
-access-point delegation behavior.
+recording beneath the configured admin root. Create that recording once with
+`RecordingStudioApi::Admin::ApiAuthorization.provision!` after the admin root exists. Authorization
+checks only read it. A missing recording denies the check and does not create one. Public and
+unprotected named APIs retain the existing access-point delegation behavior.
 
 ### Admin surfaces
 

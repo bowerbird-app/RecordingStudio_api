@@ -56,8 +56,7 @@ module RecordingStudioApi
               actor: context.current_actor,
               api: definition.name,
               root_recording: context.root_recording,
-              role: RecordingStudioApi.configuration.access_management_view_role,
-              create: true
+              role: RecordingStudioApi.configuration.access_management_view_role
             )
           }
 

@@ -27,10 +27,10 @@ class ApiClientManagementPolicyTest < ActiveSupport::TestCase
     )
     grant_access(@admin_section_recording, actor: @delegated_manager, role: :admin, manager_actor: @owner)
 
-    @admin_api_recording = RecordingStudioApi::Admin::ApiAuthorization.recording_for(
+    @admin_api_recording = RecordingStudioApi::Admin::ApiAuthorization.provision!(
       api: :operations,
       root_recording: @admin_root_recording,
-      create: true
+      actor: @owner
     )
     provision = RecordingStudioApi::Services::ProvisionApiClient.call(
       access_point_recording: @admin_section_recording,

@@ -904,47 +904,67 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_includes role_events, "updated"
   end
 
-  test "update moves the access point, records the manager, and voids dependent grants" do
+  test "moving a client to another folder retires the old key and scopes the new one" do
     api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Moving client", role: :edit)
     old_access = api_client.access_recording
+    credential = api_client.credentials.max_by(&:created_at)
+    access_token = RecordingStudioApi::ApiAccessToken.create!(
+      credential: credential,
+      token_digest: "digest_#{SecureRandom.hex(16)}",
+      token_prefix: "atk",
+      expires_at: 1.hour.from_now
+    )
     folder_recording = RecordingStudio::Recording.create!(
       recordable: Folder.create!(name: "Next access point"),
       parent_recording: @workspace_root_recording
     )
-    dependent_user = create_user(email: "dependent-grant@example.com")
-    dependent = RecordingStudioAccessible.grant_access(
-      recording: folder_recording,
-      actor: dependent_user,
-      role: :view,
-      manager_actor: @user,
-      depends_on: old_access
+    page_recording = RecordingStudio::Recording.create!(
+      recordable: Page.create!(title: "Inside the next access point"),
+      parent_recording: folder_recording
     )
-    assert dependent.success?, dependent.error
+    sibling_recording = RecordingStudio::Recording.create!(
+      recordable: Folder.create!(name: "Outside the next access point"),
+      parent_recording: @workspace_root_recording
+    )
+    old_access_snapshot = access_snapshot(old_access)
 
-    move_events = record_hook_actions do
-      patch "/recording_studio_api/api_clients/#{api_client.id}", params: {
-        api_client: {
-          access_point_recording_id: folder_recording.id,
-          role: "edit",
-          api_client_name: "Moving client",
-          expires_at: ""
-        }
+    patch "/recording_studio_api/api_clients/#{api_client.id}", params: {
+      api_client: {
+        access_point_recording_id: folder_recording.id,
+        role: "edit",
+        api_client_name: "Moving client",
+        expires_at: ""
       }
-    end
+    }
 
-    assert_redirected_to "/recording_studio_api/api_clients/#{api_client.id}?close_url=%2F"
-    api_client.reload
-    new_access = api_client.access_recording
+    assert_response :created
+    assert_select %(pre[data-secret-reveal-target="secret"]), count: 1
+    assert_equal old_access_snapshot, access_snapshot(old_access.reload)
+    assert_predicate credential.reload.revoked_at, :present?
+    assert_predicate access_token.reload.revoked_at, :present?
+    refute_predicate credential, :active_for_authentication?
+    refute_predicate access_token, :active_for_authentication?
+    assert_equal old_access.id, api_client.reload.access_recording_id
+
+    new_client = RecordingStudioApi::ApiClient.where.not(id: api_client.id).order(:created_at, :id).last
+    new_access = new_client.access_recording
     assert_equal folder_recording.id, new_access.parent_recording_id
+    assert_equal "edit", new_access.recordable.role.to_s
     assert_not_equal old_access.id, new_access.id
-    assert_nil RecordingStudio::Recording.unscoped.find_by(id: old_access.id)
-    created = new_access.events(actions: "created").first
-    assert_equal @user, created.actor
-    assert_includes move_events, "created"
-    assert_includes move_events, "deleted"
+    new_credential = new_client.credentials.order(:created_at, :id).last
+    assert_nil new_credential.revoked_at
+    assert_predicate new_credential, :active_for_authentication?
 
-    perform_enqueued_jobs
-    assert_nil RecordingStudio::Recording.unscoped.find_by(id: dependent.value.id)
+    visible_ids = RecordingStudioApi::AccessGrant.new(
+      api_client: new_client,
+      credential: new_credential,
+      access_recording: new_access,
+      root_recording: @workspace_root_recording
+    ).accessible_recording_ids
+    assert_includes visible_ids, folder_recording.id
+    assert_includes visible_ids, page_recording.id
+    assert_not_includes visible_ids, sibling_recording.id
+    assert_not_includes visible_ids, @workspace_root_recording.id
   end
 
   test "a refused access move keeps the old access and shows the service error" do
@@ -975,16 +995,24 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_equal @workspace_root_recording.id, api_client.access_recording.parent_recording_id
   end
 
-  test "a refused access revoke rolls back the new grant" do
+  test "a failed move leaves the old client, its tokens, and its access unchanged" do
     api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Stays after revoke", role: :edit)
     old_access = api_client.access_recording
+    credential = api_client.credentials.max_by(&:created_at)
+    access_token = RecordingStudioApi::ApiAccessToken.create!(
+      credential: credential,
+      token_digest: "digest_#{SecureRandom.hex(16)}",
+      token_prefix: "atk",
+      expires_at: 1.hour.from_now
+    )
     folder_recording = RecordingStudio::Recording.create!(
       recordable: Folder.create!(name: "Revoke refused access point"),
       parent_recording: @workspace_root_recording
     )
-    refusal = RecordingStudioAccessible::Services::BaseService::Result.new(success: false, error: "Revoke was refused")
+    old_access_snapshot = access_snapshot(old_access)
+    refusal = RecordingStudio::Services::BaseService::Result.new(success: false, error: "Grant was refused")
 
-    RecordingStudioAccessible::Services::RevokeRecordingAccess.stub(:call, refusal) do
+    RecordingStudioApi::Services::ProvisionApiClient.stub(:call, refusal) do
       patch "/recording_studio_api/api_clients/#{api_client.id}", params: {
         api_client: {
           access_point_recording_id: folder_recording.id,
@@ -996,11 +1024,13 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :unprocessable_entity
-    assert_includes response.body, "Revoke was refused"
+    assert_includes response.body, "Grant was refused"
     api_client.reload
     assert_equal "Stays after revoke", api_client.name
     assert_equal old_access.id, api_client.access_recording_id
-    assert RecordingStudio::Recording.unscoped.exists?(old_access.id)
+    assert_equal old_access_snapshot, access_snapshot(old_access.reload)
+    assert_nil credential.reload.revoked_at
+    assert_nil access_token.reload.revoked_at
     assert_empty RecordingStudio::Recording.unscoped.where(
       parent_recording_id: folder_recording.id,
       recordable_type: "RecordingStudio::Access"
@@ -1200,6 +1230,21 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
 
   private
 
+  def access_snapshot(recording)
+    recordable = recording.recordable
+    {
+      id: recording.id,
+      parent_recording_id: recording.parent_recording_id,
+      root_recording_id: recording.root_recording_id,
+      recordable_id: recording.recordable_id,
+      recordable_type: recording.recordable_type,
+      trashed_at: recording.trashed_at,
+      role: recordable.role.to_s,
+      actor_id: recordable.actor_id,
+      actor_type: recordable.actor_type
+    }
+  end
+
   def record_hook_actions
     hooks = RecordingStudio.configuration.hooks
     actions = []
@@ -1237,10 +1282,10 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     )
     assert delegated_access.success?, delegated_access.error
 
-    RecordingStudioApi::Admin::ApiAuthorization.recording_for(
+    RecordingStudioApi::Admin::ApiAuthorization.provision!(
       api: :operations,
       root_recording: admin_root_recording,
-      create: true
+      actor: owner
     )
     provision = RecordingStudioApi::Services::ProvisionApiClient.call(
       access_point_recording: admin_section_recording,

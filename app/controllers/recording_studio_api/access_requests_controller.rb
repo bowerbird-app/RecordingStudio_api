@@ -66,7 +66,16 @@ module RecordingStudioApi
       @errors << "Requested API access role exceeds your access" unless access_management_policy.can_assign_role?(selected_edit_access_point_recording, @form_values.fetch(:role))
       return render :edit, status: :unprocessable_entity if @errors.any?
 
-      return redirect_to(api_client_path(@api_client, page_nav_close_param), notice: "API access updated.") if persist_access_updates(expires_at)
+      if persist_access_updates(expires_at)
+        if @replacement_payload
+          @payload = @replacement_payload
+          prevent_secret_response_storage!
+          render :create, status: :created
+        else
+          redirect_to api_client_path(@api_client, page_nav_close_param), notice: "API access updated."
+        end
+        return
+      end
 
       @errors << "The API client could not be updated"
       render :edit, status: :unprocessable_entity

@@ -138,8 +138,7 @@ module RecordingStudioApi
           actor: resolved_manager_actor,
           api: api,
           root_recording: root_recording,
-          role: RecordingStudioApi.configuration.access_management_edit_role,
-          create: true
+          role: RecordingStudioApi.configuration.access_management_edit_role
         )
       end
 

@@ -51,8 +51,7 @@ module ApiDummyHelpers # rubocop:disable Metrics/ModuleLength
           actor: actor,
           api: api,
           root_recording: root_recording,
-          role: RecordingStudioApi.configuration.access_management_view_role,
-          create: true
+          role: RecordingStudioApi.configuration.access_management_view_role
         )
       end
       api.default_access = :read_only

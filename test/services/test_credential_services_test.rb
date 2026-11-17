@@ -115,10 +115,10 @@ class TestCredentialServicesTest < ActiveSupport::TestCase
       manager_actor: owner
     )
     assert delegated_access.success?, delegated_access.error
-    RecordingStudioApi::Admin::ApiAuthorization.recording_for(
+    RecordingStudioApi::Admin::ApiAuthorization.provision!(
       api: :operations,
       root_recording: admin_root_recording,
-      create: true
+      actor: owner
     )
 
     assert_no_difference -> { RecordingStudioApi::ApiClient.count } do
