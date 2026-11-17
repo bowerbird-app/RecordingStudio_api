@@ -230,22 +230,6 @@ module RecordingStudioApi
             deleted_via: deleted_via
           )
         end
-
-        def destroy_resource!(target_recording)
-          recordable = target_recording.recordable
-
-          RecordingStudio::Recording.transaction do
-            target_recording.destroy!
-
-            if recordable.respond_to?(:destroy!) && recordable.respond_to?(:persisted?) && recordable.persisted?
-              begin
-                recordable.destroy!
-              rescue ActiveRecord::ReadOnlyRecord
-                # Immutable recordables are removed from API scope by deleting their recording.
-              end
-            end
-          end
-        end
       end
     end
   end
