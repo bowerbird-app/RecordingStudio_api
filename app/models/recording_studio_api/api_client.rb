@@ -18,6 +18,8 @@ module RecordingStudioApi
                inverse_of: false,
                optional: true
 
+    belongs_to :owner, polymorphic: true, optional: true
+
     has_many :credentials,
              class_name: "RecordingStudioApi::ApiCredential",
              dependent: :destroy,

@@ -6,9 +6,9 @@
 
 Companion pins on current main: Trashable `>= 0.17.0, < 2.0` / `v1.0.1`
 (query-only), Admin `v2.18.0`, Moveable `>= 5.0, < 7.0` / `v6.0.0`, Root Switchable
-`v0.16.0`, Cache `v0.7.0` (development/test), Accessible `>= 0.44.0, < 2.0`
-(`tag: v0.45.1`), RecordingStudio `v7.3.0`
-(`>= 7.1.0, < 8.0`), Flatpack `0.1.377`
+`v0.16.0`, Cache `v0.7.0` (development/test), Accessible `>= 0.46.0, < 2.0`
+(`tag: v0.47.0`), RecordingStudio `v7.4.0`
+(`>= 7.4.0, < 8.0`), Flatpack `0.1.377`
 (`tag: v0.1.377`, `>= 0.1.356, < 2.0`),
 Metrics `v0.9.0` (`>= 0.9.0, < 2.0`), Logs `v0.8.0` (`>= 0.8.0, < 2.0`). Recording Studio MCP `v0.17.0`
 allows this gem at `>= 0.11.0, < 0.12`, so it cannot take `0.12.0` or `0.13.0` until
@@ -560,7 +560,7 @@ Each action declares its verb, capability mapping, handler, and serializer so ad
 - `RecordingStudioApi::AccessGrant` carries `api_client`, `credential`, `access_recording`, `root_recording`, and the access actor into handlers
 - capability handlers own authorization and should call `context.access_grant.authorize!` or `RecordingStudioAccessible.authorized?` before doing work
 - the built-in resource and move handlers already perform their own grant checks
-- `AccessGrant#accessible_recordings` is the subtree under the access recording's parent. Collection and member lookups keep that subtree in SQL. Trashed descendants stay out unless the caller passes `include_trashed: true`. The walk stops at a trashed parent, so a kept recording under that parent stays out of the default subtree. `accessible_recording_ids` still returns those ids when a caller asks for the list.
+- `AccessGrant#accessible_recordings` is the owner's live `authorized_recording_ids`, limited to the grant anchor. A root anchor uses Accessible's fast path (`Recording.within`). A nested anchor keeps the parent walk. `authorize!` uses the lower of the grant role and the owner's role on that recording. If the owner loses access, the token loses it on the next request. A key with no owner sees nothing. Trashed recordings stay out unless the caller passes `include_trashed: true`. A kept recording under a trashed ancestor stays visible when the owner can still view it. `accessible_recording_ids` returns those ids when a caller asks for the list.
 - `ApiClient` is the API credential principal for audit metadata, while the `RecordingStudio::Access` actor remains the Recording Studio authorization actor
 - each access recording owns at most one active API credential record
 - raw secrets should only be revealed at creation or rotation time
@@ -1151,7 +1151,7 @@ Token-record contract (if provided):
 - `active_for_authentication?`
 - writable `last_used_at` column (updated with `update_column`)
 
-Both credential and token record must have active, non-trashed RecordingStudio recordables so scope resolution can derive the root recording. Kept/trashed predicates use Recording Studio Trashable (`recording_studio_trashable_kept?` / `recording_studio_trashable_trashed?`). Relation filters use additive `Recording.kept`. SQL and recursive walks use `RecordingStudio.kept_sql`. Pin `recording_studio` `>= 7.1.0`, `< 8.0` and `recording_studio_trashable` `>= 0.17.0`, `< 2.0`, and load `recording_studio_trashable/query` only.
+Both credential and token record must have active, non-trashed RecordingStudio recordables so scope resolution can derive the root recording. Kept/trashed predicates use Recording Studio Trashable (`recording_studio_trashable_kept?` / `recording_studio_trashable_trashed?`). Relation filters use additive `Recording.kept`. SQL filters use `RecordingStudio.kept_sql`. Pin `recording_studio` `>= 7.4.0`, `< 8.0` and `recording_studio_trashable` `>= 0.17.0`, `< 2.0`, and load `recording_studio_trashable/query` only.
 
 ### OAuth resource server
 
@@ -1408,7 +1408,7 @@ with Draft off to load a new pack. See
 | Rails           | ~> 8.1.1 |
 | PostgreSQL      | 16      |
 | TailwindCSS     | 4       |
-| RecordingStudio | v7.3.0 (pinned in `test/dummy/Gemfile`) |
+| RecordingStudio | v7.4.0 (pinned in `test/dummy/Gemfile`) |
 | FlatPack        | v0.1.377 (pinned in `test/dummy/Gemfile`) |
 | Devise          | latest  |
 

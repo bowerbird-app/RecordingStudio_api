@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 module RecordingStudioApi
+  # A token sees the owner's live access, limited to the grant anchor.
+  # `authorize!` uses the lower of the grant role and the owner's role.
   class AccessGrant
     def initialize(api_client:, credential:, access_recording:, root_recording: nil, authorized_by: AuthorizedBy::OMITTED)
       @api_client = api_client
@@ -8,9 +10,6 @@ module RecordingStudioApi
       @access_recording = access_recording
       @root_recording = root_recording
       @authorized_by_source = authorized_by
-      @accessible_scopes = {}
-      @accessible_recordings = {}
-      @accessible_recording_ids = {}
     end
 
     attr_reader :api_client, :credential, :access_recording, :root_recording
@@ -18,12 +17,7 @@ module RecordingStudioApi
     def authorized_by
       return @authorized_by if defined?(@authorized_by)
 
-      @authorized_by =
-        if @authorized_by_source.equal?(AuthorizedBy::OMITTED)
-          AuthorizedBy.actor_for(credential: credential)
-        else
-          @authorized_by_source
-        end
+      @authorized_by = resolve_authorized_by
     end
 
     def access
@@ -31,43 +25,37 @@ module RecordingStudioApi
     end
 
     def actor
-      resolved_access = access
-      resolved_access.actor if resolved_access.respond_to?(:actor)
+      access.actor if access.respond_to?(:actor)
     end
 
     def role
-      resolved_access = access
-      resolved_access.role if resolved_access.respond_to?(:role)
+      access.role if access.respond_to?(:role)
     end
 
     def scope_recording
       access_recording&.parent_recording || root_recording || access_recording&.root_recording
     end
 
+    def owner
+      return @owner if defined?(@owner)
+
+      @owner = owner_from_client || owner_from_actor
+    end
+
     def accessible_recordings(include_trashed: false)
-      @accessible_recordings[include_trashed] ||= begin
-        scope = accessible_scope(include_trashed: include_trashed)
-        RecordingStudio::Recording.unscoped.where(id: scope.relation.select(:id))
-      end
+      visible.relation(include_trashed: include_trashed)
     end
 
     def accessible_recording_ids(include_trashed: false)
-      @accessible_recording_ids[include_trashed] ||= accessible_scope(include_trashed: include_trashed).recording_ids
+      visible.recording_ids(include_trashed: include_trashed)
     end
 
     def authorized?(recording:, role:, include_trashed: false)
-      return false unless recording.present?
-      return false unless role_satisfies?(role)
-      return false unless accessible_scope(include_trashed: include_trashed).include?(recording.id)
+      return false unless recording.present? && ranked?(role)
+      return false unless in_scope?(recording, include_trashed)
 
-      recording_for_access_check = recording_for_accessible_check(recording, include_trashed: include_trashed)
-      return false if actor.nil? || recording_for_access_check.nil?
-
-      RecordingStudioAccessible.authorized?(
-        actor: actor,
-        recording: recording_for_access_check,
-        role: role
-      )
+      held = effective_role(recording, include_trashed: include_trashed)
+      held.present? && RecordingStudio::AccessRoles.satisfies?(role: held, minimum_role: role)
     end
 
     def authorize!(recording:, role:, include_trashed: false)
@@ -78,25 +66,69 @@ module RecordingStudioApi
 
     private
 
-    def accessible_scope(include_trashed:)
-      @accessible_scopes[include_trashed] ||= RecordingStudioApi::AccessibleRecordingScope.new(
-        scope_recording: scope_recording,
-        access_recording: access_recording,
-        include_trashed: include_trashed
-      )
+    def resolve_authorized_by
+      return AuthorizedBy.actor_for(credential: credential) if @authorized_by_source.equal?(AuthorizedBy::OMITTED)
+
+      @authorized_by_source
     end
 
-    def role_satisfies?(required_role)
-      return false if required_role.blank?
+    def owner_from_client
+      client = api_client
+      return if client.nil? || !client.respond_to?(:owner)
 
-      RecordingStudio::AccessRoles.satisfies?(role: role, minimum_role: required_role)
+      client.owner
     end
 
-    def recording_for_accessible_check(recording, include_trashed:)
+    def owner_from_actor
+      person = actor
+      return person.owner if person.is_a?(ApiClient)
+
+      person
+    end
+
+    def visible
+      @visible ||= VisibleRecordings.new(owner: owner, anchor: scope_recording, grant_role: role)
+    end
+
+    def ranked?(required)
+      RecordingStudio::AccessRoles.value_for(required).present?
+    end
+
+    def in_scope?(recording, include_trashed)
+      accessible_recordings(include_trashed: include_trashed).exists?(id: recording.id)
+    end
+
+    def effective_role(recording, include_trashed:)
+      person = owner
+      return if person.nil? || role.blank?
+
+      target = recording_for_role(recording, include_trashed: include_trashed)
+      return if target.nil?
+
+      lower_role(role, RecordingStudioAccessible.role_for(actor: person, recording: target))
+    end
+
+    def lower_role(left, right)
+      left_rank = RecordingStudio::AccessRoles.value_for(left)
+      right_rank = RecordingStudio::AccessRoles.value_for(right)
+      return if left_rank.nil? || right_rank.nil?
+
+      left_rank <= right_rank ? left.to_sym : right.to_sym
+    end
+
+    def recording_for_role(recording, include_trashed:)
       return recording unless include_trashed
-      return recording if recording.recording_studio_trashable_kept?
+      return recording if kept_recording?(recording)
 
       recording.parent_recording || scope_recording
+    end
+
+    def kept_recording?(recording)
+      if recording.respond_to?(:recording_studio_trashable_kept?)
+        recording.recording_studio_trashable_kept?
+      else
+        recording.trashed_at.nil?
+      end
     end
   end
 end

@@ -1,5 +1,23 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.4.0
+
+Behavior change. Run two migrations. A token follows its owner's live access.
+
+1. Bump the host gem to `1.4.0`.
+2. Allow `recording_studio` `>= 7.4.0`, `< 8.0` and `recording_studio_accessible` `>= 0.46.0`, `< 2.0`. This release is developed against Accessible `0.47.0`. That release returns the same ids. A child grant walks the seeded subtree. Hosts on `0.46.0` still satisfy the dependency.
+3. Run this gem's migration that adds `owner_type` and `owner_id` to `recording_studio_api_api_clients`.
+4. Run Recording Studio `7.4.0`'s migration `AddRecordingStudioRecordingsRootTypeCreationIndex` (`index_rs_recordings_on_root_type_created_at_id` on `root_recording_id`, `recordable_type`, `created_at`, `id`).
+5. Set `owner` on each existing API client to the person whose access the key should follow. A key with a null owner sees nothing. New keys store the manager who created them.
+
+A token's visible recordings are `RecordingStudioAccessible.authorized_recording_ids` for that owner, limited to the grant anchor, at view. `authorize!` then uses the lower of the grant role and the owner's role on the recording. The key's own access row does not widen either set. Revoking or downgrading the owner changes the token on the next request. The key is not deleted.
+
+Writes still use the API client as the actor. `HandlerGuard` is unchanged. Callers that authorize through it, including MCP, pick up the new ceiling.
+
+A kept recording under a trashed ancestor stays visible when the owner can still view it. The trashed ancestor itself stays out of the default scope.
+
+Conditional GET is not added. `MAX(updated_at)` on a root still scans the matching rows. The 7.4 index is ordered by `created_at`, and that scan costs more than the index read of one page, so an ETag check is not cheaper than returning the page.
+
 ## Upgrading to 1.3.0
 
 No migration. List responses and included children change.

@@ -98,11 +98,8 @@ module OperationsApi::ScalarTestAuth
     return [] if scope_recording.nil? || access_recording.nil?
 
     allowed_types = RecordingStudioApi.api_recordable_types(api: scalar_test_auth_api)
-    RecordingStudioApi::AccessibleRecordingScope.new(
-      scope_recording: scope_recording,
-      access_recording: access_recording,
-      include_trashed: true
-    ).relation
+    scalar_test_auth_access_grant(scope_recording, access_recording)
+      .accessible_recordings(include_trashed: true)
       .includes(:recordable)
       .where(recordable_type: allowed_types)
       .reorder(:created_at, :id)
@@ -114,6 +111,19 @@ module OperationsApi::ScalarTestAuth
           id: recording.id
         }
       end
+  end
+
+  def scalar_test_auth_access_grant(scope_recording, access_recording)
+    access = access_recording.recordable
+    client = access.actor if access.is_a?(RecordingStudio::Access)
+    client = nil unless client.is_a?(RecordingStudioApi::ApiClient)
+
+    RecordingStudioApi::AccessGrant.new(
+      api_client: client,
+      credential: nil,
+      access_recording: access_recording,
+      root_recording: scope_recording.root_recording || scope_recording
+    )
   end
 
   def scalar_test_auth_timestamp(value)

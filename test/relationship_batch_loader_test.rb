@@ -158,7 +158,7 @@ class RelationshipBatchLoaderTest < ActiveSupport::TestCase
     assert_equal({ limit: 2, has_more: true }, context.relationship_metadata(@primary, "folders"))
   end
 
-  test "does not walk the accessible scope tree for direct children of the page" do
+  test "applies the caller scope when loading direct children" do
     child = create_children(@primary, 1, "Tree").first
     trashed = create_children(@primary, 1, "Trashed").first
     trashed.update_columns(trashed_at: Time.utc(2026, 2, 1))
@@ -185,7 +185,7 @@ class RelationshipBatchLoaderTest < ActiveSupport::TestCase
 
       assert_equal 1, queries.length
       assert_includes queries.first, @primary.id
-      refute_includes queries.first, "scope_tree"
+      assert_includes queries.first, "scope_tree"
       assert_includes queries.first, "trashed_at"
       assert_equal [child], context.relationship_value(@primary, "folders")
     end
