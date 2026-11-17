@@ -87,10 +87,6 @@ module RecordingStudioApi
       )
     end
 
-    def authorized_for_root_recording?(root_recording, access_management_role:)
-      authorized_for_recording?(root_recording, access_management_role: access_management_role)
-    end
-
     def authorized_for_recording?(recording, access_management_role:)
       return false if actor.nil?
       return false if recording.nil?

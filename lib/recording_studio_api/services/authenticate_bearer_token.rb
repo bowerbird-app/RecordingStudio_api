@@ -40,8 +40,6 @@ module RecordingStudioApi
         provided_token = parsed.fetch(:token)
         return [nil, nil] unless Token.digest_matches?(credential.token_digest, provided_token)
 
-        TokenDigest.rehash_if_legacy!(credential, provided_token)
-
         [credential, nil]
       end
     end

@@ -1,5 +1,18 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.12.0
+
+Behavior change. No migration. Accessible owns the Access model, and the legacy token digest is gone.
+
+1. Bump the host gem to `1.12.0`. The gemspec requires `recording_studio_admin` `>= 2.19.0`, `< 3.0`. Development and dummy pins are tag `v2.19.0`. Stay on Recording Studio `>= 7.7.0`, `< 8.0` and Accessible `>= 0.49.0`, `< 2.0`.
+2. Delete any host copy of `RecordingStudio::Access`. This gem no longer defines that model. Accessible loads its own, including the creation guard. Create grants with `RecordingStudioAccessible.grant_access`. A direct `RecordingStudio::Access.create!` is invalid.
+3. `RecordingStudioApi::AccessPolicy` and `AccessManagementPolicy#authorized_for_root_recording?` are gone. Recording checks stay on `authorized_for_recording?`, which calls `RecordingStudioAccessible.authorized?`.
+4. Digests are HMAC-SHA256 with the pepper only. Remove `config.token_digest_legacy_verify`. Unsalted SHA256 digests no longer match and are not rewritten. Rotate those credentials before booting this version.
+5. Add `config/recording_studio_api.yml` if the host does not have one. A missing file, invalid YAML, or a failure while reading `config.x.recording_studio_api` raises during boot. The install template is the starting point.
+6. Delete any host prepend on `RecordingStudioAdmin::Filters::SelectFilter` that applied `default:`. Admin `2.19.0` does that. A missing param uses the default when it is allowed. A blank param, including All, means all.
+
+Two direct `RecordingStudio::Access` reads stay. Accessible has no public method that lists every access recording for an actor without a parent recording. `access_recordings_for_actor` needs that parent. `Integration.actor_access_recordings` and `AccessManagementPolicy#access_recordings` still query `RecordingStudio::Access.where(actor:)`, now on Accessible's model.
+
 ## Upgrading to 1.11.0
 
 Behavior change. No migration. `DELETE` follows the recordable type.

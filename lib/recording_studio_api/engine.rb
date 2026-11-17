@@ -14,7 +14,6 @@ module RecordingStudioApi
     ADMIN_API_RECORDABLE_TYPE_NAME = "RecordingStudioApi::AdminApi"
 
     RECORDABLE_MODEL_DEPENDENCIES = {
-      "RecordingStudio::Access" => "recording_studio/access",
       "RecordingStudioApi::ApiClient" => "recording_studio_api/api_client",
       "RecordingStudioApi::ApiCredential" => "recording_studio_api/api_credential",
       "RecordingStudioApi::ApiAccessToken" => "recording_studio_api/api_access_token"
@@ -89,38 +88,22 @@ module RecordingStudioApi
     end
 
     initializer "recording_studio_api.load_config" do |app|
-      # Load config/recording_studio_api.yml via Rails config_for if present
       if app.respond_to?(:config_for)
-        begin
-          yaml = begin
-            app.config_for(:recording_studio_api)
-          rescue StandardError
-            nil
-          end
-          RecordingStudioApi.configuration.merge!(yaml) if yaml.respond_to?(:each)
-        rescue StandardError => _e
-          # ignore load errors; host app can provide initializer overrides
-        end
+        yaml = app.config_for(:recording_studio_api)
+        RecordingStudioApi.configuration.merge!(yaml) if yaml.respond_to?(:each)
       end
 
-      # Merge Rails.application.config.x.recording_studio_api if present
       if app.config.respond_to?(:x) && app.config.x.respond_to?(:recording_studio_api)
         xcfg = app.config.x.recording_studio_api
         if xcfg.respond_to?(:to_h)
           RecordingStudioApi.configuration.merge!(xcfg.to_h)
-        else
-          begin
-            # try converting OrderedOptions
-            hash = {}
-            xcfg.each_pair { |k, v| hash[k] = v } if xcfg.respond_to?(:each_pair)
-            RecordingStudioApi.configuration.merge!(hash) if hash&.any?
-          rescue StandardError => _e
-            # ignore
-          end
+        elsif xcfg.respond_to?(:each_pair)
+          hash = {}
+          xcfg.each_pair { |key, value| hash[key] = value }
+          RecordingStudioApi.configuration.merge!(hash) if hash.any?
         end
       end
 
-      # Run on_configuration hooks after config is loaded
       RecordingStudioApi.configuration.hooks.run(:on_configuration, RecordingStudioApi.configuration)
     end
 

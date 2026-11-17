@@ -1,0 +1,12 @@
+# Loaded at boot. A missing or invalid file raises.
+shared:
+  timeout: 5
+
+development:
+  timeout: 5
+
+test:
+  timeout: 5
+
+production:
+  timeout: 5

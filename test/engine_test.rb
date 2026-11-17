@@ -51,7 +51,21 @@ class EngineTest < Minitest::Test
     assert_equal true, RecordingStudioApi.configuration.rate_limit_api_enabled
   end
 
-  def test_load_config_handles_errors_and_each_pair_fallback
+  def test_load_config_raises_when_yaml_cannot_load
+    app = Struct.new(:config) do
+      def config_for(_name)
+        raise "missing file"
+      end
+    end.new(Object.new)
+
+    error = assert_raises(RuntimeError) do
+      find_initializer("recording_studio_api.load_config").block.call(app)
+    end
+
+    assert_equal "missing file", error.message
+  end
+
+  def test_load_config_merges_each_pair_when_config_has_no_to_h
     pair_config = Class.new do
       def each_pair
         yield(:timeout, 15)
@@ -60,10 +74,9 @@ class EngineTest < Minitest::Test
 
     xcfg = Struct.new(:recording_studio_api).new(pair_config)
     app_config = Struct.new(:x).new(xcfg)
-
     app = Struct.new(:config) do
       def config_for(_name)
-        raise "missing file"
+        { timeout: 8 }
       end
     end.new(app_config)
 
@@ -72,7 +85,7 @@ class EngineTest < Minitest::Test
     assert_equal 15, RecordingStudioApi.configuration.timeout
   end
 
-  def test_load_config_swallow_each_pair_errors
+  def test_load_config_raises_when_each_pair_fails
     bad_pair_config = Class.new do
       def each_pair
         raise "bad pair"
@@ -87,9 +100,11 @@ class EngineTest < Minitest::Test
       end
     end.new(app_config)
 
-    # Should not raise even if xcfg.each_pair fails.
-    find_initializer("recording_studio_api.load_config").block.call(app)
+    error = assert_raises(RuntimeError) do
+      find_initializer("recording_studio_api.load_config").block.call(app)
+    end
 
+    assert_equal "bad pair", error.message
     assert_equal 8, RecordingStudioApi.configuration.timeout
   end
 
@@ -100,11 +115,10 @@ class EngineTest < Minitest::Test
 
     assert_equal 5, RecordingStudioApi.configuration.timeout
     assert_equal true, RecordingStudioApi.configuration.rate_limit_api_enabled
-    assert_equal false, RecordingStudioApi.configuration.token_digest_legacy_verify
     assert_equal %w[oauth api_pre_auth api_failed_auth], RecordingStudioApi.configuration.rate_limit_fail_closed_buckets
   end
 
-  def test_load_config_ignores_non_enumerable_yaml_and_merge_errors
+  def test_load_config_raises_when_yaml_each_fails
     yaml = Class.new do
       def each
         raise "bad yaml"
@@ -122,9 +136,11 @@ class EngineTest < Minitest::Test
     end.new(app_config)
     app.yaml = yaml
 
-    find_initializer("recording_studio_api.load_config").block.call(app)
+    error = assert_raises(RuntimeError) do
+      find_initializer("recording_studio_api.load_config").block.call(app)
+    end
 
-    assert_equal 22, RecordingStudioApi.configuration.timeout
+    assert_equal "bad yaml", error.message
   end
 
   def test_apply_extension_initializers_register_active_support_on_load_callbacks

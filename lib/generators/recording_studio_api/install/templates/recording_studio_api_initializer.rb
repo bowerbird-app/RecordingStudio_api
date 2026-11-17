@@ -27,10 +27,8 @@ RecordingStudioApi.configure do |config|
   config.access_token_ttl = 1.hour
 
   # Credential and access-token digests are HMAC-SHA256(pepper, token). Defaults to
-  # Rails secret_key_base when token_digest_pepper is unset. Legacy unsalted SHA256
-  # verify is off by default; enable only while rotating/rehashing older digests.
+  # Rails secret_key_base when token_digest_pepper is unset.
   # config.token_digest_pepper = ENV.fetch("RECORDING_STUDIO_API_TOKEN_DIGEST_PEPPER", nil)
-  # config.token_digest_legacy_verify = true
 
   # Require AdminApi management access when provisioning/managing credentials.
   # Disable only for intentionally open access-point delegation on an API.

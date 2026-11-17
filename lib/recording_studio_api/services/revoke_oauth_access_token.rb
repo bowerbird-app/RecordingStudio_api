@@ -43,7 +43,6 @@ module RecordingStudioApi
       def authenticate_client?(credential)
         expected_digest = credential&.token_digest.presence || Token.digest(IssueOauthAccessToken::DUMMY_CLIENT_SECRET)
         secret_matches = Token.digest_matches?(expected_digest, client_secret)
-        TokenDigest.rehash_if_legacy!(credential, client_secret) if secret_matches && credential.present?
 
         return false if credential.blank? || !secret_matches
 

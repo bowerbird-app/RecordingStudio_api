@@ -8,7 +8,7 @@ class RecordingStudioApiTest < Minitest::Test
   end
 
   def test_version_pin
-    assert_equal "1.11.0", ::RecordingStudioApi::VERSION
+    assert_equal "1.12.0", ::RecordingStudioApi::VERSION
   end
 
   def test_metrics_dependency_pins
@@ -17,6 +17,7 @@ class RecordingStudioApiTest < Minitest::Test
     assert_includes gemspec, '"recording_studio", ">= 7.7.0", "< 8.0"'
     assert_includes gemspec, '"recording_studio_trashable", ">= 0.17.0", "< 2.0"'
     assert_includes gemspec, '"recording_studio_accessible", ">= 0.49.0", "< 2.0"'
+    assert_includes gemspec, '"recording_studio_admin", ">= 2.19.0", "< 3.0"'
     assert_includes gemspec, '"flat_pack", ">= 0.1.356", "< 2.0"'
     assert_includes gemspec, '"view_component", ">= 4.14", "< 5"'
     %w[Gemfile.lock test/dummy/Gemfile.lock].each do |path|
@@ -43,7 +44,7 @@ class RecordingStudioApiTest < Minitest::Test
       assert_includes contents, 'RecordingStudio_metrics", tag: "v0.9.0"', path
       assert_includes contents, 'RecordingStudio_logs", tag: "v0.8.0"', path
       assert_includes contents, 'RecordingStudio_icons", tag: "v0.4.0"', path
-      assert_includes contents, 'RecordingStudio_admin", tag: "v2.18.0"', path
+      assert_includes contents, 'RecordingStudio_admin", tag: "v2.19.0"', path
       refute_includes contents, "allow_unauthorized_writes", path
     end
     %w[test/dummy/db/schema.rb test/dummy/db/api_logging_schema.rb].each do |path|

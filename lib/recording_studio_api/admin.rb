@@ -6,8 +6,6 @@ rescue LoadError
   nil
 end
 
-require "recording_studio_api/admin/select_filter_default_patch"
-
 module RecordingStudioApi
   module Admin
     DEFINITION_FILES = %w[
