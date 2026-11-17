@@ -274,8 +274,9 @@ class ListTotalCountTest < ActionDispatch::IntegrationTest
     unfiltered = list_folders(include_total: "true")
     assert_equal unfiltered.fetch("records").length, unfiltered.fetch("meta").fetch("total_count")
     assert_equal 3, unfiltered.fetch("meta").fetch("total_count")
+    assert_empty count_queries_for({})
     assert_equal 1, count_queries_for({ include_total: "true" }).length
-    assert_count_sql(/MAX\(.+updated_at.+\), COUNT\(\*\)/, params: { include_total: "true" })
+    assert_count_sql('SELECT COUNT(*) FROM "recording_studio_recordings"', params: { include_total: "true" })
     refute_count_sql(/COUNT\(DISTINCT/, params: { include_total: "true" })
 
     filtered = list_folders(filter: { name: "Marketing" }, include_total: "true")
@@ -298,7 +299,7 @@ class ListTotalCountTest < ActionDispatch::IntegrationTest
     assert_equal database_order, sorted_names
     assert_equal sort_names.sort, sorted_names.sort
     assert_equal sorted.fetch("records").length, sorted.fetch("meta").fetch("total_count")
-    assert_count_sql(/MAX\(.+updated_at.+\), COUNT\(\*\)/, params: { sort: "name", order: "asc", include_total: "true" })
+    assert_count_sql('SELECT COUNT(*) FROM "recording_studio_recordings"', params: { sort: "name", order: "asc", include_total: "true" })
     assert_page_sql(/INNER JOIN folders recordable_sort_folders/, params: { sort: "name", order: "asc", include_total: "true" })
   end
 

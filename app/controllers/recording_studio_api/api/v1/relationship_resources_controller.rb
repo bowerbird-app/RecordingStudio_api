@@ -14,14 +14,19 @@ module RecordingStudioApi
           end
 
           assert_nested_operation!(:index, role: :view)
-          known_total_count = nested_collection_total
-          return if performed?
 
           pagination = RecordingStudioApi::Services::PaginateResourceCollection.call(
-            **nested_page_options,
+            relation: child_scope,
+            resource: child_resource_name,
+            recordable_type: relationship.child_type,
+            limit: params[:limit],
+            pagination_token: params[:pagination_token],
+            sort: params[:sort],
+            order: params[:order],
             count: params[:count],
             include_total: params[:include_total],
-            known_total_count: known_total_count
+            api: current_api_key,
+            scope_key: "client:#{current_api_client.id}"
           )
           raise RecordingStudioApi::InvalidPaginationTokenError, pagination.error if pagination.failure?
 
@@ -100,57 +105,6 @@ module RecordingStudioApi
         end
 
         private
-
-        def nested_collection_total
-          return nil if RecordingStudioApi::Services::PaginateResourceCollection.flag(params[:count], name: "count")
-
-          normalized = RecordingStudioApi::Services::PaginateResourceCollection.normalize_page!(**nested_page_options)
-          include_total = RecordingStudioApi::Services::PaginateResourceCollection.flag(params[:include_total], name: "include_total")
-          freshness = RecordingStudioApi::CollectionFreshness.new(
-            relation: child_scope,
-            grant_key: nested_grant_key,
-            representation: nested_representation(normalized, include_total)
-          )
-          return nil if RecordingStudioApi::CollectionFreshness.not_modified?(self, freshness)
-
-          include_total ? freshness.total_count : nil
-        end
-
-        def nested_page_options
-          {
-            relation: child_scope,
-            resource: child_resource_name,
-            recordable_type: relationship.child_type,
-            limit: params[:limit],
-            pagination_token: params[:pagination_token],
-            sort: params[:sort],
-            order: params[:order],
-            api: current_api_key,
-            scope_key: "client:#{current_api_client.id}"
-          }
-        end
-
-        def nested_grant_key
-          grant = current_access_grant
-          ["client:#{current_api_client.id}", grant.access_recording&.id, grant.scope_recording&.id, grant.role].join(":")
-        end
-
-        def nested_representation(normalized, include_total)
-          {
-            "api" => current_api_key.to_s,
-            "version" => current_api_version.to_s,
-            "resource" => child_resource_name.to_s,
-            "recordable_type" => relationship.child_type.to_s,
-            "parent_id" => parent_recording.id,
-            "relationship" => relationship_name,
-            "sort" => normalized.fetch(:sort),
-            "order" => normalized.fetch(:order),
-            "limit" => normalized.fetch(:limit),
-            "pagination_token" => params[:pagination_token].to_s,
-            "include" => params[:include].to_s,
-            "include_total" => include_total
-          }
-        end
 
         def parent_recording(include_trashed: false)
           @parent_recordings ||= {}

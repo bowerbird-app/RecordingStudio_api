@@ -871,7 +871,6 @@ module RecordingStudioApi
         {
           "200" => {
             description: "List #{docs_resource_name} visible in scope.",
-            headers: collection_validators,
             content: {
               "application/json" => {
                 schema: { oneOf: [list_schema, count_schema] },
@@ -880,27 +879,6 @@ module RecordingStudioApi
                 )
               }
             }
-          },
-          "304" => {
-            description: "Not modified. If-None-Match or If-Modified-Since matched this page. " \
-                         "The body is empty. Authentication and authorization still run."
-          }
-        }
-      end
-
-      def collection_validators
-        {
-          "ETag" => {
-            description: "Weak validator for this grant, filter, page cursor, and the filtered scope.",
-            schema: { type: "string" }
-          },
-          "Last-Modified" => {
-            description: "Newest updated_at in the filtered scope. HTTP dates use second resolution; ETag is precise.",
-            schema: { type: "string" }
-          },
-          "Cache-Control" => {
-            description: "private, must-revalidate. Shared caches do not store the list.",
-            schema: { type: "string" }
           }
         }
       end

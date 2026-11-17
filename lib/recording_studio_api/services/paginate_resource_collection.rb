@@ -32,13 +32,7 @@ module RecordingStudioApi
         raise RecordingStudioApi::InvalidActionInputError, "#{name} must be true or false"
       end
 
-      def self.normalize_page!(**)
-        new(**).normalize_page!
-      rescue ActiveSupport::MessageVerifier::InvalidSignature, ArgumentError, TypeError
-        raise RecordingStudioApi::InvalidPaginationTokenError, "Invalid pagination token"
-      end
-
-      def initialize(relation:, resource:, recordable_type:, limit:, pagination_token:, sort:, order:, api: :public, scope_key: nil, count: nil, include_total: nil, known_total_count: nil)
+      def initialize(relation:, resource:, recordable_type:, limit:, pagination_token:, sort:, order:, api: :public, scope_key: nil, count: nil, include_total: nil)
         @relation = relation
         @resource = resource.to_s
         @recordable_type = recordable_type.to_s
@@ -52,8 +46,9 @@ module RecordingStudioApi
 
         @count = count
         @include_total = include_total
-        @known_total_count = known_total_count
       end
+
+      private
 
       def normalize_page!
         sortable_context = resolve_sortable_context
@@ -70,10 +65,8 @@ module RecordingStudioApi
         }
       end
 
-      private
-
       attr_reader :relation, :resource, :recordable_type, :limit, :pagination_token, :sort, :order, :api_key, :scope_key, :count,
-                  :include_total, :known_total_count
+                  :include_total
 
       def perform
         include_total?
@@ -118,8 +111,6 @@ module RecordingStudioApi
       end
 
       def total_count
-        return known_total_count unless known_total_count.nil?
-
         @total_count ||= begin
           counted = relation.unscope(:order)
           if plain_count?(counted)

@@ -227,7 +227,7 @@ module RecordingStudioApi
           assert_includes index_endpoint.fetch(:description), "`filter[title]`"
           assert_includes index_endpoint.fetch(:description), "Set `count=true`"
           assert_includes index_endpoint.fetch(:description), "include_total=true"
-          assert_includes index_endpoint.fetch(:description), "If-None-Match"
+          refute_includes index_endpoint.fetch(:description), "If-None-Match"
           assert_includes create_endpoint.fetch(:description), "`Idempotency-Key`"
           refute_includes create_endpoint.fetch(:description), "the caller can access"
         end

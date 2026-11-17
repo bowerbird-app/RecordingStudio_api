@@ -584,7 +584,7 @@ module RecordingStudioApi
           },
           list_operation.fetch(:parameters).find { |parameter| parameter.fetch("name") == "include_total" }
         )
-        assert_equal true, list_operation.fetch(:responses).key?("304")
+        refute list_operation.fetch(:responses).key?("304")
       end
 
       def test_capability_actions_generate_nested_resource_paths

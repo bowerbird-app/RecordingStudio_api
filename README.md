@@ -906,14 +906,6 @@ Search, attribute filters, and any other join keep `COUNT(DISTINCT id)`, so a
 joined row is not counted twice. `count=true` returns only `{ "total_count": N }`
 and does not load records.
 
-List responses send `ETag`, `Last-Modified`, and `Cache-Control: private, must-revalidate`.
-The validator is one aggregate, `max(updated_at)` and the count of the filtered
-scope, plus the grant, the filters, and the page cursor. A later GET with
-`If-None-Match` or `If-Modified-Since` returns 304 and an empty body when that
-validator still matches. Authentication and authorization run before the 304.
-`ETag` changes when any recording in the filtered scope changes. `Last-Modified`
-uses HTTP-date second resolution.
-
 A record's `_meta` reports `limit` and `has_more` for emitted collection
 relationships.
 
