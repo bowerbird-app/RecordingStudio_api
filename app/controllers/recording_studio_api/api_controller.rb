@@ -3,6 +3,7 @@
 module RecordingStudioApi
   class ApiController < ActionController::API
     include RecordingStudioApi::Concerns::ApiContext
+    include RecordingStudioApi::Concerns::BillingDenials
     include RecordingStudioApi::Concerns::BearerAuthentication
     include RecordingStudioApi::Concerns::RateLimiting
     include RecordingStudioApi::Concerns::RequestLogging
@@ -35,7 +36,7 @@ module RecordingStudioApi
     end
 
     rescue_from RecordingStudioApi::InvalidActionInputError do |error|
-      render_error(code: "invalid_input", message: error.message, status: :unprocessable_entity, details: error.details)
+      render_error(code: "invalid_input", message: error.message, status: :unprocessable_entity, details: error.validation_details)
     end
 
     rescue_from RecordingStudioApi::InvalidPaginationTokenError do |error|

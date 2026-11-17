@@ -22,7 +22,10 @@ module RecordingStudioApi
             endpoint: endpoint,
             id: endpoint.recording_id_from(match.captures)
           ).recording
-          result = endpoint.handler.call(endpoint_context(endpoint, match.captures, recording))
+          context = endpoint_context(endpoint, match.captures, recording)
+          result = run_authorized_handler { endpoint.handler.call(context) }
+          return if performed?
+
           render json: serialize_result(endpoint, result)
         end
 

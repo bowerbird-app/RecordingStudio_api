@@ -10,6 +10,12 @@ module RecordingStudioApi
       super(message)
       @details = Array(details)
     end
+
+    # Kept separate from `#details` so a `RecordingStudio::Denial` mixin,
+    # which defines its own `#details`, cannot replace the validation list.
+    def validation_details
+      @details
+    end
   end
 
   class AuthenticationError < Error; end

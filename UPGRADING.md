@@ -1,5 +1,24 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.5.0
+
+No migration. Billing denials with a registered code render as 402 after the caller is authorized.
+
+1. Bump the host gem to `1.5.0`.
+2. Allow `recording_studio` `>= 7.6.0`, `< 8.0`. This release is developed against core `7.6.0`.
+3. Teach a billing gate to return `GateDecision.deny(code:, details:)` or raise an error that includes `RecordingStudio::Denial` and calls `denial(code:, details:)`. Use a code from the registry.
+4. Pass only `message`, `feature`, `limit`, `fix_path`, and `fixable_by` in `details`. `message` is a string of at most 500 characters. `feature` and `fixable_by` are strings of at most 100. `limit` is an integer. `fix_path` starts with one `/` and then only letters, digits, and `-._~/?=&`. A value that contains a Stripe id is dropped. Anything else is dropped.
+5. Register a host or gem code with `config.register_billing_code(:storage_limit_reached)` before relying on 402.
+6. In gem and host tests, `require "recording_studio_api/test_helpers"`, include `RecordingStudioApi::TestHelpers`, and call `assert_billing_denial`.
+
+The API checks authentication, then `HandlerGuard` (or the equivalent `authorize!` on a nested route), then the handler. A caller who fails that check gets 403 or 404. The handler does not run, so its billing denial is not rendered.
+
+A returned `GateDecision` that is denied, and whose code is missing or not registered, renders 403 with `error.code` `forbidden` and no details. A raised error with an unknown or missing code stays on the response it already had: 403 for `AuthorizationError`, `invalid_input` for `InvalidActionInputError`. `Stripe::StripeError` defines `#code` and is not a denial. Development logs a warning when a denial carries an unknown code.
+
+A dispatcher that runs a handler itself, including MCP, calls `HandlerGuard` first and then `RecordingStudioApi::BillingDenial.interpret` on the handler result or the rescued denial. Render 402 only when `interpret` returns a payload. When the handler returns a denied `GateDecision` and `interpret` returns nil, render 403 with no details. Do not call `respond_to?(:code)`.
+
+An `owns_scoping` read skips `authorize!`. That handler authorizes before it returns a billing denial.
+
 ## Upgrading to 1.4.0
 
 Behavior change. Run two migrations. A token follows its owner's live access.

@@ -2,6 +2,7 @@
 
 require_relative "configuration/layout_setting"
 require_relative "configuration/rate_limit_validation"
+require_relative "billing_codes"
 require_relative "action_registry"
 require_relative "registered_endpoint_registry"
 require_relative "api_version_profile"
@@ -70,6 +71,7 @@ module RecordingStudioApi
 
     include LayoutSetting
     include RateLimitValidation
+    include BillingCodeList
 
     attr_reader :hooks, :action_registry, :registered_endpoint_registry, :recordable_registry, :resource_handler_registry, :default_api_version, :api_version_profiles, :capability_action_roles, :logs_summaries_enabled, :layout, :layout_name
 
@@ -148,6 +150,7 @@ module RecordingStudioApi
       @api_request_log_retention_days = 30
       @api_daily_metric_retention_days = nil
       @logs_summaries_enabled = false
+      @billing_codes = BillingCodes::Registry.new
       @hooks = RecordingStudio::Hooks.new
       @action_registry = ActionRegistry.new
       @registered_endpoint_registry = RegisteredEndpointRegistry.new
@@ -219,6 +222,7 @@ module RecordingStudioApi
         api_request_log_retention_days: api_request_log_retention_days,
         api_daily_metric_retention_days: api_daily_metric_retention_days,
         logs_summaries_enabled: logs_summaries_enabled,
+        billing_codes: billing_codes.codes,
         action_registrations: action_registry.to_h,
         registered_endpoint_registrations: registered_endpoint_registry.to_h,
         recordable_registrations: recordable_registry.to_h,
@@ -362,11 +366,6 @@ module RecordingStudioApi
 
     def api_version_profile_for(value)
       api_version_profiles[normalize_api_version(value)]
-    end
-
-    def []=(key, value)
-      setter = "#{key}="
-      public_send(setter, value) if respond_to?(setter)
     end
 
     private
