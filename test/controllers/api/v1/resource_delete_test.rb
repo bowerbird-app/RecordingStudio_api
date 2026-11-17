@@ -62,6 +62,24 @@ class ApiV1ResourceDeleteTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
+  test "delete trashes a folder and its child" do
+    folder_recording = RecordingStudio::Recording.create!(
+      recordable: Folder.create!(name: "Parent folder"),
+      parent_recording: @root_recording
+    )
+    child_recording = RecordingStudio::Recording.create!(
+      recordable: Page.create!(title: "Child page"),
+      parent_recording: folder_recording
+    )
+
+    delete "/recording_studio_api/api/v1/folders/#{folder_recording.id}", headers: authorization_headers
+
+    assert_response :success
+    assert_equal "trashed", JSON.parse(response.body).fetch("deleted_via")
+    assert folder_recording.reload.trashed_at.present?
+    assert child_recording.reload.trashed_at.present?
+  end
+
   test "a view key cannot trash a trashable recording" do
     _view_root, view_access = create_access_recording_for(user: create_user(email: "view-trash@example.com"), role: :view)
     folder_recording = RecordingStudio::Recording.create!(
