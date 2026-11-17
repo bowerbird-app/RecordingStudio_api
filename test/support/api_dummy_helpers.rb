@@ -325,4 +325,17 @@ module ApiDummyHelpers # rubocop:disable Metrics/ModuleLength
       parent_recording: parent
     )
   end
+
+  # A parentless recording of a non-root type. Core stores root_recording_id = id
+  # on every parentless insert, so this row still looks like a root in that column.
+  def create_orphan_recording(parent_recording:, title: "Orphan page #{SecureRandom.hex(4)}")
+    page = Page.create!(title: title)
+    recording = RecordingStudio::Recording.create!(recordable: page, parent_recording: parent_recording)
+    recording.update_columns(
+      parent_recording_id: nil,
+      root_recording_id: recording.id,
+      updated_at: Time.current
+    )
+    recording.reload
+  end
 end

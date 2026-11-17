@@ -407,7 +407,9 @@ the requested RecordingStudioAccessible data grant and management access to that
 recording beneath the configured admin root. Create that recording once with
 `RecordingStudioApi::Admin::ApiAuthorization.provision!` after the admin root exists, or run
 `bin/rails recording_studio_api:provision_admin` once per admin root. The task calls `provision!`
-for every configured API and is safe to run again. Authorization checks only read the recording.
+for every configured API and is safe to run again. It provisions a recording only when that
+recording's type is a declared root and `root_recording_id` is its own id. A parentless recording
+of any other type is skipped. Authorization checks only read the recording.
 A missing recording returns 403 and names `provision!` and `recording_studio_api:provision_admin`. Public and
 unprotected named APIs retain the existing access-point delegation behavior.
 

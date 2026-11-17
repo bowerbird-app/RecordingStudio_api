@@ -285,7 +285,7 @@ module RecordingStudioApi
         return nil if recording_id.blank?
 
         root_recording = RecordingStudio::Recording.includes(:recordable).find_by(id: recording_id)
-        raise RecordingStudioApi::AuthorizationError, "Root scope must reference a root recording" if root_recording.nil? || root_recording.parent_recording_id.present?
+        raise RecordingStudioApi::AuthorizationError, "Root scope must reference a root recording" if root_recording.nil? || !root_recording.root?
 
         authorize_scope_recording_view!(root_recording)
         root_recording
@@ -335,7 +335,7 @@ module RecordingStudioApi
 
       def subtitle_for_scoped_recording(recording, rows)
         access_points = rows.filter_map { |row| row[:access_point_recording] }.uniq { |access_point| access_point.id }
-        return "API access below #{recording_label(access_points.first)}." if access_points.one? && access_points.first.parent_recording_id.present?
+        return "API access below #{recording_label(access_points.first)}." if access_points.one? && !access_points.first.root?
 
         "API access below #{recording_label(recording)}."
       end

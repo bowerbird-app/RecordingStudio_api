@@ -4,8 +4,13 @@ namespace :recording_studio_api do
   desc "Provision the Admin API recording under every admin root. Safe to run again."
   task provision_admin: :environment do
     actor = RecordingStudio.configuration.actor&.call
-    types = RecordingStudioApi::Engine.admin_root_recordable_type_names
-    roots = RecordingStudio::Recording.unscoped.kept.where(parent_recording_id: nil, recordable_type: types).order(:created_at, :id)
+    declared_root_types = RecordingStudio.root_recordable_types.map(&:to_s)
+    types = RecordingStudioApi::Engine.admin_root_recordable_type_names & declared_root_types
+    table = RecordingStudio::Recording.arel_table
+    roots = RecordingStudio::Recording.unscoped.kept
+                                      .where(recordable_type: types)
+                                      .where(table[:root_recording_id].eq(table[:id]))
+                                      .order(:created_at, :id)
 
     roots.each do |root|
       RecordingStudioApi.configuration.each_api do |api|
