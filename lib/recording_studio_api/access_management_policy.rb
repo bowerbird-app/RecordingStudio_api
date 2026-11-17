@@ -146,7 +146,7 @@ module RecordingStudioApi
     def access_scope_recording_for(access_recording)
       return nil if access_recording.nil?
 
-      access_recording.parent_recording || access_recording.root_recording
+      access_recording.parent_recording
     end
 
     def valid_access_roles

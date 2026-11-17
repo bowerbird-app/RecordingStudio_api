@@ -1,5 +1,13 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.14.3
+
+No behavior change beyond 1.14.2. No migration.
+
+1. Bump the host gem to `1.14.3`. Stay on Recording Studio `>= 7.7.0`, `< 8.0`.
+2. Authentication and access checks call `Recording#kept?`. That includes the credential recording check from 1.14.2, the access recording, the API client recording, and the root. Relation filters stay on `Recording.kept`. SQL filters stay on `RecordingStudio.kept_sql`.
+3. A root is `root_recording_or_self`. An Access recording's access point is its parent.
+
 ## Upgrading to 1.14.2
 
 Behavior change. No migration. An API key whose own recording is trashed no longer authenticates.

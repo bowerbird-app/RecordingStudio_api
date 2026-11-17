@@ -107,7 +107,7 @@ module RecordingStudioApi
         def access_point_label(access_recording)
           return "Unknown" if access_recording.nil?
 
-          recording = access_recording.parent_recording || access_recording.root_recording
+          recording = access_recording.parent_recording
           return "Unknown" if recording.nil?
           return recording.recordable_type.to_s.demodulize.underscore.humanize if recording.root?
 

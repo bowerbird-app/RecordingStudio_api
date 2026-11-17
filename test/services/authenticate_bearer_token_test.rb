@@ -42,13 +42,14 @@ class AuthenticateBearerTokenTest < ActiveSupport::TestCase
     client_recording = credential.api_client.recording
     credential_recording = credential.recording
 
-    credential_recording.update_column(:trashed_at, Time.current)
+    RecordingStudio.enable_capability(:trashable, on: credential_recording.recordable_type)
+    credential_recording.recording_studio_trashable_trash!(actor: @user)
     credential.instance_variable_set(:@recording, nil)
 
     assert_nil credential.revoked_at
     refute_predicate credential, :expired?
-    assert_predicate access_recording.reload, :recording_studio_trashable_kept?
-    assert_predicate client_recording.reload, :recording_studio_trashable_kept?
+    assert_predicate access_recording.reload, :kept?
+    assert_predicate client_recording.reload, :kept?
     refute_equal credential_recording.id, access_recording.id
     refute_equal credential_recording.id, client_recording.id
     refute_predicate credential.recording, :kept?

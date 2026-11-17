@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.14.3] - 2026-11-17
+
+### Changed
+- Kept checks call `Recording#kept?`. Relation filters stay on `Recording.kept`.
+- Root resolution calls `Recording#root_recording_or_self`.
+- An Access recording's access point is `parent_recording`.
+
+### Upgrade notes
+- Bump to `1.14.3`. No migration. Stay on Recording Studio `>= 7.7.0`, `< 8.0`.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.14.2] - 2026-11-17
 
 ### Fixed

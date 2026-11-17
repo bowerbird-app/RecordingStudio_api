@@ -1273,7 +1273,7 @@ Token-record contract (if provided):
 - `active_for_authentication?`
 - writable `last_used_at` column (updated with `update_column`)
 
-An API key is active only when its credential recording exists and `Recording#kept?` is true. OAuth access tokens also require a kept recording for the token and the credential. The access recording and the API client recording must pass `recording_studio_trashable_kept?`. Scope resolution loads the root with `RecordingStudio.root_recording_id_for` on the access recording and rejects a trashed root. Relation filters use additive `Recording.kept`. SQL filters use `RecordingStudio.kept_sql`. Pin `recording_studio` `>= 7.7.0`, `< 8.0` and `recording_studio_trashable` `>= 0.17.0`, `< 2.0`, and load `recording_studio_trashable/query` only.
+An API key is active only when its credential recording exists and `Recording#kept?` is true. OAuth access tokens also require a kept recording for the token and the credential. The access recording, the API client recording, and the root must pass `Recording#kept?`. Scope resolution loads the root with `RecordingStudio.root_recording_id_for` on the access recording. Relation filters use additive `Recording.kept`. SQL filters use `RecordingStudio.kept_sql`. Pin `recording_studio` `>= 7.7.0`, `< 8.0` and `recording_studio_trashable` `>= 0.17.0`, `< 2.0`, and load `recording_studio_trashable/query` only.
 
 ### OAuth resource server
 

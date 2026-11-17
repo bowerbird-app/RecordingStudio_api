@@ -77,7 +77,7 @@ module RecordingStudioApi
 
       def access_recording_active?(credential)
         access_recording = credential.effective_access_recording
-        access_recording.present? && access_recording.recording_studio_trashable_kept?
+        access_recording.present? && access_recording.kept?
       end
 
       def resolve_root_recording(credential)
@@ -86,7 +86,7 @@ module RecordingStudioApi
 
         root_id = RecordingStudio.root_recording_id_for(access_recording)
         root_recording = RecordingStudio::Recording.unscoped.find_by(id: root_id)
-        return if root_recording.nil? || root_recording.recording_studio_trashable_trashed?
+        return if root_recording.nil? || !root_recording.kept?
 
         root_recording
       end

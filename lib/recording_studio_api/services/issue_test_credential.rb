@@ -49,7 +49,7 @@ module RecordingStudioApi
             access_token: access_token,
             access_token_record: access_token_record,
             scope_recording: access_point_recording,
-            root_recording: access_point_recording.root_recording || access_point_recording,
+            root_recording: access_point_recording.root_recording_or_self,
             role: provision.value.fetch(:access_recording).recordable.role.to_s,
             api: api_key
           )

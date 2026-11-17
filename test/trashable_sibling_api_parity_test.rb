@@ -260,7 +260,7 @@ class TrashableSiblingApiParityTest < ActiveSupport::TestCase
     assert grant.authorized?(recording: page_recording, role: :view, include_trashed: true)
 
     duck = Struct.new(:parent_recording) do
-      def recording_studio_trashable_kept?
+      def kept?
         false
       end
     end.new(root_recording)
