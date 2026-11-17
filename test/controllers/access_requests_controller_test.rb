@@ -416,6 +416,34 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_response :forbidden
   end
 
+  test "a parentless non-root recording is not a root scope" do
+    orphan = create_orphan_recording(parent_recording: @workspace_root_recording, title: "Scope orphan")
+    controller = access_requests_controller_for(@user)
+
+    assert_nil orphan.parent_recording_id
+    assert_equal orphan.id, orphan.root_recording_id
+    assert_predicate orphan, :orphan?
+    refute_predicate orphan, :root?
+
+    error = assert_raises(RecordingStudioApi::AuthorizationError) do
+      controller.send(:scoped_root_recording, orphan.id)
+    end
+    assert_equal "Root scope must reference a root recording", error.message
+    assert_equal @workspace_root_recording, controller.send(:scoped_root_recording, @workspace_root_recording.id)
+  end
+
+  test "subtitle names an access point that is not a root" do
+    orphan = create_orphan_recording(parent_recording: @workspace_root_recording, title: "Label orphan")
+    controller = access_requests_controller_for(@user)
+    subtitle = controller.send(
+      :subtitle_for_scoped_recording,
+      @workspace_root_recording,
+      [{ access_point_recording: orphan }]
+    )
+
+    assert_equal "API access below Page: Label orphan.", subtitle
+  end
+
   test "index subtitle shows folder name when scoped to a folder root" do
     folder = Folder.create!(name: "Scoped Folder")
     folder_root_recording = RecordingStudio::Recording.create!(recordable: folder)
@@ -1272,6 +1300,12 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
   end
 
   private
+
+  def access_requests_controller_for(user)
+    controller = RecordingStudioApi::AccessRequestsController.new
+    controller.define_singleton_method(:current_user) { user }
+    controller
+  end
 
   def access_snapshot(recording)
     recordable = recording.recordable

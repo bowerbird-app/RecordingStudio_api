@@ -181,6 +181,22 @@ class ApiAccessClientsQueryTest < ActiveSupport::TestCase
     assert_includes ids, folder_key
   end
 
+  test "a parentless recording of a non-root type is not a root for the type filter" do
+    orphan = create_orphan_recording(parent_recording: @root_recording, title: "Query orphan")
+
+    assert_nil orphan.parent_recording_id
+    assert_equal orphan.id, orphan.root_recording_id
+    assert_predicate orphan, :orphan?
+    refute_predicate orphan, :root?
+
+    page_scope = root_recordings_for("Page")
+    workspace_scope = root_recordings_for("Workspace")
+
+    refute_includes page_scope, orphan.id
+    refute_includes workspace_scope, orphan.id
+    assert_includes workspace_scope, @root_recording.id
+  end
+
   test "a workspace admin sees every key in the workspace" do
     tree = build_folder_access
     owner = tree.fetch(:owner)
@@ -199,6 +215,16 @@ class ApiAccessClientsQueryTest < ActiveSupport::TestCase
   def remove_credential!
     credential = @payload.fetch(:credential)
     credential.delete
+  end
+
+  def root_recordings_for(root_type)
+    context = Context.new(
+      params: { root_type: root_type },
+      current_actor: @user,
+      root_recording: @root_recording
+    )
+
+    RecordingStudioApi::Admin::Queries::ApiAccessClientsQuery.new(context).send(:root_recordings_for_type).pluck(:id)
   end
 
   def query(status: nil, api_key: nil)

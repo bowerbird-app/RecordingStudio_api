@@ -255,9 +255,7 @@ module RecordingStudioApi
         end
 
         def root_recordings_for_type
-          RecordingStudio::Recording.unscoped
-                                    .where(parent_recording_id: nil, recordable_type: root_type_filter)
-                                    .kept
+          RecordingStudioApi::Admin::RootRecordings.for_types(root_type_filter)
         end
 
         def recordings_table

@@ -1,5 +1,14 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.14.1
+
+Behavior change. No migration. A missing parent is not a root.
+
+1. Bump the host gem to `1.14.1`. Stay on Recording Studio `>= 7.7.0`, `< 8.0`.
+2. A root is a recording whose type is declared `root: true` and whose `root_recording_id` equals its id (`Recording#root?`). A parentless recording of any other type is an orphan. Core writes `root_recording_id = id` on every parentless insert, so that column alone does not make a root.
+3. A `root_type` filter and `bin/rails recording_studio_api:provision_admin` select `root_recording_id = id` among declared root types only. An orphan is skipped. A configured admin root type that is not declared `root: true` is skipped.
+4. An API keys list `root_recording_id` must pass `root?`. An orphan returns 403. When that list has one access point and the access point is not a root, the subtitle names the access point.
+
 ## Upgrading to 1.14.0
 
 No behavior change for declared roots. No migration.

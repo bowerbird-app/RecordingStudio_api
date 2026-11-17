@@ -82,6 +82,30 @@ class ApiAuthorizationTest < ActiveSupport::TestCase
     end
   end
 
+  test "provision_admin skips a parentless recording of a non-root type" do
+    Current.actor = @actor
+    workspace_root = RecordingStudio::Recording.create!(recordable: Workspace.create!(name: "Orphan workspace"))
+    orphan = create_orphan_recording(parent_recording: workspace_root, title: "Provision orphan")
+    RecordingStudioApi.configuration.admin_root_recordable_type_names = %w[AdminRoot Page]
+
+    assert_nil orphan.parent_recording_id
+    assert_equal orphan.id, orphan.root_recording_id
+    assert_predicate orphan, :orphan?
+    refute_predicate orphan, :root?
+
+    Rails.application.load_tasks unless Rake::Task.task_defined?("recording_studio_api:provision_admin")
+    task = Rake::Task["recording_studio_api:provision_admin"]
+    task.reenable
+    task.invoke
+
+    assert_nil RecordingStudio::Recording.unscoped.find_by(
+      parent_recording_id: orphan.id,
+      recordable_type: "RecordingStudioApi::AdminApi"
+    )
+    recording = RecordingStudioApi::Admin::ApiAuthorization.recording_for(api: :public, root_recording: @root_recording)
+    assert_equal @root_recording.id, recording.parent_recording_id
+  end
+
   test "provisioning records the admin api once under the admin root" do
     first = RecordingStudioApi::Admin::ApiAuthorization.provision!(
       api: :public,

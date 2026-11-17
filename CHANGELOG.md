@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.14.1] - 2026-11-17
+
+### Fixed
+- A root is a recording whose type is declared `root: true` and whose `root_recording_id` is its own id. A parentless recording of any other type is an orphan. Those orphans also store `root_recording_id = id`, so a missing parent is not enough.
+- `ApiAccessClientsQuery` root type filters select `root_recording_id = id` and only declared root types.
+- `recording_studio_api:provision_admin` uses that same rule, so it does not provision under an orphan.
+- The API keys list accepts a root scope only when `Recording#root?` is true. When the single access point is not a root, the subtitle names that access point.
+
+### Upgrade notes
+- Bump to `1.14.1`. No migration. Stay on Recording Studio `>= 7.7.0`, `< 8.0`.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.14.0] - 2026-11-17
 
 ### Changed
