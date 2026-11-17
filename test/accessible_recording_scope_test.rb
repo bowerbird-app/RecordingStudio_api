@@ -29,11 +29,9 @@ class AccessibleRecordingScopeTest < ActiveSupport::TestCase
       root_recording: root_recording,
       parent_recording: nested_folder_recording
     )
+    grant = access_grant_for(access_recording, root_recording)
 
-    ids = RecordingStudioApi::AccessibleRecordingScope.new(
-      scope_recording: root_recording,
-      access_recording: access_recording
-    ).relation.pluck(:id)
+    ids = grant.accessible_recordings.pluck(:id)
 
     assert_includes ids, root_recording.id
     assert_includes ids, visible_page.id
@@ -43,7 +41,6 @@ class AccessibleRecordingScopeTest < ActiveSupport::TestCase
 
   test "excludes trashed descendants from the scoped subtree" do
     root_recording, access_recording = create_access_recording_for(user: @user, role: :admin)
-
     folder = Folder.create!(name: "Trashed Folder")
     folder_recording = RecordingStudio::Recording.create!(recordable: folder, parent_recording: root_recording)
     page_recording = create_page_recording(
@@ -51,11 +48,9 @@ class AccessibleRecordingScopeTest < ActiveSupport::TestCase
       parent_recording: folder_recording
     )
     page_recording.update_column(:trashed_at, Time.current)
+    grant = access_grant_for(access_recording, root_recording)
 
-    ids = RecordingStudioApi::AccessibleRecordingScope.new(
-      scope_recording: root_recording,
-      access_recording: access_recording
-    ).relation.pluck(:id)
+    ids = grant.accessible_recordings.pluck(:id)
 
     assert_includes ids, folder_recording.id
     assert_not_includes ids, page_recording.id
@@ -65,12 +60,9 @@ class AccessibleRecordingScopeTest < ActiveSupport::TestCase
     root_recording, access_recording = create_access_recording_for(user: @user, role: :admin)
     page_recording = create_page_recording(root_recording: root_recording)
     page_recording.update_column(:trashed_at, Time.current)
+    grant = access_grant_for(access_recording, root_recording)
 
-    ids = RecordingStudioApi::AccessibleRecordingScope.new(
-      scope_recording: root_recording,
-      access_recording: access_recording,
-      include_trashed: true
-    ).relation.pluck(:id)
+    ids = grant.accessible_recordings(include_trashed: true).pluck(:id)
 
     assert_includes ids, page_recording.id
   end
@@ -78,12 +70,7 @@ class AccessibleRecordingScopeTest < ActiveSupport::TestCase
   test "memoizes recording ids for repeated authorization checks" do
     root_recording, access_recording = create_access_recording_for(user: @user, role: :edit)
     page_recording = create_page_recording(root_recording: root_recording)
-    grant = RecordingStudioApi::AccessGrant.new(
-      api_client: nil,
-      credential: nil,
-      access_recording: access_recording,
-      root_recording: root_recording
-    )
+    grant = access_grant_for(access_recording, root_recording)
 
     first_ids = grant.accessible_recording_ids
     second_ids = grant.accessible_recording_ids
@@ -93,38 +80,42 @@ class AccessibleRecordingScopeTest < ActiveSupport::TestCase
     assert grant.accessible_recordings.exists?(id: page_recording.id)
   end
 
-  test "returns empty relation when scope is nil" do
-    root_recording, access_recording = create_access_recording_for(user: @user, role: :admin)
+  test "returns an empty relation when the grant has no anchor" do
+    _root_recording, access_recording = create_access_recording_for(user: @user, role: :admin)
+    grant = RecordingStudioApi::AccessGrant.new(
+      api_client: nil,
+      credential: nil,
+      access_recording: nil,
+      root_recording: nil
+    )
 
-    relation = RecordingStudioApi::AccessibleRecordingScope.new(
-      scope_recording: nil,
-      access_recording: access_recording
-    ).relation
-
-    assert_empty relation.to_a
-    assert_equal root_recording.id, access_recording.root_recording_id
+    assert_empty grant.accessible_recordings.to_a
+    assert access_recording.root_recording_id.present?
   end
 
-  test "returns empty relation when access recording is not a RecordingStudio::Access" do
+  test "returns an empty relation when the access recording is not an access grant" do
     root_recording, = create_access_recording_for(user: @user, role: :admin)
+    grant = RecordingStudioApi::AccessGrant.new(
+      api_client: nil,
+      credential: nil,
+      access_recording: root_recording,
+      root_recording: root_recording
+    )
 
-    relation = RecordingStudioApi::AccessibleRecordingScope.new(
-      scope_recording: root_recording,
-      access_recording: root_recording
-    ).relation
-
-    assert_empty relation.to_a
+    assert_empty grant.accessible_recordings.to_a
   end
 
-  test "accessible recordings stay a subquery and match accessible recording ids" do
+  test "a root grant uses the fast path and stays a relation" do
     root_recording, access_recording = create_access_recording_for(user: @user, role: :edit)
     page_recording = create_page_recording(root_recording: root_recording)
     grant = access_grant_for(access_recording, root_recording)
     queries = capture_sql { grant.accessible_recordings.pluck(:id) }
+    sql = queries.join("\n")
 
-    assert_equal 1, queries.length
-    assert_includes queries.first, "scope_tree"
-    refute_match(/IN \(\$\d+, \$\d+/, queries.first)
+    refute_includes sql, "WITH RECURSIVE"
+    refute_includes sql, "scope_tree"
+    assert_includes sql, "root_recording_id"
+    refute_match(/IN \(\$\d+, \$\d+/, sql)
     assert_equal grant.accessible_recording_ids.sort, grant.accessible_recordings.pluck(:id).sort
     assert_includes grant.accessible_recordings.pluck(:id), page_recording.id
   end
@@ -141,7 +132,7 @@ class AccessibleRecordingScopeTest < ActiveSupport::TestCase
     assert_includes grant.accessible_recording_ids(include_trashed: true), page_recording.id
   end
 
-  test "hides a kept recording under a trashed folder" do
+  test "keeps a recording under a trashed folder visible" do
     root_recording, access_recording = create_access_recording_for(user: @user, role: :edit)
     folder = Folder.create!(name: "Trashed parent")
     folder_recording = RecordingStudio::Recording.create!(recordable: folder, parent_recording: root_recording)
@@ -151,8 +142,9 @@ class AccessibleRecordingScopeTest < ActiveSupport::TestCase
 
     visible_ids = grant.accessible_recordings.pluck(:id)
     assert_not_includes visible_ids, folder_recording.id
-    assert_not_includes visible_ids, kept_page.id
+    assert_includes visible_ids, kept_page.id
     assert_includes grant.accessible_recordings(include_trashed: true).pluck(:id), kept_page.id
+    assert_includes grant.accessible_recordings(include_trashed: true).pluck(:id), folder_recording.id
   end
 
   test "a folder grant cannot see a sibling folder or a second root" do
@@ -178,7 +170,72 @@ class AccessibleRecordingScopeTest < ActiveSupport::TestCase
     assert_not_includes visible_ids, sibling.id
     assert_not_includes visible_ids, other_root.id
     assert_not_includes visible_ids, root_recording.id
+    assert_includes grant.accessible_recordings.to_sql, "WITH RECURSIVE"
     assert_equal visible_ids.sort, grant.accessible_recording_ids.sort
+  end
+
+  test "an api client with no owner sees nothing" do
+    root_recording, = create_access_recording_for(user: @user, role: :admin)
+    page_recording = create_page_recording(root_recording: root_recording)
+    client = RecordingStudioApi::ApiClient.create!(name: "Orphan key", api_key: "public")
+    access_recording = grant_or_bootstrap_access!(recording: root_recording, actor: client, role: :admin)
+    grant = RecordingStudioApi::AccessGrant.new(
+      api_client: client,
+      credential: nil,
+      access_recording: access_recording,
+      root_recording: root_recording
+    )
+
+    assert_nil client.owner
+    assert_empty grant.accessible_recordings.pluck(:id)
+    refute grant.authorized?(recording: page_recording, role: :view)
+
+    owned_client = RecordingStudioApi::ApiClient.create!(name: "Owned key", api_key: "public", owner: @user)
+    owned = RecordingStudioApi::AccessGrant.new(
+      api_client: owned_client,
+      credential: nil,
+      access_recording: access_recording,
+      root_recording: root_recording
+    )
+    assert_equal @user, owned_client.owner
+    assert_includes owned.accessible_recordings.pluck(:id), page_recording.id
+  end
+
+  test "grant role narrower than the owner role is enforced" do
+    root_recording, access_recording = create_access_recording_for(user: @user, role: :admin)
+    page_recording = create_page_recording(root_recording: root_recording)
+    client = RecordingStudioApi::ApiClient.create!(name: "Narrow key", api_key: "public", owner: @user)
+    client_access = grant_or_bootstrap_access!(recording: root_recording, actor: client, role: :view)
+    grant = RecordingStudioApi::AccessGrant.new(
+      api_client: client,
+      credential: nil,
+      access_recording: client_access,
+      root_recording: root_recording
+    )
+
+    assert_equal :admin, RecordingStudioAccessible.role_for(actor: @user, recording: root_recording)
+    assert_equal "view", client_access.recordable.role.to_s
+    assert_equal "admin", access_recording.recordable.role.to_s
+    assert grant.authorized?(recording: page_recording, role: :view)
+    refute grant.authorized?(recording: page_recording, role: :edit)
+  end
+
+  test "owner role narrower than the grant role is enforced" do
+    root_recording, access_recording = create_access_recording_for(user: @user, role: :view)
+    page_recording = create_page_recording(root_recording: root_recording)
+    client = RecordingStudioApi::ApiClient.create!(name: "Wide key", api_key: "public", owner: @user)
+    client_access = grant_or_bootstrap_access!(recording: root_recording, actor: client, role: :admin)
+    grant = RecordingStudioApi::AccessGrant.new(
+      api_client: client,
+      credential: nil,
+      access_recording: client_access,
+      root_recording: root_recording
+    )
+
+    assert_equal "admin", client_access.recordable.role.to_s
+    assert_equal "view", access_recording.recordable.role.to_s
+    assert grant.authorized?(recording: page_recording, role: :view)
+    refute grant.authorized?(recording: page_recording, role: :edit)
   end
 
   test "relationship targets outside the subquery stay hidden" do
@@ -229,20 +286,16 @@ class AccessibleRecordingScopeTest < ActiveSupport::TestCase
     end
   end
 
-  test "include? checks membership without materializing the full id list" do
+  test "membership checks do not materialize the id list" do
     root_recording, access_recording = create_access_recording_for(user: @user, role: :edit)
     page_recording = create_page_recording(root_recording: root_recording)
     other_root, = create_access_recording_for(user: @user, role: :edit, workspace_name: "Other Workspace")
     other_page = create_page_recording(root_recording: other_root)
+    grant = access_grant_for(access_recording, root_recording)
 
-    scope = RecordingStudioApi::AccessibleRecordingScope.new(
-      scope_recording: root_recording,
-      access_recording: access_recording
-    )
-
-    assert scope.include?(page_recording.id)
-    refute scope.include?(other_page.id)
-    refute scope.include?(nil)
+    assert grant.accessible_recordings.exists?(id: page_recording.id)
+    refute grant.accessible_recordings.exists?(id: other_page.id)
+    refute grant.accessible_recordings.exists?(id: nil)
   end
 
   private

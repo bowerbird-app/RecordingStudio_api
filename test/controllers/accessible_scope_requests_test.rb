@@ -78,7 +78,7 @@ class AccessibleScopeRequestsTest < ActionDispatch::IntegrationTest
     assert_equal "Elsewhere", other_folder.recordable.reload.name
   end
 
-  test "a trashed descendant is hidden and a kept child of a trashed folder stays hidden" do
+  test "a trashed descendant is hidden and a kept child of a trashed folder stays visible" do
     @child_folder.update_column(:trashed_at, Time.current)
     kept_under_trash = create_folder("Still here", parent: @child_folder)
 
@@ -86,19 +86,19 @@ class AccessibleScopeRequestsTest < ActionDispatch::IntegrationTest
     assert_response :success
     ids = JSON.parse(response.body).fetch("records").map { |row| row.fetch("id") }
     assert_not_includes ids, @child_folder.id
-    assert_not_includes ids, kept_under_trash.id
+    assert_includes ids, kept_under_trash.id
 
     get "/recording_studio_api/api/v1/folders/#{@child_folder.id}", headers: authorization_headers
     assert_response :not_found
 
     get "/recording_studio_api/api/v1/folders/#{kept_under_trash.id}", headers: authorization_headers
-    assert_response :not_found
+    assert_response :success
 
     patch "/recording_studio_api/api/v1/folders/#{kept_under_trash.id}",
-          params: { name: "Should not stick" },
+          params: { name: "Renamed under trash" },
           headers: authorization_headers
-    assert_response :not_found
-    assert_equal "Still here", kept_under_trash.recordable.reload.name
+    assert_response :success
+    assert_equal "Renamed under trash", kept_under_trash.reload.recordable.name
   end
 
   private

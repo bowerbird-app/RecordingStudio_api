@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_14_090000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_17_010025) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -160,9 +160,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_14_090000) do
     t.string "api_key", default: "public", null: false
     t.datetime "created_at", null: false
     t.string "name", null: false
+    t.string "owner_type"
+    t.uuid "owner_id"
     t.datetime "updated_at", null: false
     t.index ["access_recording_id"], name: "index_recording_studio_api_api_clients_on_access_recording_id", unique: true
     t.index ["api_key"], name: "index_recording_studio_api_api_clients_on_api_key"
+    t.index ["owner_type", "owner_id"], name: "index_rs_api_clients_on_owner"
   end
 
   create_table "recording_studio_api_api_credentials", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -288,6 +291,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_14_090000) do
     t.index ["recordable_type", "recordable_id"], name: "index_recording_studio_recordings_on_recordable"
     t.index ["recordable_type", "recordable_id"], name: "index_rs_unique_root_recording_per_recordable", unique: true, where: "(parent_recording_id IS NULL)"
     t.index ["root_recording_id", "parent_recording_id"], name: "index_rs_recordings_on_root_and_parent"
+    t.index ["root_recording_id", "recordable_type", "created_at", "id"], name: "index_rs_recordings_on_root_type_created_at_id", order: { created_at: :desc, id: :desc }
     t.index ["root_recording_id", "recordable_type", "recordable_id"], name: "index_rs_recordings_on_root_and_recordable"
     t.index ["root_recording_id"], name: "index_rs_recordings_on_root_recording"
   end

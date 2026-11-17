@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-17
+
+### Changed
+- Collection and member scope uses Accessible `authorized_recording_ids` for the API key's owner, limited to the grant anchor. A root grant uses that method's fast path (`Recording.within`).
+- A token's effective role is the lower of the grant role and the owner's role. When the owner loses access, the token loses it on the next request. A key with no owner sees nothing.
+- A kept recording under a trashed ancestor stays in the default scope when the owner can still view it.
+
+### Upgrade notes
+- Bump to `1.4.0`. Run the API client owner migration, then Recording Studio `7.4.0`'s recordings index migration.
+- Set `owner` on each existing API client to the person whose access the key should follow.
+- Require `recording_studio` `>= 7.4.0`, `< 8.0` and `recording_studio_accessible` `>= 0.46.0`, `< 2.0`.
+- Conditional GET stays out. A freshness aggregate on a root still scans the matching rows. That scan costs more than the index read of one page, so an ETag check is not cheaper than returning the page.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.3.0] - 2026-11-16
 
 ### Changed

@@ -90,21 +90,12 @@ module RecordingStudioApi
                 .to_a
     end
 
-    # The page ids are already inside the caller's scope. A descendant-tree
-    # scope (AccessibleRecordingScope) is not walked again: kept direct
-    # children of those parents are the next step of that same tree. Any
-    # other scope is applied as an id filter on this page.
+    # The page ids are already inside the caller's scope. Direct children
+    # still have to pass that same relation, so a row outside it cannot appear.
     def scope_predicate(quoted_table)
       scope = @context.scoped_recordings
-      scope_sql = scope.to_sql
-      if scope_sql.include?("scope_tree")
-        return "" unless scope_sql.include?("trashed_at")
-
-        "AND #{RecordingStudio.kept_sql(scope.klass.table_name)}"
-      else
-        allowed_ids = scope.unscope(:order, :limit, :offset).select(:id).to_sql
-        "AND #{quoted_table}.id IN (#{allowed_ids})"
-      end
+      allowed_ids = scope.unscope(:order, :limit, :offset).select(:id).to_sql
+      "AND #{quoted_table}.id IN (#{allowed_ids})"
     end
 
     def window_size(definition)

@@ -44,18 +44,21 @@ class TrashableSiblingApiParityTest < ActiveSupport::TestCase
     refute_respond_to page, :recording_studio_trashable_purge!
   end
 
-  test "accessible recording scope SQL uses kept_sql for child filter" do
+  test "accessible recordings SQL uses kept_sql and does not walk scope_tree" do
     root_recording, access_recording = create_access_recording_for(user: @user, role: :edit)
-    scope = RecordingStudioApi::AccessibleRecordingScope.new(
-      scope_recording: root_recording,
-      access_recording: access_recording
+    grant = RecordingStudioApi::AccessGrant.new(
+      api_client: nil,
+      credential: nil,
+      access_recording: access_recording,
+      root_recording: root_recording
     )
 
-    sql = scope.send(:accessible_recording_ids_sql)
-    kept_sql = RecordingStudio.kept_sql("child")
+    sql = grant.accessible_recordings.to_sql
+    kept_sql = RecordingStudio.kept_sql(RecordingStudio::Recording.table_name)
 
-    assert_includes sql, "WHERE #{kept_sql}"
-    refute_includes sql, "WHERE child.trashed_at IS NULL"
+    assert_includes sql, kept_sql
+    refute_includes sql, "scope_tree"
+    refute_includes sql, "WITH RECURSIVE"
   end
 
   test "actor access lookup and oauth exists use kept_sql under hostile default_scope" do
@@ -261,7 +264,7 @@ class TrashableSiblingApiParityTest < ActiveSupport::TestCase
         false
       end
     end.new(root_recording)
-    checked = grant.send(:recording_for_accessible_check, duck, include_trashed: true)
+    checked = grant.send(:recording_for_role, duck, include_trashed: true)
     assert_equal root_recording, checked
   end
 

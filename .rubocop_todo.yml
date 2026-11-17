@@ -101,12 +101,11 @@ Lint/DuplicateMethods:
 Lint/HashCompareByIdentity:
   Exclude:
 
-# Offense count: 3
+# Offense count: 2
 Lint/NoReturnInBeginEndBlocks:
   Exclude:
     - 'lib/recording_studio_api/access_management_policy.rb'
     - 'lib/recording_studio_api/access_policy.rb'
-    - 'lib/recording_studio_api/accessible_recording_scope.rb'
 
 # Offense count: 2
 # This cop supports unsafe autocorrection (--autocorrect-all).
