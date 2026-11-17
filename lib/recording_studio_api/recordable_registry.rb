@@ -108,9 +108,9 @@ module RecordingStudioApi
     end
 
     def merge_public_name(existing, incoming)
-      if incoming.public_name_supplied? && existing.public_name_supplied? && incoming.public_name != existing.public_name
-        raise ConfigurationError, "Public name cannot be redefined incompatibly"
-      end
+      clash = incoming.public_name_supplied? && existing.public_name_supplied? &&
+              incoming.public_name != existing.public_name
+      raise ConfigurationError, "Public name cannot be redefined incompatibly" if clash
 
       incoming.public_name_supplied? ? incoming.public_name : existing.public_name
     end

@@ -234,124 +234,147 @@ module RecordingStudioApi
           .sort_by { |section| section.fetch(:resource) }
       end
 
-      def default_resource_endpoints(resource_name, recordable_type) # rubocop:disable Metrics/MethodLength
-        openapi_tag = openapi_tag_for(resource_name, recordable_type)
-        docs_resource_name = docs_resource_name_for(resource_name, recordable_type)
+      def default_resource_endpoints(resource_name, recordable_type)
         registration = recordable_registration_for(recordable_type)
-        openapi_overrides = registration&.openapi || {}
-        operation_docs = resource_operation_docs_for(resource_name, recordable_type, registration)
+        docs = resource_operation_docs_for(resource_name, recordable_type, registration)
+        tag = openapi_tag_for(resource_name, recordable_type)
+        docs_name = docs_resource_name_for(resource_name, recordable_type)
+        overrides = registration&.openapi || {}
 
-        endpoints = [
-          {
-            verb: "GET",
-            path: "#{api_root_path}/#{resource_name}",
-            action: "resources#index",
-            summary: operation_docs.summary_for(:index),
-            description: operation_docs.description_for(:index),
-            capability: nil,
-            scope: nil,
-            openapi: resource_openapi(
-              {
-                tags: [openapi_tag],
-                parameters: pagination_parameters(recordable_type) + collection_filter_parameters(recordable_type) + include_parameters_for(recordable_type),
-                responses: resource_list_responses(
-                  resource_name,
-                  recordable_type,
-                  docs_resource_name,
-                  relationship_examples: relationship_response_examples(recordable_type, collection: true),
-                  filter_meta: true
-                )
-              },
-              openapi_overrides.fetch(:index, {}),
-              recordable_type,
-              resource_name: resource_name,
-              collection: true
-            )
-          },
-          {
-            verb: "POST",
-            path: "#{api_root_path}/#{resource_name}",
-            action: "resources#create",
-            summary: operation_docs.summary_for(:create),
-            description: operation_docs.description_for(:create),
-            capability: nil,
-            scope: nil,
-            openapi: merge_openapi(
-              {
-                tags: [openapi_tag],
-                parameters: [idempotency_key_parameter],
-                request_body: resource_write_request_body(recordable_type, operation: :create),
-                responses: resource_create_responses(recordable_type)
-              },
-              openapi_overrides.fetch(:create, {})
-            )
-          },
-          {
-            verb: "GET",
-            path: "#{api_root_path}/#{resource_name}/:id",
-            action: "resources#show",
-            summary: operation_docs.summary_for(:show),
-            description: operation_docs.description_for(:show),
-            capability: nil,
-            scope: nil,
-            openapi: resource_openapi(
-              {
-                tags: [openapi_tag],
-                parameters: [id_parameter] + include_parameters_for(recordable_type),
-                responses: resource_item_responses(
-                  recordable_type,
-                  relationship_examples: relationship_response_examples(recordable_type)
-                )
-              },
-              openapi_overrides.fetch(:show, {}),
-              recordable_type,
-              resource_name: resource_name,
-              collection: false
-            )
-          },
-          {
-            verb: "PATCH",
-            path: "#{api_root_path}/#{resource_name}/:id",
-            action: "resources#update",
-            summary: operation_docs.summary_for(:update),
-            description: operation_docs.description_for(:update),
-            capability: nil,
-            scope: nil,
-            openapi: merge_openapi(
-              {
-                tags: [openapi_tag],
-                parameters: [id_parameter],
-                request_body: resource_write_request_body(recordable_type, operation: :update),
-                responses: resource_item_responses(recordable_type)
-              },
-              openapi_overrides.fetch(:update, {})
-            )
-          },
-          {
-            verb: "DELETE",
-            path: "#{api_root_path}/#{resource_name}/:id",
-            action: "resources#destroy",
-            summary: operation_docs.summary_for(:destroy),
-            description: destroy_description_for(resource_name, recordable_type),
-            capability: nil,
-            scope: nil,
-            openapi: merge_openapi(
-              {
-                tags: [openapi_tag],
-                parameters: [id_parameter],
-                responses: resource_delete_responses(recordable_type)
-              },
-              openapi_overrides.fetch(:destroy, {})
-            )
-          }
-        ]
+        default_resource_endpoint_specs(resource_name, recordable_type, tag, docs_name, docs, overrides).filter_map do |endpoint|
+          operation = endpoint.fetch(:action).split("#").last
+          next unless registration.nil? || registration.supports_operation?(operation)
 
-        endpoints.select do |endpoint|
-          registration.nil? || registration.supports_operation?(endpoint.fetch(:action).split("#").last)
-        end.map do |endpoint|
-          annotate_public_type(endpoint, recordable_type, endpoint.fetch(:action).split("#").last)
+          annotate_public_type(endpoint, recordable_type, operation)
         end
-      end # rubocop:enable Metrics/MethodLength
+      end
+
+      def default_resource_endpoint_specs(resource_name, recordable_type, tag, docs_name, docs, overrides)
+        [
+          default_index_endpoint(resource_name, recordable_type, tag, docs_name, docs, overrides),
+          default_create_endpoint(resource_name, recordable_type, tag, docs, overrides),
+          default_show_endpoint(resource_name, recordable_type, tag, docs, overrides),
+          default_update_endpoint(resource_name, recordable_type, tag, docs, overrides),
+          default_destroy_endpoint(resource_name, recordable_type, tag, docs, overrides)
+        ]
+      end
+
+      def default_index_endpoint(resource_name, recordable_type, tag, docs_name, docs, overrides)
+        {
+          verb: "GET",
+          path: "#{api_root_path}/#{resource_name}",
+          action: "resources#index",
+          summary: docs.summary_for(:index),
+          description: docs.description_for(:index),
+          capability: nil,
+          scope: nil,
+          openapi: resource_openapi(
+            {
+              tags: [tag],
+              parameters: pagination_parameters(recordable_type) + collection_filter_parameters(recordable_type) + include_parameters_for(recordable_type),
+              responses: resource_list_responses(
+                resource_name,
+                recordable_type,
+                docs_name,
+                relationship_examples: relationship_response_examples(recordable_type, collection: true),
+                filter_meta: true
+              )
+            },
+            overrides.fetch(:index, {}),
+            recordable_type,
+            resource_name: resource_name,
+            collection: true
+          )
+        }
+      end
+
+      def default_create_endpoint(resource_name, recordable_type, tag, docs, overrides)
+        {
+          verb: "POST",
+          path: "#{api_root_path}/#{resource_name}",
+          action: "resources#create",
+          summary: docs.summary_for(:create),
+          description: docs.description_for(:create),
+          capability: nil,
+          scope: nil,
+          openapi: merge_openapi(
+            {
+              tags: [tag],
+              parameters: [idempotency_key_parameter],
+              request_body: resource_write_request_body(recordable_type, operation: :create),
+              responses: resource_create_responses(recordable_type)
+            },
+            overrides.fetch(:create, {})
+          )
+        }
+      end
+
+      def default_show_endpoint(resource_name, recordable_type, tag, docs, overrides)
+        {
+          verb: "GET",
+          path: "#{api_root_path}/#{resource_name}/:id",
+          action: "resources#show",
+          summary: docs.summary_for(:show),
+          description: docs.description_for(:show),
+          capability: nil,
+          scope: nil,
+          openapi: resource_openapi(
+            {
+              tags: [tag],
+              parameters: [id_parameter] + include_parameters_for(recordable_type),
+              responses: resource_item_responses(
+                recordable_type,
+                relationship_examples: relationship_response_examples(recordable_type)
+              )
+            },
+            overrides.fetch(:show, {}),
+            recordable_type,
+            resource_name: resource_name,
+            collection: false
+          )
+        }
+      end
+
+      def default_update_endpoint(resource_name, recordable_type, tag, docs, overrides)
+        {
+          verb: "PATCH",
+          path: "#{api_root_path}/#{resource_name}/:id",
+          action: "resources#update",
+          summary: docs.summary_for(:update),
+          description: docs.description_for(:update),
+          capability: nil,
+          scope: nil,
+          openapi: merge_openapi(
+            {
+              tags: [tag],
+              parameters: [id_parameter],
+              request_body: resource_write_request_body(recordable_type, operation: :update),
+              responses: resource_item_responses(recordable_type)
+            },
+            overrides.fetch(:update, {})
+          )
+        }
+      end
+
+      def default_destroy_endpoint(resource_name, recordable_type, tag, docs, overrides)
+        {
+          verb: "DELETE",
+          path: "#{api_root_path}/#{resource_name}/:id",
+          action: "resources#destroy",
+          summary: docs.summary_for(:destroy),
+          description: destroy_description_for(resource_name, recordable_type),
+          capability: nil,
+          scope: nil,
+          openapi: merge_openapi(
+            {
+              tags: [tag],
+              parameters: [id_parameter],
+              responses: resource_delete_responses(recordable_type)
+            },
+            overrides.fetch(:destroy, {})
+          )
+        }
+      end
 
       def recordable_metric_endpoints(resource_name, recordable_type)
         registration = recordable_registration_for(recordable_type)
