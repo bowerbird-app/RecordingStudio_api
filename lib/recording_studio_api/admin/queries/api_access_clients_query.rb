@@ -254,22 +254,8 @@ module RecordingStudioApi
           @root_type_filter ||= context.params[:root_type].presence || context.params["root_type"].presence
         end
 
-        # A root stores its own id and its type is declared root: true.
-        # Parentless rows of every other type are orphans, and they also store
-        # root_recording_id = id so the parentless check can pass.
         def root_recordings_for_type
-          types = declared_root_types_for_filter
-          return RecordingStudio::Recording.none if types.empty?
-
-          table = RecordingStudio::Recording.arel_table
-          RecordingStudio::Recording.unscoped
-                                    .where(recordable_type: types)
-                                    .where(table[:root_recording_id].eq(table[:id]))
-                                    .kept
-        end
-
-        def declared_root_types_for_filter
-          Array(root_type_filter).map(&:to_s) & RecordingStudio.root_recordable_types.map(&:to_s)
+          RecordingStudioApi::Admin::RootRecordings.for_types(root_type_filter)
         end
 
         def recordings_table

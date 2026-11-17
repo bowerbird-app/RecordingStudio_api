@@ -23,6 +23,7 @@ module RecordingStudioApi
     ensure_supported_version!
 
     DEFINITION_FILES = %w[
+      recording_studio_api/admin/root_recordings
       recording_studio_api/admin/api_context
       recording_studio_api/admin/api_authorization
       recording_studio_api/admin/api_request_log_helpers
