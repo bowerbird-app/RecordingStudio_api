@@ -195,6 +195,7 @@ module RecordingStudioApi
         else
           {
             "401" => { "$ref" => "#/components/responses/Unauthorized" },
+            "402" => { "$ref" => "#/components/responses/PaymentRequired" },
             "403" => { "$ref" => "#/components/responses/Forbidden" },
             "404" => { "$ref" => "#/components/responses/NotFound" }
           }
@@ -247,6 +248,7 @@ module RecordingStudioApi
           },
           schemas: {
             Error: error_schema,
+            BillingError: billing_error_schema,
             OAuthError: {
               type: "object",
               properties: {
@@ -282,6 +284,14 @@ module RecordingStudioApi
                 }
               }
             },
+            PaymentRequired: {
+              description: payment_required_description,
+              content: {
+                "application/json" => {
+                  schema: { "$ref" => "#/components/schemas/BillingError" }
+                }
+              }
+            },
             Forbidden: {
               description: "Caller does not have permission for this operation.",
               content: {
@@ -307,6 +317,49 @@ module RecordingStudioApi
               }
             }
           }
+        }
+      end
+
+      def payment_required_description
+        codes = RecordingStudioApi.configuration.billing_codes.codes.join(", ")
+        "Authenticated and authorized, but a registered billing denial blocked the request. " \
+          "Codes: #{codes}. details may include message, feature, limit, fix_path, and fixable_by. " \
+          "fix_path is a relative in-app path. Prices, usage totals, and Stripe ids are omitted."
+      end
+
+      def billing_error_schema
+        {
+          type: "object",
+          description: "402 billing denial. The standard error envelope, with an allowlisted details object.",
+          properties: {
+            error: {
+              type: "object",
+              properties: {
+                code: {
+                  type: "string",
+                  enum: RecordingStudioApi.configuration.billing_codes.codes.map(&:to_s),
+                  description: "Registered billing code."
+                },
+                message: { type: "string" },
+                details: {
+                  type: "object",
+                  additionalProperties: false,
+                  properties: {
+                    message: { type: "string" },
+                    feature: { type: "string", description: "Feature name the caller can show." },
+                    limit: { description: "Ceiling the caller can show, as a string or number." },
+                    fix_path: {
+                      type: "string",
+                      description: "Relative in-app path. Starts with one slash and has no scheme or host."
+                    },
+                    fixable_by: { type: "string", description: "Who can clear the block, such as owner." }
+                  }
+                }
+              },
+              required: %w[code message]
+            }
+          },
+          required: ["error"]
         }
       end
 

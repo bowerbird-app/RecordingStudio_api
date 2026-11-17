@@ -27,11 +27,15 @@ module RecordingStudioApi
           if handler
             registration = RecordingStudioApi.resource_handler_registration(recordable_type, action.name, api: current_api_key)
             handler_context = member_handler_context(action, recordable_type, registration)
-            result = handler.call(handler_context)
+            result = run_authorized_handler { handler.call(handler_context) }
+            return if performed?
+
             render json: result.fetch(:json), status: result.fetch(:status, :ok)
           else
             context = capability_action_context(action)
-            result = action.handler.call(context)
+            result = run_authorized_handler { action.handler.call(context) }
+            return if performed?
+
             render json: serialize_result(action, result)
           end
         end

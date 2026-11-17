@@ -73,13 +73,16 @@ module RecordingStudioApi
           end
 
           context = resource_operation_context(recording: builtin_member_recording_for(operation_name))
-          result = operation.handler.call(context)
+          result = run_authorized_handler { operation.handler.call(context) }
+          return if performed?
 
           render json: result.fetch(:json), status: result.fetch(:status, :ok)
         end
 
         def render_registered_resource_handler!(handler, context)
-          result = handler.call(context)
+          result = run_authorized_handler { handler.call(context) }
+          return if performed?
+
           render json: result.fetch(:json), status: result.fetch(:status, :ok)
         end
 

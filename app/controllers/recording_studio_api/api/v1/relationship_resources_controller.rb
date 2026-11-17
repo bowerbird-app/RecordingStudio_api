@@ -64,9 +64,13 @@ module RecordingStudioApi
           assert_nested_operation!(:create, role: :edit)
           reject_nested_type_or_parent_input!
 
-          result = RecordingStudioApi::Services::ResourceOperations::Create.call(
-            relationship_operation_context(recordable_type: relationship.child_type)
-          )
+          result = run_authorized_handler do
+            RecordingStudioApi::Services::ResourceOperations::Create.call(
+              relationship_operation_context(recordable_type: relationship.child_type)
+            )
+          end
+          return if performed?
+
           render json: result.fetch(:json), status: result.fetch(:status, :created)
         end
 
@@ -82,9 +86,13 @@ module RecordingStudioApi
           child = child_recording
           authorize_child!(child)
 
-          result = RecordingStudioApi::Services::ResourceOperations::Update.call(
-            relationship_operation_context(recording: child, recordable_type: relationship.child_type)
-          )
+          result = run_authorized_handler do
+            RecordingStudioApi::Services::ResourceOperations::Update.call(
+              relationship_operation_context(recording: child, recordable_type: relationship.child_type)
+            )
+          end
+          return if performed?
+
           render json: result.fetch(:json), status: result.fetch(:status, :ok)
         end
 
@@ -98,9 +106,13 @@ module RecordingStudioApi
           child = child_recording(include_trashed: true)
           authorize_child!(child)
 
-          result = RecordingStudioApi::Services::ResourceOperations::Destroy.call(
-            relationship_operation_context(recording: child, recordable_type: relationship.child_type)
-          )
+          result = run_authorized_handler do
+            RecordingStudioApi::Services::ResourceOperations::Destroy.call(
+              relationship_operation_context(recording: child, recordable_type: relationship.child_type)
+            )
+          end
+          return if performed?
+
           render json: result.fetch(:json), status: result.fetch(:status, :ok)
         end
 

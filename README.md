@@ -7,8 +7,8 @@
 Companion pins on current main: Trashable `>= 0.17.0, < 2.0` / `v1.0.1`
 (query-only), Admin `v2.18.0`, Moveable `>= 5.0, < 7.0` / `v6.0.0`, Root Switchable
 `v0.16.0`, Cache `v0.7.0` (development/test), Accessible `>= 0.46.0, < 2.0`
-(`tag: v0.47.0`), RecordingStudio `v7.4.0`
-(`>= 7.4.0, < 8.0`), Flatpack `0.1.377`
+(`tag: v0.47.0`), RecordingStudio `v7.6.0`
+(`>= 7.6.0, < 8.0`), Flatpack `0.1.377`
 (`tag: v0.1.377`, `>= 0.1.356, < 2.0`),
 Metrics `v0.9.0` (`>= 0.9.0, < 2.0`), Logs `v0.8.0` (`>= 0.8.0, < 2.0`). Recording Studio MCP `v0.17.0`
 allows this gem at `>= 0.11.0, < 0.12`, so it cannot take `0.12.0` or `0.13.0` until
@@ -851,6 +851,79 @@ endpoints load through `ScopedRecording.find!` and `authorize!`. The role is
 Nested relationship handlers still resolve the parent and child in
 `RelationshipResourcesController`, which also authorizes the relationship.
 
+### Billing denials
+
+A billing block is rendered only after authentication and authorization.
+`HandlerGuard` (or the nested route's `authorize!`) runs first. The handler
+runs next. A token that fails access gets 403 or 404, and the handler does
+not run.
+
+The handler reports a block in one of two ways:
+
+- return a denied `RecordingStudio::GateDecision` that has a `code`
+- raise an error that `is_a?(RecordingStudio::Denial)`
+
+`RecordingStudio.check_gate` copies `code` and `details` from the first deny.
+Core defines no codes. This gem's registry does. A registered code renders
+402 in the standard error envelope:
+
+```json
+{
+  "error": {
+    "code": "paywall_locked",
+    "message": "Exports are locked",
+    "details": {
+      "message": "Exports are locked",
+      "feature": "exports",
+      "limit": 3,
+      "fix_path": "/settings/plan",
+      "fixable_by": "owner"
+    }
+  }
+}
+```
+
+Built-in codes are `paywall_locked`, `plan_limit_reached`,
+`meter_limit_reached`, and `seat_limit_reached`. Each one is HTTP 402.
+Add another with `config.register_billing_code`.
+
+```ruby
+RecordingStudioApi.configure do |config|
+  config.register_billing_code(:storage_limit_reached)
+end
+```
+
+`details` keeps `message`, `feature`, `limit`, `fix_path`, and `fixable_by`.
+`fix_path` must start with a single `/` and must not include a scheme or host.
+A bad `fix_path` is omitted. Prices, usage totals, and Stripe ids are omitted.
+
+An unknown code, or a denial with no code, keeps today's response: 403 for
+`AuthorizationError`, and `invalid_input` for `InvalidActionInputError`.
+Development logs a warning for an unknown code. An error that merely defines
+`#code`, including `Stripe::StripeError`, is not a denial.
+
+Gems and hosts prove the envelope with the test helper:
+
+```ruby
+require "recording_studio_api/test_helpers"
+
+class ExportApiTest < ActionDispatch::IntegrationTest
+  include RecordingStudioApi::TestHelpers
+
+  test "a locked export tells the caller how to fix it" do
+    post export_path, headers: bearer
+    assert_billing_denial(:paywall_locked, details: { feature: "exports", fix_path: "/settings/plan" })
+  end
+end
+```
+
+`assert_billing_denial` fails when the code is not in the registry.
+
+A dispatcher that calls a handler itself, including Recording Studio MCP,
+calls `HandlerGuard` and then `RecordingStudioApi::BillingDenial.interpret`.
+Render 402 only when that returns a payload. An `owns_scoping` handler
+authorizes before it returns a billing denial.
+
 ### Fields, relationships, and includes
 
 Resource registration declares the flat fields and named relationships an API may expose.
@@ -1151,7 +1224,7 @@ Token-record contract (if provided):
 - `active_for_authentication?`
 - writable `last_used_at` column (updated with `update_column`)
 
-Both credential and token record must have active, non-trashed RecordingStudio recordables so scope resolution can derive the root recording. Kept/trashed predicates use Recording Studio Trashable (`recording_studio_trashable_kept?` / `recording_studio_trashable_trashed?`). Relation filters use additive `Recording.kept`. SQL filters use `RecordingStudio.kept_sql`. Pin `recording_studio` `>= 7.4.0`, `< 8.0` and `recording_studio_trashable` `>= 0.17.0`, `< 2.0`, and load `recording_studio_trashable/query` only.
+Both credential and token record must have active, non-trashed RecordingStudio recordables so scope resolution can derive the root recording. Kept/trashed predicates use Recording Studio Trashable (`recording_studio_trashable_kept?` / `recording_studio_trashable_trashed?`). Relation filters use additive `Recording.kept`. SQL filters use `RecordingStudio.kept_sql`. Pin `recording_studio` `>= 7.6.0`, `< 8.0` and `recording_studio_trashable` `>= 0.17.0`, `< 2.0`, and load `recording_studio_trashable/query` only.
 
 ### OAuth resource server
 
@@ -1408,7 +1481,7 @@ with Draft off to load a new pack. See
 | Rails           | ~> 8.1.1 |
 | PostgreSQL      | 16      |
 | TailwindCSS     | 4       |
-| RecordingStudio | v7.4.0 (pinned in `test/dummy/Gemfile`) |
+| RecordingStudio | v7.6.0 (pinned in `test/dummy/Gemfile`) |
 | FlatPack        | v0.1.377 (pinned in `test/dummy/Gemfile`) |
 | Devise          | latest  |
 

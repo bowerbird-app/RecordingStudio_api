@@ -502,6 +502,7 @@ module RecordingStudioApi
         assert token_operation.fetch(:responses).key?("400")
         assert token_operation.fetch(:responses).key?("401")
         assert token_operation.fetch(:responses).key?("429")
+        assert_not token_operation.fetch(:responses).key?("402")
         assert_not token_operation.fetch(:responses).key?("403")
         assert_not token_operation.fetch(:responses).key?("422")
         assert_equal "/platform/recording-api/oauth/token",
@@ -510,6 +511,22 @@ module RecordingStudioApi
       ensure
         RecordingStudioApi.configuration.api_versions = original_versions
         RecordingStudioApi.configuration.default_api_version = original_version
+      end
+
+      def test_authenticated_operations_document_billing_payment_required
+        document = with_recordable_types(["Workspace"]) { OpenapiDocument.call }
+        list_operation = document.fetch(:paths).fetch("/recording_studio_api/api/v1/workspaces").fetch("get")
+        assert_equal({ "$ref" => "#/components/responses/PaymentRequired" }, list_operation.fetch(:responses).fetch("402"))
+
+        payment = document.fetch(:components).fetch(:responses).fetch(:PaymentRequired)
+        assert_equal "#/components/schemas/BillingError", payment.dig(:content, "application/json", :schema, "$ref")
+
+        code = document.dig(:components, :schemas, :BillingError, :properties, :error, :properties, :code)
+        assert_equal RecordingStudioApi::BillingCodes::BUILTIN.map(&:to_s), code.fetch(:enum)
+        details = document.dig(:components, :schemas, :BillingError, :properties, :error, :properties, :details, :properties)
+        assert_equal %i[message feature limit fix_path fixable_by], details.keys
+        assert_includes payment.fetch(:description), "paywall_locked"
+        assert_includes payment.fetch(:description), "fix_path"
       end
 
       def test_resource_list_operation_includes_cursor_pagination_contract
