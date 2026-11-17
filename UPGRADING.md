@@ -5,7 +5,7 @@
 Behavior change. Run two migrations. A token follows its owner's live access.
 
 1. Bump the host gem to `1.4.0`.
-2. Allow `recording_studio` `>= 7.4.0`, `< 8.0` and `recording_studio_accessible` `>= 0.46.0`, `< 2.0`.
+2. Allow `recording_studio` `>= 7.4.0`, `< 8.0` and `recording_studio_accessible` `>= 0.46.0`, `< 2.0`. This release is developed against Accessible `0.47.0`. That release returns the same ids. A child grant walks the seeded subtree. Hosts on `0.46.0` still satisfy the dependency.
 3. Run this gem's migration that adds `owner_type` and `owner_id` to `recording_studio_api_api_clients`.
 4. Run Recording Studio `7.4.0`'s migration `AddRecordingStudioRecordingsRootTypeCreationIndex` (`index_rs_recordings_on_root_type_created_at_id` on `root_recording_id`, `recordable_type`, `created_at`, `id`).
 5. Set `owner` on each existing API client to the person whose access the key should follow. A key with a null owner sees nothing. New keys store the manager who created them.

@@ -35,7 +35,7 @@ class RecordingStudioApiTest < Minitest::Test
       contents = File.read(File.join(root, path))
       assert_includes contents, 'RecordingStudio", tag: "v7.4.0"', path
       assert_includes contents, 'flatpack", tag: "v0.1.377"', path
-      assert_includes contents, 'RecordingStudio_accessible", tag: "v0.46.0"', path
+      assert_includes contents, 'RecordingStudio_accessible", tag: "v0.47.0"', path
       assert_includes contents, 'RecordingStudio_trashable", tag: "v1.0.1"', path
       assert_includes contents, 'RecordingStudio_root_switchable", tag: "v0.16.0"', path
       assert_includes contents, 'RecordingStudio_moveable", tag: "v6.0.0"', path

@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Upgrade notes
 - Bump to `1.4.0`. Run the API client owner migration, then Recording Studio `7.4.0`'s recordings index migration.
 - Set `owner` on each existing API client to the person whose access the key should follow.
-- Require `recording_studio` `>= 7.4.0`, `< 8.0` and `recording_studio_accessible` `>= 0.46.0`, `< 2.0`.
+- Require `recording_studio` `>= 7.4.0`, `< 8.0` and `recording_studio_accessible` `>= 0.46.0`, `< 2.0`. Development is pinned to Accessible `0.47.0`. That release returns the same ids. A child grant walks the seeded subtree.
 - Conditional GET stays out. A freshness aggregate on a root still scans the matching rows. That scan costs more than the index read of one page, so an ETag check is not cheaper than returning the page.
 - See [UPGRADING.md](UPGRADING.md).
 
