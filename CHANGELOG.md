@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-11-17
+
+### Changed
+- List and relationship collection queries use `authorized_recordings(actor:, root:, scope:)` for the key's owner and grant anchor. The endpoint's scope is passed through, then the keyset, order, and limit run on that relation. A nested anchor is no longer an id list from a descendant walk.
+- Require `recording_studio` `>= 7.7.0`, `< 8.0` and `recording_studio_accessible` `>= 0.49.0`, `< 2.0`. Development and dummy pins are core `v7.7.0` and Accessible `v0.49.0`.
+
+### Upgrade notes
+- Bump to `1.7.0`. No migration in this gem. Install Recording Studio `>= 7.7.0`, `< 8.0` and Accessible `>= 0.49.0`, `< 2.0`, and run the core migrations through `7.7.0` (root invariant, then `index_rs_recordings_on_root_created_at_id`).
+- Visible ids stay the owner's live access intersected with the grant anchor. `authorize!` is still the lower of the grant role and the owner's role. A key with no owner still sees nothing.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.6.0] - 2026-11-17
 
 ### Added

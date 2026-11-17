@@ -40,7 +40,9 @@ module RecordingStudioApi
 
         def scoped_recordings(include_trashed: false)
           @scoped_recordings ||= {}
-          @scoped_recordings[include_trashed] ||= current_access_grant.accessible_recordings(include_trashed: include_trashed)
+          @scoped_recordings[include_trashed] ||= RecordingStudioApi::LazyRecordings.new do
+            current_access_grant.accessible_recordings(include_trashed: include_trashed)
+          end
         end
 
         def resolve_recordable_type!

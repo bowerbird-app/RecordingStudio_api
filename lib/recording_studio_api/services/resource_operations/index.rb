@@ -39,8 +39,14 @@ module RecordingStudioApi
         private
 
         def filtered_recordings
+          access_grant.accessible_recordings(scope: list_scope)
+        end
+
+        # Type and attribute filters are the list's scope. Pagination then
+        # applies the keyset, order, and limit on the authorized relation.
+        def list_scope
           ResourceOperations.apply_list_filter(
-            scoped_recordings.where(recordable_type: recordable_type),
+            RecordingStudio::Recording.unscoped.where(recordable_type: recordable_type),
             recordable_type: recordable_type,
             params: params,
             api: api_key

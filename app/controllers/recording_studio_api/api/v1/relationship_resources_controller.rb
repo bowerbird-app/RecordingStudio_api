@@ -164,9 +164,12 @@ module RecordingStudioApi
         end
 
         def child_scope(include_trashed: false)
-          scoped_recordings(include_trashed: include_trashed).where(
-            parent_recording_id: parent_recording.id,
-            recordable_type: relationship.child_type
+          current_access_grant.accessible_recordings(
+            include_trashed: include_trashed,
+            scope: RecordingStudio::Recording.unscoped.where(
+              parent_recording_id: parent_recording.id,
+              recordable_type: relationship.child_type
+            )
           )
         end
 

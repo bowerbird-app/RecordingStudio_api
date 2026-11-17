@@ -42,8 +42,8 @@ module RecordingStudioApi
       @owner = owner_from_client || owner_from_actor
     end
 
-    def accessible_recordings(include_trashed: false)
-      visible.relation(include_trashed: include_trashed)
+    def accessible_recordings(include_trashed: false, scope: nil)
+      visible.relation(include_trashed: include_trashed, scope: scope)
     end
 
     def accessible_recording_ids(include_trashed: false)

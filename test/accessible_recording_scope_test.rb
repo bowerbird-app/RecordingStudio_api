@@ -170,7 +170,8 @@ class AccessibleRecordingScopeTest < ActiveSupport::TestCase
     assert_not_includes visible_ids, sibling.id
     assert_not_includes visible_ids, other_root.id
     assert_not_includes visible_ids, root_recording.id
-    assert_includes grant.accessible_recordings.to_sql, "WITH RECURSIVE"
+    refute_includes grant.accessible_recordings.to_sql, "covered"
+    assert_equal visible_ids.sort, ids_authorized_for(member, folder_recording, include_trashed: false)
     assert_equal visible_ids.sort, grant.accessible_recording_ids.sort
   end
 
@@ -317,6 +318,26 @@ class AccessibleRecordingScopeTest < ActiveSupport::TestCase
 
   private
 
+  test "a folder grant matches authorized_recording_ids including trashed rows" do
+    root_recording, = create_access_recording_for(user: @user, role: :admin)
+    folder_recording = RecordingStudio::Recording.create!(
+      recordable: Folder.create!(name: "Granted"),
+      parent_recording: root_recording
+    )
+    page = create_page_recording(root_recording: root_recording, parent_recording: folder_recording)
+    page.update_column(:trashed_at, Time.current)
+    sibling = create_page_recording(root_recording: root_recording)
+    member = create_user
+    access_recording = create_access_recording(parent_recording: folder_recording, user: member, role: :view)
+    grant = access_grant_for(access_recording, root_recording)
+
+    visible = grant.accessible_recordings(include_trashed: true).pluck(:id)
+
+    assert_equal ids_authorized_for(member, folder_recording, include_trashed: true), visible.sort
+    assert_includes visible, page.id
+    assert_not_includes visible, sibling.id
+  end
+
   def access_grant_for(access_recording, root_recording)
     RecordingStudioApi::AccessGrant.new(
       api_client: nil,
@@ -324,6 +345,17 @@ class AccessibleRecordingScopeTest < ActiveSupport::TestCase
       access_recording: access_recording,
       root_recording: root_recording
     )
+  end
+
+  def ids_authorized_for(actor, anchor, include_trashed:)
+    ids = RecordingStudioAccessible.authorized_recording_ids(actor: actor, root: anchor, role: :view).pluck(:id)
+    return ids.sort if include_trashed
+
+    RecordingStudio::Recording.unscoped
+                              .where(id: ids)
+                              .where(RecordingStudio.kept_sql(RecordingStudio::Recording.table_name))
+                              .pluck(:id)
+                              .sort
   end
 
   def capture_sql(&)
