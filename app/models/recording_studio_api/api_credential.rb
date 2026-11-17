@@ -65,7 +65,8 @@ module RecordingStudioApi
         effective_access_recording.present? &&
         effective_access_recording.recording_studio_trashable_kept? &&
         api_client.recording.present? &&
-        api_client.recording.recording_studio_trashable_kept?
+        api_client.recording.recording_studio_trashable_kept? &&
+        recording&.kept?
     end
 
     def expired?
