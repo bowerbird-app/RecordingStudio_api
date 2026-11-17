@@ -174,6 +174,23 @@ class AccessibleRecordingScopeTest < ActiveSupport::TestCase
     assert_equal visible_ids.sort, grant.accessible_recording_ids.sort
   end
 
+  test "a wrapped client uses the access actor's stored owner" do
+    root_recording, = create_access_recording_for(user: @user, role: :admin)
+    page_recording = create_page_recording(root_recording: root_recording)
+    client = RecordingStudioApi::ApiClient.create!(name: "Wrapped key", api_key: "public", owner: @user)
+    access_recording = grant_or_bootstrap_access!(recording: root_recording, actor: client, role: :edit)
+    grant = RecordingStudioApi::AccessGrant.new(
+      api_client: Object.new,
+      credential: nil,
+      access_recording: access_recording,
+      root_recording: root_recording
+    )
+
+    assert_equal @user, grant.owner
+    assert grant.authorized?(recording: page_recording, role: :view)
+    refute grant.authorized?(recording: page_recording, role: :admin)
+  end
+
   test "an api client with no owner sees nothing" do
     root_recording, = create_access_recording_for(user: @user, role: :admin)
     page_recording = create_page_recording(root_recording: root_recording)

@@ -39,7 +39,7 @@ module RecordingStudioApi
     def owner
       return @owner if defined?(@owner)
 
-      @owner = owner_from_client || owner_from_grant
+      @owner = owner_from_client || owner_from_actor
     end
 
     def accessible_recordings(include_trashed: false)
@@ -79,9 +79,9 @@ module RecordingStudioApi
       client.owner
     end
 
-    def owner_from_grant
+    def owner_from_actor
       person = actor
-      return if person.is_a?(ApiClient)
+      return person.owner if person.is_a?(ApiClient)
 
       person
     end
