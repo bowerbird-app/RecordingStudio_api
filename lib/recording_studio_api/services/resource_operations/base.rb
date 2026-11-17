@@ -3,6 +3,10 @@
 module RecordingStudioApi
   module Services
     module ResourceOperations
+      def self.trashable_type?(recordable_type)
+        RecordingStudio.capability_enabled?(:trashable, for: recordable_type)
+      end
+
       class Base
         class << self
           def call(context)

@@ -1,15 +1,9 @@
 # frozen_string_literal: true
 
 require_relative "../../../support/api_dummy_helpers"
-require_relative "../../../support/trashable_capability_loader"
 
 class ApiV1ResourceDeleteTest < ActionDispatch::IntegrationTest
   include ApiDummyHelpers
-
-  def before_setup
-    TrashableCapabilityLoader.ensure_columns!
-    super
-  end
 
   setup do
     reset_recording_studio_api_configuration!
@@ -20,16 +14,12 @@ class ApiV1ResourceDeleteTest < ActionDispatch::IntegrationTest
   end
 
   teardown do
-    TrashableCapabilityLoader.conceal!
     reset_recording_studio_api_configuration!
     reset_recording_studio_capabilities!
     Current.actor = nil if defined?(Current)
   end
 
   test "delete trashes a trashable recording and keeps its history" do
-    TrashableCapabilityLoader.install!
-    RecordingStudio.enable_capability(:trashable, on: "Folder")
-
     folder_recording = RecordingStudio::Recording.create!(
       recordable: Folder.create!(name: "Trash me"),
       parent_recording: @root_recording
@@ -73,8 +63,6 @@ class ApiV1ResourceDeleteTest < ActionDispatch::IntegrationTest
   end
 
   test "a view key cannot trash a trashable recording" do
-    TrashableCapabilityLoader.install!
-    RecordingStudio.enable_capability(:trashable, on: "Folder")
     _view_root, view_access = create_access_recording_for(user: create_user(email: "view-trash@example.com"), role: :view)
     folder_recording = RecordingStudio::Recording.create!(
       recordable: Folder.create!(name: "View blocked"),

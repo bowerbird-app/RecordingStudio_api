@@ -804,7 +804,7 @@ module RecordingStudioApi
 
       def destroy_description_for(resource_name, recordable_type)
         label = docs_resource_name_for(resource_name, recordable_type)
-        if trashable_recordable_type?(recordable_type)
+        if ResourceOperations.trashable_type?(recordable_type)
           "Move #{label} to the trash, including nested items. Requires edit access. " \
             "Permanent deletion uses Trashable's purge action, which requires admin access."
         else
@@ -813,15 +813,8 @@ module RecordingStudioApi
         end
       end
 
-      def trashable_recordable_type?(recordable_type)
-        return false if recordable_type.blank?
-        return false unless defined?(RecordingStudio) && RecordingStudio.respond_to?(:capability_enabled?)
-
-        RecordingStudio.capability_enabled?(:trashable, for: recordable_type)
-      end
-
       def deleted_via_values_for(recordable_type)
-        trashable_recordable_type?(recordable_type) ? ["trashed"] : ["destroyed"]
+        ResourceOperations.trashable_type?(recordable_type) ? ["trashed"] : ["destroyed"]
       end
 
       def delete_marker_schema(recordable_type)

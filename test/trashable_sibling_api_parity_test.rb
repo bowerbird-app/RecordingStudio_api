@@ -18,10 +18,10 @@ class TrashableSiblingApiParityTest < ActiveSupport::TestCase
     remove_recording_default_scope!
   end
 
-  test "query helpers expose kept sql and predicates without lifecycle methods" do
+  test "query helpers expose kept sql and predicates with the Trashable engine" do
     assert defined?(RecordingStudioTrashable)
     assert_equal "1.0.1", RecordingStudioTrashable::VERSION
-    refute defined?(RecordingStudioTrashable::Engine)
+    assert defined?(RecordingStudioTrashable::Engine)
 
     recording = RecordingStudio::Recording
     assert_respond_to recording, :kept
@@ -39,9 +39,9 @@ class TrashableSiblingApiParityTest < ActiveSupport::TestCase
     page = create_page_recording(root_recording: root_recording)
     assert_predicate page, :recording_studio_trashable_kept?
 
-    refute_respond_to page, :recording_studio_trashable_trash!
-    refute_respond_to page, :recording_studio_trashable_restore!
-    refute_respond_to page, :recording_studio_trashable_purge!
+    assert_respond_to page, :recording_studio_trashable_trash!
+    assert_respond_to page, :recording_studio_trashable_restore!
+    assert_respond_to page, :recording_studio_trashable_purge!
   end
 
   test "accessible recordings SQL uses kept_sql and does not walk scope_tree" do

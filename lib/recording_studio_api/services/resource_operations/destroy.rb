@@ -16,19 +16,13 @@ module RecordingStudioApi
         private
 
         def delete_recording!(target_recording)
-          if trashable_type?(target_recording.recordable_type)
+          if ResourceOperations.trashable_type?(target_recording.recordable_type)
             trash_recording!(target_recording)
             "trashed"
           else
             destroy_recording!(target_recording)
             "destroyed"
           end
-        end
-
-        def trashable_type?(recordable_type)
-          return false unless defined?(RecordingStudio) && RecordingStudio.respond_to?(:capability_enabled?)
-
-          RecordingStudio.capability_enabled?(:trashable, for: recordable_type)
         end
 
         # Trashable owns permission, events, children, and its other rules.
