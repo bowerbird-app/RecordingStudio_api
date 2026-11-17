@@ -1,5 +1,14 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.14.0
+
+No behavior change for declared roots. No migration.
+
+1. Bump the host gem to `1.14.0`. Stay on Recording Studio `>= 7.7.0`, `< 8.0`.
+2. A recording is a root when `root?` is true. Token authentication loads that root with `RecordingStudio.root_recording_id_for` and still rejects a trashed root. Access-point labels for a root still use the recordable type. A nested access point still uses its name.
+3. A `root_type` filter still matches parentless recordings of that type. Core 7.7.0 does not ship a roots scope, so that query stays here.
+4. List `filter`, `q`, and recordable `sort` are unchanged. Core's `recordable_filters` and `recordable_order` run inside `recordings_query` on a root. They do not apply to an already authorized relation, and they do not cover search or keyset order.
+
 ## Upgrading to 1.13.0
 
 Behavior change. No migration. Authorization checks no longer write, and moving a key does not re-parent it.

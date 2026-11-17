@@ -45,6 +45,25 @@ class AuthenticateBearerTokenTest < ActiveSupport::TestCase
     assert_equal "Bearer token is inactive", result.error
   end
 
+  test "resolves the workspace root for a key on a folder" do
+    folder = nested_folder_recording("Token folder", @root_recording)
+    payload = RecordingStudioApi::Services::ProvisionApiClient.call(
+      access_point_recording: folder,
+      manager_actor: @user,
+      role: :admin,
+      name: "Folder token"
+    ).value
+    access_recording = payload.fetch(:access_recording)
+
+    result = RecordingStudioApi::Services::AuthenticateBearerToken.call(
+      authorization_header: "Bearer #{payload.fetch(:token)}"
+    )
+
+    assert result.success?, result.error.to_s
+    assert_equal @root_recording.id, result.value.root_recording.id
+    assert_equal RecordingStudio.root_recording_id_for(access_recording), result.value.root_recording.id
+  end
+
   test "rejects a token when its root recording is trashed" do
     user = create_user(email: "scoped-auth@example.com")
     root_recording, access_recording = create_access_recording_for(user: user)

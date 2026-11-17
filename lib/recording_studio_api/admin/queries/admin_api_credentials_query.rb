@@ -109,7 +109,7 @@ module RecordingStudioApi
 
           recording = access_recording.parent_recording || access_recording.root_recording
           return "Unknown" if recording.nil?
-          return recording.recordable_type.to_s.demodulize.underscore.humanize if recording.parent_recording_id.nil?
+          return recording.recordable_type.to_s.demodulize.underscore.humanize if recording.root?
 
           recordable_identifier(recording.recordable)
         end

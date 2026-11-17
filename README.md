@@ -1271,7 +1271,7 @@ Token-record contract (if provided):
 - `active_for_authentication?`
 - writable `last_used_at` column (updated with `update_column`)
 
-Both credential and token record must have active, non-trashed RecordingStudio recordables so scope resolution can derive the root recording. Kept/trashed predicates use Recording Studio Trashable (`recording_studio_trashable_kept?` / `recording_studio_trashable_trashed?`). Relation filters use additive `Recording.kept`. SQL filters use `RecordingStudio.kept_sql`. Pin `recording_studio` `>= 7.7.0`, `< 8.0` and `recording_studio_trashable` `>= 0.17.0`, `< 2.0`, and load `recording_studio_trashable/query` only.
+Both credential and token record must have active, non-trashed RecordingStudio recordables. Scope resolution loads the root with `RecordingStudio.root_recording_id_for` on the access recording and rejects a trashed root. Kept/trashed predicates use Recording Studio Trashable (`recording_studio_trashable_kept?` / `recording_studio_trashable_trashed?`). Relation filters use additive `Recording.kept`. SQL filters use `RecordingStudio.kept_sql`. Pin `recording_studio` `>= 7.7.0`, `< 8.0` and `recording_studio_trashable` `>= 0.17.0`, `< 2.0`, and load `recording_studio_trashable/query` only.
 
 ### OAuth resource server
 

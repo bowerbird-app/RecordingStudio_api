@@ -141,6 +141,46 @@ class ApiAccessClientsQueryTest < ActiveSupport::TestCase
     assert_equal 1, scoped_calls
   end
 
+  test "labels a root access point by type and a nested access point by its name" do
+    tree = build_folder_access
+    owner = tree.fetch(:owner)
+    provisioned_client_id(tree.fetch(:root), owner, "Workspace root key")
+    provisioned_client_id(tree.fetch(:folder), owner, "Workspace folder key")
+
+    rows = RecordingStudioApi::Admin::Queries::ApiAccessClientsQuery.call(
+      Context.new(params: {}, current_actor: owner, root_recording: tree.fetch(:root))
+    )
+    by_name = rows.index_by(&:name)
+
+    assert_equal "Workspace", by_name.fetch("Workspace root key").access_point
+    assert_equal "Managed folder", by_name.fetch("Workspace folder key").access_point
+    assert tree.fetch(:root).root?
+    refute tree.fetch(:folder).root?
+
+    RecordingStudioApi::Admin::Queries::AdminApiCredentialsQuery.clear_cache!
+    credential_rows = RecordingStudioApi::Admin::Queries::AdminApiCredentialsQuery.call.index_by { |row| row.api_client.name }
+
+    assert_equal "Workspace", credential_rows.fetch("Workspace root key").access_point
+    assert_equal "Managed folder", credential_rows.fetch("Workspace folder key").access_point
+    assert credential_rows.fetch("Workspace root key").root_recording.root?
+  end
+
+  test "a folder id is not treated as a root scope" do
+    tree = build_folder_access
+    owner = tree.fetch(:owner)
+    root_key = provisioned_client_id(tree.fetch(:root), owner, "Root stays")
+    folder_key = provisioned_client_id(tree.fetch(:folder), owner, "Folder stays")
+
+    ids = visible_client_ids(
+      actor: owner,
+      root_recording: tree.fetch(:root),
+      params: { root_recording_id: tree.fetch(:folder).id }
+    )
+
+    assert_includes ids, root_key
+    assert_includes ids, folder_key
+  end
+
   test "a workspace admin sees every key in the workspace" do
     tree = build_folder_access
     owner = tree.fetch(:owner)

@@ -84,7 +84,7 @@ module RecordingStudioApi
         access_recording = RecordingStudio::Recording.unscoped.find_by(id: credential.effective_access_recording_id)
         return if access_recording.nil?
 
-        root_id = access_recording.root_recording_id.presence || access_recording.id
+        root_id = RecordingStudio.root_recording_id_for(access_recording)
         root_recording = RecordingStudio::Recording.unscoped.find_by(id: root_id)
         return if root_recording.nil? || root_recording.recording_studio_trashable_trashed?
 
