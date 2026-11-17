@@ -50,14 +50,11 @@ module RecordingStudioApi
     alias_method :scoped_recordings_source, :scoped_recordings
 
     # A Proc is the builder. Callers that query recordings resolve it here.
-    # Passing the source into a relationship context does not.
+    # This object is frozen, so the builder keeps the relation.
+    # Passing the source into a relationship context does not call it.
     def scoped_recordings
       source = scoped_recordings_source
-      return source unless source.is_a?(Proc)
-
-      return @member_recordings if defined?(@member_recordings)
-
-      @member_recordings = source.call
+      source.is_a?(Proc) ? source.call : source
     end
 
     def api_key

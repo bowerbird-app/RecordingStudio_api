@@ -78,5 +78,18 @@ module RecordingStudioApi
       error[:details] = details if details.present?
       { error: error }
     end
+
+    # The operation context is frozen, so the lambda keeps the relation.
+    def lazy_recordings
+      recordings = nil
+      loaded = false
+      lambda do
+        return recordings if loaded
+
+        recordings = yield
+        loaded = true
+        recordings
+      end
+    end
   end
 end
