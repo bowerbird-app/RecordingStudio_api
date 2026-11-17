@@ -66,8 +66,6 @@ module RecordingStudioApi
         return [nil, nil] if credential.nil?
         return [nil, nil] unless active_recording_exists_for?("RecordingStudioApi::ApiCredential", credential.id)
 
-        OauthAccessToken.rehash_if_legacy!(access_token, token)
-
         [credential, access_token]
       end
 

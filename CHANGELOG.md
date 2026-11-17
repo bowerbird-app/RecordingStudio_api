@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-11-17
+
+### Removed
+- This gem no longer defines `RecordingStudio::Access`. Boot uses Accessible's model, including its creation guard and recordable name. Create grants with `RecordingStudioAccessible.grant_access`.
+- `RecordingStudioApi::AccessPolicy` is gone. `AccessManagementPolicy#authorized_for_root_recording?` is gone.
+- Unsalted SHA256 credential and access-token digests are gone. `token_digest_legacy_verify`, rehash-on-use, `TokenDigest.legacy_digest`, and `digest_candidates` are gone. Digests are HMAC-SHA256 with the pepper.
+- `RecordingStudioApi::Admin::SelectFilterDefaultPatch` is gone. Select filters use Admin's `default:`.
+
+### Changed
+- A missing or invalid `config/recording_studio_api.yml`, and a failure while reading `config.x.recording_studio_api`, raise while the engine loads.
+- Actor access lists use `RecordingStudioAccessible.access_grants_for`. Require `recording_studio_accessible` `>= 0.50.0`, `< 2.0`. Development and dummy pins are tag `v0.50.0`.
+- `recording_studio_admin` stays optional. Loading a copy older than `2.19.0` raises. Development and dummy Gemfiles pin tag `v2.19.0`. Select filters use that release's `default:`.
+
+### Upgrade notes
+- Bump to `1.12.0`. No migration.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.11.0] - 2026-11-17
 
 ### Changed

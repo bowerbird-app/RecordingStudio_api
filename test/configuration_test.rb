@@ -69,7 +69,7 @@ class ConfigurationTest < Minitest::Test
     assert_equal 20, configuration.rate_limit_api_failed_auth_requests
     assert_equal 60, configuration.rate_limit_api_failed_auth_period_seconds
     assert_equal false, configuration.rate_limit_check_fail_closed
-    assert_equal false, configuration.token_digest_legacy_verify
+    refute configuration.respond_to?(:token_digest_legacy_verify)
     assert_equal "recording_studio_api", configuration.rate_limit_redis_namespace
     assert_equal 10, configuration.rate_limit_oauth_requests
     assert_equal 60, configuration.rate_limit_oauth_period_seconds

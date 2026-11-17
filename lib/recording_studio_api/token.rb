@@ -39,10 +39,6 @@ module RecordingStudioApi
       TokenDigest.digest(token)
     end
 
-    def digest_candidates(token)
-      TokenDigest.digest_candidates(token)
-    end
-
     def digest_matches?(stored_digest, token)
       TokenDigest.matches?(stored_digest, token)
     end

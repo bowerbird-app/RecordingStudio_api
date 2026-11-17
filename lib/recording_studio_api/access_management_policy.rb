@@ -87,10 +87,6 @@ module RecordingStudioApi
       )
     end
 
-    def authorized_for_root_recording?(root_recording, access_management_role:)
-      authorized_for_recording?(root_recording, access_management_role: access_management_role)
-    end
-
     def authorized_for_recording?(recording, access_management_role:)
       return false if actor.nil?
       return false if recording.nil?
@@ -199,16 +195,9 @@ module RecordingStudioApi
     end
 
     def access_recordings
-      @access_recordings ||= begin
-        access_ids = RecordingStudio::Access.where(actor: actor).pluck(:id)
-        return [] if access_ids.empty?
-
-        RecordingStudio::Recording.unscoped
-                                  .includes(:recordable)
-                                  .where(recordable_type: "RecordingStudio::Access", recordable_id: access_ids)
-                                  .kept
-                                  .to_a
-      end
+      @access_recordings ||= RecordingStudioAccessible.access_grants_for(actor: actor)
+                                                      .includes(:recordable)
+                                                      .to_a
     end
 
     def api_client_access_recordings

@@ -28,16 +28,8 @@ module RecordingStudioApi
       TokenDigest.digest(token)
     end
 
-    def digest_candidates(token)
-      TokenDigest.digest_candidates(token)
-    end
-
     def find_by_token(scope, token)
       TokenDigest.find_by_token_digest(scope, token)
-    end
-
-    def rehash_if_legacy!(record, token)
-      TokenDigest.rehash_if_legacy!(record, token)
     end
   end
 end

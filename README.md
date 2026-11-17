@@ -5,9 +5,9 @@
 `RecordingStudioApi` is a mountable Rails engine that provides authenticated, capability-backed JSON APIs for Recording Studio addons.
 
 Companion pins on current main: Trashable `>= 0.17.0, < 2.0` / `v1.0.1`
-(query-only), Admin `v2.18.0`, Moveable `>= 5.0, < 7.0` / `v6.0.0`, Root Switchable
-`v0.16.0`, Cache `v0.7.0` (development/test), Accessible `>= 0.49.0, < 2.0`
-(`tag: v0.49.0`), RecordingStudio `v7.7.0`
+(query-only), Admin `v2.19.0` (development and dummy only), Moveable `>= 5.0, < 7.0` / `v6.0.0`, Root Switchable
+`v0.16.0`, Cache `v0.7.0` (development/test), Accessible `>= 0.50.0, < 2.0`
+(`tag: v0.50.0`), RecordingStudio `v7.7.0`
 (`>= 7.7.0, < 8.0`), Flatpack `0.1.377`
 (`tag: v0.1.377`, `>= 0.1.356, < 2.0`),
 Metrics `v0.9.0` (`>= 0.9.0, < 2.0`), Logs `v0.8.0` (`>= 0.8.0, < 2.0`). Recording Studio MCP `v0.17.0`
@@ -542,9 +542,7 @@ Recording Studio 3.x requires every configured ActiveRecord recordable to declar
 `recording_studio_recordable(...)`. Host apps must mark real roots with `root: true`, declare
 `allowed_parent_types` for child-capable recordables, and enable `RecordingStudio.enable_capability(:accessible, on: ...)`
 for every recordable that can own direct access grants. Enable `RecordingStudio.enable_capability(:api_access_point, on: ...)`
-for recordables that may act as API key access points. When an admin root has none for the selected API, the new-key form lists manageable roots that do, and creates the key there. It does not nest that access point under the admin root. A workspace stays on the access points already in its tree. The dummy app marks `Workspace` and `Folder` as root-capable,
-keeps `Page` as a child recordable, and the API engine registers its internal `RecordingStudio::Access`, API client,
-credential, access-token, and admin API recordables with explicit parent rules.
+for recordables that may act as API key access points. When an admin root has none for the selected API, the new-key form lists manageable roots that do, and creates the key there. It does not nest that access point under the admin root. A workspace stays on the access points already in its tree. The dummy app marks `Workspace` and `Folder` as root-capable and keeps `Page` as a child recordable. Accessible owns `RecordingStudio::Access`. The API engine registers API client, credential, access-token, and admin API recordables with explicit parent rules. API clients still nest under an Access recording.
 
 Each action declares its verb, capability mapping, handler, and serializer so addon gems can register an API action once and let the API expose it automatically for any recordable type that enables the capability.
 
@@ -570,6 +568,8 @@ Each action declares its verb, capability mapping, handler, and serializer so ad
 ### Boot validation
 
 The runtime should fail fast when:
+
+- `config/recording_studio_api.yml` is missing or invalid, or `config.x.recording_studio_api` cannot be read
 
 - an API action points at a capability that is not enabled
 - duplicate action name plus contribution version pairs are registered

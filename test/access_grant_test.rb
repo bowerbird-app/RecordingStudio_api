@@ -50,6 +50,19 @@ class AccessGrantTest < ActiveSupport::TestCase
     refute RecordingStudio::Access.respond_to?(:roles)
   end
 
+  test "Access is Accessible's model and rejects a direct create" do
+    model_path = File.expand_path("../app/models/recording_studio/access.rb", __dir__)
+
+    refute File.exist?(model_path)
+    assert_includes RecordingStudio::Access.included_modules, RecordingStudioAccessible::AccessCreationGuard
+
+    error = assert_raises(ActiveRecord::RecordInvalid) do
+      RecordingStudio::Access.create!(actor: @user, role: :view)
+    end
+
+    assert_match(/grant_access/, error.message)
+  end
+
   test "unknown required role is not authorized" do
     root_recording, access_recording = create_access_recording_for(user: @user, role: :admin)
     page_recording = create_page_recording(root_recording: root_recording)

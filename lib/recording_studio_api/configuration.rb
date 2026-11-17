@@ -23,7 +23,6 @@ module RecordingStudioApi
                   :access_management_edit_role,
                   :api_management_authorization_required,
                   :token_digest_pepper,
-                  :token_digest_legacy_verify,
                   :capability_action_role_resolver,
                   :admin_dashboard_path_resolver,
                   :admin_settings_path_resolver,
@@ -86,7 +85,6 @@ module RecordingStudioApi
       @access_management_edit_role = :admin
       @api_management_authorization_required = true
       @token_digest_pepper = ENV["RECORDING_STUDIO_API_TOKEN_DIGEST_PEPPER"].presence
-      @token_digest_legacy_verify = false # off; enable while rotating unsalted SHA256 credentials
       @capability_action_roles = {}
       @capability_action_role_resolver = nil
       @admin_dashboard_path_resolver = lambda do |controller:, **|
@@ -167,7 +165,6 @@ module RecordingStudioApi
         access_token_ttl: access_token_ttl,
         api_management_authorization_required: api_management_authorization_required,
         token_digest_pepper_present: token_digest_pepper.present?,
-        token_digest_legacy_verify: token_digest_legacy_verify,
         token_authenticators_count: token_authenticators.count,
         oauth_grant_types: oauth_grants.keys,
         capability_action_roles: capability_action_roles,

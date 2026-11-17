@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "digest"
 require_relative "support/api_dummy_helpers"
 
 class TokenDigestTest < ActiveSupport::TestCase
@@ -19,28 +20,18 @@ class TokenDigestTest < ActiveSupport::TestCase
 
     assert_equal RecordingStudioApi::TokenDigest.peppered_digest(token_data.fetch(:token)), token_data.fetch(:digest)
     assert_equal RecordingStudioApi::TokenDigest.peppered_digest(access_token_data.fetch(:token)), access_token_data.fetch(:digest)
-    refute_equal RecordingStudioApi::TokenDigest.legacy_digest(token_data.fetch(:token)), token_data.fetch(:digest)
+    refute_equal Digest::SHA256.hexdigest(token_data.fetch(:token)), token_data.fetch(:digest)
   end
 
-  test "accepts legacy sha256 digests while legacy verify is enabled" do
-    RecordingStudioApi.configuration.token_digest_legacy_verify = true
+  test "rejects an unsalted sha256 digest" do
     secret = "rsapi_abcd1234.legacy-secret-value"
-    legacy_digest = RecordingStudioApi::TokenDigest.legacy_digest(secret)
+    unsalted = Digest::SHA256.hexdigest(secret)
 
-    assert RecordingStudioApi::Token.digest_matches?(legacy_digest, secret)
-  end
-
-  test "rejects legacy digests when legacy verify is disabled" do
-    RecordingStudioApi.configuration.token_digest_legacy_verify = false
-    secret = "rsapi_abcd1234.legacy-secret-value"
-    legacy_digest = RecordingStudioApi::TokenDigest.legacy_digest(secret)
-
-    refute RecordingStudioApi::Token.digest_matches?(legacy_digest, secret)
+    refute RecordingStudioApi::Token.digest_matches?(unsalted, secret)
     assert RecordingStudioApi::Token.digest_matches?(RecordingStudioApi::Token.digest(secret), secret)
   end
 
-  test "rehashes legacy credential digests after a successful match" do
-    RecordingStudioApi.configuration.token_digest_legacy_verify = true
+  test "does not authenticate or rewrite an unsalted credential digest" do
     user = create_user
     _root, access_recording = create_access_recording_for(user: user)
     payload = RecordingStudioApi::Services::ProvisionApiClient.call(
@@ -49,8 +40,8 @@ class TokenDigestTest < ActiveSupport::TestCase
     ).value
     credential = payload.fetch(:credential)
     secret = payload.fetch(:token)
-
-    credential.update_columns(token_digest: RecordingStudioApi::TokenDigest.legacy_digest(secret))
+    unsalted = Digest::SHA256.hexdigest(secret)
+    credential.update_columns(token_digest: unsalted)
 
     result = RecordingStudioApi::Services::IssueOauthAccessToken.call(
       grant_type: "client_credentials",
@@ -58,8 +49,8 @@ class TokenDigestTest < ActiveSupport::TestCase
       client_secret: secret
     )
 
-    assert result.success?, result.error
-    assert_equal RecordingStudioApi::Token.digest(secret), credential.reload.token_digest
+    assert result.failure?
+    assert_equal unsalted, credential.reload.token_digest
   end
 
   test "raises when no digest pepper or secret_key_base is available" do

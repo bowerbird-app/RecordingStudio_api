@@ -31,16 +31,7 @@ module RecordingStudioApi
     end
 
     def actor_access_recordings(actor:)
-      return [] if actor.nil?
-
-      access_ids = RecordingStudio::Access.where(actor: actor).pluck(:id)
-      return [] if access_ids.empty?
-
-      RecordingStudio::Recording.unscoped
-                                .where(recordable_type: "RecordingStudio::Access", recordable_id: access_ids)
-                                .kept
-                                .order(:created_at, :id)
-                                .to_a
+      RecordingStudioAccessible.access_grants_for(actor: actor).order(:created_at, :id).to_a
     end
 
     def resolve_access_recording_for_actor(actor:, requested_access_recording_id: nil)
