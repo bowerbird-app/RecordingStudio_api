@@ -1,31 +1,6 @@
 # frozen_string_literal: true
 
 module RecordingStudioApi
-  # Defers `accessible_recordings` until a caller actually queries the relation.
-  # Building that relation runs Accessible's subtree probe, so a list that
-  # passes its own scope should not pay for a second unused one.
-  class LazyRecordings < BasicObject
-    def initialize(&block)
-      @block = block
-    end
-
-    def respond_to?(*)
-      true
-    end
-
-    def respond_to_missing?(*)
-      true
-    end
-
-    def method_missing(...)
-      __relation__.__send__(...)
-    end
-
-    def __relation__
-      @__relation__ ||= @block.call
-    end
-  end
-
   # Recordings the owner can view under one grant anchor.
   #
   # `authorized_recordings` returns that set as a relation. Callers pass the

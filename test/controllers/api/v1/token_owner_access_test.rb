@@ -69,7 +69,11 @@ class ApiV1TokenOwnerAccessTest < ActionDispatch::IntegrationTest
     assert(queries.any? { |sql| sql.include?("LIMIT") })
     queries.each { |sql| refute_includes sql, "covered" }
 
-    get "/recording_studio_api/api/v1/pages", params: { limit: 50 }, headers: bearer(token)
+    page_calls = count_authorized_recordings do
+      get "/recording_studio_api/api/v1/pages", params: { limit: 50 }, headers: bearer(token)
+    end
+    assert_equal 1, page_calls.fetch(:typed)
+    assert_equal 1, page_calls.fetch(:plain)
     assert_response :success
     page_ids = JSON.parse(response.body).fetch("records").map { |row| row.fetch("id") }
     assert_includes page_ids, child_page.id
@@ -195,6 +199,24 @@ class ApiV1TokenOwnerAccessTest < ActionDispatch::IntegrationTest
 
   def bearer(token)
     { "Authorization" => "Bearer #{token}" }
+  end
+
+  # :typed is the page list. :plain is authorize! on the anchor.
+  # A second plain call would be the unused untyped scope.
+  def count_authorized_recordings
+    calls = { typed: 0, plain: 0 }
+    singleton = class << RecordingStudioAccessible; self; end
+    singleton.alias_method(:authorized_recordings_without_count, :authorized_recordings)
+    singleton.define_method(:authorized_recordings) do |*args, **kwargs, &block|
+      typed = kwargs[:scope].respond_to?(:to_sql) && kwargs[:scope].to_sql.include?("recordable_type")
+      calls[typed ? :typed : :plain] += 1
+      authorized_recordings_without_count(*args, **kwargs, &block)
+    end
+    yield
+    calls
+  ensure
+    singleton.alias_method(:authorized_recordings, :authorized_recordings_without_count)
+    singleton.remove_method(:authorized_recordings_without_count)
   end
 
   def capture_sql(&)

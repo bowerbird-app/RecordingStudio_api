@@ -47,6 +47,19 @@ module RecordingStudioApi
       super
     end
 
+    alias_method :scoped_recordings_source, :scoped_recordings
+
+    # A Proc is the builder. Callers that query recordings resolve it here.
+    # Passing the source into a relationship context does not.
+    def scoped_recordings
+      source = scoped_recordings_source
+      return source unless source.is_a?(Proc)
+
+      return @member_recordings if defined?(@member_recordings)
+
+      @member_recordings = source.call
+    end
+
     def api_key
       api_client&.api_key.presence || "public"
     end

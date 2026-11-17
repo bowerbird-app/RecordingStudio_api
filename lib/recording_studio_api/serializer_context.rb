@@ -2,7 +2,7 @@
 
 module RecordingStudioApi
   class SerializerContext
-    attr_reader :recording, :recordable, :access_grant, :scoped_recordings, :api_version,
+    attr_reader :recording, :recordable, :access_grant, :api_version,
                 :api_key, :params, :registration, :current_field, :current_relationship,
                 :selected_include_names, :target_recording
 
@@ -16,7 +16,7 @@ module RecordingStudioApi
         recording: recording,
         recordable: recording.recordable,
         access_grant: context_value(context, :access_grant),
-        scoped_recordings: context_value(context, :scoped_recordings),
+        scoped_recordings: lazy_scoped_recordings(context),
         api_version: context_value(context, :api_version) || api_version,
         api_key: context_value(context, :api_key) || api_key,
         params: context_value(context, :params),
@@ -34,7 +34,11 @@ module RecordingStudioApi
       @recording = recording
       @recordable = recordable
       @access_grant = access_grant
-      @scoped_recordings = scoped_recordings
+      if scoped_recordings.is_a?(Proc)
+        @scoped_recordings_resolver = scoped_recordings
+      else
+        @scoped_recordings = scoped_recordings
+      end
       @api_version = api_version
       @api_key = api_key
       @params = params
@@ -52,10 +56,16 @@ module RecordingStudioApi
              target_recording: @target_recording)
       self.class.new(
         recording: recording, recordable: recordable, access_grant: access_grant,
-        scoped_recordings: scoped_recordings, api_version: api_version, api_key: api_key, params: params,
+        scoped_recordings: scoped_recordings_for_copy, api_version: api_version, api_key: api_key, params: params,
         registration: registration, selected_include_names: selected_include_names,
         relationship_context: @relationship_context, field: field, relationship: relationship, target_recording: target_recording
       )
+    end
+
+    def scoped_recordings
+      return @scoped_recordings if defined?(@scoped_recordings)
+
+      @scoped_recordings = @scoped_recordings_resolver&.call
     end
 
     def include?(name, definition = nil)
@@ -72,8 +82,23 @@ module RecordingStudioApi
       @relationship_context.relationship_metadata(recording, name) if @relationship_context.respond_to?(:relationship_metadata)
     end
 
+    # The lambda is called when a serializer or field asks for the relation.
+    def self.lazy_scoped_recordings(context)
+      return nil unless context.respond_to?(:scoped_recordings)
+
+      -> { context.scoped_recordings }
+    end
+
     def self.context_value(context, name)
       context.public_send(name) if context.respond_to?(name)
+    end
+
+    private
+
+    def scoped_recordings_for_copy
+      return @scoped_recordings_resolver if !defined?(@scoped_recordings) && @scoped_recordings_resolver
+
+      scoped_recordings
     end
   end
 end

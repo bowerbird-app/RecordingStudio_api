@@ -4,7 +4,7 @@ module RecordingStudioApi
   class RelationshipContext
     INCLUDE_NAME_PATTERN = /\A[a-zA-Z_][a-zA-Z0-9_]*\z/
 
-    attr_reader :access_grant, :api_key, :api_version, :params, :scoped_recordings, :selected_include_names
+    attr_reader :access_grant, :api_key, :api_version, :params, :selected_include_names
 
     def self.for(recordings:, include_values:, scoped_recordings:, api_key:, api_version:, access_grant: nil, params: {}, nested: false, batch: false)
       new(
@@ -22,7 +22,7 @@ module RecordingStudioApi
 
     def initialize(recordings:, include_values:, scoped_recordings:, api_key:, api_version:, access_grant: nil, params: {}, nested: false, batch: false)
       @recordings = Array(recordings)
-      @scoped_recordings = scoped_recordings
+      @scoped_recordings_source = scoped_recordings
       @api_key = api_key
       @api_version = api_version
       @access_grant = access_grant
@@ -64,9 +64,16 @@ module RecordingStudioApi
         @resolved_relationship_metadata[[recording.id, name.to_s]]
     end
 
+    def scoped_recordings
+      source = @scoped_recordings_source
+      return source unless source.is_a?(Proc)
+
+      @scoped_recordings ||= source.call
+    end
+
     def nested
       self.class.for(
-        recordings: [], include_values: nil, scoped_recordings: scoped_recordings,
+        recordings: [], include_values: nil, scoped_recordings: @scoped_recordings_source,
         api_key: api_key, api_version: api_version, access_grant: access_grant, params: params, nested: true, batch: false
       )
     end
