@@ -17,6 +17,7 @@ module RecordingStudioApi
             sort: params[:sort],
             order: params[:order],
             count: params[:count],
+            include_total: params[:include_total],
             api: api_key,
             scope_key: scope_key
           )

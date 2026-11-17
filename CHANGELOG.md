@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-16
+
+### Changed
+- List `meta.total_count` is omitted unless the request passes `include_total=true`. `count=true` still returns only `{ total_count }`.
+- Included child collections load from the current page's recording ids. Each parent returns at most 100 children, or the relationship `limit` when that is lower.
+
+### Upgrade notes
+- Bump to `1.3.0`. No migration.
+- Clients that read `meta.total_count` on every list pass `include_total=true`.
+- Included relationships never return more than 100 children per parent.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.2.2] - 2026-11-16
 
 ### Fixed

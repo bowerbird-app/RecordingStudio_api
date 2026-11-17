@@ -72,9 +72,9 @@ module RecordingStudioApi
             return
           end
 
-          result = operation.handler.call(
-            resource_operation_context(recording: builtin_member_recording_for(operation_name))
-          )
+          context = resource_operation_context(recording: builtin_member_recording_for(operation_name))
+          result = operation.handler.call(context)
+
           render json: result.fetch(:json), status: result.fetch(:status, :ok)
         end
 

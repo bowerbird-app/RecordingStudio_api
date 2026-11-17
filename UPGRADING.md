@@ -1,5 +1,15 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.3.0
+
+No migration. List responses and included children change.
+
+1. Bump the host gem to `1.3.0`.
+2. Pass `include_total=true` when a client needs `meta.total_count`. It is omitted by default. `count=true` still returns only `{ "total_count": N }`.
+3. Included child collections load from the current page's recording ids. Each parent returns at most 100 children, or the relationship `limit` when that is lower.
+
+Custom index handlers are unchanged. They do not gain `total_count` or `count=true`.
+
 ## Upgrading to 1.2.2
 
 No migration. Routes stay the same. Member actions authorize before the input contract runs.

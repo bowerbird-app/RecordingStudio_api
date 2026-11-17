@@ -556,8 +556,9 @@ module RecordingStudioApi
         count_branch = schema_branch(list_schema, "Count")
 
         assert_equal %w[resource type records meta], list_branch.fetch("required")
-        assert_equal %w[limit sort order has_more next_pagination_token total_count],
+        assert_equal %w[limit sort order has_more next_pagination_token],
                      list_branch.fetch("properties").fetch("meta").fetch("required")
+        assert_equal true, list_branch.fetch("properties").fetch("meta").fetch("properties").key?("total_count")
         assert_equal ["total_count"], count_branch.fetch("required")
         assert_equal false, count_branch.fetch("additionalProperties")
         assert_equal ["total_count"], count_branch.fetch("properties").keys
@@ -572,6 +573,18 @@ module RecordingStudioApi
           },
           list_operation.fetch(:parameters).find { |parameter| parameter.fetch("name") == "count" }
         )
+        assert_equal(
+          {
+            "name" => "include_total",
+            "in" => "query",
+            "required" => false,
+            "description" => "Set to true to add meta.total_count, the number of matching records on every page. " \
+                             "Omitted by default so list reads do not count the scope.",
+            "schema" => { "type" => "boolean", "default" => false }
+          },
+          list_operation.fetch(:parameters).find { |parameter| parameter.fetch("name") == "include_total" }
+        )
+        refute list_operation.fetch(:responses).key?("304")
       end
 
       def test_capability_actions_generate_nested_resource_paths
@@ -1001,7 +1014,8 @@ module RecordingStudioApi
 
         assert_equal false, meta_schema.fetch("example").fetch("has_more")
         assert_nil meta_schema.fetch("example").fetch("next_pagination_token")
-        assert_equal 2, meta_schema.fetch("example").fetch("total_count")
+        refute meta_schema.fetch("example").key?("total_count")
+        assert_equal true, meta_schema.fetch("properties").key?("total_count")
       end
 
       def test_unregistered_page_schema_has_no_attributes_wrapper
