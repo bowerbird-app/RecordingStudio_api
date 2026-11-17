@@ -1,5 +1,15 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.11.0
+
+Behavior change. No migration. `DELETE` follows the recordable type.
+
+1. Bump the host gem to `1.11.0`. Stay on Recording Studio `>= 7.7.0`, `< 8.0` and Trashable `>= 0.17.0`, `< 2.0`.
+2. When `RecordingStudio.capability_enabled?(:trashable, for: type)` is true, `DELETE` calls `recording_studio_trashable_trash!` with the request actor and impersonator. Trashable checks permission, writes the trashed events, and includes children. The recording stays, with `trashed_at` set. Default lists omit it and show returns 404. The response `deleted_via` is `trashed`.
+3. When the type is not trashable, `DELETE` calls `Recording#destroy!`. Core refuses a recording that still has children (`dependent: :restrict_with_error`). The API returns 422 with that message. Core removes that recording's events through the association `delete_all`. The immutable recordable snapshot stays. `deleted_via` is `destroyed`.
+4. The edit role is still required before either path. A view key gets 403. `DELETE` does not call `recordable.destroy!` and does not rescue `ActiveRecord::ReadOnlyRecord`.
+5. Permanent deletion is Trashable's `trashable_purge` action (`POST .../actions/trashable_purge`), which requires admin. This gem does not add a second purge route. Trashable registers that action when its engine is loaded. It is available on a trashable type when capability actions are automatic (the default) or the type lists `trashable_purge`. The item must already be in the trash.
+
 ## Upgrading to 1.10.0
 
 Behavior change. No migration. The admin API keys list follows Accessible.

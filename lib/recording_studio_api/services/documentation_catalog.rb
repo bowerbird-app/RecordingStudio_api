@@ -803,8 +803,29 @@ module RecordingStudioApi
       end
 
       def destroy_description_for(resource_name, recordable_type)
-        "Permanently delete #{docs_resource_name_for(resource_name, recordable_type)}. " \
-          "Recording Studio API hard-deletes the recording and recordable; it does not soft-delete or move to trash."
+        label = docs_resource_name_for(resource_name, recordable_type)
+        if ResourceOperations.trashable_type?(recordable_type)
+          "Move #{label} to the trash, including nested items. Requires edit access. " \
+            "Permanent deletion uses Trashable's purge action, which requires admin access."
+        else
+          "Delete #{label} by destroying the recording. A recording that still has children is refused. " \
+            "Requires edit access."
+        end
+      end
+
+      def deleted_via_values_for(recordable_type)
+        ResourceOperations.trashable_type?(recordable_type) ? ["trashed"] : ["destroyed"]
+      end
+
+      def delete_marker_schema(recordable_type)
+        {
+          type: "object",
+          properties: {
+            deleted: { type: "boolean" },
+            deleted_via: { type: "string", enum: deleted_via_values_for(recordable_type) }
+          },
+          required: %w[deleted deleted_via]
+        }
       end
 
       def resource_list_responses(resource_name, recordable_type, docs_resource_name, item_schema: nil,
@@ -995,20 +1016,13 @@ module RecordingStudioApi
 
         {
           "200" => {
-            description: "Resource permanently deleted.",
+            description: "Resource deleted.",
             content: {
               "application/json" => {
                 schema: {
                   allOf: [
                     recording_schema(recordable_type),
-                    {
-                      type: "object",
-                      properties: {
-                        deleted: { type: "boolean" },
-                        deleted_via: { type: "string", enum: ["destroyed"] }
-                      },
-                      required: %w[deleted deleted_via]
-                    }
+                    delete_marker_schema(recordable_type)
                   ]
                 }
               }
@@ -1529,18 +1543,11 @@ module RecordingStudioApi
         recording = relationship_recording_schema(relationship, operation: :destroy)
         relationship_response(
           "200",
-          "Resource permanently deleted.",
+          "Resource deleted.",
           {
             allOf: [
               recording,
-              {
-                type: "object",
-                properties: {
-                  deleted: { type: "boolean" },
-                  deleted_via: { type: "string", enum: ["destroyed"] }
-                },
-                required: %w[deleted deleted_via]
-              }
+              delete_marker_schema(relationship.child_type)
             ]
           }
         )

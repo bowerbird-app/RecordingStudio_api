@@ -81,6 +81,7 @@ module ApiDummyHelpers # rubocop:disable Metrics/ModuleLength
     RecordingStudio.enable_capability(:api_access_point, on: "Folder")
     RecordingStudio.enable_capability(:api_access_point, on: "AdminRoot") if defined?(AdminRoot)
     RecordingStudio.enable_capability(:movable, on: "Folder")
+    RecordingStudio.enable_capability(:trashable, on: "Folder")
     RecordingStudioAuthorizedWrites.install!
   end
 

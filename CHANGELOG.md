@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-11-17
+
+### Changed
+- `DELETE` follows the recordable type. A type with Trashable enabled is moved to the trash with `recording_studio_trashable_trash!`. Trashable checks permission, writes the events, and includes children. `deleted_via` is `trashed`. The recording stays, so default lists omit it and show returns 404.
+- Any other type is destroyed with `Recording#destroy!`. Core refuses a recording that still has children, and the API returns 422 with that message. Core removes that recording's events. The recordable snapshot stays. `deleted_via` is `destroyed`.
+- `DELETE` still requires the edit role. It no longer destroys the recordable, and it does not rescue `ActiveRecord::ReadOnlyRecord`.
+
+### Upgrade notes
+- Bump to `1.11.0`. No migration.
+- Permanent deletion is Trashable's `trashable_purge` action, which requires admin. This gem does not add a second purge route.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.10.0] - 2026-11-17
 
 ### Fixed

@@ -14,6 +14,7 @@ class Folder < ApplicationRecord
   RecordingStudio.enable_capability(:api_access_point, on: self)
   RecordingStudio.enable_capability(:movable, on: self)
   include RecordingStudio::Capabilities::Moveable.to(allow_cross_root: false)
+  include RecordingStudio::Capabilities::Trashable.to
 
   recording_studio_admin_sections do
     section :api

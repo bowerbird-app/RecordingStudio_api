@@ -36,6 +36,7 @@ RecordingStudio.configure do |config|
   config.enable_capability(:api_access_point, on: "Folder")
   config.enable_capability(:api_access_point, on: "AdminRoot")
   config.enable_capability(:movable, on: "Folder")
+  config.enable_capability(:trashable, on: "Folder")
 end
 
 RecordingStudio::Labels.register_formatter(

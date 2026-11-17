@@ -221,7 +221,7 @@ module RecordingStudioApi
           assert_includes update_operation.fetch(:description), "Requires edit access."
           refute_includes update_operation.fetch(:description), "the caller can access"
           refute_includes update_operation.fetch(:description), "`parent_id`"
-          assert_includes delete_operation.fetch(:description), "Permanently delete Page."
+          assert_includes delete_operation.fetch(:description), "Delete Page by destroying the recording."
           refute_includes delete_operation.fetch(:description), "the caller can access"
         end
       end
@@ -439,16 +439,39 @@ module RecordingStudioApi
         end
       end
 
-      def test_delete_operation_description_mentions_permanent_delete
+      def test_delete_operation_description_destroys_a_type_that_is_not_trashable
         with_stubbed_recordable_class("Page", [column_stub("id", :uuid, false)]) do
           with_recordable_registration("Page", openapi: {}, operations: %i[index show create update destroy]) do
             document = with_recordable_types(["Page"]) { OpenapiDocument.call }
             delete_operation = document.fetch(:paths).fetch("/recording_studio_api/api/v1/pages/{id}").fetch("delete")
 
             assert_equal(
-              "Permanently delete Page. Recording Studio API hard-deletes the recording and recordable; it does not soft-delete or move to trash.",
+              "Delete Page by destroying the recording. A recording that still has children is refused. Requires edit access.",
               delete_operation.fetch(:description)
             )
+            enum = delete_operation.dig(:responses, "200", "content", "application/json", "schema", "allOf")
+                                   .last.dig("properties", "deleted_via", "enum")
+            assert_equal ["destroyed"], enum
+          end
+        end
+      end
+
+      def test_delete_operation_description_trashes_a_trashable_type
+        with_stubbed_recordable_class("Page", [column_stub("id", :uuid, false)]) do
+          with_recordable_registration("Page", openapi: {}, operations: %i[index show create update destroy]) do
+            RecordingStudio.stub(:capability_enabled?, ->(capability, **) { capability.to_sym == :trashable }) do
+              document = with_recordable_types(["Page"]) { OpenapiDocument.call }
+              delete_operation = document.fetch(:paths).fetch("/recording_studio_api/api/v1/pages/{id}").fetch("delete")
+
+              assert_equal(
+                "Move Page to the trash, including nested items. Requires edit access. " \
+                "Permanent deletion uses Trashable's purge action, which requires admin access.",
+                delete_operation.fetch(:description)
+              )
+              enum = delete_operation.dig(:responses, "200", "content", "application/json", "schema", "allOf")
+                                     .last.dig("properties", "deleted_via", "enum")
+              assert_equal ["trashed"], enum
+            end
           end
         end
       end

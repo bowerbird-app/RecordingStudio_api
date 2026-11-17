@@ -770,6 +770,17 @@ show, update, or destroy authorizes the child. A flat create does not scope
 `parent_id` from the body. A move destination and any other id in the body
 stay the handler's job.
 
+`destroy` then follows the recordable type. A type with Trashable enabled
+is moved to the trash with `recording_studio_trashable_trash!`. Trashable
+checks permission, writes the events, and includes children. `deleted_via`
+is `trashed`. The recording stays, so default lists omit it and show returns
+404. Any other type is destroyed with `Recording#destroy!`. Core refuses a
+recording that still has children, and the API returns 422 with that message.
+Core removes that recording's events. The recordable snapshot stays.
+`deleted_via` is `destroyed`. Permanent deletion of a trashed recording is
+Trashable's `trashable_purge` action, which requires admin. This gem does
+not add a second purge route.
+
 Pass `include_trashed: true` on `register_resource_handler` when the action
 must see a trashed recording. The default lookup is kept recordings only.
 
@@ -1453,7 +1464,7 @@ With no reporter, `progress` returns `nil` and `cancelled?` is `false`.
 - `GET /recording_studio_api/api/<version>/:resource/:id` — show one recording
 - `POST /recording_studio_api/api/<version>/:resource` — create a recording when the resource permits `:create`
 - `PATCH /recording_studio_api/api/<version>/:resource/:id` — update a recording when the resource permits `:update`
-- `DELETE /recording_studio_api/api/<version>/:resource/:id` — destroy a recording when the resource permits `:destroy`
+- `DELETE /recording_studio_api/api/<version>/:resource/:id` — delete a recording when the resource permits `:destroy`. A trashable type moves to the trash. Any other type is destroyed
 - `GET /recording_studio_api/api/<version>/:resource/:id/:relationship` — list a registered named relationship
 - `GET /recording_studio_api/api/<version>/:resource/:id/:relationship/:relationship_id` — show a direct child from a registered `children` relationship
 - `POST /recording_studio_api/api/<version>/:resource/:id/:relationship` and `PATCH|DELETE /.../:relationship/:relationship_id` — mutate a writable `children` relationship

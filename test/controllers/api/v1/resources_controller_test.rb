@@ -1134,8 +1134,11 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_equal "Resource was not found in this API scope", JSON.parse(response.body).dig("error", "message")
   end
 
-  test "deletes a resource by hard deleting its recording" do
+  test "deletes a non-trashable resource by destroying its recording" do
     page_recording = create_page_recording(root_recording: @root_recording)
+    page = page_recording.recordable
+    page_recording.log_event!(action: "noted", actor: @user, metadata: { source: "test" })
+    noted_id = page_recording.events.pick(:id)
 
     delete "/recording_studio_api/api/v1/pages/#{page_recording.id}", headers: authorization_headers
 
@@ -1146,9 +1149,20 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_equal true, payload.fetch("deleted")
     assert_equal "destroyed", payload.fetch("deleted_via")
     assert_nil RecordingStudio::Recording.unscoped.find_by(id: page_recording.id)
+    assert Page.exists?(page.id)
+    assert_nil RecordingStudio::Event.find_by(id: noted_id)
 
     get "/recording_studio_api/api/v1/pages/#{page_recording.id}", headers: authorization_headers
     assert_response :not_found
+  end
+
+  test "refuses to destroy a non-trashable recording that still has children" do
+    delete "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}", headers: authorization_headers
+
+    assert_response :unprocessable_entity
+    assert_includes JSON.parse(response.body).dig("error", "message"), "child"
+    assert RecordingStudio::Recording.exists?(@root_recording.id)
+    assert @root_recording.child_recordings.exists?
   end
 
   test "forbids create for clients with view-only access" do

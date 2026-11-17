@@ -2,9 +2,8 @@
 
 require_relative "support/api_dummy_helpers"
 
-# Proves query-only Trashable loading leaves the published dummy surface free of
-# full-engine side effects (importmap pin/preload, capability, lifecycle methods,
-# CopyHelper, trash metrics).
+# The dummy loads the Trashable engine, the same way it loads Accessible.
+# Folder is trashable. Page is not.
 class TrashableQuerySurfaceTest < ActionDispatch::IntegrationTest
   include ApiDummyHelpers
 
@@ -20,43 +19,40 @@ class TrashableQuerySurfaceTest < ActionDispatch::IntegrationTest
     Current.actor = nil if defined?(Current)
   end
 
-  test "query-only require leaves no Trashable engine side effects" do
-    refute defined?(RecordingStudioTrashable::Engine), "Engine must stay unloaded"
-    refute defined?(RecordingStudioTrashable::CopyHelper), "CopyHelper must stay unloaded"
-    refute defined?(RecordingStudioTrashable::Metrics), "Trashable::Metrics must stay unloaded"
-
-    refute RecordingStudio.registered_capabilities.key?(:trashable) if RecordingStudio.respond_to?(:registered_capabilities)
+  test "dummy boot loads the Trashable engine and one trashable type" do
+    assert defined?(RecordingStudioTrashable::Engine)
+    assert defined?(RecordingStudioTrashable::CopyHelper)
+    assert defined?(RecordingStudioTrashable::Metrics)
+    assert RecordingStudio.registered_capabilities.key?(:trashable)
 
     recording = RecordingStudio::Recording.new
-    refute_respond_to recording, :recording_studio_trashable_trash!
-    refute_respond_to recording, :recording_studio_trashable_restore!
-    refute_respond_to recording, :recording_studio_trashable_purge!
+    assert_respond_to recording, :recording_studio_trashable_trash!
+    assert_respond_to recording, :recording_studio_trashable_restore!
+    assert_respond_to recording, :recording_studio_trashable_purge!
+    assert RecordingStudio.capability_enabled?(:trashable, for: "Folder")
+    refute RecordingStudio.capability_enabled?(:trashable, for: "Page")
 
     importmap_paths = Array(Rails.application.config.importmap.paths).map(&:to_s)
     asset_paths = Array(Rails.application.config.assets.paths).map(&:to_s)
-    refute(importmap_paths.any? { |path| path.include?("recording_studio_trashable") })
-    refute(asset_paths.any? { |path| path.include?("recording_studio_trashable") })
+    assert(importmap_paths.any? { |path| path.include?("RecordingStudio_trashable") && path.end_with?("/config/importmap.rb") })
+    assert(asset_paths.any? { |path| path.include?("RecordingStudio_trashable") && path.end_with?("/app/javascript") })
 
-    if defined?(RecordingStudioMetrics)
-      refute RecordingStudioMetrics.find("trash.in_trash")
-      refute RecordingStudioMetrics.find("trash.in_trash_by_type")
-      refute RecordingStudioMetrics.find("trash.trashed_over_time")
-    end
+    assert defined?(RecordingStudioMetrics)
+    assert_equal :trash, RecordingStudioTrashable::Metrics::RESOURCE
 
     importmap_json = Rails.application.importmap.to_json(resolver: ActionController::Base.helpers)
-    refute_includes importmap_json, "controllers/recording_studio_trashable"
-    refute_includes importmap_json, "live_search_controller"
+    assert_includes importmap_json, "controllers/recording_studio_trashable"
+    assert_includes importmap_json, "live_search_controller"
 
     get "/users/sign_in"
     assert_response :success
     body = response.body
-    refute_includes body, "controllers/recording_studio_trashable"
-    refute_includes body, "live_search_controller"
-    refute_match(/rel="modulepreload"[^>]+recording_studio_trashable/, body)
+    assert_includes body, "controllers/recording_studio_trashable"
+    assert_includes body, "live_search_controller"
 
     loaded = $LOADED_FEATURES.map { |path| path.tr("\\", "/") }
-    refute(loaded.any? { |path| path.end_with?("/recording_studio_trashable/engine.rb") })
-    refute(loaded.any? { |path| path.end_with?("/lib/recording_studio_trashable.rb") })
+    assert(loaded.any? { |path| path.end_with?("/recording_studio_trashable/engine.rb") })
+    assert(loaded.any? { |path| path.end_with?("/lib/recording_studio_trashable.rb") })
     assert(loaded.any? { |path| path.end_with?("/recording_studio_trashable/query.rb") })
   end
 end
