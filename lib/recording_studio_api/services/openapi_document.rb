@@ -100,13 +100,19 @@ module RecordingStudioApi
       end
 
       def recordable_tag_metadata(recordable_type)
-        registration = if @api_key == "public"
-                         RecordingStudioApi.recordable_registration_for(recordable_type)
-                       else
-                         RecordingStudioApi.recordable_registration_for(recordable_type, api: @api_key)
-                       end
+        registration = recordable_registration_for_tag(recordable_type)
         tag_metadata = registration&.openapi&.fetch(:tag, {})
         tag_metadata.is_a?(Hash) ? tag_metadata : {}
+      end
+
+      def recordable_registration_for_tag(recordable_type)
+        if @api_key == "public"
+          RecordingStudioApi.recordable_registration_for_public_name(recordable_type) ||
+            RecordingStudioApi.recordable_registration_for(recordable_type)
+        else
+          RecordingStudioApi.recordable_registration_for_public_name(recordable_type, api: @api_key) ||
+            RecordingStudioApi.recordable_registration_for(recordable_type, api: @api_key)
+        end
       end
 
       def resource_tag_groups
@@ -216,6 +222,8 @@ module RecordingStudioApi
       end
 
       def operation_id_for(endpoint)
+        return endpoint[:docs_anchor] if endpoint[:docs_anchor].present?
+
         action = endpoint.fetch(:action)
         suffix = endpoint.fetch(:verb).downcase
 

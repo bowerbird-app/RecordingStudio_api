@@ -36,6 +36,12 @@ module RecordingStudioApi
         assert_includes endpoint_paths, "/recording_studio_api/api/v1/workspaces/:id"
         assert_includes endpoint_paths, "/recording_studio_api/api/v1/workspaces/:id/actions/publish"
         assert_equal "resources#destroy", destroy_endpoint.fetch(:action)
+        assert_equal "Workspace", workspace_section.fetch(:recordable_type)
+        assert_equal "Workspace", workspace_section.fetch(:type)
+        assert_equal "Workspace--destroy", destroy_endpoint.fetch(:docs_anchor)
+        publish = workspace_section.fetch(:endpoints).find { |endpoint| endpoint.fetch(:path).end_with?("/actions/publish") }
+        assert_equal "Workspace--publish", publish.fetch(:docs_anchor)
+        assert_equal "Workspace", publish.fetch(:type)
       end
 
       def test_action_endpoints_include_capability_metadata
@@ -763,7 +769,7 @@ module RecordingStudioApi
             description: "Generic attach description"
           },
           openapi_for: lambda { |type:, action:|
-            next unless action.to_s == "attach" && type.to_s == "RecordingStudioPresskits::PressKit"
+            next unless action.to_s == "attach" && type.to_s == "PressKit"
 
             {
               title: "Add File",
@@ -789,6 +795,11 @@ module RecordingStudioApi
           assert_equal "Generic attach", page.fetch(:summary)
           assert_equal "Generic attach description", page.fetch(:description)
           assert_equal "Attach", page.fetch(:openapi).fetch(:title)
+          press_kit_section = catalog.fetch(:resources).find { |section| section.fetch(:resource) == "press_kits" }
+          assert_equal "PressKit", press_kit_section.fetch(:type)
+          refute_equal "RecordingStudioPresskits::PressKit", press_kit_section.fetch(:recordable_type)
+          attach = action_endpoint_for(catalog, "press_kits", "attach")
+          assert_equal "PressKit--attach", attach.fetch(:docs_anchor)
         end
       ensure
         api_singleton.send(:define_method, :api_recordable_types, original_recordable_types) if api_singleton && original_recordable_types

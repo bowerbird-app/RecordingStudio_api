@@ -27,6 +27,7 @@ require "recording_studio_api/visible_recordings"
 require "recording_studio_api/access_policy"
 require "recording_studio_api/api_runtime_policy"
 require "recording_studio_api/recordable_registry"
+require "recording_studio_api/request_type"
 require "recording_studio_api/api_request_log_classification"
 require "recording_studio_api/logs_registration"
 require "recording_studio_api/api_request_log_batch"
@@ -241,7 +242,7 @@ module RecordingStudioApi
       )
     end
 
-    def register_recordable_type_api(recordable_type, serializer: nil, output_keys: nil, fields: nil, openapi: nil,
+    def register_recordable_type_api(recordable_type, public_name: nil, serializer: nil, output_keys: nil, fields: nil, openapi: nil,
                                      sortable_attributes: nil, writable_attributes: nil, immutable_fields: nil,
                                      relationships: nil, immutable_relationships: nil, operations: nil,
                                      capability_actions: nil, auto_capability_actions: nil, metrics: nil, api: :public)
@@ -251,6 +252,7 @@ module RecordingStudioApi
       resolved_operations = nil if operations.nil? && definition.recordable_registry[recordable_type]&.operations_supplied?
       definition.recordable_registry.register(
         recordable_type,
+        public_name: public_name,
         serializer: serializer,
         output_keys: output_keys,
         fields: fields,
@@ -331,6 +333,72 @@ module RecordingStudioApi
     def recordable_registration_for(recordable_type, api: :public)
       configuration.fetch_api(api).recordable_registry[recordable_type]
     end
+
+    # Class or class name -> public type string used in requests, replies, and docs.
+    def public_name_for(recordable_type, api: :public)
+      configuration.fetch_api(api).recordable_registry.public_name_for(recordable_type)
+    end
+
+    # Public type string -> registration. MCP resolves request `type` with this.
+    def recordable_registration_for_public_name(public_name, api: :public)
+      configuration.fetch_api(api).recordable_registry.fetch_by_public_name(public_name)
+    end
+
+    # Public type string -> class name. Registry first, then a unique match on this API's types.
+    def recordable_type_for_public_name(public_name, api: :public)
+      registration = recordable_registration_for_public_name(public_name, api: api)
+      return registration.recordable_type if registration
+
+      needle = public_name.to_s
+      matches = types_for_api(api).select { |type| public_name_for(type, api: api) == needle }
+      matches.first if matches.one?
+    end
+
+    # Class name -> public name for registered types and every type this API exposes.
+    def public_name_map(api: :public)
+      registry = configuration.fetch_api(api).recordable_registry
+      map = registry.public_name_map
+      types_for_api(api).each_with_object(map.dup) do |type, names|
+        names[type] ||= registry.public_name_for(type)
+      end
+    end
+
+    def public_type_names(api: :public)
+      public_name_map(api: api).values.uniq.sort
+    end
+
+    def resolve_request_type!(name, api: :public)
+      value = name.to_s
+      raise RequestType.invalid_type("type is required") if value.blank?
+
+      class_name = recordable_type_for_public_name(value, api: api)
+      return class_name if class_name.present?
+
+      if registered_class_name?(value, api: api)
+        public_name = public_name_for(value, api: api)
+        if public_name.present? && public_name != value
+          raise RequestType.invalid_type("Unknown type #{value}. Use the public name #{public_name}.")
+        end
+      end
+
+      raise RequestType.invalid_type("Unknown type #{value}")
+    end
+
+    def registered_class_name?(value, api:)
+      return true if recordable_registration_for(value, api: api)
+      return true if types_for_api(api).include?(value.to_s)
+
+      false
+    end
+    private :registered_class_name?
+
+    # Public API stubs often omit `api:`. Named APIs still pass it.
+    def types_for_api(api)
+      return api_recordable_types if api.to_s == "public"
+
+      api_recordable_types(api: api)
+    end
+    private :types_for_api
 
     def sortable_attributes_for(recordable_type, api: :public)
       registration = recordable_registration_for(recordable_type, api: api)

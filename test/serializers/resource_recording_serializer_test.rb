@@ -50,6 +50,15 @@ module RecordingStudioApi
         %i[attributes relationships data actions _meta].each { |key| refute payload.key?(key) }
       end
 
+      def test_call_emits_public_name_for_namespaced_types
+        payload = serialize(
+          recording(type: "RecordingStudioPresskits::PressKit"),
+          registration: registration("RecordingStudioPresskits::PressKit")
+        )
+
+        assert_equal "PressKit", payload.fetch(:type)
+      end
+
       def test_call_supports_legacy_and_context_aware_top_level_serializers
         resource = recording(type: "Page", title: "Guide")
         legacy = registration("Page", serializer: ->(recordable) { { label: recordable.title } }, output_keys: ["label"])

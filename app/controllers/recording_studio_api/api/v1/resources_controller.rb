@@ -4,6 +4,8 @@ module RecordingStudioApi
   module Api
     module V1
       class ResourcesController < RecordingStudioApi::ApiController
+        before_action :validate_request_recordable_types!
+
         def index
           return render json: root_resources_payload if params[:resource].blank?
 
@@ -48,6 +50,16 @@ module RecordingStudioApi
           raise RecordingStudioApi::NotFoundError, "Unknown API resource #{params[:resource]}" if recordable_type.blank?
 
           recordable_type
+        end
+
+        def validate_request_recordable_types!
+          return if params[:relationship].present?
+
+          RecordingStudioApi::RequestType.validate!(
+            params,
+            api: current_api_key,
+            expected: params[:resource].present? ? resolve_recordable_type! : nil
+          )
         end
 
         def serialize_recording(recording, context: nil)
@@ -143,7 +155,7 @@ module RecordingStudioApi
             resources: RecordingStudioApi.api_recordable_types(api: current_api_key).map do |recordable_type|
               {
                 name: RecordingStudioApi.resource_name_for(recordable_type),
-                type: recordable_type.demodulize.underscore
+                type: RecordingStudioApi.public_name_for(recordable_type, api: current_api_key)
               }
             end
           }

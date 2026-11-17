@@ -4,6 +4,7 @@ module RecordingStudioApi
   module Api
     module V1
       class MemberActionsController < RecordingStudioApi::ApiController
+        before_action :validate_request_recordable_types!
         RESERVED_ACTION_PARAM_KEYS = %w[
           action
           action_name
@@ -50,6 +51,14 @@ module RecordingStudioApi
           raise RecordingStudioApi::NotFoundError, "Unknown API resource #{params[:resource]}" if recordable_type.blank?
 
           recordable_type
+        end
+
+        def validate_request_recordable_types!
+          RecordingStudioApi::RequestType.validate!(
+            params,
+            api: current_api_key,
+            expected: resolve_recordable_type!
+          )
         end
 
         def member_handler_context(action, recordable_type, registration)

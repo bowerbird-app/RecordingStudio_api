@@ -218,6 +218,69 @@ class RecordableRegistrationTest < Minitest::Test
     end
   end
 
+  def test_public_name_defaults_to_demodulized_class_name
+    registration = RecordingStudioApi::RecordableRegistration.new(recordable_type: "RecordingStudioPresskits::PressKit")
+
+    assert_equal "PressKit", registration.public_name
+    refute registration.public_name_supplied?
+  end
+
+  def test_public_name_override_and_invalid_values
+    registration = RecordingStudioApi::RecordableRegistration.new(
+      recordable_type: "RecordingStudioPresskits::PressKit",
+      public_name: "Kit"
+    )
+
+    assert_equal "Kit", registration.public_name
+    assert registration.public_name_supplied?
+
+    assert_configuration_error("Public name is invalid") do
+      RecordingStudioApi::RecordableRegistration.new(recordable_type: "Page", public_name: "press-kit")
+    end
+  end
+
+  def test_registry_rejects_duplicate_public_names_and_incompatible_overrides
+    registry = RecordingStudioApi::RecordableRegistry.new
+    registry.register("Foo::Item")
+
+    error = assert_raises(RecordingStudioApi::ConfigurationError) { registry.register("Bar::Item") }
+    assert_includes error.message, "Foo::Item"
+    assert_includes error.message, "Bar::Item"
+    assert_includes error.message, "public_name:"
+
+    registry.register("Bar::Item", public_name: "BarItem")
+    assert_equal "Item", registry.public_name_for("Foo::Item")
+    assert_equal "BarItem", registry.public_name_for("Bar::Item")
+    assert_equal "Foo::Item", registry.fetch_by_public_name("Item").recordable_type
+    assert_equal({ "Foo::Item" => "Item", "Bar::Item" => "BarItem" }, registry.public_name_map)
+
+    registry.register("Foo::Item", public_name: "Item")
+    assert_configuration_error("Public name cannot be redefined") do
+      registry.register("Foo::Item", public_name: "FooItem")
+    end
+  end
+
+  def test_module_public_lookup_helpers_for_mcp
+    original = RecordingStudioApi.configuration
+    RecordingStudioApi.instance_variable_set(:@configuration, RecordingStudioApi::Configuration.new)
+    RecordingStudioApi.register_recordable_type_api("RecordingStudioPresskits::PressKit")
+    RecordingStudioApi.register_recordable_type_api("Foo::Item", public_name: "FooItem")
+
+    assert_equal "PressKit", RecordingStudioApi.public_name_for("RecordingStudioPresskits::PressKit")
+    assert_equal "RecordingStudioPresskits::PressKit", RecordingStudioApi.recordable_type_for_public_name("PressKit")
+    assert_equal "Foo::Item", RecordingStudioApi.recordable_registration_for_public_name("FooItem").recordable_type
+    assert_equal "FooItem", RecordingStudioApi.public_name_map.fetch("Foo::Item")
+    assert_includes RecordingStudioApi.public_type_names, "PressKit"
+    assert_equal "RecordingStudioPresskits::PressKit", RecordingStudioApi.resolve_request_type!("PressKit")
+
+    error = assert_raises(RecordingStudioApi::InvalidActionInputError) do
+      RecordingStudioApi.resolve_request_type!("RecordingStudioPresskits::PressKit")
+    end
+    assert_includes error.message, "PressKit"
+  ensure
+    RecordingStudioApi.instance_variable_set(:@configuration, original)
+  end
+
   def test_auto_capability_actions_defaults_to_true_and_rejects_non_booleans
     registration = RecordingStudioApi::RecordableRegistration.new(recordable_type: "Page")
 

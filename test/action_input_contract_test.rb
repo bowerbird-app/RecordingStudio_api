@@ -297,7 +297,7 @@ class ActionInputContractTest < Minitest::Test
         description: "Generic attach description"
       },
       openapi_for: lambda { |type:, action:|
-        next unless action.to_s == "attach" && type.to_s == "RecordingStudioPresskits::PressKit"
+        next unless action.to_s == "attach" && type.to_s == "PressKit"
 
         {
           title: "Add File",
@@ -309,7 +309,7 @@ class ActionInputContractTest < Minitest::Test
     )
     registration.validate!
 
-    press_kit = registration.openapi_for(type: "RecordingStudioPresskits::PressKit")
+    press_kit = registration.openapi_for(type: "PressKit")
     page = registration.openapi_for(type: "Page")
 
     assert_equal "Add File", press_kit.fetch(:title)

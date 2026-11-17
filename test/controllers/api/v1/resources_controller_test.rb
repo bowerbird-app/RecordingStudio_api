@@ -831,6 +831,31 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
 
     assert_includes names, "workspaces"
     assert_includes names, "folders"
+    assert_includes resources.map { |entry| entry.fetch("type") }, "Workspace"
+    refute_includes resources.map { |entry| entry.fetch("type") }, "workspace"
+  end
+
+  test "accepts public type names and rejects full class names" do
+    RecordingStudioApi.register_recordable_type_api("RecordingStudioPresskits::PressKit")
+
+    get "/recording_studio_api/api/v1/pages", params: { type: "Page" }, headers: authorization_headers
+    assert_response :success
+    assert_equal "Page", JSON.parse(response.body).fetch("type")
+
+    get "/recording_studio_api/api/v1/pages",
+        params: { type: "RecordingStudioPresskits::PressKit" },
+        headers: authorization_headers
+    assert_response :unprocessable_entity
+    payload = JSON.parse(response.body)
+    assert_equal "invalid_input", payload.dig("error", "code")
+    assert_includes payload.dig("error", "message"), "PressKit"
+    refute_equal 500, response.status
+
+    post "/recording_studio_api/api/v1/folders",
+         params: { name: "Typed", parent_id: @root_recording.id, type: "RecordingStudioPresskits::PressKit" },
+         headers: authorization_headers
+    assert_response :unprocessable_entity
+    assert_equal "invalid_input", JSON.parse(response.body).dig("error", "code")
   end
 
   test "creates a scoped workspace resource and filters unknown attributes" do

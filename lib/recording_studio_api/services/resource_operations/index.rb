@@ -27,7 +27,7 @@ module RecordingStudioApi
             relationship_context = relationship_context_for(recordings, batch: true)
             {
               resource: resource_name,
-              type: recordable_type.demodulize,
+              type: RecordingStudioApi.public_name_for(recordable_type, api: api_key),
               records: recordings.map { |entry| serialize_recording(entry, context: relationship_context) },
               meta: meta.merge(filter_meta)
             }

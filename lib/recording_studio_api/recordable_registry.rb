@@ -7,27 +7,31 @@ module RecordingStudioApi
   class RecordableRegistry
     def initialize
       @registrations = {}
+      @public_names = {}
       @seen_since_reload = {}
       @reload_pending = false
       @mutex = Mutex.new
     end
 
-    def register(recordable_type, serializer: nil, output_keys: nil, fields: nil, openapi: nil,
+    def register(recordable_type, public_name: nil, serializer: nil, output_keys: nil, fields: nil, openapi: nil,
                  sortable_attributes: nil, writable_attributes: nil, immutable_fields: nil,
                  relationships: nil, immutable_relationships: nil, operations: nil, capability_actions: nil,
                  auto_capability_actions: nil, metrics: nil)
       incoming = RecordableRegistration.new(
-        recordable_type: recordable_type, serializer: serializer, output_keys: output_keys, fields: fields,
-        openapi: openapi, sortable_attributes: sortable_attributes, writable_attributes: writable_attributes,
-        immutable_fields: immutable_fields, relationships: relationships,
+        recordable_type: recordable_type, public_name: public_name, serializer: serializer, output_keys: output_keys,
+        fields: fields, openapi: openapi, sortable_attributes: sortable_attributes,
+        writable_attributes: writable_attributes, immutable_fields: immutable_fields, relationships: relationships,
         immutable_relationships: immutable_relationships, operations: operations,
         capability_actions: capability_actions, auto_capability_actions: auto_capability_actions, metrics: metrics
       )
       key = incoming.recordable_type
       @mutex.synchronize do
         replace_metrics = @reload_pending && !@seen_since_reload[key]
-        @registrations[key] = merge_registrations(@registrations[key], incoming, replace_metrics: replace_metrics)
+        merged = merge_registrations(@registrations[key], incoming, replace_metrics: replace_metrics)
+        assert_unique_public_name!(merged)
+        @registrations[key] = merged
         @seen_since_reload[key] = true
+        rebuild_public_names!
       end
     end
 
@@ -48,6 +52,28 @@ module RecordingStudioApi
       @mutex.synchronize { @registrations[recordable_type.to_s] }
     end
 
+    # Class or class name -> public name. MCP and serializers call this.
+    def public_name_for(recordable_type)
+      return if recordable_type.blank?
+
+      registration = self[recordable_type]
+      return registration.public_name if registration
+
+      recordable_type.to_s.demodulize.presence
+    end
+
+    # Public name -> registration. MCP maps request `type` through this.
+    def fetch_by_public_name(public_name)
+      return if public_name.blank?
+
+      @mutex.synchronize { @public_names[public_name.to_s] }
+    end
+
+    # Registered class name -> public name, for enums and docs anchors.
+    def public_name_map
+      @mutex.synchronize { @registrations.values.to_h { |registration| [registration.recordable_type, registration.public_name] } }
+    end
+
     def to_h
       @mutex.synchronize { @registrations.transform_values(&:as_json) }
     end
@@ -55,6 +81,7 @@ module RecordingStudioApi
     def validate!
       registrations = @mutex.synchronize { @registrations.values }
       registrations.each(&:validate!)
+      assert_unique_public_names!(registrations)
     end
 
     private
@@ -65,6 +92,8 @@ module RecordingStudioApi
       @replace_metrics = replace_metrics
       RecordableRegistration.new(
         recordable_type: incoming.recordable_type,
+        public_name: merge_public_name(existing, incoming),
+        public_name_supplied: existing.public_name_supplied? || incoming.public_name_supplied?,
         serializer: merge_value("serializer", existing.serializer, incoming.serializer),
         output_keys: existing.output_keys | incoming.output_keys,
         fields: merge_definitions("field", existing.fields, incoming.fields),
@@ -76,6 +105,14 @@ module RecordingStudioApi
         immutable_relationships: existing.immutable_relationships | incoming.immutable_relationships,
         **merged_explicit_sets(existing, incoming)
       )
+    end
+
+    def merge_public_name(existing, incoming)
+      if incoming.public_name_supplied? && existing.public_name_supplied? && incoming.public_name != existing.public_name
+        raise ConfigurationError, "Public name cannot be redefined incompatibly"
+      end
+
+      incoming.public_name_supplied? ? incoming.public_name : existing.public_name
     end
 
     def merged_explicit_sets(existing, incoming)
@@ -127,6 +164,40 @@ module RecordingStudioApi
       base.merge(overlay) do |_key, base_value, overlay_value|
         base_value.is_a?(Hash) && overlay_value.is_a?(Hash) ? deep_merge_hashes(base_value, overlay_value) : overlay_value
       end
+    end
+
+    def assert_unique_public_name!(incoming)
+      conflict = @registrations.each_value.find do |registration|
+        registration.recordable_type != incoming.recordable_type && registration.public_name == incoming.public_name
+      end
+      return unless conflict
+
+      raise duplicate_public_name_error(incoming.public_name, [conflict.recordable_type, incoming.recordable_type])
+    end
+
+    def assert_unique_public_names!(registrations)
+      registrations.group_by(&:public_name).each do |public_name, group|
+        next if group.size < 2
+
+        raise duplicate_public_name_error(public_name, group.map(&:recordable_type))
+      end
+    end
+
+    def duplicate_public_name_error(public_name, class_names)
+      classes = class_names.map(&:to_s).uniq.sort
+      named = if classes.size == 2
+                "#{classes.first} and #{classes.last}"
+              else
+                classes.join(", ")
+              end
+
+      ConfigurationError.new(
+        "Public name #{public_name} is used by both #{named}. Pass public_name: when registering one of them."
+      )
+    end
+
+    def rebuild_public_names!
+      @public_names = @registrations.values.to_h { |registration| [registration.public_name, registration] }
     end
   end
 end

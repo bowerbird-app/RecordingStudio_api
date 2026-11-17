@@ -602,6 +602,14 @@ RecordingStudioApi.register_recordable_type_api(
   operations: %i[index show create update],
   capability_actions: %i[publish]
 )
+RecordingStudioApi.register_recordable_type_api(
+  "Billing::Item",
+  public_name: "BillingItem"
+)
+RecordingStudioApi.public_name_for("RecordingStudioPresskits::PressKit")
+RecordingStudioApi.recordable_type_for_public_name("PressKit")
+RecordingStudioApi.recordable_registration_for_public_name("PressKit")
+RecordingStudioApi.public_name_map
 RecordingStudioApi.register_capability_action(
   :publish,
   capability: :publishable,
@@ -896,7 +904,9 @@ selects only configured request-enabled names. There is no `?include=true`, wild
 or arbitrary-name form.
 
 Responses are flat. A record always includes `id`, `type`, `root_id`, `parent_id`, `created_at`,
-and `updated_at`; serializer output keys, always-included fields, and expanded relationship names
+and `updated_at`. `type` is the public name (class name without its module, so
+`RecordingStudioPresskits::PressKit` is `PressKit`). Requests accept only that public name.
+A full class name returns `invalid_input`. Serializer output keys, always-included fields, and expanded relationship names
 sit beside those keys. There are no `data`, `attributes`, or `relationships` wrappers. Collections
 use `records` plus `meta`. `meta.total_count` is omitted unless the request
 passes `include_total=true`. It is the number of matching recordings across
@@ -1356,6 +1366,9 @@ With no reporter, `progress` returns `nil` and `cancelled?` is `false`.
 - `GET|POST|PATCH|PUT|DELETE /recording_studio_api/api/<version>/<registered-path>` — execute a `register_endpoint` path that is not a tree collection. Matching uses the registered verb. A path with no handler for the request verb returns 405 and `Allow`.
 
 Named API resource routes use `/recording_studio_api/apis/<api-name>/<version>` with the same resource and action shapes.
+
+`type` on every named API is the public name. OpenAPI enums, describe payloads, and capability
+catalog entries use that same string. Action docs anchors are `#{public_name}--#{action}`.
 
 Additional configured public API versions currently alias the shared controller implementation while still selecting version-specific contribution contracts and OpenAPI documents.
 

@@ -74,16 +74,21 @@ module RecordingStudioApi
       end
     end
 
-    attr_reader :recordable_type, :serializer, :output_keys, :fields, :openapi, :sortable_attributes,
+    PUBLIC_NAME_PATTERN = /\A[A-Z][A-Za-z0-9]*\z/
+
+    attr_reader :recordable_type, :public_name, :serializer, :output_keys, :fields, :openapi, :sortable_attributes,
                 :writable_attributes, :immutable_fields, :relationships, :immutable_relationships,
                 :operations, :capability_actions, :auto_capability_actions, :metric_names
 
-    def initialize(recordable_type:, serializer: nil, output_keys: nil, fields: nil, openapi: nil,
+    def initialize(recordable_type:, public_name: nil, serializer: nil, output_keys: nil, fields: nil, openapi: nil,
                    sortable_attributes: nil, writable_attributes: nil, immutable_fields: nil,
                    relationships: nil, immutable_relationships: nil, operations: nil, capability_actions: nil,
                    auto_capability_actions: nil, metrics: nil, operations_supplied: nil,
-                   capability_actions_supplied: nil, auto_capability_actions_supplied: nil, metrics_supplied: nil)
+                   capability_actions_supplied: nil, auto_capability_actions_supplied: nil, metrics_supplied: nil,
+                   public_name_supplied: nil)
       @recordable_type = recordable_type.to_s
+      @public_name_supplied = public_name_supplied.nil? ? !public_name.nil? : public_name_supplied
+      @public_name = normalize_public_name(public_name)
       @serializer = serializer
       @output_keys = normalize_names(output_keys, "Output keys")
       @fields = normalize_fields(fields)
@@ -170,13 +175,17 @@ module RecordingStudioApi
       @metrics_supplied
     end
 
+    def public_name_supplied?
+      @public_name_supplied
+    end
+
     def filterable_attributes
       (sortable_attributes | writable_attributes).map(&:to_s)
     end
 
     def as_json(*)
       {
-        recordable_type: recordable_type, serializer: serializer, output_keys: output_keys,
+        recordable_type: recordable_type, public_name: public_name, serializer: serializer, output_keys: output_keys,
         fields: fields.transform_values(&:to_h), openapi: openapi, sortable_attributes: sortable_attributes,
         writable_attributes: writable_attributes, immutable_fields: immutable_fields,
         relationships: relationships.transform_values(&:to_h), immutable_relationships: immutable_relationships,
@@ -361,6 +370,16 @@ module RecordingStudioApi
     def validate_reserved_names!(names, label)
       reserved = names & RESERVED_RESPONSE_KEYS
       raise ConfigurationError, "#{label} are reserved for #{recordable_type}: #{reserved.join(', ')}" if reserved.any?
+    end
+
+    def normalize_public_name(value)
+      name = value.nil? ? recordable_type.demodulize : value.to_s
+      raise ConfigurationError, "Public name is required for #{recordable_type}" if name.blank?
+      unless name.match?(PUBLIC_NAME_PATTERN)
+        raise ConfigurationError, "Public name is invalid for #{recordable_type}: #{name}"
+      end
+
+      name.freeze
     end
 
     def normalize_operations(value)

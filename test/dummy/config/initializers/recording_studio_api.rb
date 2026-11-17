@@ -114,11 +114,11 @@ RecordingStudioApi.register_recordable_type_api(
                 default: {
                   value: {
                     resource: "workspaces",
-                    type: "workspace",
+                    type: "Workspace",
                     records: [
                       {
                         id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f",
-                        type: "workspace",
+                        type: "Workspace",
                         root_id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f",
                         parent_id: nil,
                         created_at: "2026-01-01T00:00:00Z",
@@ -152,7 +152,7 @@ RecordingStudioApi.register_recordable_type_api(
                 default: {
                   value: {
                     id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f",
-                    type: "workspace",
+                    type: "Workspace",
                     root_id: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f",
                     parent_id: nil,
                     created_at: "2026-01-01T00:00:00Z",

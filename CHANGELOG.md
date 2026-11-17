@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-17
+
+**1.5.0 is a breaking change:** full class names are no longer accepted in requests.
+
+### BREAKING
+- Recordable `type` in requests, replies, describe, and catalogs is the public name. The default is the class name without its module (`RecordingStudioPresskits::PressKit` → `PressKit`). Send `PressKit`. A full class name such as `RecordingStudioPresskits::PressKit` is rejected with `invalid_input`.
+- Duplicate public names fail boot with `ConfigurationError`. Pass `public_name:` on `register_recordable_type_api` only when two types would share a demodulized name.
+
+### Added
+- Registry lookup for MCP: `public_name_for`, `recordable_registration_for_public_name`, `recordable_type_for_public_name`, and `public_name_map`.
+
+### Upgrade notes
+- Bump to `1.5.0`. No migration.
+- Send and read `PressKit`, not `RecordingStudioPresskits::PressKit`. A full class name in `type` (params, filters, parent/relationship types) returns `invalid_input`, not 500.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.4.0] - 2026-11-17
 
 ### Changed

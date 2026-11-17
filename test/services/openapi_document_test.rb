@@ -619,7 +619,7 @@ module RecordingStudioApi
               description: "Generic attach description"
             },
             openapi_for: lambda { |type:, action:|
-              next unless action.to_s == "attach" && type.to_s == "RecordingStudioPresskits::PressKit"
+              next unless action.to_s == "attach" && type.to_s == "PressKit"
 
               {
                 title: "Add File",

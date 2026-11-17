@@ -4,6 +4,7 @@ module RecordingStudioApi
   module Api
     module V1
       class ResourceMetricsController < RecordingStudioApi::ApiController
+        before_action :validate_request_recordable_types!
         rescue_from RecordingStudioApi::ConfigurationError do |error|
           render_error(code: "invalid_input", message: error.message, status: :unprocessable_entity)
         end
@@ -56,6 +57,14 @@ module RecordingStudioApi
           raise RecordingStudioApi::NotFoundError, "Unknown API resource #{ClientText.cap(params[:resource])}" if recordable_type.blank?
 
           recordable_type
+        end
+
+        def validate_request_recordable_types!
+          RecordingStudioApi::RequestType.validate!(
+            params,
+            api: current_api_key,
+            expected: resolve_recordable_type!
+          )
         end
 
         def scoped_recordings

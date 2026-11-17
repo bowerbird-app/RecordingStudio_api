@@ -15,7 +15,7 @@ module RecordingStudioApi
         def serialize_recording(recording, version: nil, api: :public)
           {
             id: recording.id.to_s,
-            type: recording.recordable_type.to_s,
+            type: RecordingStudioApi.public_name_for(recording.recordable_type, api: api),
             parent_id: recording.parent_recording_id&.to_s,
             root_id: recording.root_recording_id&.to_s,
             created_at: iso8601(recording, :created_at),

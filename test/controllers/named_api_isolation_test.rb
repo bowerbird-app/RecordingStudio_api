@@ -58,7 +58,9 @@ class NamedApiIsolationTest < ActionDispatch::IntegrationTest
 
     get operations_root_path, headers: bearer_headers(@operations_token)
     assert_response :success
-    assert_equal %w[folders workspaces], JSON.parse(response.body).fetch("resources").map { |resource| resource.fetch("name") }.sort
+    resources = JSON.parse(response.body).fetch("resources")
+    assert_equal %w[folders workspaces], resources.map { |resource| resource.fetch("name") }.sort
+    assert_equal %w[Folder Workspace], resources.map { |resource| resource.fetch("type") }.sort
   end
 
   test "named api uses its own serializer and read only operation defaults" do

@@ -25,6 +25,7 @@ module RecordingStudioApi
             end
 
           allowed = filterable_attributes(recordable_type, api)
+          filter_hash = drop_recordable_type_filter(filter_hash, allowed)
           unknown = filter_hash.keys.map(&:to_s) - allowed
           if unknown.any?
             raise RecordingStudioApi::InvalidActionInputError,
@@ -42,6 +43,12 @@ module RecordingStudioApi
 
             filters[attribute] = value
           end
+        end
+
+        def drop_recordable_type_filter(filter_hash, allowed)
+          return filter_hash if allowed.include?("type")
+
+          filter_hash.reject { |key, _value| key.to_s == "type" }
         end
 
         def scalar_filter_value?(value)
@@ -105,7 +112,8 @@ module RecordingStudioApi
         end
 
         private_class_method :apply_attribute_filters, :apply_search_query, :filterable_attributes,
-                             :with_recordable_join, :recordable_join_sql, :scalar_filter_value?
+                             :with_recordable_join, :recordable_join_sql, :scalar_filter_value?,
+                             :drop_recordable_type_filter
       end
       private_constant :CollectionFilter
 

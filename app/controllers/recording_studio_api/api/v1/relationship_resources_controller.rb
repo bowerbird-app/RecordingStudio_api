@@ -34,7 +34,7 @@ module RecordingStudioApi
             children = authorized_children(rows)
             {
               resource: child_resource_name,
-              type: relationship.child_type.demodulize,
+              type: RecordingStudioApi.public_name_for(relationship.child_type, api: current_api_key),
               records: children.map { |child| serialize_recording(child, context: relationship_context.nested) },
               meta: meta
             }

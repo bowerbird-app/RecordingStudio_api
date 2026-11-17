@@ -223,7 +223,8 @@ module RecordingStudioApi
 
             {
               resource: resource_name,
-              recordable_type: recordable_type,
+              recordable_type: public_name_for(recordable_type),
+              type: public_name_for(recordable_type),
               endpoints: default_resource_endpoints(resource_name, recordable_type) +
                 recordable_metric_endpoints(resource_name, recordable_type) +
                 relationship_resource_endpoints(resource_name, recordable_type) +
@@ -347,6 +348,8 @@ module RecordingStudioApi
 
         endpoints.select do |endpoint|
           registration.nil? || registration.supports_operation?(endpoint.fetch(:action).split("#").last)
+        end.map do |endpoint|
+          annotate_public_type(endpoint, recordable_type, endpoint.fetch(:action).split("#").last)
         end
       end # rubocop:enable Metrics/MethodLength
 
@@ -580,23 +583,27 @@ module RecordingStudioApi
           .map do |action|
             action_openapi = action_openapi_for(action, recordable_type)
 
-            {
-              verb: action.http_verb.to_s.upcase,
-              path: "#{api_root_path}/#{resource_name}/:id/actions/#{action.name}",
-              action: "member_actions#create",
-              summary: action_openapi.fetch(:summary, action.name.humanize),
-              description: action_openapi.fetch(:description, "Execute the #{action.name} action."),
-              action_name: action.capability.to_s,
-              capability: action.capability.to_s,
-              scope: action.scope.to_s,
-              openapi: merge_hashes(default_action_openapi(resource_name, recordable_type, action), action_openapi)
-            }
+            annotate_public_type(
+              {
+                verb: action.http_verb.to_s.upcase,
+                path: "#{api_root_path}/#{resource_name}/:id/actions/#{action.name}",
+                action: "member_actions#create",
+                summary: action_openapi.fetch(:summary, action.name.humanize),
+                description: action_openapi.fetch(:description, "Execute the #{action.name} action."),
+                action_name: action.capability.to_s,
+                capability: action.capability.to_s,
+                scope: action.scope.to_s,
+                openapi: merge_hashes(default_action_openapi(resource_name, recordable_type, action), action_openapi)
+              },
+              recordable_type,
+              action.name
+            )
           end
       end
 
       def action_openapi_for(action, recordable_type)
         if action.respond_to?(:openapi_for)
-          resolved = action.openapi_for(type: recordable_type)
+          resolved = action.openapi_for(type: public_name_for(recordable_type))
           return resolved if resolved.is_a?(Hash)
         end
 
@@ -686,6 +693,27 @@ module RecordingStudioApi
         return RecordingStudioApi.recordable_registration_for(recordable_type) if @api_key == "public"
 
         RecordingStudioApi.recordable_registration_for(recordable_type, api: @api_key)
+      end
+
+      def public_name_for(recordable_type)
+        RecordingStudioApi.public_name_for(recordable_type, api: @api_key)
+      end
+
+      def annotate_public_type(endpoint, recordable_type, action)
+        public_name = public_name_for(recordable_type)
+        endpoint.merge(
+          type: public_name,
+          docs_anchor: "#{public_name}--#{action}"
+        )
+      end
+
+      def type_field_schema(recordable_type, example: nil)
+        schema = { type: "string" }
+        names = api_recordable_types.map { |type| public_name_for(type) }.uniq.sort
+        schema[:enum] = names if names.any?
+        resolved_example = example || public_name_for(recordable_type)
+        schema[:example] = resolved_example if resolved_example.present?
+        schema
       end
 
       def capability_actions_for(recordable_type)
@@ -844,7 +872,7 @@ module RecordingStudioApi
           type: "object",
           properties: {
             resource: { type: "string" },
-            type: { type: "string", example: resource_type },
+            type: type_field_schema(recordable_type, example: public_name_for(recordable_type) || resource_type),
             records: {
               type: "array",
               items: item_schema || recording_schema(recordable_type)
@@ -1054,7 +1082,7 @@ module RecordingStudioApi
       def recording_schema(recordable_type = nil, output_keys: nil)
         properties = {
           id: { type: "string" },
-          type: { type: "string" },
+          type: type_field_schema(recordable_type),
           root_id: { type: "string", example: "5ed47afc-f67f-4f4a-af7b-8f62f2eec85f" },
           parent_id: {
             type: "string",
@@ -1451,7 +1479,7 @@ module RecordingStudioApi
         resource_name = RecordingStudioApi.resource_name_for(recordable_type)
         {
           resource: resource_name,
-          type: resource_name.to_s.singularize,
+          type: public_name_for(recordable_type) || resource_name.to_s.singularize,
           records: [record],
           meta: {
             limit: 50,
@@ -1466,7 +1494,7 @@ module RecordingStudioApi
       def relationship_example_record(recordable_type, relationships)
         record = {
           id: "00000000-0000-4000-8000-000000000001",
-          type: recordable_type.to_s,
+          type: public_name_for(recordable_type),
           root_id: "00000000-0000-4000-8000-000000000001",
           parent_id: nil,
           created_at: "2026-01-01T00:00:00Z",
@@ -1479,7 +1507,7 @@ module RecordingStudioApi
       def relationship_example_value(relationship)
         child = {
           id: "00000000-0000-4000-8000-000000000002",
-          type: relationship.child_type.presence || "Custom relationship",
+          type: relationship.child_type.present? ? public_name_for(relationship.child_type) : "Custom relationship",
           root_id: "00000000-0000-4000-8000-000000000001",
           parent_id: "00000000-0000-4000-8000-000000000001",
           created_at: "2026-01-01T00:00:00Z",

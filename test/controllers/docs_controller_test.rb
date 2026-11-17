@@ -277,8 +277,8 @@ class DocsControllerTest < ActionDispatch::IntegrationTest
       assert payload.fetch("paths").fetch("/recording_studio_api/api/v1/workspaces").key?("post")
       assert payload.fetch("paths").fetch("/recording_studio_api/api/v1/workspaces/{id}").key?("patch")
       assert payload.fetch("paths").fetch("/recording_studio_api/api/v1/workspaces/{id}").key?("delete")
-      assert_match(
-        /^resources_index_get_/,
+      assert_equal(
+        "Workspace--index",
         payload.fetch("paths").fetch("/recording_studio_api/api/v1/workspaces").fetch("get").fetch("operationId")
       )
     end

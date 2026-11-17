@@ -1,5 +1,17 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.5.0
+
+**Breaking.** 1.5.0 stops accepting full class names as recordable `type`. No migration.
+
+1. Bump the host gem to `1.5.0`.
+2. Send the public name in every request `type` (params, filters, parent/relationship types). `RecordingStudioPresskits::PressKit` becomes `PressKit`. There is no fallback for the old class name. The API returns `invalid_input` (not 500).
+3. Read the same public name from replies, describe, OpenAPI, and capability/metric catalogs. Docs anchors are `#{public_name}--#{action}` (`PressKit--attach`).
+4. Pass `public_name:` on `register_recordable_type_api` only when two types would share a demodulized name. A clash raises `ConfigurationError` and names both classes.
+5. MCP and other gems resolve names through `RecordingStudioApi.public_name_for`, `recordable_type_for_public_name`, `recordable_registration_for_public_name`, and `public_name_map`.
+
+`openapi_for` on capability actions receives the public name as `type:`.
+
 ## Upgrading to 1.4.0
 
 Behavior change. Run two migrations. A token follows its owner's live access.
