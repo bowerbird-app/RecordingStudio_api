@@ -182,7 +182,7 @@ class TrashableSiblingApiParityTest < ActiveSupport::TestCase
     )
     trashed_folder.update_column(:trashed_at, Time.current)
 
-    host = form_state_host(manageable_roots: [root_recording])
+    host = form_state_host(actor: @user)
     ids = host.send(:available_access_point_recordings, root_recording).map(&:id)
 
     assert_includes ids, root_recording.id
@@ -270,18 +270,18 @@ class TrashableSiblingApiParityTest < ActiveSupport::TestCase
 
   private
 
-  def form_state_host(manageable_roots:)
+  def form_state_host(actor:)
     Class.new do
       def self.helper_method(*); end
 
       include RecordingStudioApi::AccessRequests::FormState
 
-      def initialize(roots)
-        @roots = roots
+      def initialize(actor)
+        @actor = actor
       end
 
-      def manageable_root_recordings
-        @roots
+      def access_management_policy
+        @access_management_policy ||= RecordingStudioApi::AccessManagementPolicy.new(actor: @actor)
       end
 
       def selected_api
@@ -291,7 +291,7 @@ class TrashableSiblingApiParityTest < ActiveSupport::TestCase
       def params
         ActionController::Parameters.new({})
       end
-    end.new(manageable_roots)
+    end.new(actor)
   end
 
   def admin_clients_context(actor:, root_recording:)

@@ -87,17 +87,10 @@ module RecordingStudioApi
         access_point_types = RecordingStudioApi.api_access_point_recordable_types(api: selected_api.name)
         return [] if access_point_types.empty?
 
-        roots = root_recording.present? ? [root_recording] : manageable_root_recordings
-        recordings = roots.flat_map do |available_root_recording|
-          available_root_recording.subtree_recordings(include_self: true)
-            .includes(:recordable)
-            .where(recordable_type: access_point_types)
-            .kept
-            .reorder(:created_at, :id)
-            .to_a
-        end
-
-        recordings.uniq { |recording| recording.id }
+        access_management_policy.manageable_recordings(
+          recordable_types: access_point_types,
+          roots: root_recording.present? ? [root_recording] : nil
+        )
       end
 
       def selected_root_recording

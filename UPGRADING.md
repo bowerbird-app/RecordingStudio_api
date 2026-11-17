@@ -1,5 +1,14 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.9.0
+
+Behavior change. No migration. Access management follows the recording.
+
+1. Bump the host gem to `1.9.0`. Stay on Recording Studio `>= 7.7.0`, `< 8.0` and Accessible `>= 0.49.0`, `< 2.0`.
+2. `AccessManagementPolicy#can_view_recording?` and `#can_manage_recording?` authorize that recording through Accessible. A grant on one folder no longer manages API clients or grants for the rest of the workspace, and it no longer provisions on a recording the actor can only view.
+3. `manageable_root_recordings` is the roots the actor can manage. `manageable_recordings` is every recording they can manage, from `authorized_recordings`. The new-key form, the API keys screen, and test-credential access points use that set. `can_manage_any_recording?` uses `authorized_recording_ids`.
+4. An actor who can manage a folder still creates keys on that folder and its descendants. A workspace admin still manages the workspace. A viewer still cannot provision.
+
 ## Upgrading to 1.8.0
 
 Behavior change. No migration. Unscoped registered endpoints check the key's role.

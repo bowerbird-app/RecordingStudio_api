@@ -1115,6 +1115,8 @@ Defaults:
 
 This means users with view-level access can inspect API access in the UI, but only admin-level access can mutate API access.
 
+`AccessManagementPolicy#can_view_recording?` and `#can_manage_recording?` ask Recording Studio Accessible about that recording. A grant on a folder covers that folder and its descendants. It does not cover a sibling folder or the workspace root. Lists of recordings someone can manage use `authorized_recordings` and `authorized_recording_ids` for the edit role. `root_recordings_for` only finds the workspaces to ask about.
+
 Example overrides:
 
 ```ruby

@@ -184,4 +184,56 @@ class ProvisionAccessRequestTest < ActiveSupport::TestCase
     assert_equal "Requested API access role exceeds the manager's access", rejected_result.error
     assert_equal 0, RecordingStudioApi::ApiClient.where(name: "Escalated client").count
   end
+
+  test "a folder admin provisions on that folder and its descendants only" do
+    tree = build_folder_access
+
+    assert_access_provision(tree.fetch(:folder_admin), tree.fetch(:folder), "Folder request")
+    assert_access_provision(tree.fetch(:folder_admin), tree.fetch(:child), "Child request")
+    refute_access_provision(tree.fetch(:folder_admin), tree.fetch(:sibling), "Sibling request")
+    refute_access_provision(tree.fetch(:folder_admin), tree.fetch(:root), "Root request")
+  end
+
+  test "a viewer cannot provision an access request" do
+    tree = build_folder_access
+
+    refute_access_provision(tree.fetch(:viewer), tree.fetch(:folder), "Viewer folder request")
+    refute_access_provision(tree.fetch(:viewer), tree.fetch(:child), "Viewer child request")
+  end
+
+  test "a workspace admin provisions on the root and every folder" do
+    tree = build_folder_access
+
+    assert_access_provision(tree.fetch(:owner), tree.fetch(:root), "Owner root request")
+    assert_access_provision(tree.fetch(:owner), tree.fetch(:sibling), "Owner sibling request")
+    assert_access_provision(tree.fetch(:owner), tree.fetch(:folder), "Owner folder request")
+    assert_access_provision(tree.fetch(:owner), tree.fetch(:child), "Owner child request")
+  end
+
+  private
+
+  def assert_access_provision(actor, recording, name)
+    result = RecordingStudioApi::Services::ProvisionAccessRequest.call(
+      access_point_recording: recording,
+      actor: actor,
+      role: :view,
+      api_client_name: name
+    )
+
+    assert result.success?, result.error
+    assert_equal recording.id, result.value.fetch(:access_recording).parent_recording_id
+  end
+
+  def refute_access_provision(actor, recording, name)
+    result = RecordingStudioApi::Services::ProvisionAccessRequest.call(
+      access_point_recording: recording,
+      actor: actor,
+      role: :view,
+      api_client_name: name
+    )
+
+    assert result.failure?
+    assert_equal "Actor is not authorized to manage API access for this recording", result.error
+    assert_nil RecordingStudioApi::ApiClient.find_by(name: name)
+  end
 end

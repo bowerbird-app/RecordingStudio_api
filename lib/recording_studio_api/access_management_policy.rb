@@ -11,7 +11,33 @@ module RecordingStudioApi
     end
 
     def manageable_root_recordings
-      root_recordings_for(access_management_role: RecordingStudioApi.configuration.access_management_edit_role)
+      return [] if actor.nil?
+
+      role = edit_role
+      root_recordings_for(access_management_role: role).select do |root|
+        authorized_recording_ids_for(root, access_management_role: role).where(id: root.id).exists?
+      end
+    end
+
+    # Recordings this actor can manage. Roots come from workspace membership.
+    # The rows come from Accessible's authorized_recordings for the edit role.
+    def manageable_recordings(recordable_types: nil, roots: nil)
+      anchors = manageable_anchors(roots)
+      return [] if anchors.empty?
+
+      scope = kept_recordings_for(recordable_types)
+      anchors.flat_map do |anchor|
+        authorized_recording_rows(anchor, scope: scope, access_management_role: edit_role)
+      end.uniq(&:id)
+    end
+
+    def can_manage_any_recording?
+      return false if actor.nil?
+
+      role = edit_role
+      root_recordings_for(access_management_role: role).any? do |root|
+        authorized_recording_ids_for(root, access_management_role: role).exists?
+      end
     end
 
     def visible_access_recordings
@@ -39,11 +65,11 @@ module RecordingStudioApi
     end
 
     def can_view_recording?(recording)
-      authorized_root_recording?(recording, access_management_role: RecordingStudioApi.configuration.access_management_view_role)
+      authorized_for_recording?(recording, access_management_role: view_role)
     end
 
     def can_manage_recording?(recording)
-      authorized_root_recording?(recording, access_management_role: RecordingStudioApi.configuration.access_management_edit_role)
+      authorized_for_recording?(recording, access_management_role: edit_role)
     end
 
     def maximum_assignable_role_for(recording)
@@ -74,15 +100,6 @@ module RecordingStudioApi
         recording: recording,
         role: access_management_role
       )
-    end
-
-    def authorized_root_recording?(recording, access_management_role:)
-      root_recording = root_recording_for(recording)
-      return false if root_recording.nil?
-
-      root_recordings_for(access_management_role: access_management_role).any? do |candidate|
-        candidate.id == root_recording.id
-      end
     end
 
     def authorized_for_access_recording?(access_recording, access_management_role:)
@@ -140,10 +157,45 @@ module RecordingStudioApi
       RecordingStudio::AccessRoles::ORDER.keys.map(&:to_sym)
     end
 
-    def root_recording_for(recording)
-      return nil if recording.nil?
+    def view_role
+      RecordingStudioApi.configuration.access_management_view_role
+    end
 
-      recording.root_recording || recording
+    def edit_role
+      RecordingStudioApi.configuration.access_management_edit_role
+    end
+
+    def manageable_anchors(roots)
+      return [] if actor.nil?
+
+      anchors = Array(roots).compact
+      return anchors if anchors.any?
+
+      root_recordings_for(access_management_role: edit_role)
+    end
+
+    def kept_recordings_for(recordable_types)
+      scope = RecordingStudio::Recording.unscoped.kept
+      return scope if recordable_types.blank?
+
+      scope.where(recordable_type: recordable_types)
+    end
+
+    def authorized_recording_ids_for(recording, access_management_role:)
+      RecordingStudioAccessible.authorized_recording_ids(
+        actor: actor,
+        root: recording,
+        role: access_management_role
+      )
+    end
+
+    def authorized_recording_rows(recording, scope:, access_management_role:)
+      RecordingStudioAccessible.authorized_recordings(
+        actor: actor,
+        root: recording,
+        scope: scope,
+        role: access_management_role
+      ).includes(:recordable).reorder(:created_at, :id).to_a
     end
 
     def access_recordings

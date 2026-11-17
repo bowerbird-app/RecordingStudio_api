@@ -294,4 +294,35 @@ module ApiDummyHelpers # rubocop:disable Metrics/ModuleLength
   end
 
   def register_dummy_capability_actions!; end
+
+  def build_folder_access(workspace_name: "Scoped workspace #{SecureRandom.hex(2)}")
+    owner = create_user
+    root_recording, = create_access_recording_for(user: owner, workspace_name: workspace_name, role: :admin)
+    folder = nested_folder_recording("Managed folder", root_recording)
+    child = nested_folder_recording("Managed child", folder)
+    sibling = nested_folder_recording("Sibling folder", root_recording)
+    folder_admin = create_user
+    viewer = create_user
+
+    grant_or_bootstrap_access!(recording: root_recording, actor: folder_admin, role: :view)
+    grant_or_bootstrap_access!(recording: folder, actor: folder_admin, role: :admin)
+    grant_or_bootstrap_access!(recording: folder, actor: viewer, role: :view)
+
+    {
+      owner: owner,
+      root: root_recording,
+      folder: folder,
+      child: child,
+      sibling: sibling,
+      folder_admin: folder_admin,
+      viewer: viewer
+    }
+  end
+
+  def nested_folder_recording(name, parent)
+    RecordingStudio::Recording.create!(
+      recordable: Folder.create!(name: name),
+      parent_recording: parent
+    )
+  end
 end

@@ -235,4 +235,56 @@ class ProvisionApiClientTest < ActiveSupport::TestCase
 
     assert_equal result.value.fetch(:access_recording).id, credential.reload.effective_access_recording_id
   end
+
+  test "a folder admin provisions on that folder and its descendants only" do
+    tree = build_folder_access
+
+    assert_client_provision(tree.fetch(:folder_admin), tree.fetch(:folder), "Folder key")
+    assert_client_provision(tree.fetch(:folder_admin), tree.fetch(:child), "Child key")
+    refute_client_provision(tree.fetch(:folder_admin), tree.fetch(:sibling), "Sibling key")
+    refute_client_provision(tree.fetch(:folder_admin), tree.fetch(:root), "Root key")
+  end
+
+  test "a viewer cannot provision an api client" do
+    tree = build_folder_access
+
+    refute_client_provision(tree.fetch(:viewer), tree.fetch(:folder), "Viewer folder key")
+    refute_client_provision(tree.fetch(:viewer), tree.fetch(:child), "Viewer child key")
+  end
+
+  test "a workspace admin provisions on the root and every folder" do
+    tree = build_folder_access
+
+    assert_client_provision(tree.fetch(:owner), tree.fetch(:root), "Owner root key")
+    assert_client_provision(tree.fetch(:owner), tree.fetch(:sibling), "Owner sibling key")
+    assert_client_provision(tree.fetch(:owner), tree.fetch(:folder), "Owner folder key")
+    assert_client_provision(tree.fetch(:owner), tree.fetch(:child), "Owner child key")
+  end
+
+  private
+
+  def assert_client_provision(actor, recording, name)
+    result = RecordingStudioApi::Services::ProvisionApiClient.call(
+      access_point_recording: recording,
+      manager_actor: actor,
+      role: :view,
+      name: name
+    )
+
+    assert result.success?, result.error
+    assert_equal recording.id, result.value.fetch(:access_recording).parent_recording_id
+  end
+
+  def refute_client_provision(actor, recording, name)
+    result = RecordingStudioApi::Services::ProvisionApiClient.call(
+      access_point_recording: recording,
+      manager_actor: actor,
+      role: :view,
+      name: name
+    )
+
+    assert result.failure?
+    assert_equal "Not authorized to manage access", result.error
+    assert_nil RecordingStudioApi::ApiClient.find_by(name: name)
+  end
 end

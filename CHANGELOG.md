@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-11-17
+
+### Fixed
+- Access management checks the recording. `can_view_recording?` and `can_manage_recording?` call `authorized_for_recording?`, which uses `RecordingStudioAccessible.authorized?`. A folder admin can manage API clients and grants on that folder and its descendants. A sibling folder and the workspace root stay out. A viewer cannot provision. Lists of recordings someone can manage use `authorized_recordings` and `authorized_recording_ids`.
+
+### Upgrade notes
+- Bump to `1.9.0`. No migration.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.8.0] - 2026-11-17
 
 ### Fixed
