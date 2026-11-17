@@ -575,7 +575,7 @@ The runtime should fail fast when:
 - duplicate action name plus contribution version pairs are registered
 - required handlers or serializers are missing
 - contribution versions or version-profile constraints are malformed
-- two recordable types selected by one named API resolve to the same public name
+- two recordable types in one named API resolve to the same public name
 
 ## Ruby Integration Surface
 
@@ -646,11 +646,9 @@ RecordingStudioApi.register_recordable_type_api(
 )
 ```
 
-`registration.public_name` returns `"PressKit"`. `RecordingStudioApi.recordable_type_for_public_name("PressKit")` returns `"RecordingStudioPresskits::PressKit"`. A miss returns nil. Pass `api:` for a named API and `version:` for one public API version. The full class name still finds the registration through `recordable_registration_for` and through this lookup.
+`registration.public_name` returns `"PressKit"`. `RecordingStudioApi.recordable_type_for_public_name("PressKit", api: :public)` returns `"RecordingStudioPresskits::PressKit"`. It checks the public name first, then the exact full class name. A miss returns nil. Pass `api:` for a named API. The full class name still finds the registration through `recordable_registration_for`.
 
-Resolved public names are unique inside one named API, including the public API. A clash raises `RecordingStudioApi::ConfigurationError` and names both classes and the public name. The same public name may be registered on two different named APIs.
-
-Pass `version:` when the type belongs to a contribution contract. The contribution name is the public name underscored (`PressKit` is `:press_kit`). `config.version` and `api.use` select it the same way they select action contracts. A registration that no profile selects does not clash. Omit `version:` and the type stays selected for every profile.
+Resolved public names are unique inside one named API, including the public API. A clash raises `RecordingStudioApi::ConfigurationError` and names both classes and the public name. The same public name may be registered on two different named APIs. A later registration of the same type keeps the established public name. Passing a different `public_name:` raises `ConfigurationError`.
 
 REST paths, the JSON `type`, and OpenAPI keep the full class name and the existing resource name.
 

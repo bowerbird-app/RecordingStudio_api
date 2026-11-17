@@ -96,7 +96,7 @@ module RecordingStudioApi
     def validate!
       action_registry.validate!
       registered_endpoint_registry.validate!
-      recordable_registry.validate!(profiles: RecordableRegistry.profiles_for(self))
+      recordable_registry.validate!
       resource_handler_registry.validate!
       MetricCatalog.validate_configured!(recordable_registry, api: name)
       raise ConfigurationError, "authentication must be oauth for #{name}" unless authentication == :oauth

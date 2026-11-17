@@ -247,7 +247,7 @@ module RecordingStudioApi
                                      sortable_attributes: nil, writable_attributes: nil, immutable_fields: nil,
                                      relationships: nil, immutable_relationships: nil, operations: nil,
                                      capability_actions: nil, auto_capability_actions: nil, metrics: nil,
-                                     public_name: nil, version: nil, api: :public)
+                                     public_name: nil, api: :public)
       definition = configuration.api(api)
       resolved_operations = operations
       resolved_operations = %i[index show] if resolved_operations.nil? && definition.respond_to?(:default_access) && definition.default_access == :read_only
@@ -267,8 +267,7 @@ module RecordingStudioApi
         capability_actions: capability_actions,
         auto_capability_actions: auto_capability_actions,
         metrics: metrics,
-        public_name: public_name,
-        version: version
+        public_name: public_name
       )
     end
 
@@ -337,11 +336,8 @@ module RecordingStudioApi
       configuration.fetch_api(api).recordable_registry[recordable_type]
     end
 
-    def recordable_type_for_public_name(name, api: :public, version: nil)
-      definition = configuration.fetch_api(api)
-      resolved_version = version.nil? ? default_api_version(api: api) : version
-      profile = api_version_profile_for(resolved_version, api: api)
-      definition.recordable_registry.type_for_public_name(name, profile: profile)
+    def recordable_type_for_public_name(name, api: :public)
+      configuration.fetch_api(api).recordable_registry.type_for_public_name(name)
     end
 
     def sortable_attributes_for(recordable_type, api: :public)

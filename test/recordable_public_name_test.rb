@@ -31,6 +31,14 @@ class RecordablePublicNameTest < Minitest::Test
 
       assert_equal "Kit", registration.public_name
       assert_equal ["Press"], registration.openapi.fetch(:tags)
+
+      error = assert_raises(RecordingStudioApi::ConfigurationError) do
+        RecordingStudioApi.register_recordable_type_api(
+          "RecordingStudioPresskits::PressKit",
+          public_name: "Other"
+        )
+      end
+      assert_equal "Public name cannot be redefined incompatibly for RecordingStudioPresskits::PressKit", error.message
     end
   end
 
@@ -88,38 +96,6 @@ class RecordablePublicNameTest < Minitest::Test
         "RecordingStudioPresskits::PressKit",
         RecordingStudioApi.recordable_type_for_public_name("RecordingStudioPresskits::PressKit")
       )
-    end
-  end
-
-  def test_unselected_contribution_version_does_not_clash_and_lookup_follows_the_profile
-    with_configuration do |configuration|
-      configuration.version("v1") { |api| api.use :video, "~> 1.0" }
-      configuration.version("v2") { |api| api.use :video, "~> 2.0" }
-      configuration.recordable_registry.register("AddonA::Video", version: "1.2.0")
-      configuration.recordable_registry.register("AddonB::Video", version: "2.0.0")
-
-      configuration.validate!
-
-      assert_equal "AddonA::Video", RecordingStudioApi.recordable_type_for_public_name("Video", version: "v1")
-      assert_equal "AddonB::Video", RecordingStudioApi.recordable_type_for_public_name("Video", version: "v2")
-      assert_equal "AddonA::Video", RecordingStudioApi.recordable_type_for_public_name("AddonA::Video", version: "v1")
-      assert_nil RecordingStudioApi.recordable_type_for_public_name("AddonB::Video", version: "v1")
-      assert_equal "AddonB::Video", RecordingStudioApi.recordable_registration_for("AddonB::Video").recordable_type
-    end
-  end
-
-  def test_a_profile_that_selects_both_contribution_versions_still_clashes
-    with_configuration do |configuration|
-      configuration.version("v1") { |api| api.use :video }
-      configuration.recordable_registry.register("AddonA::Video", version: "1.2.0")
-      configuration.recordable_registry.register("AddonB::Video", version: "2.0.0")
-
-      error = assert_raises(RecordingStudioApi::ConfigurationError) { configuration.validate! }
-
-      assert_includes error.message, "AddonA::Video"
-      assert_includes error.message, "AddonB::Video"
-      assert_includes error.message, "Video"
-      assert_includes error.message, "v1"
     end
   end
 
