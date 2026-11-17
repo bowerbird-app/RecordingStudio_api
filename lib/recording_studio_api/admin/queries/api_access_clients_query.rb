@@ -201,7 +201,7 @@ module RecordingStudioApi
             requested_id = context.params[:root_recording_id].presence || context.params["root_recording_id"].presence
             recording = RecordingStudio::Recording.includes(:recordable).find_by(id: requested_id) if requested_id.present?
             recording ||= context.root_recording
-            recording if RecordingStudio.root_recording?(recording)
+            recording if recording&.root?
           end
         end
 
@@ -330,7 +330,7 @@ module RecordingStudioApi
 
         def access_point_label(recording)
           return "Unknown" if recording.nil?
-          return recording.recordable_type.to_s.demodulize.underscore.humanize if recording.parent_recording_id.nil?
+          return recording.recordable_type.to_s.demodulize.underscore.humanize if recording.root?
 
           recordable_identifier(recording.recordable)
         end

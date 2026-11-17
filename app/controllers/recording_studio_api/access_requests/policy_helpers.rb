@@ -55,7 +55,7 @@ module RecordingStudioApi
         return true unless api.api_management_authorization_required
         return false if access_point_recording.nil?
 
-        root_recording = access_point_recording.root_recording || access_point_recording
+        root_recording = access_point_recording.root_recording_or_self
         return false unless RecordingStudioApi.configuration.admin_root_recordable_type_names.include?(root_recording.recordable_type)
 
         RecordingStudioApi::Admin::ApiAuthorization.authorized?(
@@ -93,7 +93,7 @@ module RecordingStudioApi
       end
 
       def manageable_root_recording?(recording)
-        return false if recording.nil? || recording.parent_recording_id.present?
+        return false unless recording&.root?
 
         manageable_root_recordings.any? { |candidate| candidate.id == recording.id }
       end
@@ -109,9 +109,7 @@ module RecordingStudioApi
       def access_point_label(recording)
         return "Unknown" if recording.nil?
 
-        if recording.parent_recording_id.nil?
-          return recording.recordable_type.to_s.demodulize.underscore.humanize
-        end
+        return recording.recordable_type.to_s.demodulize.underscore.humanize if recording.root?
 
         recordable_identifier(recording.recordable)
       end

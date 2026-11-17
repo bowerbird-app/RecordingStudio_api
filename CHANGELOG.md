@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.14.0] - 2026-11-17
+
+### Changed
+- Root checks call Recording Studio. `Recording#root?` decides a root. `root_recording_or_self` resolves the root recording. Token scope uses `RecordingStudio.root_recording_id_for`. A root access point is still labeled by its type. A nested access point is still labeled by its name.
+- A `root_type` filter still selects parentless recordings of that type. Core 7.7.0 has no roots scope.
+- List `filter`, `q`, and recordable `sort` still join the recordable table in this gem. `recordable_filters` and `recordable_order` are arguments to `recordings_query` on a root. They are not scopes on an authorized relation.
+
+### Upgrade notes
+- Bump to `1.14.0`. No migration. Stay on Recording Studio `>= 7.7.0`, `< 8.0`.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.13.0] - 2026-11-17
 
 ### Fixed
