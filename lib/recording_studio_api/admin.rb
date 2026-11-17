@@ -8,6 +8,20 @@ end
 
 module RecordingStudioApi
   module Admin
+    MINIMUM_VERSION = "2.19.0"
+
+    def self.ensure_supported_version!
+      return unless defined?(::RecordingStudioAdmin::VERSION)
+
+      loaded = Gem::Version.new(::RecordingStudioAdmin::VERSION.to_s)
+      return if loaded >= Gem::Version.new(MINIMUM_VERSION)
+
+      raise ConfigurationError,
+            "recording_studio_admin #{MINIMUM_VERSION} or newer is required (loaded #{::RecordingStudioAdmin::VERSION})"
+    end
+
+    ensure_supported_version!
+
     DEFINITION_FILES = %w[
       recording_studio_api/admin/api_context
       recording_studio_api/admin/api_authorization

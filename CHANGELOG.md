@@ -17,7 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - A missing or invalid `config/recording_studio_api.yml`, and a failure while reading `config.x.recording_studio_api`, raise while the engine loads.
-- Require `recording_studio_admin` `>= 2.19.0`, `< 3.0`. Development and dummy Gemfiles pin tag `v2.19.0`.
+- Actor access lists use `RecordingStudioAccessible.access_grants_for`. Require `recording_studio_accessible` `>= 0.50.0`, `< 2.0`. Development and dummy pins are tag `v0.50.0`.
+- `recording_studio_admin` stays optional. Loading a copy older than `2.19.0` raises. Development and dummy Gemfiles pin tag `v2.19.0`. Select filters use that release's `default:`.
 
 ### Upgrade notes
 - Bump to `1.12.0`. No migration.

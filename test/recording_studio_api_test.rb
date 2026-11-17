@@ -16,8 +16,8 @@ class RecordingStudioApiTest < Minitest::Test
     gemspec = File.read(File.join(root, "recording_studio_api.gemspec"))
     assert_includes gemspec, '"recording_studio", ">= 7.7.0", "< 8.0"'
     assert_includes gemspec, '"recording_studio_trashable", ">= 0.17.0", "< 2.0"'
-    assert_includes gemspec, '"recording_studio_accessible", ">= 0.49.0", "< 2.0"'
-    assert_includes gemspec, '"recording_studio_admin", ">= 2.19.0", "< 3.0"'
+    assert_includes gemspec, '"recording_studio_accessible", ">= 0.50.0", "< 2.0"'
+    refute_includes gemspec, "recording_studio_admin"
     assert_includes gemspec, '"flat_pack", ">= 0.1.356", "< 2.0"'
     assert_includes gemspec, '"view_component", ">= 4.14", "< 5"'
     %w[Gemfile.lock test/dummy/Gemfile.lock].each do |path|
@@ -36,7 +36,7 @@ class RecordingStudioApiTest < Minitest::Test
       contents = File.read(File.join(root, path))
       assert_includes contents, 'RecordingStudio", tag: "v7.7.0"', path
       assert_includes contents, 'flatpack", tag: "v0.1.377"', path
-      assert_includes contents, 'RecordingStudio_accessible", tag: "v0.49.0"', path
+      assert_includes contents, 'RecordingStudio_accessible", tag: "v0.50.0"', path
       assert_includes contents, 'RecordingStudio_trashable", tag: "v1.0.1"', path
       assert_includes contents, 'RecordingStudio_root_switchable", tag: "v0.16.0"', path
       assert_includes contents, 'RecordingStudio_moveable", tag: "v6.0.0"', path
