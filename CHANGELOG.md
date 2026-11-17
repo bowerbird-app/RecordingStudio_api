@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-11-17
+
+### Fixed
+- The admin API keys list asks Accessible which recordings the actor can manage. For each workspace from `root_recording_ids_for`, it calls `authorized_recordings` once at `access_management_edit_role` and keeps keys whose access point is in that set. A folder admin sees keys on that folder and its descendants. A sibling folder stays out, including when the actor can view the workspace. A dependent grant follows the manager chain. A workspace admin still sees every key in that workspace. A root scope uses `RecordingStudio.root_recording?`.
+
+### Upgrade notes
+- Bump to `1.10.0`. No migration.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.9.0] - 2026-11-17
 
 ### Fixed

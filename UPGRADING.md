@@ -1,5 +1,13 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.10.0
+
+Behavior change. No migration. The admin API keys list follows Accessible.
+
+1. Bump the host gem to `1.10.0`. Stay on Recording Studio `>= 7.7.0`, `< 8.0` and Accessible `>= 0.49.0`, `< 2.0`.
+2. The keys list, the requests screen, and the most-used widget use `root_recording_ids_for` and then one `authorized_recordings` call per workspace, at `access_management_edit_role`. Keys stay on access points in that set. A folder admin sees keys on that folder and its descendants. A sibling stays out. A workspace view grant does not add keys. A dependent grant follows the manager chain, including a role the manager no longer holds. A workspace admin still sees every key in the workspace.
+3. A selected root is a root only when `RecordingStudio.root_recording?` says so. One selected root asks Accessible about that workspace only.
+
 ## Upgrading to 1.9.0
 
 Behavior change. No migration. Access management follows the recording.

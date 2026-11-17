@@ -63,6 +63,97 @@ class ApiAccessClientsQueryTest < ActiveSupport::TestCase
     assert_equal [operations_payload.fetch(:api_client).id], query(api_key: "operations").map { |row| row.api_client.id }.uniq
   end
 
+  test "a folder admin sees keys under their folder only" do
+    tree = build_folder_access
+    owner = tree.fetch(:owner)
+    folder_key = provisioned_client_id(tree.fetch(:folder), owner, "Folder key")
+    child_key = provisioned_client_id(tree.fetch(:child), owner, "Child key")
+    sibling_key = provisioned_client_id(tree.fetch(:sibling), owner, "Sibling key")
+    root_key = provisioned_client_id(tree.fetch(:root), owner, "Root key")
+
+    ids = visible_client_ids(actor: tree.fetch(:folder_admin), root_recording: tree.fetch(:root))
+
+    assert_includes ids, folder_key
+    assert_includes ids, child_key
+    refute_includes ids, sibling_key
+    refute_includes ids, root_key
+    assert_empty visible_client_ids(actor: tree.fetch(:viewer), root_recording: tree.fetch(:root))
+  end
+
+  test "a dependent grant follows the manager chain" do
+    tree = build_folder_access
+    owner = tree.fetch(:owner)
+    folder = tree.fetch(:folder)
+    manager = create_user(email: "dependent-manager-#{SecureRandom.hex(4)}@example.com")
+    grant_or_bootstrap_access!(recording: folder, actor: manager, role: :admin)
+    manager_access = RecordingStudioAccessible.access_recordings_for_actor(recording: folder, actor: manager).first
+    dependent_user = create_user(email: "dependent-actor-#{SecureRandom.hex(4)}@example.com")
+    dependent = RecordingStudioAccessible.grant_access(
+      recording: folder,
+      actor: dependent_user,
+      role: :admin,
+      manager_actor: manager,
+      depends_on: manager_access
+    )
+    assert dependent.success?, dependent.error
+
+    folder_key = provisioned_client_id(folder, owner, "Dependent folder key")
+    sibling_key = provisioned_client_id(tree.fetch(:sibling), owner, "Dependent sibling key")
+    ids = visible_client_ids(actor: dependent_user, root_recording: tree.fetch(:root))
+
+    assert_includes ids, folder_key
+    refute_includes ids, sibling_key
+
+    RecordingStudio::Access.where(id: manager_access.recordable_id).update_all(role: "view")
+    constrained_ids = visible_client_ids(actor: dependent_user, root_recording: tree.fetch(:root))
+
+    refute_includes constrained_ids, folder_key
+    refute_includes constrained_ids, sibling_key
+  end
+
+  test "a multi-workspace actor sees each workspace's permitted keys" do
+    first = build_folder_access
+    actor = first.fetch(:folder_admin)
+    second_owner = create_user(email: "second-workspace-#{SecureRandom.hex(4)}@example.com")
+    second_root, = create_access_recording_for(user: second_owner, role: :admin, workspace_name: "Second workspace")
+    grant_or_bootstrap_access!(recording: second_root, actor: actor, role: :admin)
+
+    folder_key = provisioned_client_id(first.fetch(:folder), first.fetch(:owner), "First folder key")
+    sibling_key = provisioned_client_id(first.fetch(:sibling), first.fetch(:owner), "First sibling key")
+    second_key = provisioned_client_id(second_root, second_owner, "Second workspace key")
+
+    calls = authorized_recording_calls do
+      ids = visible_client_ids(actor: actor)
+
+      assert_includes ids, folder_key
+      assert_includes ids, second_key
+      refute_includes ids, sibling_key
+    end
+    assert_equal 2, calls
+
+    scoped_calls = authorized_recording_calls do
+      scoped_ids = visible_client_ids(actor: actor, root_recording: first.fetch(:root))
+
+      assert_includes scoped_ids, folder_key
+      refute_includes scoped_ids, second_key
+      refute_includes scoped_ids, sibling_key
+    end
+    assert_equal 1, scoped_calls
+  end
+
+  test "a workspace admin sees every key in the workspace" do
+    tree = build_folder_access
+    owner = tree.fetch(:owner)
+    ids = [
+      provisioned_client_id(tree.fetch(:root), owner, "Workspace root key"),
+      provisioned_client_id(tree.fetch(:folder), owner, "Workspace folder key"),
+      provisioned_client_id(tree.fetch(:child), owner, "Workspace child key"),
+      provisioned_client_id(tree.fetch(:sibling), owner, "Workspace sibling key")
+    ]
+
+    assert_equal ids.sort, visible_client_ids(actor: owner, root_recording: tree.fetch(:root)).sort
+  end
+
   private
 
   def remove_credential!
@@ -77,5 +168,38 @@ class ApiAccessClientsQueryTest < ActiveSupport::TestCase
     context = Context.new(params: params, current_actor: @user, root_recording: @root_recording)
 
     RecordingStudioApi::Admin::Queries::ApiAccessClientsQuery.call(context)
+  end
+
+  def provisioned_client_id(access_point, manager, name)
+    result = RecordingStudioApi::Services::ProvisionApiClient.call(
+      access_point_recording: access_point,
+      manager_actor: manager,
+      role: :admin,
+      name: name
+    )
+    assert result.success?, result.error.to_s
+
+    result.value.fetch(:api_client).id
+  end
+
+  def visible_client_ids(actor:, root_recording: nil, params: {})
+    context = Context.new(params: params, current_actor: actor, root_recording: root_recording)
+
+    RecordingStudioApi::Admin::Queries::ApiAccessClientsQuery.call(context).map { |row| row.api_client.id }.uniq
+  end
+
+  def authorized_recording_calls
+    calls = 0
+    singleton = class << RecordingStudioAccessible; self; end
+    singleton.alias_method(:authorized_recordings_without_count, :authorized_recordings)
+    singleton.define_method(:authorized_recordings) do |*args, **kwargs, &block|
+      calls += 1
+      authorized_recordings_without_count(*args, **kwargs, &block)
+    end
+    yield
+    calls
+  ensure
+    singleton.alias_method(:authorized_recordings, :authorized_recordings_without_count)
+    singleton.remove_method(:authorized_recordings_without_count)
   end
 end

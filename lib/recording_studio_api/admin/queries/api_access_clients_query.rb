@@ -141,46 +141,66 @@ module RecordingStudioApi
           end
         end
 
+        # Recordings where this actor can manage keys. One Accessible call per
+        # workspace, at the access-management edit role. Dependent grants and
+        # the manager chain stay inside that call.
         def accessible_access_point_recordings
-          RecordingStudio::Recording.unscoped.where("#{recordings_table}.id IN (#{accessible_access_point_ids_sql})")
+          @accessible_access_point_recordings ||= access_points_for(manageable_workspace_roots)
         end
 
-        def accessible_access_point_ids_sql
-          role_names = access_management_role_names
-          return "SELECT NULL::uuid WHERE FALSE" if context.current_actor.nil? || role_names.empty?
+        def manageable_workspace_roots
+          actor = context.current_actor
+          return [] if actor.nil?
 
-          actor_type = connection.quote(RecordingStudioAccessible::ActorType.for(context.current_actor))
-          actor_id = connection.quote(context.current_actor.id)
-          matching_roles = role_names.map { |name| connection.quote(name) }.join(", ")
-
-          <<~SQL.squish
-            WITH RECURSIVE access_scope AS (
-              SELECT #{recordings_table}.parent_recording_id AS id
-              FROM #{recordings_table}
-              INNER JOIN #{accesses_table}
-                ON #{accesses_table}.id = #{recordings_table}.recordable_id
-              WHERE #{recordings_table}.recordable_type = 'RecordingStudio::Access'
-                AND #{recordings_table}.parent_recording_id IS NOT NULL
-                AND #{RecordingStudio.kept_sql(recordings_table)}
-                AND #{accesses_table}.actor_type = #{actor_type}
-                AND #{accesses_table}.actor_id = #{actor_id}
-                AND #{accesses_table}.role IN (#{matching_roles})
-
-              UNION
-
-              SELECT child.id
-              FROM #{recordings_table} child
-              INNER JOIN access_scope parent ON child.parent_recording_id = parent.id
-              WHERE #{RecordingStudio.kept_sql('child')}
+          root_ids = Array(
+            RecordingStudioAccessible.root_recording_ids_for(
+              actor: actor,
+              minimum_role: access_management_role
             )
-            SELECT id FROM access_scope WHERE id IS NOT NULL
-          SQL
+          )
+          scoped_root = scoped_root_recording
+          root_ids = root_ids.select { |id| id == scoped_root.id } if scoped_root
+          root_ids = root_ids_matching_type(root_ids) if root_type_filter.present?
+          return [] if root_ids.empty?
+
+          RecordingStudio::Recording.unscoped.where(id: root_ids).to_a
         end
 
-        def access_management_role_names
-          @access_management_role_names ||= RecordingStudio::AccessRoles.names_at_or_above(
-            RecordingStudioApi.configuration.access_management_view_role
-          )
+        def root_ids_matching_type(root_ids)
+          allowed_ids = root_recordings_for_type.where(id: root_ids).pluck(:id)
+          root_ids.select { |id| allowed_ids.include?(id) }
+        end
+
+        def access_points_for(roots)
+          return RecordingStudio::Recording.none if roots.empty?
+
+          actor = context.current_actor
+          relations = roots.map do |root|
+            RecordingStudioAccessible.authorized_recordings(
+              actor: actor,
+              root: root,
+              scope: RecordingStudio::Recording.unscoped.kept,
+              role: access_management_role
+            )
+          end
+          combine_recording_relations(relations)
+        end
+
+        def combine_recording_relations(relations)
+          return relations.first if relations.one?
+
+          sql = relations.map { |relation| inlined_id_sql(relation) }.join(" UNION ")
+          RecordingStudio::Recording.unscoped.where("#{recordings_table}.id IN (#{sql})")
+        end
+
+        def inlined_id_sql(relation)
+          connection.unprepared_statement do
+            relation.unscope(:order).reselect(:id).to_sql
+          end
+        end
+
+        def access_management_role
+          RecordingStudioApi.configuration.access_management_edit_role
         end
 
         def scoped_root_recording
@@ -188,7 +208,7 @@ module RecordingStudioApi
             requested_id = context.params[:root_recording_id].presence || context.params["root_recording_id"].presence
             recording = RecordingStudio::Recording.includes(:recordable).find_by(id: requested_id) if requested_id.present?
             recording ||= context.root_recording
-            recording if recording&.parent_recording_id.nil?
+            recording if RecordingStudio.root_recording?(recording)
           end
         end
 
@@ -249,10 +269,6 @@ module RecordingStudioApi
 
         def recordings_table
           RecordingStudio::Recording.table_name
-        end
-
-        def accesses_table
-          RecordingStudio::Access.table_name
         end
 
         def connection
