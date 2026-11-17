@@ -858,12 +858,14 @@ from the lookup, before the check.
 
 An `owns_scoping` read is the exception. `capability!` yields nil and returns
 without lookup, `before_authorize`, or `authorize!`. The handler owns scoping,
-and the block still runs with a nil recording. A flat index or create, and an
-endpoint with `scope_id: false` or no recording id, also return a nil
-recording. `show`, `update`, `destroy`, capability actions, and id-scoped
-endpoints load through `ScopedRecording.find!` and `authorize!`. The role is
-`:view` for index, show, and GET, and `:edit` otherwise, unless
-`required_role:` or `capability_action_role_for` says otherwise.
+and the block still runs with a nil recording. A flat index or create returns
+a nil recording. An endpoint with `scope_id: false` or no recording id also
+returns a nil recording, after `endpoint!` calls `access_grant.authorize!` on
+the grant anchor. The role is that endpoint's `authorization_role`. `show`,
+`update`, `destroy`, capability actions, and id-scoped endpoints load through
+`ScopedRecording.find!` and `authorize!`. The role is `:view` for index, show,
+and GET, and `:edit` otherwise, unless `required_role:` or
+`capability_action_role_for` says otherwise.
 `include_trashed` and `trashed_semantics` go through
 `HandlerScope.dispatch_include_trashed?`. A blank id on a scoped path raises
 `NotFoundError`.
@@ -1348,6 +1350,7 @@ RecordingStudioApi.register_endpoint(
   http_verb: :patch,
   path: "presskits/:id",
   scope_id: false,
+  required_role: :edit,
   handler: Presskits::Edit,
   ui: "presskits.editor"
 )
@@ -1377,7 +1380,9 @@ Handlers receive `RecordingStudioApi::RegisteredEndpointContext`. That object ha
 
 A path that captures `:id` or `:recording_id` must pass `recordable_type:`. Registration raises when that type is missing. This gem loads the capture from the token's scope, checks the type, and calls `access_grant.authorize!` before the handler runs. `:recording_id` is scoped the same way as `:id`. GET defaults to `:view`. Every other verb defaults to `:edit`. Pass `required_role:` to override that default, so a POST search can require `:view`. A foreign or wrong-type id is 404 and the handler does not run.
 
-Pass `scope_id: false` when the capture is not a recording, such as `people/:id`. `recording` stays nil and the handler owns that id.
+Pass `scope_id: false` when the capture is not a recording, such as `people/:id`. `recording` stays nil and the handler owns that id. A non-GET with `scope_id: false` must pass `required_role:`. Registration raises when it is missing.
+
+An endpoint that does not scope a recording still authorizes before the handler runs. `endpoint!` calls `access_grant.authorize!` with the grant anchor (`scope_recording`) and `authorization_role`. Membership is the `authorized_recordings` relation for that anchor. GET defaults to `:view`. Every other verb defaults to `:edit`. `required_role:` overrides that default, so a view key can mark a notification read. The effective role is the lower of the key grant and the owner's current role. A view key is refused on an unscoped write. A key whose owner lost access is refused. The response is the same 403 a collection index uses for that anchor. The handler does not run.
 
 `include_trashed: true` is accepted on a read, on restore, on destroy, and when
 the endpoint declares `trashed_semantics: :restore` or `:destroy`. Registration

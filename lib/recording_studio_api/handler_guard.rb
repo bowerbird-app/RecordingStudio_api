@@ -47,7 +47,8 @@ module RecordingStudioApi
       end
 
       def endpoint!(access_grant:, endpoint:, id:)
-        return empty_result if HandlerScope.endpoint_opt_out?(endpoint) || !endpoint.scopes_recording?
+        return authorize_unscoped_endpoint!(access_grant, endpoint) unless endpoint.scopes_recording?
+        return empty_result if HandlerScope.endpoint_opt_out?(endpoint)
 
         role = endpoint.authorization_role
         include_trashed = include_trashed?(endpoint, role: role)
@@ -126,6 +127,16 @@ module RecordingStudioApi
           role: role,
           include_trashed: include_trashed
         )
+      end
+
+      def authorize_unscoped_endpoint!(access_grant, endpoint)
+        authorize_recording!(
+          access_grant,
+          access_grant.scope_recording,
+          endpoint.authorization_role,
+          false
+        )
+        empty_result
       end
 
       def empty_result

@@ -213,6 +213,7 @@ class ApiV1RegisteredEndpointsControllerTest < ActionDispatch::IntegrationTest
       http_verb: :patch,
       path: "people/:id",
       scope_id: false,
+      required_role: :edit,
       handler: ->(context) { { operation: "update", id: context.params[:id], name: context.params[:name] } }
     )
 

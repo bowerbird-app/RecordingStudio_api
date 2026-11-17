@@ -56,7 +56,7 @@ class RegisteredEndpointRegistryTest < Minitest::Test
     @registry.register(:list_users, http_verb: :get, path: "users", handler: ->(_context) { :list })
     @registry.register(:create_user, http_verb: :post, path: "users", handler: ->(_context) { :create })
     @registry.register(:show_user, http_verb: :get, path: "users/:id", scope_id: false, handler: ->(_context) { :show })
-    @registry.register(:update_user, http_verb: :patch, path: "users/:id", scope_id: false, handler: ->(_context) { :update })
+    @registry.register(:update_user, http_verb: :patch, path: "users/:id", scope_id: false, required_role: :edit, handler: ->(_context) { :update })
 
     list = @registry.match(path: "users", http_verb: :get)
     create = @registry.match(path: "users", http_verb: :POST)
@@ -234,5 +234,44 @@ class RegisteredEndpointRegistryTest < Minitest::Test
 
     assert_equal "first", match.endpoint.name
     assert_equal({ id: "button" }, match.captures)
+  end
+
+  def test_scope_id_false_write_requires_required_role
+    %i[post patch put delete].each do |verb|
+      registry = RecordingStudioApi::RegisteredEndpointRegistry.new
+      error = assert_raises(RecordingStudioApi::ConfigurationError) do
+        registry.register(:write_user, http_verb: verb, path: "users/:id", scope_id: false, handler: ->(_) { :ok })
+      end
+
+      assert_includes error.message, "required_role"
+      assert_includes error.message, "scope_id: false"
+      assert_includes error.message, "write_user"
+      assert_includes error.message, verb.to_s.upcase
+    end
+
+    uncaptured = RecordingStudioApi::RegisteredEndpointRegistry.new
+    error = assert_raises(RecordingStudioApi::ConfigurationError) do
+      uncaptured.register(:touch, http_verb: :post, path: "touch", scope_id: false, handler: ->(_) { :ok })
+    end
+    assert_includes error.message, "required_role is required when touch sets scope_id: false on POST"
+
+    shown = RecordingStudioApi::RegisteredEndpointRegistry.new
+    shown.register(:show_user, http_verb: :get, path: "users/:id", scope_id: false, handler: ->(_) { :ok })
+    assert_equal :view, shown.fetch(:show_user).authorization_role
+
+    declared = RecordingStudioApi::RegisteredEndpointRegistry.new
+    declared.register(
+      :mark_read,
+      http_verb: :post,
+      path: "users/:id/read",
+      scope_id: false,
+      required_role: :view,
+      handler: ->(_) { :ok }
+    )
+    assert_equal :view, declared.fetch(:mark_read).authorization_role
+
+    plain = RecordingStudioApi::RegisteredEndpointRegistry.new
+    plain.register(:create_user, http_verb: :post, path: "users", handler: ->(_) { :ok })
+    assert_equal :edit, plain.fetch(:create_user).authorization_role
   end
 end

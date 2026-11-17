@@ -336,6 +336,55 @@ class HandlerGuardTest < ActiveSupport::TestCase
     assert_equal "Resource type does not match Page", error.message
   end
 
+  test "an unscoped endpoint authorizes the grant anchor" do
+    view_grant, = open_grant(:view)
+    edit_grant, = open_grant(:edit)
+    create_note = register_endpoint(:create_note, http_verb: :post, path: "notes")
+    revise_note = register_endpoint(:revise_note, http_verb: :patch, path: "notes")
+    remove_person = register_endpoint(
+      :remove_person,
+      http_verb: :delete,
+      path: "people/:id",
+      scope_id: false,
+      required_role: :edit
+    )
+    mark_read = register_endpoint(
+      :mark_read,
+      http_verb: :post,
+      path: "notes/:id/read",
+      scope_id: false,
+      required_role: :view
+    )
+
+    assert_forbidden { guard_endpoint(view_grant, create_note, nil) }
+    assert_forbidden { guard_endpoint(view_grant, revise_note, nil) }
+    assert_forbidden { guard_endpoint(view_grant, remove_person, "person-1") }
+    assert_nil_guard guard_endpoint(edit_grant, create_note, nil)
+    assert_nil_guard guard_endpoint(edit_grant, revise_note, nil)
+    assert_nil_guard guard_endpoint(edit_grant, remove_person, "person-1")
+    assert_nil_guard guard_endpoint(view_grant, mark_read, "note-1")
+  end
+
+  test "an unscoped endpoint denies a grant whose owner lost access" do
+    user = create_user
+    root, access = create_access_recording_for(user: user, role: :admin)
+    other = create_user
+    grant_or_bootstrap_access!(recording: root, actor: other, role: :admin)
+    endpoint = register_endpoint(:status, http_verb: :get, path: "status")
+
+    assert_nil_guard guard_endpoint(anchor_grant(access, root), endpoint, nil)
+
+    revoked = RecordingStudioAccessible::Services::RevokeRecordingAccess.call(
+      recording: root,
+      access_recording: access,
+      manager_actor: other,
+      allow_last_admin_removal: true
+    )
+    assert revoked.success?
+
+    assert_forbidden { guard_endpoint(anchor_grant(access, root), endpoint, nil) }
+  end
+
   test "an endpoint required_role view authorizes a view grant on post" do
     grant, page = open_grant(:view)
     endpoint = register_endpoint(
@@ -378,6 +427,15 @@ class HandlerGuardTest < ActiveSupport::TestCase
   end
 
   private
+
+  def anchor_grant(access, root)
+    RecordingStudioApi::AccessGrant.new(
+      api_client: nil,
+      credential: nil,
+      access_recording: access,
+      root_recording: root
+    )
+  end
 
   def open_grant(role)
     root, access = create_access_recording_for(user: create_user, role: role)
