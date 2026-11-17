@@ -187,16 +187,9 @@ module RecordingStudioApi
         end
 
         def combine_recording_relations(relations)
-          return relations.first if relations.one?
+          return RecordingStudio::Recording.none if relations.empty?
 
-          sql = relations.map { |relation| inlined_id_sql(relation) }.join(" UNION ")
-          RecordingStudio::Recording.unscoped.where("#{recordings_table}.id IN (#{sql})")
-        end
-
-        def inlined_id_sql(relation)
-          connection.unprepared_statement do
-            relation.unscope(:order).reselect(:id).to_sql
-          end
+          relations.map { |relation| RecordingStudio::Recording.unscoped.where(id: relation.reselect(:id)) }.reduce(:or)
         end
 
         def access_management_role
