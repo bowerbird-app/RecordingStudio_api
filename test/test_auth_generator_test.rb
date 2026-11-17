@@ -37,6 +37,7 @@ class TestAuthGeneratorTest < Minitest::Test
       refute_includes credentials_controller, "can_manage_recording?"
       assert_includes concern, '"operations"'
       assert_includes concern, "RecordingStudioApi.api_recordable_types(api: scalar_test_auth_api)"
+      assert_includes concern, "manageable_recordings(recordable_types: allowed_types)"
       assert_includes concern, "Rails.env.local?"
       assert_includes token_view, "API test token"
       assert_includes token_view, 'class: "w-full max-w-xl space-y-4"'

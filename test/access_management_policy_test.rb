@@ -68,8 +68,103 @@ class AccessManagementPolicyTest < ActiveSupport::TestCase
 
     assert_includes policy.visible_access_recordings, access_recording
     assert_includes policy.visible_root_recordings, root_recording
-    assert policy.can_view_root_recording?(root_recording)
+    refute policy.can_view_recording?(root_recording)
+    refute policy.can_manage_recording?(folder_recording)
+    assert policy.can_view_recording?(folder_recording)
     assert policy.authorized_for_access_recording?(access_recording, access_management_role: :view)
+  end
+
+  test "a folder admin manages that folder and its descendants only" do
+    tree = build_folder_access
+    policy = RecordingStudioApi::AccessManagementPolicy.new(actor: tree.fetch(:folder_admin))
+    managed_ids = policy.manageable_recordings.map(&:id)
+
+    assert_includes managed_ids, tree.fetch(:folder).id
+    assert_includes managed_ids, tree.fetch(:child).id
+    refute_includes managed_ids, tree.fetch(:sibling).id
+    refute_includes managed_ids, tree.fetch(:root).id
+    refute_includes policy.manageable_root_recordings, tree.fetch(:root)
+    assert policy.can_manage_recording?(tree.fetch(:folder))
+    assert policy.can_manage_recording?(tree.fetch(:child))
+    refute policy.can_manage_recording?(tree.fetch(:sibling))
+    refute policy.can_manage_recording?(tree.fetch(:root))
+    assert policy.can_view_recording?(tree.fetch(:root))
+    assert policy.can_view_recording?(tree.fetch(:sibling))
+    assert policy.can_assign_role?(tree.fetch(:folder), :admin)
+    refute policy.can_assign_role?(tree.fetch(:sibling), :view)
+    refute policy.can_assign_role?(tree.fetch(:root), :view)
+    assert policy.can_manage_any_recording?
+
+    folder_only = create_user(email: "folder-only-#{SecureRandom.hex(4)}@example.com")
+    grant_or_bootstrap_access!(recording: tree.fetch(:folder), actor: folder_only, role: :admin)
+    only_policy = RecordingStudioApi::AccessManagementPolicy.new(actor: folder_only)
+
+    assert only_policy.can_manage_recording?(tree.fetch(:folder))
+    assert only_policy.can_manage_recording?(tree.fetch(:child))
+    refute only_policy.can_view_recording?(tree.fetch(:root))
+    refute only_policy.can_manage_recording?(tree.fetch(:root))
+    refute only_policy.can_manage_recording?(tree.fetch(:sibling))
+    refute_includes only_policy.manageable_root_recordings, tree.fetch(:root)
+  end
+
+  test "a viewer cannot manage recordings they can view" do
+    tree = build_folder_access
+    policy = RecordingStudioApi::AccessManagementPolicy.new(actor: tree.fetch(:viewer))
+
+    assert policy.can_view_recording?(tree.fetch(:folder))
+    assert policy.can_view_recording?(tree.fetch(:child))
+    refute policy.can_view_recording?(tree.fetch(:sibling))
+    refute policy.can_view_recording?(tree.fetch(:root))
+    refute policy.can_manage_recording?(tree.fetch(:folder))
+    refute policy.can_manage_recording?(tree.fetch(:child))
+    refute policy.can_manage_any_recording?
+    assert_empty policy.manageable_recordings
+    assert_empty policy.manageable_root_recordings
+  end
+
+  test "a workspace admin manages the root and every folder" do
+    tree = build_folder_access
+    policy = RecordingStudioApi::AccessManagementPolicy.new(actor: tree.fetch(:owner))
+
+    assert_includes policy.manageable_root_recordings, tree.fetch(:root)
+    assert policy.can_manage_recording?(tree.fetch(:root))
+    assert policy.can_manage_recording?(tree.fetch(:folder))
+    assert policy.can_manage_recording?(tree.fetch(:child))
+    assert policy.can_manage_recording?(tree.fetch(:sibling))
+    assert policy.can_assign_role?(tree.fetch(:root), :admin)
+    assert policy.can_manage_any_recording?
+  end
+
+  test "api keys screen manage follows the access point" do
+    tree = build_folder_access
+
+    assert api_keys_screen_manageable?(tree.fetch(:folder_admin), tree.fetch(:folder))
+    assert api_keys_screen_manageable?(tree.fetch(:folder_admin), tree.fetch(:child))
+    refute api_keys_screen_manageable?(tree.fetch(:folder_admin), tree.fetch(:sibling))
+    refute api_keys_screen_manageable?(tree.fetch(:folder_admin), tree.fetch(:root))
+    refute api_keys_screen_manageable?(tree.fetch(:viewer), tree.fetch(:folder))
+    assert api_keys_screen_manageable?(tree.fetch(:owner), tree.fetch(:root))
+    assert api_keys_screen_manageable?(tree.fetch(:owner), tree.fetch(:sibling))
+    assert api_keys_screen_manageable?(tree.fetch(:owner), tree.fetch(:child))
+  end
+
+  test "test credential access points follow manageable recordings" do
+    tree = build_folder_access
+    host = Object.new
+    host.extend(PublicApi::ScalarTestAuth)
+    host.define_singleton_method(:scalar_test_auth_actor) { tree.fetch(:folder_admin) }
+    ids = host.send(:scalar_test_auth_access_points).map { |entry| entry.fetch(:id) }
+
+    assert_includes ids, tree.fetch(:folder).id
+    assert_includes ids, tree.fetch(:child).id
+    refute_includes ids, tree.fetch(:sibling).id
+    refute_includes ids, tree.fetch(:root).id
+
+    host.define_singleton_method(:scalar_test_auth_actor) { tree.fetch(:owner) }
+    host.instance_variable_set(:@scalar_test_auth_policy, nil)
+    owner_ids = host.send(:scalar_test_auth_access_points).map { |entry| entry.fetch(:id) }
+    assert_includes owner_ids, tree.fetch(:root).id
+    assert_includes owner_ids, tree.fetch(:sibling).id
   end
 
   test "api client access recordings are visible to managers of their access point" do
@@ -93,5 +188,13 @@ class AccessManagementPolicyTest < ActiveSupport::TestCase
     refute_includes policy.visible_access_recordings, api_client_access_recording
     assert policy.authorized_for_access_recording?(api_client_access_recording, access_management_role: :admin)
     assert_equal root_recording.id, api_client_access_recording.root_recording_id
+  end
+
+  private
+
+  def api_keys_screen_manageable?(actor, recording)
+    row = Struct.new(:access_point_recording).new(recording)
+    context = Struct.new(:current_actor).new(actor)
+    RecordingStudioApi::Admin::ApiKeysScreen.manageable?(row, context)
   end
 end

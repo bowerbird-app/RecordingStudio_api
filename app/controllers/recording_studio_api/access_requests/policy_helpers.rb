@@ -38,10 +38,6 @@ module RecordingStudioApi
                                     .map(&:id)
       end
 
-      def visible_root_recordings
-        access_management_policy.visible_root_recordings
-      end
-
       def manageable_root_recordings
         access_management_policy.manageable_root_recordings
       end

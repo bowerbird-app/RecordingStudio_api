@@ -35,9 +35,7 @@ module RecordingStudioApi
         scoped_recording = @scoped_parent_recording || @scoped_root_recording
         scoped_recording_ids = scoped_recording_filter_ids(scoped_recording, include_children: @include_children)
         visible_access_recording_ids = visible_api_client_access_recordings.map(&:id)
-        @can_manage_access_requests = visible_root_recordings.any? do |recording|
-          access_management_policy.can_manage_recording?(recording)
-        end
+        @can_manage_access_requests = access_management_policy.can_manage_any_recording?
 
         api_clients = RecordingStudioApi::ApiClient
           .includes(:credentials, access_recording: [:recordable, { parent_recording: :parent_recording }])

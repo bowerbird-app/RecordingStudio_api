@@ -1150,6 +1150,54 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_in_delta new_expires_at.to_i, latest_credential.reload.expires_at.to_i, 60
   end
 
+  test "a folder admin manages keys on that folder and not on a sibling or the workspace" do
+    tree = build_folder_access(workspace_name: "Controller scope")
+
+    sign_in tree.fetch(:owner)
+    post "/recording_studio_api/api_clients", params: api_client_create_params(tree.fetch(:sibling), "Owner sibling key")
+    assert_response :created
+
+    sign_in tree.fetch(:folder_admin)
+    get "/recording_studio_api/api_clients/new"
+
+    assert_response :success
+    assert_select %(option[value="#{tree.fetch(:folder).id}"])
+    assert_select %(option[value="#{tree.fetch(:child).id}"])
+    assert_select %(option[value="#{tree.fetch(:sibling).id}"]), count: 0
+    assert_select %(option[value="#{tree.fetch(:root).id}"]), count: 0
+    assert_not_includes response.body, "Pick where this key can work."
+
+    post "/recording_studio_api/api_clients", params: api_client_create_params(tree.fetch(:folder), "Folder screen key")
+    assert_response :created
+
+    post "/recording_studio_api/api_clients", params: api_client_create_params(tree.fetch(:child), "Child screen key")
+    assert_response :created
+
+    post "/recording_studio_api/api_clients", params: api_client_create_params(tree.fetch(:sibling), "Sibling screen key")
+    assert_response :forbidden
+    assert_nil RecordingStudioApi::ApiClient.find_by(name: "Sibling screen key")
+
+    post "/recording_studio_api/api_clients", params: api_client_create_params(tree.fetch(:root), "Root screen key")
+    assert_response :forbidden
+    assert_nil RecordingStudioApi::ApiClient.find_by(name: "Root screen key")
+
+    get "/recording_studio_api/api_clients"
+    assert_response :success
+    assert_select %(a[href*="/recording_studio_api/api_clients/new"]), minimum: 1
+
+    sign_in tree.fetch(:viewer)
+    get "/recording_studio_api/api_clients/new"
+    assert_response :forbidden
+
+    post "/recording_studio_api/api_clients", params: api_client_create_params(tree.fetch(:folder), "Viewer screen key")
+    assert_response :forbidden
+    assert_nil RecordingStudioApi::ApiClient.find_by(name: "Viewer screen key")
+
+    get "/recording_studio_api/api_clients"
+    assert_response :success
+    assert_select %(a[href*="/recording_studio_api/api_clients/new"]), count: 0
+  end
+
   private
 
   def record_hook_actions
@@ -1217,6 +1265,17 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "pagehide"
     assert_includes response.body, "turbo:before-cache"
     assert_includes response.body, "Secret hidden after leaving this page."
+  end
+
+  def api_client_create_params(recording, name)
+    {
+      api_client: {
+        access_point_recording_id: recording.id,
+        role: "view",
+        api_client_name: name,
+        expires_at: ""
+      }
+    }
   end
 
   def create_api_client_for(parent_recording:, name:, role: :admin)
