@@ -158,6 +158,35 @@ class RelationshipBatchLoaderTest < ActiveSupport::TestCase
     assert_equal({ limit: 2, has_more: true }, context.relationship_metadata(@primary, "folders"))
   end
 
+  test "direct children of a folder grant stay inside authorized recordings" do
+    owner = create_user
+    root, = create_access_recording_for(user: owner, role: :admin)
+    granted = RecordingStudio::Recording.create!(recordable: Folder.create!(name: "Granted"), parent_recording: root)
+    child = RecordingStudio::Recording.create!(recordable: Folder.create!(name: "Child"), parent_recording: granted)
+    trashed = RecordingStudio::Recording.create!(recordable: Folder.create!(name: "Trashed"), parent_recording: granted)
+    trashed.update_column(:trashed_at, Time.current)
+    access_recording = create_access_recording(parent_recording: granted, user: owner, role: :edit)
+    grant = RecordingStudioApi::AccessGrant.new(
+      api_client: nil,
+      credential: nil,
+      access_recording: access_recording,
+      root_recording: root
+    )
+    definition = relationship_definition(source: :children, child_type: "Folder", many: true, limit: 10,
+                                         order: { "created_at" => :asc })
+
+    with_registration("folders" => definition) do
+      context = build_context(
+        include_values: "folders",
+        recordings: [granted],
+        scoped_recordings: grant.accessible_recordings,
+        batch: true
+      )
+
+      assert_equal [child], context.relationship_value(granted, "folders")
+    end
+  end
+
   test "applies the caller scope when loading direct children" do
     child = create_children(@primary, 1, "Tree").first
     trashed = create_children(@primary, 1, "Trashed").first

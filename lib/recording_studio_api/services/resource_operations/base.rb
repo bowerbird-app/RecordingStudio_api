@@ -101,7 +101,7 @@ module RecordingStudioApi
           RecordingStudioApi::RelationshipContext.for(
             recordings: recordings,
             include_values: params[:include],
-            scoped_recordings: scoped_recordings,
+            scoped_recordings: context.scoped_recordings_source,
             api_key: api_key,
             api_version: api_version,
             access_grant: access_grant,

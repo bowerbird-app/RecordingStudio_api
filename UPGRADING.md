@@ -1,5 +1,17 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.7.0
+
+No migration in this gem. Lists read through Accessible `authorized_recordings`.
+
+1. Bump the host gem to `1.7.0`.
+2. Allow `recording_studio` `>= 7.7.0`, `< 8.0` and `recording_studio_accessible` `>= 0.49.0`, `< 2.0`. This release is developed against core `7.7.0` and Accessible `0.49.0`.
+3. Run Recording Studio's migrations through `7.7.0`. That includes the `7.5.0` root invariant (`root_recording_id` not null, parent/root foreign key, parentless check) and the `7.7.0` replacement of `index_rs_recordings_on_root_recording` with `index_rs_recordings_on_root_created_at_id` on `(root_recording_id, created_at, id)`, newest first.
+
+A token's visible recordings are `RecordingStudioAccessible.authorized_recordings` for the owner, rooted at the grant anchor, at view. The list passes its scope (resource type and filters) into that call. Pagination then applies the keyset, order, and limit. Included children use the same authorized relation. `authorize!` still uses the lower of the grant role and the owner's role. The key's own access row does not widen either set. Revoking or downgrading the owner changes the token on the next request. A key with no owner sees nothing.
+
+The ids match `authorized_recording_ids` on valid `root_recording_id` data. A sibling of the grant anchor stays out.
+
 ## Upgrading to 1.6.0
 
 Additive. No migration. Payloads, auth, routes, and OpenAPI stay the same.

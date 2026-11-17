@@ -52,9 +52,13 @@ class ApiV1TokenOwnerAccessTest < ActionDispatch::IntegrationTest
     granted = folder("Granted", root)
     child = folder("Child", granted)
     sibling = folder("Sibling", root)
+    child_page = create_page_recording(root_recording: root, parent_recording: child, page_title: "Inside")
+    sibling_page = create_page_recording(root_recording: root, parent_recording: sibling, page_title: "Outside")
     token, = issue_owner_token(access_point: granted, manager: owner, role: :edit, name: "Folder key")
 
-    get "/recording_studio_api/api/v1/folders", headers: bearer(token)
+    queries = capture_sql do
+      get "/recording_studio_api/api/v1/folders", params: { limit: 50 }, headers: bearer(token)
+    end
     assert_response :success
     ids = JSON.parse(response.body).fetch("records").map { |row| row.fetch("id") }
 
@@ -62,6 +66,23 @@ class ApiV1TokenOwnerAccessTest < ActionDispatch::IntegrationTest
     assert_includes ids, child.id
     assert_not_includes ids, sibling.id
     assert_not_includes ids, root.id
+    assert(queries.any? { |sql| sql.include?("LIMIT") })
+    queries.each { |sql| refute_includes sql, "covered" }
+
+    page_calls = count_authorized_recordings do
+      get "/recording_studio_api/api/v1/pages", params: { limit: 50 }, headers: bearer(token)
+    end
+    assert_equal 1, page_calls.fetch(:typed)
+    assert_equal 1, page_calls.fetch(:plain)
+    assert_response :success
+    page_ids = JSON.parse(response.body).fetch("records").map { |row| row.fetch("id") }
+    assert_includes page_ids, child_page.id
+    assert_not_includes page_ids, sibling_page.id
+
+    get "/recording_studio_api/api/v1/workspaces", headers: bearer(token)
+    assert_response :success
+    workspace_ids = JSON.parse(response.body).fetch("records").map { |row| row.fetch("id") }
+    assert_not_includes workspace_ids, root.id
 
     get "/recording_studio_api/api/v1/folders/#{sibling.id}", headers: bearer(token)
     assert_response :not_found
@@ -72,6 +93,10 @@ class ApiV1TokenOwnerAccessTest < ActionDispatch::IntegrationTest
     root, = create_access_recording_for(user: owner, role: :admin)
     page = create_page_recording(root_recording: root)
     token, = issue_owner_token(access_point: root, manager: owner, role: :view, name: "View key")
+
+    get "/recording_studio_api/api/v1/pages", params: { limit: 50 }, headers: bearer(token)
+    assert_response :success
+    assert_includes JSON.parse(response.body).fetch("records").map { |row| row.fetch("id") }, page.id
 
     get "/recording_studio_api/api/v1/pages/#{page.id}", headers: bearer(token)
     assert_response :success
@@ -174,6 +199,24 @@ class ApiV1TokenOwnerAccessTest < ActionDispatch::IntegrationTest
 
   def bearer(token)
     { "Authorization" => "Bearer #{token}" }
+  end
+
+  # :typed is the page list. :plain is authorize! on the anchor.
+  # A second plain call would be the unused untyped scope.
+  def count_authorized_recordings
+    calls = { typed: 0, plain: 0 }
+    singleton = class << RecordingStudioAccessible; self; end
+    singleton.alias_method(:authorized_recordings_without_count, :authorized_recordings)
+    singleton.define_method(:authorized_recordings) do |*args, **kwargs, &block|
+      typed = kwargs[:scope].respond_to?(:to_sql) && kwargs[:scope].to_sql.include?("recordable_type")
+      calls[typed ? :typed : :plain] += 1
+      authorized_recordings_without_count(*args, **kwargs, &block)
+    end
+    yield
+    calls
+  ensure
+    singleton.alias_method(:authorized_recordings, :authorized_recordings_without_count)
+    singleton.remove_method(:authorized_recordings_without_count)
   end
 
   def capture_sql(&)

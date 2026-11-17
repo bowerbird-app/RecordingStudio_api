@@ -59,7 +59,7 @@ module RecordingStudioApi
         end
 
         def scoped_recordings
-          @scoped_recordings ||= current_access_grant.accessible_recordings
+          @scoped_recordings ||= lazy_recordings { current_access_grant.accessible_recordings }
         end
       end
     end

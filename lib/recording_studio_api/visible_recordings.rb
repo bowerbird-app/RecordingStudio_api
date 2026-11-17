@@ -3,9 +3,11 @@
 module RecordingStudioApi
   # Recordings the owner can view under one grant anchor.
   #
-  # A root anchor uses Accessible's fast path (`Recording.within`) when that
-  # relation is not a parent walk. Every other anchor keeps the relation
-  # `authorized_recording_ids` returns. Trashed rows stay out unless asked for.
+  # `authorized_recordings` returns that set as a relation. Callers pass the
+  # scope (a list passes its type and filters). Kept rows are applied unless
+  # trashed rows were requested. Pagination then adds the keyset, order, and
+  # limit. A root anchor stays on `Recording.within`. A nested anchor does not
+  # walk the subtree into an id list before that limit.
   class VisibleRecordings
     def initialize(owner:, anchor:, grant_role:)
       @owner = owner
@@ -13,11 +15,12 @@ module RecordingStudioApi
       @grant_role = grant_role
       @relations = {}
       @ids = {}
-      @authorized_ids = :unset
     end
 
-    def relation(include_trashed: false)
-      @relations[include_trashed] ||= build_relation(include_trashed)
+    def relation(include_trashed: false, scope: nil)
+      return build_relation(include_trashed, scope) unless scope.nil?
+
+      @relations[include_trashed] ||= build_relation(include_trashed, nil)
     end
 
     def recording_ids(include_trashed: false)
@@ -26,41 +29,24 @@ module RecordingStudioApi
 
     private
 
-    def build_relation(include_trashed)
-      ids = authorized_ids
-      return recordings.none if ids.nil?
+    def build_relation(include_trashed, scope)
+      base = apply_kept(scope || recordings, include_trashed)
+      return base.none unless viewable?
 
-      apply_kept(base_relation(ids), include_trashed)
+      RecordingStudioAccessible.authorized_recordings(
+        actor: @owner,
+        root: @anchor,
+        scope: base,
+        role: :view
+      )
     end
 
-    def authorized_ids
-      return @authorized_ids unless @authorized_ids.equal?(:unset)
-
-      @authorized_ids = lookup_authorized_ids
-    end
-
-    def lookup_authorized_ids
-      return if @owner.nil? || @anchor.nil?
-      return unless view_role?
-
-      RecordingStudioAccessible.authorized_recording_ids(actor: @owner, root: @anchor, role: :view)
+    def viewable?
+      !@owner.nil? && !@anchor.nil? && view_role?
     end
 
     def view_role?
       RecordingStudio::AccessRoles.satisfies?(role: @grant_role, minimum_role: :view)
-    end
-
-    def base_relation(ids)
-      return recordings.within(@anchor) if root_fast_path?(ids)
-
-      recordings.where(id: ids)
-    end
-
-    def root_fast_path?(ids)
-      return false if @anchor.parent_recording_id.present?
-
-      sql = ids.to_sql
-      !sql.include?("WITH RECURSIVE") && !sql.include?("1=0") && sql.include?("root_recording_id")
     end
 
     def apply_kept(relation, include_trashed)

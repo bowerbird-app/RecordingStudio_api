@@ -45,7 +45,9 @@ module RecordingStudioApi
 
         def scoped_relation(definition, query)
           recordings = ResourceOperations.apply_list_filter(
-            scoped_recordings.where(recordable_type: recordable_type),
+            access_grant.accessible_recordings(
+              scope: RecordingStudio::Recording.unscoped.where(recordable_type: recordable_type)
+            ),
             recordable_type: recordable_type,
             params: params,
             api: api_key

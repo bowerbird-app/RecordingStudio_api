@@ -38,9 +38,13 @@ module RecordingStudioApi
           )
         end
 
+        # Built when a caller queries it. A list that already passed its scope
+        # into `authorized_recordings` does not pay for this one as well.
         def scoped_recordings(include_trashed: false)
           @scoped_recordings ||= {}
-          @scoped_recordings[include_trashed] ||= current_access_grant.accessible_recordings(include_trashed: include_trashed)
+          @scoped_recordings[include_trashed] ||= lazy_recordings do
+            current_access_grant.accessible_recordings(include_trashed: include_trashed)
+          end
         end
 
         def resolve_recordable_type!
