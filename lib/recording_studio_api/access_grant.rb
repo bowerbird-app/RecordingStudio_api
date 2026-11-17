@@ -33,7 +33,7 @@ module RecordingStudioApi
     end
 
     def scope_recording
-      access_recording&.parent_recording || root_recording || access_recording&.root_recording
+      access_recording&.parent_recording || root_recording
     end
 
     def owner
@@ -118,17 +118,9 @@ module RecordingStudioApi
 
     def recording_for_role(recording, include_trashed:)
       return recording unless include_trashed
-      return recording if kept_recording?(recording)
+      return recording if recording.kept?
 
       recording.parent_recording || scope_recording
-    end
-
-    def kept_recording?(recording)
-      if recording.respond_to?(:recording_studio_trashable_kept?)
-        recording.recording_studio_trashable_kept?
-      else
-        recording.trashed_at.nil?
-      end
     end
   end
 end

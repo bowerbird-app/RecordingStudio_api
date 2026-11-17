@@ -323,7 +323,7 @@ module RecordingStudioApi
         end
 
         def access_point_recording_for(access_recording)
-          access_recording.parent_recording || access_recording.root_recording
+          access_recording.parent_recording
         end
 
         def access_point_label(recording)

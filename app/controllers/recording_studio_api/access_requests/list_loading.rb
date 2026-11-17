@@ -305,7 +305,7 @@ module RecordingStudioApi
 
         return recording if scoped_root_recording.blank?
 
-        recording_root = recording.root_recording || recording
+        recording_root = recording.root_recording_or_self
         return recording if recording_root.id == scoped_root_recording.id
 
         raise RecordingStudioApi::AuthorizationError, "Parent scope must belong to the selected root"

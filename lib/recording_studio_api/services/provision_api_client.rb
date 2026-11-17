@@ -103,7 +103,7 @@ module RecordingStudioApi
       end
 
       def resolved_access_point_recording
-        @resolved_access_point_recording ||= access_point_recording || access_recording&.parent_recording || access_recording&.root_recording
+        @resolved_access_point_recording ||= access_point_recording || access_recording&.parent_recording
       end
 
       def resolved_manager_actor
@@ -131,7 +131,7 @@ module RecordingStudioApi
         api = RecordingStudioApi.configuration.fetch_api(api_key)
         return true unless api.api_management_authorization_required
 
-        root_recording = resolved_access_point_recording.root_recording || resolved_access_point_recording
+        root_recording = resolved_access_point_recording.root_recording_or_self
         return false unless RecordingStudioApi.configuration.admin_root_recordable_type_names.include?(root_recording.recordable_type)
 
         RecordingStudioApi::Admin::ApiAuthorization.authorized?(

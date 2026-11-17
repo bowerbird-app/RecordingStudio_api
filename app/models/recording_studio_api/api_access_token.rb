@@ -41,9 +41,9 @@ module RecordingStudioApi
         expires_at.present? &&
         expires_at.future? &&
         credential_recording.present? &&
-        credential_recording.recording_studio_trashable_kept? &&
+        credential_recording.kept? &&
         recording.present? &&
-        recording.recording_studio_trashable_kept?
+        recording.kept?
     end
 
     def revoke!(time: Time.current)

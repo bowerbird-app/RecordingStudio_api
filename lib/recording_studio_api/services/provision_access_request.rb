@@ -63,7 +63,7 @@ module RecordingStudioApi
       end
 
       def root_recording
-        access_point_recording.root_recording || access_point_recording
+        access_point_recording.root_recording_or_self
       end
 
       def service_args

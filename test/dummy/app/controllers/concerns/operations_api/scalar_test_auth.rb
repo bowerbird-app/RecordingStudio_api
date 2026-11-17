@@ -117,7 +117,7 @@ module OperationsApi::ScalarTestAuth
       api_client: client,
       credential: nil,
       access_recording: access_recording,
-      root_recording: scope_recording.root_recording || scope_recording
+      root_recording: scope_recording.root_recording_or_self
     )
   end
 

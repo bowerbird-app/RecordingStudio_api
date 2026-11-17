@@ -48,7 +48,7 @@ module RecordingStudioApi
 
     def access_point_recording(api_client)
       access_recording = api_client.access_recording
-      access_recording&.parent_recording || access_recording&.root_recording
+      access_recording&.parent_recording
     end
   end
 end
