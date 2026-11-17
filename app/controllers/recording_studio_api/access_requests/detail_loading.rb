@@ -112,8 +112,23 @@ module RecordingStudioApi
 
         apply_credential_expiry!(result.value.fetch(:credential), expires_at)
         retire_api_client!(@api_client)
+        remove_access_children!(@access_recording)
+        revoked = RecordingStudioAccessible::Services::RevokeRecordingAccess.call(
+          recording: @access_recording.parent_recording,
+          access_recording: @access_recording,
+          manager_actor: current_request_actor
+        )
+        return revoked.error.to_s if revoked.failure?
+
         @replacement_payload = result.value
         nil
+      end
+
+      def remove_access_children!(access_recording)
+        RecordingStudio::Recording.unscoped.where(parent_recording_id: access_recording.id).find_each do |child|
+          remove_access_children!(child)
+          child.destroy!
+        end
       end
 
       def change_access_role!(role)

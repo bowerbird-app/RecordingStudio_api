@@ -357,11 +357,11 @@ admin_root_recording = RecordingStudio::Recording.unscoped.find_or_create_by!(
 )
 
 Current.actor = admin_user
-RecordingStudioApi::Admin::ApiAuthorization.provision!(
-  api: :public,
-  root_recording: admin_root_recording,
-  actor: admin_user
-)
+unless Rake::Task.task_defined?("recording_studio_api:provision_admin")
+  Rails.application.load_tasks
+end
+Rake::Task["recording_studio_api:provision_admin"].reenable
+Rake::Task["recording_studio_api:provision_admin"].invoke
 
 root_recording = RecordingStudio::Recording.unscoped.find_or_create_by!(
   recordable: workspace,

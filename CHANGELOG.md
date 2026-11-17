@@ -10,14 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.13.0] - 2026-11-17
 
 ### Fixed
-- Admin API authorization only reads. `ApiAuthorization.authorized?` and `recording_for` no longer create an `AdminApi` row or its recording. A missing recording denies the check. The admin screen returns 403 with "Admin API has not been provisioned for this root".
-- Provision the recording once with `RecordingStudioApi::Admin::ApiAuthorization.provision!`. It records the `AdminApi` under the admin root through `RecordingStudio.record!` with an idempotency key. A second call returns the same recording.
-- Saving an API key onto another access point creates a new client there through `ProvisionApiClient` and revokes the old client's credentials and access tokens. The old Access recording stays where it was. The save action is unchanged. The new secret is shown once.
+- Admin API authorization only reads. `ApiAuthorization.authorized?` and `recording_for` no longer create an `AdminApi` row or its recording. A missing recording denies the check. The admin screen returns 403 and names `provision!` and `recording_studio_api:provision_admin`.
+- Provision the recording once with `RecordingStudioApi::Admin::ApiAuthorization.provision!`. `bin/rails recording_studio_api:provision_admin` does that for every admin root and every configured API. A second call returns the same recording.
+- Saving an API key onto another access point creates a new client there through `ProvisionApiClient`, then revokes the old Access grant and the old client's credentials and access tokens in the same transaction. A refused revoke rolls the move back. The save action is unchanged. The new secret is shown once.
 
 ### Upgrade notes
 - Bump to `1.13.0`. No migration.
-- Call `provision!` when the admin root exists, before anyone opens the admin API. An authorization check will not create that recording.
-- A key moved to another folder is a new client. The previous secret stops working. Copy the new secret from the confirmation screen.
+- Run `bin/rails recording_studio_api:provision_admin` once per admin root, or call `provision!`. An authorization check will not create that recording.
+- A key moved to another folder is a new client. The old Access grant is revoked with the old secret. Copy the new secret from the confirmation screen.
 - See [UPGRADING.md](UPGRADING.md).
 
 ## [1.12.0] - 2026-11-17

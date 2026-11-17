@@ -926,7 +926,7 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
       recordable: Folder.create!(name: "Outside the next access point"),
       parent_recording: @workspace_root_recording
     )
-    old_access_snapshot = access_snapshot(old_access)
+    assert_includes RecordingStudioAccessible.access_grants_for(actor: api_client).pluck(:id), old_access.id
 
     patch "/recording_studio_api/api_clients/#{api_client.id}", params: {
       api_client: {
@@ -939,7 +939,8 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :created
     assert_select %(pre[data-secret-reveal-target="secret"]), count: 1
-    assert_equal old_access_snapshot, access_snapshot(old_access.reload)
+    refute_includes RecordingStudioAccessible.access_grants_for(actor: api_client).pluck(:id), old_access.id
+    refute RecordingStudio::Recording.unscoped.exists?(old_access.id)
     assert_predicate credential.reload.revoked_at, :present?
     assert_predicate access_token.reload.revoked_at, :present?
     refute_predicate credential, :active_for_authentication?
@@ -993,6 +994,48 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "Stays put", api_client.name
     assert_equal old_access.id, api_client.access_recording_id
     assert_equal @workspace_root_recording.id, api_client.access_recording.parent_recording_id
+  end
+
+  test "a failed access revoke rolls the move back" do
+    api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Stays when revoke fails", role: :edit)
+    old_access = api_client.access_recording
+    credential = api_client.credentials.max_by(&:created_at)
+    access_token = RecordingStudioApi::ApiAccessToken.create!(
+      credential: credential,
+      token_digest: "digest_#{SecureRandom.hex(16)}",
+      token_prefix: "atk",
+      expires_at: 1.hour.from_now
+    )
+    folder_recording = RecordingStudio::Recording.create!(
+      recordable: Folder.create!(name: "Revoke rolls back"),
+      parent_recording: @workspace_root_recording
+    )
+    client_count = RecordingStudioApi::ApiClient.count
+    refusal = RecordingStudioAccessible::Services::BaseService::Result.new(success: false, error: "Revoke was refused")
+
+    RecordingStudioAccessible::Services::RevokeRecordingAccess.stub(:call, refusal) do
+      patch "/recording_studio_api/api_clients/#{api_client.id}", params: {
+        api_client: {
+          access_point_recording_id: folder_recording.id,
+          role: "edit",
+          api_client_name: "Renamed during a revoke refusal",
+          expires_at: ""
+        }
+      }
+    end
+
+    assert_response :unprocessable_entity
+    assert_includes response.body, "Revoke was refused"
+    assert_equal client_count, RecordingStudioApi::ApiClient.count
+    assert_equal "Stays when revoke fails", api_client.reload.name
+    assert_equal old_access.id, api_client.access_recording_id
+    assert_includes RecordingStudioAccessible.access_grants_for(actor: api_client).pluck(:id), old_access.id
+    assert_nil credential.reload.revoked_at
+    assert_nil access_token.reload.revoked_at
+    assert_empty RecordingStudio::Recording.unscoped.where(
+      parent_recording_id: folder_recording.id,
+      recordable_type: "RecordingStudio::Access"
+    )
   end
 
   test "a failed move leaves the old client, its tokens, and its access unchanged" do

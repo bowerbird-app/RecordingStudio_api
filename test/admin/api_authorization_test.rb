@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "rake"
 require_relative "../support/api_dummy_helpers"
 
 class ApiAuthorizationTest < ActiveSupport::TestCase
@@ -62,6 +63,22 @@ class ApiAuthorizationTest < ActiveSupport::TestCase
       policy = RecordingStudioApi::ApiClientManagementPolicy.new(actor: @actor)
       refute policy.view?(client)
       refute policy.manage?(client)
+    end
+  end
+
+  test "provision_admin records every admin root and can run again" do
+    Current.actor = @actor
+    Rails.application.load_tasks unless Rake::Task.task_defined?("recording_studio_api:provision_admin")
+    task = Rake::Task["recording_studio_api:provision_admin"]
+    task.reenable
+    task.invoke
+
+    recording = RecordingStudioApi::Admin::ApiAuthorization.recording_for(api: :public, root_recording: @root_recording)
+    assert_equal @root_recording.id, recording.parent_recording_id
+
+    assert_no_writes do
+      task.reenable
+      task.invoke
     end
   end
 

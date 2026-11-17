@@ -370,6 +370,8 @@ class AdminDashboardsControllerTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :forbidden
+    assert_includes response.body, "provision!"
+    assert_includes response.body, "recording_studio_api:provision_admin"
     assert_nil RecordingStudio::Recording.unscoped.find_by(
       parent_recording_id: @admin_root_recording.id,
       recordable_type: "RecordingStudioApi::AdminApi"

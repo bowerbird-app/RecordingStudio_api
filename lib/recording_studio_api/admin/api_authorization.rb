@@ -37,6 +37,11 @@ module RecordingStudioApi
         RecordingStudioAccessible.authorized?(actor: actor, recording: recording, role: role)
       end
 
+      def missing_recording_message
+        "Admin API has not been provisioned for this root. " \
+          "Call RecordingStudioApi::Admin::ApiAuthorization.provision! or run recording_studio_api:provision_admin."
+      end
+
       def definition_for(api)
         api_key = api.respond_to?(:name) ? api.name : api
         RecordingStudioApi.configuration.fetch_api(api_key)

@@ -37,7 +37,7 @@ module RecordingStudioApi
         api: @current_admin_api.name,
         root_recording: current_root_recording
       )
-      raise RecordingStudioApi::AuthorizationError, "Admin API has not been provisioned for this root" if @admin_api_recording.nil?
+      return render plain: RecordingStudioApi::Admin::ApiAuthorization.missing_recording_message, status: :forbidden if @admin_api_recording.nil?
 
       @admin_api = @admin_api_recording.recordable
     end
