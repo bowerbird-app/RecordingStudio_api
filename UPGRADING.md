@@ -1,5 +1,12 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.14.2
+
+Behavior change. No migration. An API key whose own recording is trashed no longer authenticates.
+
+1. Bump the host gem to `1.14.2`. Stay on Recording Studio `>= 7.7.0`, `< 8.0`.
+2. `ApiCredential#active_for_authentication?` requires the credential recording to exist and `Recording#kept?` to be true. A trashed or missing credential recording is inactive, including when the access recording and the API client recording are still kept. Rotate or restore that credential before the key can sign in again.
+
 ## Upgrading to 1.14.1
 
 Behavior change. No migration. A missing parent is not a root.

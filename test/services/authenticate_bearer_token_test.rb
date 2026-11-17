@@ -22,6 +22,47 @@ class AuthenticateBearerTokenTest < ActiveSupport::TestCase
     Current.actor = nil if defined?(Current)
   end
 
+  test "authenticates a bearer token while the credential recording is kept" do
+    credential = @payload.fetch(:credential)
+
+    assert_predicate credential.recording, :kept?
+    assert_predicate credential, :active_for_authentication?
+
+    result = RecordingStudioApi::Services::AuthenticateBearerToken.call(
+      authorization_header: "Bearer #{@payload.fetch(:token)}"
+    )
+
+    assert result.success?, result.error
+    assert_equal credential.id, result.value.credential.id
+  end
+
+  test "rejects a bearer token when only the credential recording is trashed" do
+    credential = @payload.fetch(:credential)
+    access_recording = credential.effective_access_recording
+    client_recording = credential.api_client.recording
+    credential_recording = credential.recording
+
+    credential_recording.update_column(:trashed_at, Time.current)
+    credential.instance_variable_set(:@recording, nil)
+
+    assert_nil credential.revoked_at
+    refute_predicate credential, :expired?
+    assert_predicate access_recording.reload, :recording_studio_trashable_kept?
+    assert_predicate client_recording.reload, :recording_studio_trashable_kept?
+    refute_equal credential_recording.id, access_recording.id
+    refute_equal credential_recording.id, client_recording.id
+    refute_predicate credential.recording, :kept?
+    refute_predicate credential, :active_for_authentication?
+
+    result = RecordingStudioApi::Services::AuthenticateBearerToken.call(
+      authorization_header: "Bearer #{@payload.fetch(:token)}"
+    )
+
+    assert result.failure?
+    assert_equal "Bearer token is inactive", result.error
+    assert_nil credential.reload.last_used_at
+  end
+
   test "authenticates a valid bearer token" do
     result = RecordingStudioApi::Services::AuthenticateBearerToken.call(
       authorization_header: "Bearer #{@payload.fetch(:token)}"
