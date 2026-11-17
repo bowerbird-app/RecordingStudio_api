@@ -125,6 +125,11 @@ class AdminRootAccessPointChoiceTest < ActionDispatch::IntegrationTest
   test "operations new form on an admin root does not ask for a workspace" do
     configure_dummy_operations_api!
     admin_recording = create_admin_root_recording_for(@user, name: "Ops admin")
+    RecordingStudioApi::Admin::ApiAuthorization.provision!(
+      api: :operations,
+      root_recording: admin_recording,
+      actor: @user
+    )
 
     get "/recording_studio_api/api_clients/new", params: {
       root_recording_id: admin_recording.id,

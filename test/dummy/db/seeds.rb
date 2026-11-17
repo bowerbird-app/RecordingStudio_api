@@ -347,10 +347,6 @@ end
 
 admin_root = AdminRoot.find_or_create_by!(name: "Admin")
 
-admin_api = RecordingStudioApi::AdminApi.find_or_create_by!(key: "api") do |record|
-  record.name = "Admin API"
-end
-
 workspace = Workspace.find_or_create_by!(name: "Studio Workspace")
 folders = ["Product Docs", "Release Notes"].map { |name| Folder.find_or_create_by!(name: name) }
 pages = ["Getting Started", "Production Checklist"].map { |title| Page.find_or_create_by!(title: title) }
@@ -360,11 +356,12 @@ admin_root_recording = RecordingStudio::Recording.unscoped.find_or_create_by!(
   parent_recording_id: nil
 )
 
-RecordingStudio::Recording.unscoped.find_or_create_by!(
-  recordable: admin_api,
-  root_recording_id: admin_root_recording.id,
-  parent_recording_id: admin_root_recording.id
-)
+Current.actor = admin_user
+unless Rake::Task.task_defined?("recording_studio_api:provision_admin")
+  Rails.application.load_tasks
+end
+Rake::Task["recording_studio_api:provision_admin"].reenable
+Rake::Task["recording_studio_api:provision_admin"].invoke
 
 root_recording = RecordingStudio::Recording.unscoped.find_or_create_by!(
   recordable: workspace,

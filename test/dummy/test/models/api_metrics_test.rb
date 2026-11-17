@@ -21,10 +21,10 @@ class ApiMetricsTest < ActionDispatch::IntegrationTest
     @outsider = create_user("metrics-outsider-#{SecureRandom.hex(4)}@example.com")
     @admin_root = AdminRoot.find_or_create_by!(name: "Admin")
     @admin_recording = RecordingStudio.create_root_recording!(@admin_root, actor: @actor)
-    RecordingStudioApi::Admin::ApiAuthorization.recording_for(
+    RecordingStudioApi::Admin::ApiAuthorization.provision!(
       api: :operations,
       root_recording: @admin_recording,
-      create: true
+      actor: @actor
     )
     grant_admin!(@actor, @admin_recording)
 

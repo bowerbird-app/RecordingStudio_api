@@ -35,9 +35,10 @@ module RecordingStudioApi
       @current_admin_api = RecordingStudioApi.configuration.fetch_api(params[:api_key].presence || :public)
       @admin_api_recording = RecordingStudioApi::Admin::ApiAuthorization.recording_for(
         api: @current_admin_api.name,
-        root_recording: current_root_recording,
-        create: true
+        root_recording: current_root_recording
       )
+      return render plain: RecordingStudioApi::Admin::ApiAuthorization.missing_recording_message, status: :forbidden if @admin_api_recording.nil?
+
       @admin_api = @admin_api_recording.recordable
     end
 

@@ -78,10 +78,10 @@ class ApiKeyHealthWidgetsTest < ActiveSupport::TestCase
     )
     _admin_root, admin_root_recording = create_admin_root_recording(name: "Health count admin")
     admin_access = create_access_recording(parent_recording: admin_root_recording, user: user, role: :admin)
-    RecordingStudioApi::Admin::ApiAuthorization.recording_for(
+    RecordingStudioApi::Admin::ApiAuthorization.provision!(
       api: :operations,
       root_recording: admin_root_recording,
-      create: true
+      actor: user
     )
 
     listed_expiring = provision_api_client_for(access_recording: access_recording, name: "Listed expiring")

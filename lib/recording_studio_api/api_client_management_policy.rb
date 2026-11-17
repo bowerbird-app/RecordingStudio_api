@@ -40,8 +40,7 @@ module RecordingStudioApi
         actor: actor,
         api: api,
         root_recording: root_recording,
-        role: role,
-        create: false
+        role: role
       )
     rescue RecordingStudioApi::ConfigurationError
       false

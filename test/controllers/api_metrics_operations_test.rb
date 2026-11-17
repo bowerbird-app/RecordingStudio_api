@@ -24,10 +24,10 @@ class ApiMetricsOperationsTest < ActionDispatch::IntegrationTest
     @manager = create_user
     _admin_root, @admin_recording = create_admin_root_recording(name: "Admin")
     create_access_recording(parent_recording: @admin_recording, user: @manager, role: :admin)
-    RecordingStudioApi::Admin::ApiAuthorization.recording_for(
+    RecordingStudioApi::Admin::ApiAuthorization.provision!(
       api: :operations,
       root_recording: @admin_recording,
-      create: true
+      actor: @manager
     )
 
     seed_daily_metrics!

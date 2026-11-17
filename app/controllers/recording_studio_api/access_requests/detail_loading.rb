@@ -67,11 +67,13 @@ module RecordingStudioApi
 
         failure = nil
         ActiveRecord::Base.transaction do
-          failure = apply_access_grant_changes!
+          failure = apply_access_grant_changes!(expires_at)
           raise ActiveRecord::Rollback unless failure.nil?
 
-          update_api_client_name!
-          update_latest_credential_expiry!(expires_at)
+          unless @replacement_payload
+            update_api_client_name!
+            update_latest_credential_expiry!(expires_at)
+          end
         end
 
         return true if failure.nil?
@@ -83,47 +85,50 @@ module RecordingStudioApi
         false
       end
 
-      def apply_access_grant_changes!
+      def apply_access_grant_changes!(expires_at)
         return if @access_recording.nil?
 
         role = @form_values.fetch(:role)
         access_point_recording_id = @form_values.fetch(:access_point_recording_id)
-        return move_access_point!(access_point_recording_id, role) if moving_access_point?(access_point_recording_id)
+        return replace_client_at_access_point!(access_point_recording_id, role, expires_at) if moving_access_point?(access_point_recording_id)
         return unless access_role_changing?(role)
 
         change_access_role!(role)
       end
 
-      # Grant before revoke. The API client recording can only sit under an
-      # Access recording, and revoke destroys the old one. A refused grant
-      # never revokes. A refused revoke rolls the grant back with the transaction.
-      def move_access_point!(access_point_recording_id, role)
-        old_access = @access_recording
+      def replace_client_at_access_point!(access_point_recording_id, role, expires_at)
         new_parent = selected_edit_access_point_recording
-        actor = access_actor(old_access)
         return "Access point is invalid" if new_parent.nil? || new_parent.id != access_point_recording_id
-        return "Access actor is missing" if actor.nil?
 
-        granted = RecordingStudioAccessible::Services::GrantRecordingAccess.call(
-          recording: new_parent,
-          actor: actor,
+        result = RecordingStudioApi::Services::ProvisionApiClient.call(
+          access_point_recording: new_parent,
+          manager_actor: current_request_actor,
           role: role,
-          manager_actor: current_request_actor
+          name: @form_values.fetch(:api_client_name),
+          expires_at: expires_at,
+          api: @api_client.api_key
         )
-        return granted.error.to_s if granted.failure?
+        return result.error.to_s if result.failure?
 
-        new_access = granted.value
-        reparent_access_children!(old_access, new_access)
-        relink_api_client!(old_access, new_access)
-
+        apply_credential_expiry!(result.value.fetch(:credential), expires_at)
+        retire_api_client!(@api_client)
+        remove_access_children!(@access_recording)
         revoked = RecordingStudioAccessible::Services::RevokeRecordingAccess.call(
-          recording: old_access.parent_recording,
-          access_recording: old_access,
+          recording: @access_recording.parent_recording,
+          access_recording: @access_recording,
           manager_actor: current_request_actor
         )
         return revoked.error.to_s if revoked.failure?
 
+        @replacement_payload = result.value
         nil
+      end
+
+      def remove_access_children!(access_recording)
+        RecordingStudio::Recording.unscoped.where(parent_recording_id: access_recording.id).find_each do |child|
+          remove_access_children!(child)
+          child.destroy!
+        end
       end
 
       def change_access_role!(role)
@@ -149,29 +154,22 @@ module RecordingStudioApi
         record.role.to_s != role.to_s
       end
 
-      def access_actor(access_recording)
-        record = access_recording.recordable
-        record.actor if record.respond_to?(:actor)
-      end
-
-      def reparent_access_children!(old_access, new_access)
-        RecordingStudio::Recording.unscoped.where(parent_recording_id: old_access.id).find_each do |child|
-          child.update!(parent_recording: new_access)
+      def retire_api_client!(api_client)
+        api_client.credentials.find_each do |credential|
+          if credential.revoked_at.nil?
+            credential.revoke!
+          else
+            credential.revoke_outstanding_access_tokens!
+          end
         end
       end
 
-      def relink_api_client!(old_access, new_access)
-        now = Time.current
-        updated_clients = RecordingStudioApi::ApiClient.where(id: @api_client.id).update_all(
-          access_recording_id: new_access.id,
-          updated_at: now
+      def apply_credential_expiry!(credential, expires_at)
+        updated_credentials = RecordingStudioApi::ApiCredential.where(id: credential.id).update_all(
+          expires_at: expires_at,
+          updated_at: Time.current
         )
-        raise ActiveRecord::ActiveRecordError, "API client update failed" unless updated_clients == 1
-
-        RecordingStudioApi::ApiCredential.where(api_client_id: @api_client.id, access_recording_id: old_access.id).update_all(
-          access_recording_id: new_access.id,
-          updated_at: now
-        )
+        raise ActiveRecord::ActiveRecordError, "Credential update failed" unless updated_credentials == 1
       end
 
       def update_api_client_name!
@@ -185,11 +183,7 @@ module RecordingStudioApi
       def update_latest_credential_expiry!(expires_at)
         return if @latest_credential.blank?
 
-        updated_credentials = RecordingStudioApi::ApiCredential.where(id: @latest_credential.id).update_all(
-          expires_at: expires_at,
-          updated_at: Time.current
-        )
-        raise ActiveRecord::ActiveRecordError, "Credential update failed" unless updated_credentials == 1
+        apply_credential_expiry!(@latest_credential, expires_at)
       end
     end
   end

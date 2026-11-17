@@ -174,8 +174,7 @@ module RecordingStudioApi
             actor: context.current_actor,
             api: RecordingStudioApi::Admin::ApiContext.key_from_context(context),
             root_recording: root_recording,
-            role: RecordingStudioApi.configuration.access_management_edit_role,
-            create: false
+            role: RecordingStudioApi.configuration.access_management_edit_role
           )
         end
 

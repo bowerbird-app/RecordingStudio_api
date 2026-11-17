@@ -29,10 +29,10 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     @admin_root = AdminRoot.find_or_create_by!(name: "Admin")
     @admin_root_recording = RecordingStudio::Recording.find_or_create_by!(recordable: @admin_root)
     create_access_recording(parent_recording: @admin_root_recording, user: @user, role: :admin)
-    RecordingStudioApi::Admin::ApiAuthorization.recording_for(
+    RecordingStudioApi::Admin::ApiAuthorization.provision!(
       api: :public,
       root_recording: @admin_root_recording,
-      create: true
+      actor: @user
     )
 
     ensure_api_request_logs_table!
@@ -777,6 +777,11 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
 
   test "admin workspace provisions and monitors operations API credentials separately" do
     switch_to_root(@admin_root_recording)
+    RecordingStudioApi::Admin::ApiAuthorization.provision!(
+      api: :operations,
+      root_recording: @admin_root_recording,
+      actor: @user
+    )
 
     get "/admin/api/operations"
 
