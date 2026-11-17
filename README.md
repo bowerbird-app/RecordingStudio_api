@@ -894,13 +894,19 @@ end
 ```
 
 `details` keeps `message`, `feature`, `limit`, `fix_path`, and `fixable_by`.
-`fix_path` must start with a single `/` and must not include a scheme or host.
-A bad `fix_path` is omitted. Prices, usage totals, and Stripe ids are omitted.
+`message`, `feature`, and `fixable_by` are strings. `message` is at most 500
+characters. `feature` and `fixable_by` are at most 100. `limit` is an integer.
+`fix_path` starts with one `/` and then only letters, digits, and `-._~/?=&`.
+Percent-encoding, a backslash, a scheme, or a host is dropped. A value that
+contains a Stripe id (`cus_`, `sub_`, `price_`, and the same shape) is dropped.
+Prices and usage totals are omitted.
 
-An unknown code, or a denial with no code, keeps today's response: 403 for
-`AuthorizationError`, and `invalid_input` for `InvalidActionInputError`.
-Development logs a warning for an unknown code. An error that merely defines
-`#code`, including `Stripe::StripeError`, is not a denial.
+A denied `GateDecision` with an unknown or missing code renders 403,
+`error.code` `forbidden`, and no details. A raised error with an unknown or
+missing code keeps today's response: 403 for `AuthorizationError`, and
+`invalid_input` for `InvalidActionInputError`. Development logs a warning for
+an unknown code. An error that merely defines `#code`, including
+`Stripe::StripeError`, is not a denial.
 
 Gems and hosts prove the envelope with the test helper:
 

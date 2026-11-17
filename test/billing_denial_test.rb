@@ -75,7 +75,15 @@ class BillingDenialTest < ActiveSupport::TestCase
   end
 
   test "a non-relative fix path is dropped" do
-    %w[https://billing.example/pay //billing.example/pay billing/upgrade http://billing.example /\\evil].each do |fix_path|
+    [
+      "https://billing.example/pay",
+      "//billing.example/pay",
+      "billing/upgrade",
+      "http://billing.example",
+      "/\\evil",
+      "/%2f%2fevil.com",
+      "/%5cevil"
+    ].each do |fix_path|
       payload = RecordingStudioApi::BillingDenial.interpret(
         RecordingStudio::GateDecision.deny(
           code: :meter_limit_reached,
@@ -85,6 +93,61 @@ class BillingDenialTest < ActiveSupport::TestCase
       assert_equal({ feature: "meters" }, payload.fetch(:details), fix_path)
       refute_includes payload.fetch(:details).values.join, "9191"
     end
+  end
+
+  test "a safe relative fix path is kept" do
+    payload = RecordingStudioApi::BillingDenial.interpret(
+      RecordingStudio::GateDecision.deny(
+        code: :paywall_locked,
+        details: { fix_path: "/settings/plan?seat=1&from=api" }
+      )
+    )
+    assert_equal({ fix_path: "/settings/plan?seat=1&from=api" }, payload.fetch(:details))
+  end
+
+  test "copied text is a capped string and limit is an integer" do
+    payload = RecordingStudioApi::BillingDenial.interpret(
+      RecordingStudio::GateDecision.deny(
+        code: :plan_limit_reached,
+        details: {
+          message: "m" * 600,
+          feature: :"#{'f' * 150}",
+          fixable_by: :owner,
+          limit: 3
+        }
+      )
+    )
+
+    assert_equal "m" * 500, payload.dig(:details, :message)
+    assert_equal "m" * 500, payload.fetch(:message)
+    assert_equal "f" * 100, payload.dig(:details, :feature)
+    assert_equal "owner", payload.dig(:details, :fixable_by)
+    assert_equal 3, payload.dig(:details, :limit)
+  end
+
+  test "stripe ids and non-integer limits are dropped" do
+    payload = RecordingStudioApi::BillingDenial.interpret(
+      RecordingStudio::GateDecision.deny(
+        code: :seat_limit_reached,
+        details: {
+          message: "See cus_abc",
+          feature: "price_123",
+          fixable_by: "acct_123",
+          limit: "3",
+          fix_path: "/settings/cus_abc"
+        }
+      )
+    )
+    assert_equal({}, payload.fetch(:details))
+    assert_equal "Payment required", payload.fetch(:message)
+
+    float_limit = RecordingStudioApi::BillingDenial.interpret(
+      RecordingStudio::GateDecision.deny(
+        code: :meter_limit_reached,
+        details: { feature: "exports", limit: 3.5 }
+      )
+    )
+    assert_equal({ feature: "exports" }, float_limit.fetch(:details))
   end
 
   test "an allowed decision and a denial without a code are not billing responses" do

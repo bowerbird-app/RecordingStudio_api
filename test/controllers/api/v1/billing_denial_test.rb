@@ -89,6 +89,34 @@ class ApiV1BillingDenialTest < ActionDispatch::IntegrationTest
     assert_equal "card was declined", error.message
   end
 
+  test "a denied gate with an unknown or missing code returns 403 and no billing details" do
+    RecordingStudio.register_gate("billing.api", "paywall") do
+      RecordingStudio::GateDecision.deny(
+        code: :invoice_past_due,
+        reason: "internal plan row 9191",
+        details: { message: "Pay the invoice", feature: "invoices", price_cents: 9191 }
+      )
+    end
+    register_bill_action do |context|
+      RecordingStudio.check_gate("billing.api", actor: context.api_client, recording: context.recording)
+    end
+
+    post bill_path(@page_recording), headers: authorization_headers
+
+    assert_plain_forbidden
+    refute_includes response.body, "invoice_past_due"
+    refute_includes response.body, "Pay the invoice"
+    refute_includes response.body, "invoices"
+  end
+
+  test "a denied gate with no code returns 403 and no billing details" do
+    register_bill_action { RecordingStudio::GateDecision.deny(reason: "internal plan row 9191") }
+
+    post bill_path(@page_recording), headers: authorization_headers
+
+    assert_plain_forbidden
+  end
+
   test "an unknown denial code keeps the forbidden response" do
     register_bill_action { raise ApiV1BillingDenialTest::UnknownCode }
 
@@ -168,6 +196,15 @@ class ApiV1BillingDenialTest < ActionDispatch::IntegrationTest
 
   def authorization_headers
     { "Authorization" => "Bearer #{@access_token}" }
+  end
+
+  def assert_plain_forbidden
+    assert_response :forbidden
+    body = response.parsed_body
+    assert_equal %w[code message], body.fetch("error").keys
+    assert_equal "forbidden", body.dig("error", "code")
+    assert_equal RecordingStudioApi::Concerns::BillingDenials::UNRECOGNIZED_DENIAL_MESSAGE, body.dig("error", "message")
+    refute_includes response.body, "9191"
   end
 
   class SeatLimit < StandardError

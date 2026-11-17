@@ -11,8 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Registered billing denials render as HTTP 402 in the standard error envelope. Built-in codes are `paywall_locked`, `plan_limit_reached`, `meter_limit_reached`, and `seat_limit_reached`. Hosts and gems add more with `config.register_billing_code`.
-- A denial is a denied `RecordingStudio::GateDecision` with a code, or a raised error that `is_a?(RecordingStudio::Denial)`. The response `details` keep `message`, `feature`, `limit`, `fix_path`, and `fixable_by`. `fix_path` must be a relative in-app path.
-- `require "recording_studio_api/test_helpers"` and `assert_billing_denial` for gems and hosts. An unknown code warns in development and stays on today's 403 or `invalid_input` response.
+- A denial is a denied `RecordingStudio::GateDecision` with a code, or a raised error that `is_a?(RecordingStudio::Denial)`. The response `details` keep `message`, `feature`, `limit`, `fix_path`, and `fixable_by`. Text fields are length-capped strings. `limit` is an integer. `fix_path` is a relative path with a safe character set. Stripe ids are dropped.
+- `require "recording_studio_api/test_helpers"` and `assert_billing_denial` for gems and hosts. A denied gate with an unknown or missing code renders 403 with no details. A raised error with an unknown code warns in development and stays on today's 403 or `invalid_input` response.
 
 ### Upgrade notes
 - Bump to `1.5.0`. No migration. Require `recording_studio` `>= 7.6.0`, `< 8.0`.

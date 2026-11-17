@@ -10,7 +10,12 @@ module RecordingStudioApi
   # `Stripe::StripeError#code` is not a denial.
   module BillingDenial
     DEFAULT_MESSAGE = "Payment required"
-    FIX_PATH = %r{\A/(?!/)[^\s]*\z}
+    MESSAGE_LIMIT = 500
+    FIELD_LIMIT = 100
+    # One leading slash, then only unreserved path characters. Percent-encoding,
+    # backslash, and control characters fail the class and the path is dropped.
+    FIX_PATH = %r{\A/(?!/)[A-Za-z0-9._~/?=&-]*\z}
+    STRIPE_ID = /\b(?:cus|sub|price|prod|pi|in|si|acct|ch|pm|seti|evt)_[A-Za-z0-9]+/
 
     module_function
 
@@ -90,31 +95,50 @@ module RecordingStudioApi
     end
 
     def public_value(key, value)
-      return relative_fix_path(value) if key == :fix_path
-
-      scalar(value)
-    end
-
-    def scalar(value)
-      case value
-      when String then value unless value.empty?
-      when Symbol then value.to_s
-      when Integer, true, false then value
-      when Float then value if value.finite?
+      case key
+      when :message then bounded_text(value, MESSAGE_LIMIT)
+      when :feature, :fixable_by then bounded_text(value, FIELD_LIMIT)
+      when :limit then integer_limit(value)
+      when :fix_path then relative_fix_path(value)
       end
     end
 
+    def bounded_text(value, limit)
+      text = text_value(value)
+      return if text.nil? || text.empty?
+      return if stripe_id?(text)
+
+      text[0, limit]
+    end
+
+    def text_value(value)
+      case value
+      when String then value
+      when Symbol, Integer, true, false then value.to_s
+      when Float then value.to_s if value.finite?
+      end
+    end
+
+    def integer_limit(value)
+      value if value.is_a?(Integer)
+    end
+
     def relative_fix_path(value)
-      path = scalar(value)
+      path = text_value(value)
       return unless path.is_a?(String)
-      return if path.include?("://") || path.include?("\\")
+      return if stripe_id?(path)
       return unless FIX_PATH.match?(path)
 
       path
     end
 
+    def stripe_id?(text)
+      text.match?(STRIPE_ID)
+    end
+
     private_class_method :interpret_decision, :interpret_error, :publish, :known?,
                          :denial_code, :denial_details, :notice_unknown, :development?,
-                         :message_for, :public_details, :public_value, :scalar, :relative_fix_path
+                         :message_for, :public_details, :public_value, :bounded_text, :text_value,
+                         :integer_limit, :relative_fix_path, :stripe_id?
   end
 end

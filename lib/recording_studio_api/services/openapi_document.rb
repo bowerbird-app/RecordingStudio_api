@@ -324,7 +324,9 @@ module RecordingStudioApi
         codes = RecordingStudioApi.configuration.billing_codes.codes.join(", ")
         "Authenticated and authorized, but a registered billing denial blocked the request. " \
           "Codes: #{codes}. details may include message, feature, limit, fix_path, and fixable_by. " \
-          "fix_path is a relative in-app path. Prices, usage totals, and Stripe ids are omitted."
+          "message is at most 500 characters. feature and fixable_by are at most 100. limit is an integer. " \
+          "fix_path starts with one slash and uses letters, digits, and -._~/?=& only. " \
+          "Prices, usage totals, and Stripe ids are omitted."
       end
 
       def billing_error_schema
@@ -345,14 +347,14 @@ module RecordingStudioApi
                   type: "object",
                   additionalProperties: false,
                   properties: {
-                    message: { type: "string" },
-                    feature: { type: "string", description: "Feature name the caller can show." },
-                    limit: { description: "Ceiling the caller can show, as a string or number." },
+                    message: { type: "string", maxLength: 500 },
+                    feature: { type: "string", maxLength: 100, description: "Feature name the caller can show." },
+                    limit: { type: "integer", description: "Integer ceiling the caller can show." },
                     fix_path: {
                       type: "string",
-                      description: "Relative in-app path. Starts with one slash and has no scheme or host."
+                      description: "Relative in-app path. Starts with one slash. Letters, digits, and -._~/?=& only."
                     },
-                    fixable_by: { type: "string", description: "Who can clear the block, such as owner." }
+                    fixable_by: { type: "string", maxLength: 100, description: "Who can clear the block, such as owner." }
                   }
                 }
               },
