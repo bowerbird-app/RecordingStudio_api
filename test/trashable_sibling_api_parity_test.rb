@@ -208,7 +208,7 @@ class TrashableSiblingApiParityTest < ActiveSupport::TestCase
     assert_includes visible_ids, client_access.id
     assert_includes query.call.map { |row| row.api_client.id }, api_client.id
 
-    # form_state.rb sibling: accessible_access_point_ids_sql kept filter (:164)
+    # A trashed actor grant is not an authorized workspace.
     access_recording.update_column(:trashed_at, Time.current)
     query = RecordingStudioApi::Admin::Queries::ApiAccessClientsQuery.new(context)
     assert_empty query.send(:accessible_access_point_recordings).pluck(:id)
