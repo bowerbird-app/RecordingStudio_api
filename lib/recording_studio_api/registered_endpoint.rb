@@ -147,6 +147,7 @@ module RecordingStudioApi
       raise ConfigurationError, "#{name} cannot capture both :id and :recording_id" if captures.size > 1
       raise ConfigurationError, "scope_id requires a path :id or :recording_id for #{name}" if @scope_id == true && captures.empty?
       raise ConfigurationError, "recordable_type is required when #{name} captures :id or :recording_id, or pass scope_id: false" if @scope_id != false && captures.any? && recordable_type.blank?
+      raise ConfigurationError, "required_role is required when #{name} sets scope_id: false on #{http_verb.to_s.upcase}" if @scope_id == false && http_verb != :get && required_role.nil?
 
       @scopes_recording = @scope_id != false && captures.any? && recordable_type.present?
     end

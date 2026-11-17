@@ -411,6 +411,97 @@ class ApiV1RegisteredHandlerScopeTest < ActionDispatch::IntegrationTest
     assert_equal @page_recording.id, @calls.last[:recording_id]
   end
 
+  test "an unscoped write refuses a view key and accepts an edit key" do
+    view_headers, = view_client
+    edit_headers, = role_client(:edit, "Edit unscoped token")
+    register_unscoped_role_endpoints
+
+    get "/recording_studio_api/api/v1/notes", headers: view_headers
+    assert_response :success
+    assert_equal "list", @calls.last[:name]
+    assert_nil @calls.last[:recording_id]
+
+    post "/recording_studio_api/api/v1/notes", headers: view_headers, as: :json
+    assert_response :forbidden
+    assert_equal "forbidden", JSON.parse(response.body).dig("error", "code")
+    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
+
+    patch "/recording_studio_api/api/v1/notes", headers: view_headers, as: :json
+    assert_response :forbidden
+
+    delete "/recording_studio_api/api/v1/people/person-1", headers: view_headers
+    assert_response :forbidden
+    assert_equal(["list"], @calls.map { |call| call[:name] })
+
+    post "/recording_studio_api/api/v1/notes", headers: edit_headers, as: :json
+    assert_response :success
+    assert_nil @calls.last[:recording_id]
+    assert_equal "create", @calls.last[:name]
+
+    patch "/recording_studio_api/api/v1/notes", headers: edit_headers, as: :json
+    assert_response :success
+    assert_equal "revise", @calls.last[:name]
+    assert_nil @calls.last[:recording_id]
+
+    delete "/recording_studio_api/api/v1/people/person-1", headers: edit_headers
+    assert_response :success
+    assert_equal "remove", @calls.last[:name]
+    assert_nil @calls.last[:recording_id]
+
+    post "/recording_studio_api/api/v1/notifications/note-1/mark-read", headers: view_headers, as: :json
+    assert_response :success
+    assert_equal "mark_read", @calls.last[:name]
+    assert_nil @calls.last[:recording_id]
+    assert_equal "note-1", @calls.last[:params_id]
+  end
+
+  test "an unscoped endpoint denies a key whose owner lost access" do
+    owner = create_user
+    root, owner_access = create_access_recording_for(user: owner, role: :admin)
+    other = create_user
+    grant_or_bootstrap_access!(recording: root, actor: other, role: :admin)
+    provisioned = RecordingStudioApi::Services::ProvisionApiClient.call(
+      access_point_recording: root,
+      manager_actor: owner,
+      role: :edit,
+      name: "Owner unscoped key"
+    )
+    assert provisioned.success?
+    issued = RecordingStudioApi::Services::IssueOauthAccessToken.call(
+      grant_type: "client_credentials",
+      client_id: provisioned.value.fetch(:credential).oauth_client_id,
+      client_secret: provisioned.value.fetch(:token)
+    )
+    assert issued.success?
+    assert_equal owner, provisioned.value.fetch(:api_client).owner
+    bearer = { "Authorization" => "Bearer #{issued.value.fetch(:access_token)}" }
+
+    RecordingStudioApi.register_endpoint(
+      :owner_note,
+      http_verb: :post,
+      path: "owner-notes",
+      handler: endpoint_probe("owner_note")
+    )
+
+    post "/recording_studio_api/api/v1/owner-notes", headers: bearer, as: :json
+    assert_response :success
+    assert_equal(["owner_note"], @calls.map { |call| call[:name] })
+
+    revoked = RecordingStudioAccessible::Services::RevokeRecordingAccess.call(
+      recording: root,
+      access_recording: owner_access,
+      manager_actor: other,
+      allow_last_admin_removal: true
+    )
+    assert revoked.success?
+
+    @calls.clear
+    post "/recording_studio_api/api/v1/owner-notes", headers: bearer, as: :json
+    assert_response :forbidden
+    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
+    assert_empty @calls
+  end
+
   test "a post endpoint can require view and a post read cannot opt out of scoping" do
     view_headers, view_page = view_client
     RecordingStudioApi.register_endpoint(
@@ -844,6 +935,28 @@ class ApiV1RegisteredHandlerScopeTest < ActionDispatch::IntegrationTest
       }
     )
     RecordingStudioApi.register_resource_handler("Folder", :show, handler: probe("nested-show"))
+  end
+
+  def register_unscoped_role_endpoints
+    RecordingStudioApi.register_endpoint(:list_notes, http_verb: :get, path: "notes", handler: endpoint_probe("list"))
+    RecordingStudioApi.register_endpoint(:create_note, http_verb: :post, path: "notes", handler: endpoint_probe("create"))
+    RecordingStudioApi.register_endpoint(:revise_note, http_verb: :patch, path: "notes", handler: endpoint_probe("revise"))
+    RecordingStudioApi.register_endpoint(
+      :remove_person,
+      http_verb: :delete,
+      path: "people/:id",
+      scope_id: false,
+      required_role: :edit,
+      handler: endpoint_probe("remove")
+    )
+    RecordingStudioApi.register_endpoint(
+      :mark_read,
+      http_verb: :post,
+      path: "notifications/:id/mark-read",
+      scope_id: false,
+      required_role: :view,
+      handler: endpoint_probe("mark_read")
+    )
   end
 
   def register_scoped_endpoint

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-11-17
+
+### Fixed
+- An unscoped registered endpoint authorizes the key before the handler runs. `HandlerGuard.endpoint!` calls `access_grant.authorize!` on the grant anchor with the endpoint's `authorization_role`. Membership uses the `authorized_recordings` relation for that anchor. The effective role is the lower of the key grant and the owner's current role. A view key is refused on an unscoped write. A key whose owner lost access is refused. The response is the same 403 a collection index uses for that anchor.
+
+### Changed
+- A non-GET endpoint with `scope_id: false` must pass `required_role`. Registration raises when it is missing. GET still defaults to `:view`. Every other verb still defaults to `:edit`.
+
+### Upgrade notes
+- Bump to `1.8.0`. No migration.
+- Users `>= 0.33.0` and Notifications `>= 0.19.3` already declare `required_role` on their `scope_id: false` writes. Older Notifications releases need `required_role: :view` on `mark_read`, `mark_unread`, `archive`, `unarchive`, and PATCH preferences to keep view-key access.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.7.0] - 2026-11-17
 
 ### Changed

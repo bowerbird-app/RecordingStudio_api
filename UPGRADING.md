@@ -1,5 +1,16 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.8.0
+
+Behavior change. No migration. Unscoped registered endpoints check the key's role.
+
+1. Bump the host gem to `1.8.0`. Stay on Recording Studio `>= 7.7.0`, `< 8.0` and Accessible `>= 0.49.0`, `< 2.0` from 1.7.0.
+2. A registered endpoint with no `:id` or `:recording_id`, or with `scope_id: false`, calls `access_grant.authorize!` on the grant anchor before the handler. Membership is the 1.7.0 `authorized_recordings` relation for that anchor. The role is `authorization_role`: `:view` for GET, `:edit` for every other verb, or `required_role` when that is set. The effective role is the lower of the key grant and the owner's current role. A view key gets 403 on an unscoped write. A key whose owner lost access gets that same 403. The handler does not run. `recording` stays nil.
+3. Pass `required_role:` on every non-GET endpoint that sets `scope_id: false`. Registration raises `ConfigurationError` when it is missing. GET still defaults to `:view`. A path with no recording id still defaults a non-GET to `:edit`.
+4. Users `>= 0.33.0` and Notifications `>= 0.19.3` already declare those roles. Older Notifications releases need `required_role: :view` on `mark_read`, `mark_unread`, `archive`, `unarchive`, and PATCH preferences to keep view-key access. A write that should require edit passes `required_role: :edit`.
+
+An `owns_scoping` read that captures a recording id still skips lookup and `authorize!` on that id. There is no write opt-out.
+
 ## Upgrading to 1.7.0
 
 No migration in this gem. Lists read through Accessible `authorized_recordings`.
