@@ -12,16 +12,25 @@ module RecordingStudioApi
       @mutex = Mutex.new
     end
 
+    def self.profiles_for(api)
+      profiles = api.api_version_profiles.values
+      return [nil] if profiles.empty?
+
+      uncovered = api.api_versions.any? { |version| api.api_version_profiles[version].nil? }
+      uncovered ? profiles + [nil] : profiles
+    end
+
     def register(recordable_type, serializer: nil, output_keys: nil, fields: nil, openapi: nil,
                  sortable_attributes: nil, writable_attributes: nil, immutable_fields: nil,
                  relationships: nil, immutable_relationships: nil, operations: nil, capability_actions: nil,
-                 auto_capability_actions: nil, metrics: nil)
+                 auto_capability_actions: nil, metrics: nil, public_name: nil, version: nil)
       incoming = RecordableRegistration.new(
         recordable_type: recordable_type, serializer: serializer, output_keys: output_keys, fields: fields,
         openapi: openapi, sortable_attributes: sortable_attributes, writable_attributes: writable_attributes,
         immutable_fields: immutable_fields, relationships: relationships,
         immutable_relationships: immutable_relationships, operations: operations,
-        capability_actions: capability_actions, auto_capability_actions: auto_capability_actions, metrics: metrics
+        capability_actions: capability_actions, auto_capability_actions: auto_capability_actions, metrics: metrics,
+        public_name: public_name, version: version
       )
       key = incoming.recordable_type
       @mutex.synchronize do
@@ -52,9 +61,30 @@ module RecordingStudioApi
       @mutex.synchronize { @registrations.transform_values(&:as_json) }
     end
 
-    def validate!
+    def validate!(profiles: nil)
       registrations = @mutex.synchronize { @registrations.values }
       registrations.each(&:validate!)
+      (profiles.nil? ? [nil] : profiles).each do |profile|
+        assert_unique_public_names!(registrations, profile)
+      end
+    end
+
+    def type_for_public_name(name, profile: nil)
+      query = name.to_s.strip
+      return if query.empty?
+
+      selected = @mutex.synchronize { @registrations.values }.select { |registration| registration.selected_by?(profile) }
+      by_name = selected.select { |registration| registration.public_name == query }
+      if by_name.many?
+        classes = by_name.map(&:recordable_type).sort
+        raise ConfigurationError, "Public name #{query} clashes for #{classes.join(', ')}"
+      end
+      return by_name.first.recordable_type if by_name.one?
+
+      match = selected.find { |registration| registration.recordable_type == query }
+      return if match.nil?
+
+      match.recordable_type
     end
 
     private
@@ -74,8 +104,37 @@ module RecordingStudioApi
         immutable_fields: existing.immutable_fields | incoming.immutable_fields,
         relationships: merge_definitions("relationship", existing.relationships, incoming.relationships),
         immutable_relationships: existing.immutable_relationships | incoming.immutable_relationships,
+        public_name: merged_public_name(existing, incoming),
+        public_name_supplied: existing.public_name_supplied? || incoming.public_name_supplied?,
+        version: merged_version(existing, incoming),
+        version_supplied: existing.version_supplied? || incoming.version_supplied?,
         **merged_explicit_sets(existing, incoming)
       )
+    end
+
+    def merged_public_name(existing, incoming)
+      clash = existing.public_name_supplied? && incoming.public_name_supplied? && existing.public_name != incoming.public_name
+      raise ConfigurationError, "Public name cannot be redefined incompatibly for #{incoming.recordable_type}" if clash
+
+      incoming.public_name_supplied? ? incoming.public_name : existing.public_name
+    end
+
+    def merged_version(existing, incoming)
+      clash = existing.version_supplied? && incoming.version_supplied? && existing.version != incoming.version
+      raise ConfigurationError, "Recordable version cannot be redefined incompatibly for #{incoming.recordable_type}" if clash
+
+      incoming.version_supplied? ? incoming.version : existing.version
+    end
+
+    def assert_unique_public_names!(registrations, profile)
+      selected = registrations.select { |registration| registration.selected_by?(profile) }
+      selected.group_by(&:public_name).each do |public_name, group|
+        next if group.size < 2
+
+        classes = group.map(&:recordable_type).sort
+        where = profile ? " on API version #{profile.name}" : ""
+        raise ConfigurationError, "Public name #{public_name} clashes for #{classes.join(', ')}#{where}"
+      end
     end
 
     def merged_explicit_sets(existing, incoming)

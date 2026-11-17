@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "rubygems/version"
+
 module RecordingStudioApi
   class RecordableRegistration
     DEFAULT_OPERATIONS = %i[index show create update destroy].freeze
@@ -74,16 +76,19 @@ module RecordingStudioApi
       end
     end
 
-    attr_reader :recordable_type, :serializer, :output_keys, :fields, :openapi, :sortable_attributes,
-                :writable_attributes, :immutable_fields, :relationships, :immutable_relationships,
-                :operations, :capability_actions, :auto_capability_actions, :metric_names
+    attr_reader :recordable_type, :public_name, :version, :serializer, :output_keys, :fields, :openapi,
+                :sortable_attributes, :writable_attributes, :immutable_fields, :relationships,
+                :immutable_relationships, :operations, :capability_actions, :auto_capability_actions, :metric_names
 
     def initialize(recordable_type:, serializer: nil, output_keys: nil, fields: nil, openapi: nil,
                    sortable_attributes: nil, writable_attributes: nil, immutable_fields: nil,
                    relationships: nil, immutable_relationships: nil, operations: nil, capability_actions: nil,
                    auto_capability_actions: nil, metrics: nil, operations_supplied: nil,
-                   capability_actions_supplied: nil, auto_capability_actions_supplied: nil, metrics_supplied: nil)
+                   capability_actions_supplied: nil, auto_capability_actions_supplied: nil, metrics_supplied: nil,
+                   public_name: nil, version: nil, public_name_supplied: nil, version_supplied: nil)
       @recordable_type = recordable_type.to_s
+      assign_public_name(public_name, public_name_supplied)
+      assign_version(version, version_supplied)
       @serializer = serializer
       @output_keys = normalize_names(output_keys, "Output keys")
       @fields = normalize_fields(fields)
@@ -170,13 +175,34 @@ module RecordingStudioApi
       @metrics_supplied
     end
 
+    def public_name_supplied?
+      @public_name_supplied
+    end
+
+    def version_supplied?
+      @version_supplied
+    end
+
+    def selected_by?(profile)
+      return true if profile.nil? || version.nil?
+
+      profile.matches?(self)
+    end
+
+    def contribution_keys
+      return [].freeze if version.nil?
+
+      [public_name.underscore.to_sym]
+    end
+
     def filterable_attributes
       (sortable_attributes | writable_attributes).map(&:to_s)
     end
 
     def as_json(*)
       {
-        recordable_type: recordable_type, serializer: serializer, output_keys: output_keys,
+        recordable_type: recordable_type, public_name: public_name, version: version&.to_s,
+        serializer: serializer, output_keys: output_keys,
         fields: fields.transform_values(&:to_h), openapi: openapi, sortable_attributes: sortable_attributes,
         writable_attributes: writable_attributes, immutable_fields: immutable_fields,
         relationships: relationships.transform_values(&:to_h), immutable_relationships: immutable_relationships,
@@ -186,6 +212,39 @@ module RecordingStudioApi
     end
 
     private
+
+    def assign_public_name(value, supplied)
+      @public_name_supplied = supplied.nil? ? explicit_public_name?(value) : supplied
+      @public_name = resolve_public_name(value)
+    end
+
+    def explicit_public_name?(value)
+      !value.nil? && !value.to_s.strip.empty?
+    end
+
+    def resolve_public_name(value)
+      name = value.to_s.strip
+      name = @recordable_type.demodulize if name.empty?
+      raise ConfigurationError, "Public name is invalid for #{@recordable_type}: #{name}" unless name.match?(FIELD_NAME_PATTERN)
+
+      name.freeze
+    end
+
+    def assign_version(value, supplied)
+      @version_supplied = supplied.nil? ? !value.nil? : supplied
+      @version = normalize_contribution_version(value)
+    end
+
+    def normalize_contribution_version(value)
+      return nil unless @version_supplied
+
+      raw_version = value.is_a?(Gem::Version) ? value.to_s : value.to_s.strip
+      raise ConfigurationError, "Recordable version is required for #{@recordable_type}" if raw_version.empty?
+
+      Gem::Version.new(raw_version)
+    rescue ArgumentError => e
+      raise ConfigurationError, "Invalid recordable version for #{@recordable_type}: #{e.message}"
+    end
 
     def normalize_fields(value)
       return {}.freeze if value.nil?

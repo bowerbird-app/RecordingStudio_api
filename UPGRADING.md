@@ -1,5 +1,21 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.6.0
+
+Additive. No migration. Payloads, auth, routes, and OpenAPI stay the same.
+
+1. Bump the host gem to `1.6.0`.
+2. Pass `public_name:` to `register_recordable_type_api` when the short name should differ from the class name without its namespace.
+3. Give two types different public names when one API would select both and the short names match.
+
+A blank or omitted `public_name:` uses the class name without its namespace. `RecordingStudioPresskits::PressKit` becomes `PressKit`. The value is a string identifier with no spaces.
+
+`registration.public_name` reads that name. `RecordingStudioApi.recordable_type_for_public_name(name, api:, version:)` returns the type string for that named API, or nil. The full class name still works with `recordable_registration_for` and with this lookup.
+
+Boot validation raises `RecordingStudioApi::ConfigurationError` when one named API, including the public API, selects two types with the same public name. The message names both classes and the public name. The same public name on two different named APIs is allowed.
+
+Pass `version:` when the type belongs to a contribution contract. The contribution name is the public name underscored, so `PressKit` is `:press_kit`. `config.version` and `api.use` select it the same way they select action contracts. A registration that a profile does not select does not clash. Omit `version:` and the type stays selected for every profile.
+
 ## Upgrading to 1.5.0
 
 No migration. Billing denials with a registered code render as 402 after the caller is authorized.

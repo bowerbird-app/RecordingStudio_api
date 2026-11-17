@@ -575,6 +575,7 @@ The runtime should fail fast when:
 - duplicate action name plus contribution version pairs are registered
 - required handlers or serializers are missing
 - contribution versions or version-profile constraints are malformed
+- two recordable types selected by one named API resolve to the same public name
 
 ## Ruby Integration Surface
 
@@ -631,6 +632,27 @@ RecordingStudioApi.configure do |config|
   config.capability_action_roles = { publish: :admin }
 end
 ```
+
+### Public names
+
+`public_name:` is the short name for a registered type. Leave it blank and the name is the class without its namespace. The value is a string identifier, with no spaces.
+
+```ruby
+RecordingStudioApi.register_recordable_type_api(
+  "RecordingStudioPresskits::PressKit",
+  public_name: "PressKit",
+  serializer: ->(press_kit, **) { { title: press_kit.title } },
+  output_keys: %i[title]
+)
+```
+
+`registration.public_name` returns `"PressKit"`. `RecordingStudioApi.recordable_type_for_public_name("PressKit")` returns `"RecordingStudioPresskits::PressKit"`. A miss returns nil. Pass `api:` for a named API and `version:` for one public API version. The full class name still finds the registration through `recordable_registration_for` and through this lookup.
+
+Resolved public names are unique inside one named API, including the public API. A clash raises `RecordingStudioApi::ConfigurationError` and names both classes and the public name. The same public name may be registered on two different named APIs.
+
+Pass `version:` when the type belongs to a contribution contract. The contribution name is the public name underscored (`PressKit` is `:press_kit`). `config.version` and `api.use` select it the same way they select action contracts. A registration that no profile selects does not clash. Omit `version:` and the type stays selected for every profile.
+
+REST paths, the JSON `type`, and OpenAPI keep the full class name and the existing resource name.
 
 `writable_attributes` is an explicit allowlist for API create and update operations. OpenAPI
 field metadata describes response data only and never grants write access.

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-17
+
+### Added
+- `public_name:` on `register_recordable_type_api`. `registration.public_name` is that string, or the class name without its namespace when the argument is blank. `RecordingStudioApi.recordable_type_for_public_name(name, api:, version:)` returns the registered type for one named API, or nil.
+- Boot validation raises `ConfigurationError` when one named API selects two types with the same public name. The error names both classes and the public name. `version:` joins the existing `config.version` / `api.use` selection, so a contract that profile does not select does not clash.
+
+### Upgrade notes
+- Bump to `1.6.0`. No migration. Payloads, auth, routes, and OpenAPI stay the same.
+- Set `public_name:` when two selected types would share a short name. See [UPGRADING.md](UPGRADING.md).
+
 ## [1.5.0] - 2026-11-17
 
 ### Added
