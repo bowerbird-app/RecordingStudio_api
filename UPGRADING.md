@@ -1,5 +1,17 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.14.4
+
+Deletion only. The project is pre-production, so regenerate the schema instead of keeping the removed migrations. Tokens and credentials stay recordings. `ApiDailyMetric` and the admin widgets are unchanged.
+
+1. Bump the host gem to `1.14.4`. Stay on Recording Studio `>= 7.7.0`, `< 8.0` and Logs `>= 0.8.0`, `< 2.0`.
+2. Delete installed copies of these migrations: `backfill_recording_studio_api_credential_recordings`, `backfill_recording_studio_api_access_token_recordings`, `create_recording_studio_api_oauth_clients`, `create_recording_studio_api_oauth_authorization_codes`, `backfill_recording_studio_api_oauth_authorization_code_recordings`, `create_recording_studio_api_oauth_grant_sessions`, `create_recording_studio_api_oauth_session_access_tokens`, `create_recording_studio_api_oauth_refresh_tokens`, `isolate_recording_studio_api_client_access_recordings`, `create_api_request_log_summaries`, and `drop_api_request_log_summaries`.
+3. Keep `remove_mobile_oauth_from_recording_studio_api`. It still removes `oauth_grant_session_id` from `recording_studio_api_api_request_logs` (that column is created with the log table) and drops the mobile OAuth tables when they already exist.
+4. A fresh migrate does not create the mobile OAuth tables or the summary tables. The resulting schema matches a database that already ran the old create-and-drop pair. If `recording_studio_api_api_request_day_summaries`, `recording_studio_api_api_request_latency_day_summaries`, or `recording_studio_api_api_request_day_metric_rollups` are still present, drop them.
+5. Delete `config.logs_summaries_enabled` from the initializer. The setter is gone. A YAML key with that name is ignored.
+6. Delete any schedule for `recording_studio_api:api_request_logs:backfill_classifications`. New request logs already store arrival time, latency bucket, and names.
+7. API request logs still register with Logs (root column, no partitions, indefinite retention) and do not declare aggregatable columns. Do not schedule Logs aggregation jobs for that table. Nightly `recording_studio_api:api_metrics:maintain` is unchanged.
+
 ## Upgrading to 1.14.3
 
 No behavior change beyond 1.14.2. No migration.

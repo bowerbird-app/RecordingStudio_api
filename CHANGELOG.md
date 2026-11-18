@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.14.4] - 2026-11-17
+
+### Removed
+- Pre-production migrations that created the mobile OAuth tables, backfilled credential, access-token, and client-access recordings with raw inserts, and created then dropped request-log summary tables.
+- `RecordingStudioApi::Services::BackfillApiRequestLogClassifications` and `recording_studio_api:api_request_logs:backfill_classifications`.
+- `config.logs_summaries_enabled`.
+- The Logs `aggregatable:` column list on API request logs. Logs screens and jobs read registered aggregations, and this gem registers none.
+
+### Upgrade notes
+- Bump to `1.14.4`. No new migration. Stay on Recording Studio `>= 7.7.0`, `< 8.0`.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.14.3] - 2026-11-17
 
 ### Changed

@@ -444,19 +444,9 @@ database (`api_logging` when that database is configured). New rows store `arriv
 PostgreSQL `clock_timestamp()` at insert, and `latency_bucket_ms` from the same bucket labels
 the daily histogram already uses (`25` through `10000`, then overflow label `30000` for anything
 above `10000`). Blank API names become `public`. Blank routes become `unknown`.
-`config.logs_summaries_enabled` is deprecated and unused. Setting it does not
-change readers or writers. API still registers the raw request-log table with
-Recording Studio Logs (root column, no partitions, `retention: :indefinite`)
-but does not write or read Logs summary tables. Tables created by the shipped
-summary migration stay in place and are safe to ignore.
-
-After you migrate an existing install, backfill those fields in batches. The task never loads
-the whole table. `BATCH_SIZE` defaults to 1000.
-
-```sh
-bin/rails recording_studio_api:api_request_logs:backfill_classifications
-BATCH_SIZE=500 bin/rails recording_studio_api:api_request_logs:backfill_classifications
-```
+API registers the raw request-log table with Recording Studio Logs (root column,
+no partitions, `retention: :indefinite`) and does not declare aggregatable columns.
+It does not write or read Logs summary tables.
 
 Admin charts prefer rolled-up daily metrics, so hosts should run maintenance nightly:
 

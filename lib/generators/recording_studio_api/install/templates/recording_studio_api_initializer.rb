@@ -74,12 +74,9 @@ RecordingStudioApi.configure do |config|
   # logging, TTLs, retention, and rate limits at runtime from Admin API settings.
   # config.api_request_log_retention_days = 30
   # config.api_daily_metric_retention_days = nil
-  # config.logs_summaries_enabled is deprecated and unused. Setting it does
-  # nothing; API does not write or read Logs summary tables.
-  #
-  # After migrating, backfill arrival time, latency buckets, and blank names:
-  #   bin/rails recording_studio_api:api_request_logs:backfill_classifications
-  # Do not schedule RecordingStudioLogs partition or aggregation jobs for this table.
+  # API registers this table with Recording Studio Logs (no partitions,
+  # retention indefinite) and does not declare aggregatable columns.
+  # Do not schedule RecordingStudioLogs partition or aggregation jobs for it.
   #
   # Schedule nightly maintenance so retention actually runs:
   #   bin/rails recording_studio_api:api_metrics:maintain

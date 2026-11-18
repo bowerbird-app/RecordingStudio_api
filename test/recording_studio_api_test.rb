@@ -8,7 +8,35 @@ class RecordingStudioApiTest < Minitest::Test
   end
 
   def test_version_pin
-    assert_equal "1.14.3", ::RecordingStudioApi::VERSION
+    assert_equal "1.14.4", ::RecordingStudioApi::VERSION
+  end
+
+  def test_preproduction_backfill_and_summary_migrations_are_gone
+    root = File.expand_path("..", __dir__)
+    engine_names = Dir.children(File.join(root, "db/migrate"))
+    dummy_names = Dir.children(File.join(root, "test/dummy/db/migrate"))
+    removed = %w[
+      backfill_recording_studio_api_credential_recordings
+      backfill_recording_studio_api_access_token_recordings
+      create_recording_studio_api_oauth_clients
+      create_recording_studio_api_oauth_authorization_codes
+      backfill_recording_studio_api_oauth_authorization_code_recordings
+      create_recording_studio_api_oauth_grant_sessions
+      create_recording_studio_api_oauth_session_access_tokens
+      create_recording_studio_api_oauth_refresh_tokens
+      isolate_recording_studio_api_client_access_recordings
+      create_api_request_log_summaries
+      drop_api_request_log_summaries
+    ]
+
+    removed.each do |name|
+      refute engine_names.any? { |file| file.include?(name) }, name
+      refute dummy_names.any? { |file| file.include?(name) }, name
+    end
+    assert(engine_names.any? { |file| file.include?("remove_mobile_oauth_from_recording_studio_api") })
+    assert(dummy_names.any? { |file| file.include?("remove_mobile_oauth_from_recording_studio_api") })
+    refute File.exist?(File.join(root, "lib/recording_studio_api/services/backfill_api_request_log_classifications.rb"))
+    refute File.exist?(File.join(root, "lib/tasks/recording_studio_api_request_logs.rake"))
   end
 
   def test_metrics_dependency_pins
