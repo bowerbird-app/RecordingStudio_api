@@ -90,15 +90,30 @@ module RecordingStudioApi
       end
 
       def warn_fallback(error)
+        return unless process_local_cache?
+
         fallback_mutex.synchronize do
           return if @fallback_warned
 
           @fallback_warned = true
           detail = error ? "#{error.class}: #{error.message}" : "Redis client is missing"
-          Rails.logger.warn(
-            "[RecordingStudioApi] idempotency is using Rails.cache because Redis is unavailable (#{detail})"
-          )
+          Rails.logger.warn(durability_warning(detail))
         end
+      end
+
+      def process_local_cache?
+        store = Rails.cache
+        store.is_a?(ActiveSupport::Cache::NullStore) || store.is_a?(ActiveSupport::Cache::MemoryStore)
+      end
+
+      def durability_warning(detail)
+        store_name = Rails.cache.class.name
+        local_detail = if Rails.cache.is_a?(ActiveSupport::Cache::NullStore)
+                         "#{store_name}, which is process-local and stores nothing"
+                       else
+                         "#{store_name}, which is process-local and keeps keys in this process only"
+                       end
+        "[RecordingStudioApi] idempotency keys are not durable. Redis is unavailable (#{detail}) and Rails.cache is #{local_detail}."
       end
 
       def fallback_mutex

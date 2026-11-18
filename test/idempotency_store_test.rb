@@ -151,9 +151,44 @@ class IdempotencyStoreTest < ActiveSupport::TestCase
     end
 
     warning = logger.messages.join("\n")
+    assert_equal 1, logger.messages.length
     assert_includes warning, "[RecordingStudioApi]"
     assert_includes warning, "Rails.cache"
     assert_includes warning, "idempotency"
+    assert_includes warning, "not durable"
+    assert_includes warning, "ActiveSupport::Cache::MemoryStore"
+    assert_includes warning, "process-local"
+  end
+
+  test "logs a warning when the fallback cache is NullStore" do
+    logger = MemoryLogger.new
+    Rails.cache = ActiveSupport::Cache::NullStore.new
+
+    Rails.stub(:logger, logger) do
+      RecordingStudioApi::IdempotencyStore.stub(:redis, nil) do
+        write_payload(key: "null-store", payload: { "id" => "1" })
+      end
+    end
+
+    warning = logger.messages.join("\n")
+    assert_equal 1, logger.messages.length
+    assert_includes warning, "not durable"
+    assert_includes warning, "ActiveSupport::Cache::NullStore"
+    assert_includes warning, "stores nothing"
+  end
+
+  test "does not log a durability warning when Redis stores the key" do
+    logger = MemoryLogger.new
+    Rails.cache = ActiveSupport::Cache::MemoryStore.new
+
+    Rails.stub(:logger, logger) do
+      RecordingStudioApi::IdempotencyStore.stub(:redis, AtomicRedis.new) do
+        write_payload(key: "redis-quiet", payload: { "id" => "1" })
+        fetch_payload(key: "redis-quiet")
+      end
+    end
+
+    assert_empty logger.messages
   end
 
   test "concurrent writes store only one payload" do

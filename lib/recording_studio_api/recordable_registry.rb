@@ -15,14 +15,14 @@ module RecordingStudioApi
     def register(recordable_type, serializer: nil, output_keys: nil, fields: nil, openapi: nil,
                  sortable_attributes: nil, writable_attributes: nil, immutable_fields: nil,
                  relationships: nil, immutable_relationships: nil, operations: nil, capability_actions: nil,
-                 auto_capability_actions: nil, metrics: nil, public_name: nil)
+                 auto_capability_actions: nil, metrics: nil, public_name: nil, default_order: nil)
       incoming = RecordableRegistration.new(
         recordable_type: recordable_type, serializer: serializer, output_keys: output_keys, fields: fields,
         openapi: openapi, sortable_attributes: sortable_attributes, writable_attributes: writable_attributes,
         immutable_fields: immutable_fields, relationships: relationships,
         immutable_relationships: immutable_relationships, operations: operations,
         capability_actions: capability_actions, auto_capability_actions: auto_capability_actions, metrics: metrics,
-        public_name: public_name
+        public_name: public_name, default_order: default_order
       )
       key = incoming.recordable_type
       @mutex.synchronize do
@@ -92,8 +92,18 @@ module RecordingStudioApi
         immutable_relationships: existing.immutable_relationships | incoming.immutable_relationships,
         public_name: merged_public_name(existing, incoming),
         public_name_supplied: existing.public_name_supplied? || incoming.public_name_supplied?,
+        **merged_default_order(existing, incoming, replace: replace_metrics),
         **merged_explicit_sets(existing, incoming)
       )
+    end
+
+    def merged_default_order(existing, incoming, replace:)
+      return { default_order: existing.default_order, default_order_supplied: existing.default_order_supplied? } unless incoming.default_order_supplied?
+
+      clash = existing.default_order_supplied? && existing.default_order != incoming.default_order && !replace
+      raise ConfigurationError, "Default order cannot be redefined incompatibly for #{incoming.recordable_type}" if clash
+
+      { default_order: incoming.default_order, default_order_supplied: true }
     end
 
     def merged_public_name(existing, incoming)

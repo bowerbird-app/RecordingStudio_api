@@ -93,7 +93,9 @@ module RecordingStudioApi
           sort: normalized_sort,
           order: normalized_order,
           has_more: has_more,
-          next_pagination_token: next_pagination_token_for(items, normalized_sort, normalized_order, has_more, sortable_context)
+          next_pagination_token: next_pagination_token_for(
+            items, normalized_sort, normalized_order, has_more, sortable_context, pagination_token_payload
+          )
         }
         meta[:total_count] = total_count if include_total?
 
@@ -139,19 +141,27 @@ module RecordingStudioApi
       end
 
       def ordered_relation(normalized_sort, normalized_order, sortable_context)
-        recording_table = relation.klass.arel_table
-
-        if normalized_sort == "created_at"
-          return relation.reorder(created_at: normalized_order, id: normalized_order)
+        if normalized_sort == DefaultListOrder::CALLABLE_SORT
+          return default_order.apply_callable(relation)
         end
 
+        recording_table = relation.klass.arel_table
+        if recording_column_sort?(normalized_sort)
+          return relation.reorder(normalized_sort => normalized_order, id: normalized_order)
+        end
+
+        ensure_default_column!(normalized_sort, sortable_context)
         recordable_table_alias = Arel::Table.new(sortable_context.fetch(:recordable_table_alias))
         joined_relation = relation.joins(recordable_sort_join_sql(sortable_context))
         joined_relation.reorder(recordable_table_alias[normalized_sort].send(normalized_order), recording_table[:id].send(normalized_order))
       end
 
       def apply_pagination_token(current_relation, pagination_token_payload, normalized_sort, normalized_order, sortable_context)
-        last_sort_value = cast_sort_value(pagination_token_payload.fetch("last_sort_value"), sortable_context)
+        if normalized_sort == DefaultListOrder::CALLABLE_SORT
+          return current_relation.offset(callable_offset(pagination_token_payload))
+        end
+
+        last_sort_value = cast_sort_value(pagination_token_payload.fetch("last_sort_value"), normalized_sort, sortable_context)
         id = pagination_token_payload.fetch("last_id")
         table = current_relation.klass.arel_table
         sort_column = sort_column_for(normalized_sort, sortable_context)
@@ -167,42 +177,73 @@ module RecordingStudioApi
         current_relation.where(comparison)
       end
 
-      def next_pagination_token_for(items, normalized_sort, normalized_order, has_more, sortable_context)
+      def next_pagination_token_for(items, normalized_sort, normalized_order, has_more, sortable_context, pagination_token_payload)
         return nil unless has_more
 
         last = items.last
-        encode_pagination_token(
-          {
-            "v" => PAGINATION_TOKEN_VERSION,
-            "api_key" => api_key,
-            "scope" => scope_key,
-            "resource" => resource,
-            "sort" => normalized_sort,
-            "order" => normalized_order,
-            "last_sort_value" => token_sort_value(last, normalized_sort, sortable_context),
-            "last_id" => last.id
-          }
-        )
+        payload = {
+          "v" => PAGINATION_TOKEN_VERSION,
+          "api_key" => api_key,
+          "scope" => scope_key,
+          "resource" => resource,
+          "sort" => normalized_sort,
+          "order" => normalized_order,
+          "last_id" => last.id
+        }
+        if normalized_sort == DefaultListOrder::CALLABLE_SORT
+          payload["last_sort_value"] = last.id
+          payload["offset"] = callable_offset_base(pagination_token_payload) + items.length
+        else
+          payload["last_sort_value"] = token_sort_value(last, normalized_sort, sortable_context)
+        end
+
+        encode_pagination_token(payload)
       end
 
       def normalize_sort(sortable_context)
-        normalized = sort.to_s.presence || "created_at"
-        allowed = sortable_context.fetch(:allowed_sort_attributes)
+        if sort.to_s == DefaultListOrder::CALLABLE_SORT
+          return DefaultListOrder::CALLABLE_SORT if default_order&.callable?
 
-        unless allowed.include?(normalized)
           raise RecordingStudioApi::InvalidPaginationTokenError,
-                "sort must be one of: #{allowed.join(', ')}"
+                "sort must be one of: #{sortable_context.fetch(:allowed_sort_attributes).join(', ')}"
         end
 
-        normalized
+        if explicit_sort?
+          normalized = sort.to_s
+          allowed = sortable_context.fetch(:allowed_sort_attributes)
+          unless allowed.include?(normalized)
+            raise RecordingStudioApi::InvalidPaginationTokenError,
+                  "sort must be one of: #{allowed.join(', ')}"
+          end
+
+          return normalized
+        end
+
+        return default_order.column if default_order&.column?
+        return DefaultListOrder::CALLABLE_SORT if default_order&.callable?
+
+        "created_at"
       end
 
       def normalize_order
-        normalized = order.to_s.downcase
-        normalized = "asc" if normalized.blank?
-        raise RecordingStudioApi::InvalidPaginationTokenError, "order must be asc or desc" unless SUPPORTED_ORDERS.include?(normalized)
+        supplied = order.to_s.downcase
+        active_default = explicit_sort? ? nil : default_order
 
-        normalized
+        if supplied.blank?
+          return active_default.direction if active_default&.column?
+
+          return "asc"
+        end
+
+        unless SUPPORTED_ORDERS.include?(supplied)
+          raise RecordingStudioApi::InvalidPaginationTokenError, "order must be asc or desc"
+        end
+        if active_default&.callable?
+          raise RecordingStudioApi::InvalidPaginationTokenError,
+                "order requires sort when this resource uses a computed default order"
+        end
+
+        supplied
       end
 
       def normalize_limit
@@ -315,14 +356,16 @@ module RecordingStudioApi
       end
 
       def sort_column_for(normalized_sort, sortable_context)
-        return relation.klass.arel_table[:created_at] if normalized_sort == "created_at"
+        if recording_column_sort?(normalized_sort)
+          return relation.klass.arel_table[normalized_sort]
+        end
 
         Arel::Table.new(sortable_context.fetch(:recordable_table_alias))[normalized_sort]
       end
 
       def token_sort_value(recording, normalized_sort, sortable_context)
-        value = if normalized_sort == "created_at"
-                  recording.created_at
+        value = if recording_column_sort?(normalized_sort)
+                  recording.public_send(normalized_sort)
                 else
                   recording.recordable.public_send(normalized_sort)
                 end
@@ -336,9 +379,8 @@ module RecordingStudioApi
         value
       end
 
-      def cast_sort_value(value, sortable_context)
-        attribute = sort.to_s.presence || "created_at"
-        type = sort_type(attribute, sortable_context)
+      def cast_sort_value(value, normalized_sort, sortable_context)
+        type = sort_type(normalized_sort, sortable_context)
 
         case type
         when :integer
@@ -357,9 +399,48 @@ module RecordingStudioApi
       end
 
       def sort_type(attribute, sortable_context)
-        return :datetime if attribute == "created_at"
+        if recording_column_sort?(attribute)
+          return relation.klass.columns_hash.fetch(attribute).type
+        end
 
         sortable_context.fetch(:sort_type_by_attribute).fetch(attribute, :string)
+      end
+
+      def default_order
+        RecordingStudioApi.recordable_registration_for(recordable_type, api: api_key)&.default_order
+      end
+
+      def explicit_sort?
+        value = sort.to_s
+        value.present? && value != DefaultListOrder::CALLABLE_SORT
+      end
+
+      def recording_column_sort?(normalized_sort)
+        return true if normalized_sort == "created_at"
+        return false if explicit_sort?
+
+        list_order = default_order
+        list_order&.column? && list_order.column == normalized_sort && list_order.recording_column?(relation.klass)
+      end
+
+      def ensure_default_column!(normalized_sort, sortable_context)
+        list_order = default_order
+        return unless list_order&.column? && list_order.column == normalized_sort && !explicit_sort?
+
+        list_order.ensure_column!(sortable_context.fetch(:recordable_class), relation.klass)
+      end
+
+      def callable_offset(payload)
+        offset = payload.fetch("offset")
+        raise RecordingStudioApi::InvalidPaginationTokenError, "Invalid pagination token" unless offset.is_a?(Integer) && offset >= 0
+
+        offset
+      end
+
+      def callable_offset_base(payload)
+        return 0 if payload.nil?
+
+        callable_offset(payload)
       end
     end
   end
