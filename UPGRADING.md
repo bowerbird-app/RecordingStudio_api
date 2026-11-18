@@ -1,5 +1,13 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.15.0
+
+Behavior change. No migration. A role is read on the recording being checked.
+
+1. Bump the host gem to `1.15.0`. Stay on Recording Studio `>= 7.7.0`, `< 8.0` and Accessible `>= 0.50.0`, `< 2.0`.
+2. A token's effective role is still the lower of the grant role and the owner's role. The owner's role is `RecordingStudioAccessible.role_for` on that recording. `role_for` walks the recording and its ancestors, so a grant several levels up still applies, including when the recording or an ancestor is trashed. A direct grant on the trashed recording counts. `include_trashed: true` is still required for that recording to be in scope. Without it, kept lookups stay empty and show returns 404.
+3. `AccessManagementPolicy#maximum_assignable_role_for` returns `role_for`. `can_assign_role?` still requires the actor to manage that recording, and it refuses a role Accessible's role ceiling would refuse. Creating or updating a grant still goes through `GrantRecordingAccess` and `UpdateRecordingAccess`.
+
 ## Upgrading to 1.14.4
 
 Deletion only. The project is pre-production, so regenerate the schema instead of keeping the removed migrations. Tokens and credentials stay recordings. `ApiDailyMetric` and the admin widgets are unchanged.

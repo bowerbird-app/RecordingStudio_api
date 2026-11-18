@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.15.0] - 2026-11-18
+
+### Changed
+- `AccessGrant#authorize!` reads the owner's role with `RecordingStudioAccessible.role_for` on the recording being checked, including a trashed recording. `role_for` walks that recording and its ancestors. `include_trashed` still decides whether a trashed recording is in scope.
+- `AccessManagementPolicy#maximum_assignable_role_for` is that same `role_for`. `can_assign_role?` is an early hint for forms and provisioning: the actor can manage the recording, and Accessible's role ceiling allows the role. `GrantRecordingAccess` and `UpdateRecordingAccess` still refuse a higher role.
+
+### Upgrade notes
+- Bump to `1.15.0`. No migration. Stay on Recording Studio `>= 7.7.0`, `< 8.0` and Accessible `>= 0.50.0`, `< 2.0`.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.14.4] - 2026-11-17
 
 ### Removed

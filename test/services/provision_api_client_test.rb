@@ -203,6 +203,27 @@ class ProvisionApiClientTest < ActiveSupport::TestCase
     assert_equal 0, RecordingStudioApi::ApiClient.where(name: "Escalated direct token").count
   end
 
+  test "prevents provisioning above an inherited role several levels down" do
+    edit_user = create_user(email: "edit-nested-provision@example.com")
+    root_recording, = create_access_recording_for(user: edit_user, role: :edit)
+    folder = nested_folder_recording("Nested access", root_recording)
+    child = nested_folder_recording("Nested child", folder)
+    grandchild = nested_folder_recording("Nested grandchild", child)
+    RecordingStudioApi.configuration.access_management_edit_role = :edit
+
+    result = RecordingStudioApi::Services::ProvisionApiClient.call(
+      access_point_recording: grandchild,
+      manager_actor: edit_user,
+      role: :admin,
+      name: "Escalated nested token"
+    )
+
+    assert result.failure?
+    assert_equal "Requested API access role exceeds the manager's access", result.error
+    assert_equal 0, RecordingStudioApi::ApiClient.where(name: "Escalated nested token").count
+    assert_equal :edit, RecordingStudioAccessible.role_for(actor: edit_user, recording: grandchild)
+  end
+
   test "applies the configured credential ttl when expires_at is omitted" do
     travel_to Time.zone.parse("2026-05-18 12:00:00 UTC") do
       RecordingStudioApi.configuration.credential_ttl = 2.hours

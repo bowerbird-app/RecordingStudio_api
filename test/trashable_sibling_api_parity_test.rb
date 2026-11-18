@@ -244,10 +244,11 @@ class TrashableSiblingApiParityTest < ActiveSupport::TestCase
     assert_equal root_recording.id, access_recording.root_recording_id
   end
 
-  test "access grant include_trashed authorizes trashed recordings via parent kept check" do
+  test "access grant include_trashed authorizes a trashed recording on that recording" do
     root_recording, access_recording = create_access_recording_for(user: @user, role: :admin)
     page_recording = create_page_recording(root_recording: root_recording)
     page_recording.update_column(:trashed_at, Time.current)
+    page_recording.reload
 
     grant = RecordingStudioApi::AccessGrant.new(
       api_client: nil,
@@ -256,16 +257,10 @@ class TrashableSiblingApiParityTest < ActiveSupport::TestCase
       root_recording: root_recording
     )
 
+    assert_equal false, page_recording.kept?
+    assert_equal :admin, RecordingStudioAccessible.role_for(actor: @user, recording: page_recording)
     refute grant.authorized?(recording: page_recording, role: :view, include_trashed: false)
-    assert grant.authorized?(recording: page_recording, role: :view, include_trashed: true)
-
-    duck = Struct.new(:parent_recording) do
-      def kept?
-        false
-      end
-    end.new(root_recording)
-    checked = grant.send(:recording_for_role, duck, include_trashed: true)
-    assert_equal root_recording, checked
+    assert grant.authorized?(recording: page_recording, role: :admin, include_trashed: true)
   end
 
   private

@@ -2,7 +2,8 @@
 
 module RecordingStudioApi
   # A token sees the owner's live access, limited to the grant anchor.
-  # `authorize!` uses the lower of the grant role and the owner's role.
+  # `authorize!` uses the lower of the grant role and
+  # `RecordingStudioAccessible.role_for` on the recording being checked.
   class AccessGrant
     def initialize(api_client:, credential:, access_recording:, root_recording: nil, authorized_by: AuthorizedBy::OMITTED)
       @api_client = api_client
@@ -54,7 +55,7 @@ module RecordingStudioApi
       return false unless recording.present? && ranked?(role)
       return false unless in_scope?(recording, include_trashed)
 
-      held = effective_role(recording, include_trashed: include_trashed)
+      held = effective_role(recording)
       held.present? && RecordingStudio::AccessRoles.satisfies?(role: held, minimum_role: role)
     end
 
@@ -98,14 +99,11 @@ module RecordingStudioApi
       accessible_recordings(include_trashed: include_trashed).exists?(id: recording.id)
     end
 
-    def effective_role(recording, include_trashed:)
+    def effective_role(recording)
       person = owner
       return if person.nil? || role.blank?
 
-      target = recording_for_role(recording, include_trashed: include_trashed)
-      return if target.nil?
-
-      lower_role(role, RecordingStudioAccessible.role_for(actor: person, recording: target))
+      lower_role(role, RecordingStudioAccessible.role_for(actor: person, recording: recording))
     end
 
     def lower_role(left, right)
@@ -114,13 +112,6 @@ module RecordingStudioApi
       return if left_rank.nil? || right_rank.nil?
 
       left_rank <= right_rank ? left.to_sym : right.to_sym
-    end
-
-    def recording_for_role(recording, include_trashed:)
-      return recording unless include_trashed
-      return recording if recording.kept?
-
-      recording.parent_recording || scope_recording
     end
   end
 end

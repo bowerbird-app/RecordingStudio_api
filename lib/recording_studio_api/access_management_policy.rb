@@ -73,17 +73,20 @@ module RecordingStudioApi
     end
 
     def maximum_assignable_role_for(recording)
-      valid_access_roles.reverse.find do |role|
-        authorized_for_recording?(recording, access_management_role: role)
-      end
+      return if actor.nil? || recording.nil?
+
+      RecordingStudioAccessible.role_for(actor: actor, recording: recording)
     end
 
+    # Early hint for forms and provisioning. Grant and update still refuse a
+    # higher role through Accessible's role ceiling.
     def can_assign_role?(recording, role)
       return false unless can_manage_recording?(recording)
 
-      RecordingStudio::AccessRoles.satisfies?(
-        role: maximum_assignable_role_for(recording),
-        minimum_role: role
+      RecordingStudioAccessible::RoleCeiling.allowed?(
+        recording: recording,
+        manager: actor,
+        role: role
       )
     end
 
@@ -147,10 +150,6 @@ module RecordingStudioApi
       return nil if access_recording.nil?
 
       access_recording.parent_recording
-    end
-
-    def valid_access_roles
-      RecordingStudio::AccessRoles::ORDER.keys.map(&:to_sym)
     end
 
     def view_role
