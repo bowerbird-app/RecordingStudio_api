@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-11-18
+
+### Removed
+- `access_recording_id` on API clients and API credentials. The recording tree is the parent. Request logs still store `access_recording_id`.
+- The unique index of one API client per access recording. It is dropped with that column.
+
+### Changed
+- `ApiClient#recording` is the recording whose recordable is that client. `ApiClient#access_recording` is that recording's parent when the parent is an Access grant.
+- A credential's parent Access grant must have that API client as its actor. Provisioning grants each Access with `actor: api_client`, so one grant belongs to one client. One credential with `revoked_at` nil per client stays the partial unique index `index_recording_studio_api_credentials_on_active_client`.
+- The admin API keys list uses `self_and_descendants` and keeps the kept rows, plus the scoped recording itself.
+- Moving an API key still revokes the old credential and its access tokens, then trashes the client recording. That trash cascades to the credential and token recordings. The rows and trashed events stay. The Access grant stays. Accessible cannot destroy it while the client recording remains a child.
+
+### Upgrade notes
+- Bump to `1.16.0`. Run `drop_access_recording_id_from_api_clients_and_credentials`. Stay on Recording Studio `>= 7.7.0`, `< 8.0`, Accessible `>= 0.50.0`, `< 2.0`, and Trashable `>= 1.0.1`, `< 2.0`.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.15.0] - 2026-11-18
 
 ### Changed

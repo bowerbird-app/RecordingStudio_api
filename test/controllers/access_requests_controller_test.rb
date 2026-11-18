@@ -280,7 +280,7 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
         duration_ms: 40,
         api_client_id: api_client.id,
         api_credential_id: api_client.credentials.max_by(&:created_at).id,
-        access_recording_id: api_client.access_recording_id,
+        access_recording_id: api_client.access_recording.id,
         root_recording_id: @workspace_root_recording.id
       )
 
@@ -293,7 +293,7 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
         duration_ms: 50,
         api_client_id: nested_api_client.id,
         api_credential_id: nested_api_client.credentials.max_by(&:created_at).id,
-        access_recording_id: nested_api_client.access_recording_id,
+        access_recording_id: nested_api_client.access_recording.id,
         root_recording_id: @workspace_root_recording.id
       )
 
@@ -306,7 +306,7 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
         duration_ms: 55,
         api_client_id: outside_api_client.id,
         api_credential_id: outside_api_client.credentials.max_by(&:created_at).id,
-        access_recording_id: outside_api_client.access_recording_id,
+        access_recording_id: outside_api_client.access_recording.id,
         root_recording_id: outside_root_recording.id
       )
     end
@@ -320,7 +320,7 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
       duration_ms: 45,
       api_client_id: api_client.id,
       api_credential_id: api_client.credentials.max_by(&:created_at).id,
-      access_recording_id: api_client.access_recording_id,
+      access_recording_id: api_client.access_recording.id,
       root_recording_id: @workspace_root_recording.id
     )
 
@@ -942,6 +942,13 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
       token_prefix: "atk",
       expires_at: 1.hour.from_now
     )
+    token_recording = RecordingStudio.record!(
+      action: "created",
+      recordable: access_token,
+      parent_recording: credential.recording,
+      root_recording: credential.recording.root_recording,
+      actor: api_client
+    ).recording
     folder_recording = RecordingStudio::Recording.create!(
       recordable: Folder.create!(name: "Next access point"),
       parent_recording: @workspace_root_recording
@@ -967,13 +974,28 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :created
     assert_select %(pre[data-secret-reveal-target="secret"]), count: 1
-    refute_includes RecordingStudioAccessible.access_grants_for(actor: api_client).pluck(:id), old_access.id
-    refute RecordingStudio::Recording.unscoped.exists?(old_access.id)
+    assert_includes RecordingStudioAccessible.access_grants_for(actor: api_client).pluck(:id), old_access.id
+    assert RecordingStudio::Recording.unscoped.exists?(old_access.id)
+    old_access.reload
+    assert_nil old_access.trashed_at
+    client_recording = RecordingStudio::Recording.unscoped.find_by!(recordable: api_client)
+    credential_recording = RecordingStudio::Recording.unscoped.find_by!(recordable: credential)
+    assert_predicate client_recording.trashed_at, :present?
+    assert client_recording.trash_root
+    assert_equal @user, client_recording.events(actions: "trashed").first.actor
+    assert_predicate credential_recording.trashed_at, :present?
+    refute credential_recording.trash_root
+    assert_predicate token_recording.reload.trashed_at, :present?
+    assert_equal "trashed", client_recording.events(actions: "trashed").first.action
+    assert RecordingStudioApi::ApiClient.exists?(api_client.id)
+    assert RecordingStudioApi::ApiCredential.exists?(credential.id)
+    assert RecordingStudioApi::ApiAccessToken.exists?(access_token.id)
+    assert RecordingStudio::Access.exists?(old_access.recordable_id)
     assert_predicate credential.reload.revoked_at, :present?
     assert_predicate access_token.reload.revoked_at, :present?
     refute_predicate credential, :active_for_authentication?
     refute_predicate access_token, :active_for_authentication?
-    assert_equal old_access.id, api_client.reload.access_recording_id
+    assert_equal old_access.id, RecordingStudio::Recording.unscoped.find_by!(recordable: api_client).parent_recording_id
 
     new_client = RecordingStudioApi::ApiClient.where.not(id: api_client.id).order(:created_at, :id).last
     new_access = new_client.access_recording
@@ -1020,11 +1042,11 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Grant was refused"
     api_client.reload
     assert_equal "Stays put", api_client.name
-    assert_equal old_access.id, api_client.access_recording_id
+    assert_equal old_access.id, api_client.access_recording.id
     assert_equal @workspace_root_recording.id, api_client.access_recording.parent_recording_id
   end
 
-  test "a failed access revoke rolls the move back" do
+  test "a failed access retirement rolls the move back" do
     api_client = create_api_client_for(parent_recording: @workspace_root_recording, name: "Stays when revoke fails", role: :edit)
     old_access = api_client.access_recording
     credential = api_client.credentials.max_by(&:created_at)
@@ -1039,9 +1061,9 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
       parent_recording: @workspace_root_recording
     )
     client_count = RecordingStudioApi::ApiClient.count
-    refusal = RecordingStudioAccessible::Services::BaseService::Result.new(success: false, error: "Revoke was refused")
+    refusal = RecordingStudioAccessible::Services::BaseService::Result.new(success: false, error: "Retirement was refused")
 
-    RecordingStudioAccessible::Services::RevokeRecordingAccess.stub(:call, refusal) do
+    RecordingStudioApi::Services::RetireApiAccess.stub(:call, refusal) do
       patch "/recording_studio_api/api_clients/#{api_client.id}", params: {
         api_client: {
           access_point_recording_id: folder_recording.id,
@@ -1053,10 +1075,10 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :unprocessable_entity
-    assert_includes response.body, "Revoke was refused"
+    assert_includes response.body, "Retirement was refused"
     assert_equal client_count, RecordingStudioApi::ApiClient.count
     assert_equal "Stays when revoke fails", api_client.reload.name
-    assert_equal old_access.id, api_client.access_recording_id
+    assert_equal old_access.id, api_client.access_recording.id
     assert_includes RecordingStudioAccessible.access_grants_for(actor: api_client).pluck(:id), old_access.id
     assert_nil credential.reload.revoked_at
     assert_nil access_token.reload.revoked_at
@@ -1098,7 +1120,7 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "Grant was refused"
     api_client.reload
     assert_equal "Stays after revoke", api_client.name
-    assert_equal old_access.id, api_client.access_recording_id
+    assert_equal old_access.id, api_client.access_recording.id
     assert_equal old_access_snapshot, access_snapshot(old_access.reload)
     assert_nil credential.reload.revoked_at
     assert_nil access_token.reload.revoked_at
@@ -1127,7 +1149,7 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
         duration_ms: 30,
         api_client_id: api_client.id,
         api_credential_id: credential.id,
-        access_recording_id: api_client.access_recording_id,
+        access_recording_id: api_client.access_recording.id,
         root_recording_id: @workspace_root_recording.id
       )
     end
@@ -1416,12 +1438,6 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
       RecordingStudio::Recording.create!(recordable: access, parent_recording: parent_recording)
     end
 
-    RecordingStudioApi::ApiClient.where(id: api_client.id).update_all(
-      access_recording_id: access_recording.id,
-      updated_at: Time.current
-    )
-    api_client.reload
-
     api_client_recording = RecordingStudio::Recording.create!(
       recordable: api_client,
       parent_recording: access_recording
@@ -1429,7 +1445,6 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
 
     api_credential = RecordingStudioApi::ApiCredential.create!(
       api_client: api_client,
-      access_recording: access_recording,
       token_public_id: "pub_#{SecureRandom.hex(8)}",
       token_digest: "digest_#{SecureRandom.hex(16)}",
       token_prefix: "api",

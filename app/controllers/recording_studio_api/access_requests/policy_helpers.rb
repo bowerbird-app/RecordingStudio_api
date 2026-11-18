@@ -31,11 +31,13 @@ module RecordingStudioApi
       end
 
       def visible_api_client_ids
-        @visible_api_client_ids ||= RecordingStudioApi::ApiClient
-                                    .includes(access_recording: [:recordable, { parent_recording: :parent_recording }])
-                                    .where(access_recording_id: visible_api_client_access_recordings.map(&:id))
-                                    .select { |api_client| api_client_management_policy.view?(api_client) }
-                                    .map(&:id)
+        @visible_api_client_ids ||= begin
+          clients = RecordingStudioApi::ApiClient
+                    .under_access_recordings(visible_api_client_access_recordings)
+                    .to_a
+          RecordingStudioApi::ApiClient.preload_recordings(clients)
+          clients.select { |api_client| api_client_management_policy.view?(api_client) }.map(&:id)
+        end
       end
 
       def manageable_root_recordings

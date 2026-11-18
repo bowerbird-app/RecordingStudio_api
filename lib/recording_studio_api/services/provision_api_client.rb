@@ -38,8 +38,6 @@ module RecordingStudioApi
         ApiCredential.transaction do
           api_client = create_api_client!
           client_access_recording = create_client_access_recording!(api_client)
-          api_client.update_columns(access_recording_id: client_access_recording.id, updated_at: Time.current)
-          api_client.association(:access_recording).reset
 
           recording = RecordingStudio.record!(
             action: "created",
@@ -51,7 +49,6 @@ module RecordingStudioApi
 
           credential = ApiCredential.create!(
             api_client: api_client,
-            access_recording: client_access_recording,
             token_public_id: token.fetch(:public_id),
             token_digest: token.fetch(:digest),
             token_prefix: token.fetch(:prefix),

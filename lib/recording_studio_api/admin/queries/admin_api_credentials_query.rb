@@ -71,11 +71,15 @@ module RecordingStudioApi
         attr_reader :api_key
 
         def credentials
-          @credentials ||= RecordingStudioApi::ApiCredential
-                           .includes(api_client: { access_recording: [:recordable, :root_recording] })
-                           .where(api_client_id: RecordingStudioApi::ApiClient.where(api_key: api_key).select(:id))
-                           .reorder(:created_at, :id)
-                           .to_a
+          @credentials ||= begin
+            rows = RecordingStudioApi::ApiCredential
+                   .includes(:api_client)
+                   .where(api_client_id: RecordingStudioApi::ApiClient.where(api_key: api_key).select(:id))
+                   .reorder(:created_at, :id)
+                   .to_a
+            RecordingStudioApi::ApiClient.preload_recordings(rows.map(&:api_client))
+            rows
+          end
         end
 
         def request_count_for(credential)

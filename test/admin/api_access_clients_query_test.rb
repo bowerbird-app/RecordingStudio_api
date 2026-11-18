@@ -197,6 +197,40 @@ class ApiAccessClientsQueryTest < ActiveSupport::TestCase
     assert_includes workspace_scope, @root_recording.id
   end
 
+  test "trashing a folder hides its keys and the scope keeps that folder" do
+    tree = build_folder_access
+    owner = tree.fetch(:owner)
+    root = tree.fetch(:root)
+    folder = tree.fetch(:folder)
+    sibling_key = provisioned_client_id(tree.fetch(:sibling), owner, "Sibling key")
+    folder_key = provisioned_client_id(folder, owner, "Folder key")
+    child_key = provisioned_client_id(tree.fetch(:child), owner, "Child key")
+
+    folder.recording_studio_trashable_trash!(actor: owner)
+
+    from_root = visible_client_ids(actor: owner, root_recording: root, params: { include_children: true })
+
+    assert_includes from_root, sibling_key
+    refute_includes from_root, folder_key
+    refute_includes from_root, child_key
+
+    scoped = RecordingStudioApi::Admin::Queries::ApiAccessClientsQuery.new(
+      Context.new(
+        params: { parent_recording_id: folder.id, include_children: true },
+        current_actor: owner,
+        root_recording: root
+      )
+    )
+    scoped_ids = scoped.send(:scoped_recording_relation).pluck(:id)
+
+    assert_includes scoped_ids, folder.id
+    assert_empty visible_client_ids(
+      actor: owner,
+      root_recording: root,
+      params: { parent_recording_id: folder.id, include_children: true }
+    )
+  end
+
   test "a workspace admin sees every key in the workspace" do
     tree = build_folder_access
     owner = tree.fetch(:owner)

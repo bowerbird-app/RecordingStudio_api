@@ -38,11 +38,12 @@ module RecordingStudioApi
         @can_manage_access_requests = access_management_policy.can_manage_any_recording?
 
         api_clients = RecordingStudioApi::ApiClient
-          .includes(:credentials, access_recording: [:recordable, { parent_recording: :parent_recording }])
-          .where(access_recording_id: visible_access_recording_ids)
+          .includes(:credentials)
+          .under_access_recordings(visible_access_recording_ids)
           .where(id: visible_api_client_ids)
           .reorder(:created_at, :id)
           .to_a
+        RecordingStudioApi::ApiClient.preload_recordings(api_clients)
 
         all_api_access_rows = api_clients.filter_map do |api_client|
           access_recording = api_client.access_recording

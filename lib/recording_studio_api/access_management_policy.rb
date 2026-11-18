@@ -200,11 +200,10 @@ module RecordingStudioApi
     end
 
     def api_client_access_recordings
-      @api_client_access_recordings ||= RecordingStudio::Recording.unscoped
-                                                                  .includes(:recordable)
-                                                                  .where(id: RecordingStudioApi::ApiClient.select(:access_recording_id), recordable_type: "RecordingStudio::Access")
-                                                                  .kept
-                                                                  .to_a
+      @api_client_access_recordings ||= RecordingStudioApi::ApiClient.access_recordings
+                                                                     .includes(:recordable)
+                                                                     .kept
+                                                                     .to_a
     end
   end
 end

@@ -33,7 +33,6 @@ module RecordingStudioApi
 
           credential = ApiCredential.create!(
             api_client: locked_client,
-            access_recording: locked_client.access_recording,
             token_public_id: token.fetch(:public_id),
             token_digest: token.fetch(:digest),
             token_prefix: token.fetch(:prefix),

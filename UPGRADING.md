@@ -1,5 +1,17 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.16.0
+
+Behavior change. One migration. Clients, credentials, and tokens stay recordings.
+
+1. Bump the host gem to `1.16.0`. Stay on Recording Studio `>= 7.7.0`, `< 8.0`, Accessible `>= 0.50.0`, `< 2.0`, and Trashable `>= 1.0.1`, `< 2.0`. Load `recording_studio_trashable`. Retirement calls Trashable.
+2. Run `drop_access_recording_id_from_api_clients_and_credentials`. It drops `access_recording_id` from `recording_studio_api_api_clients` and `recording_studio_api_api_credentials`, and the indexes on those columns. There is no backfill. The parent is already the recording tree. Request logs, access requests, and other tables keep their own `access_recording_id`.
+3. Read a client's access with `api_client.access_recording`. That is the client recording's parent when the parent is an Access grant. `ApiClient#recording` is the recording whose recordable is the client. Read a credential's access with `effective_access_recording`.
+4. A new credential must sit under an Access grant whose actor is that API client. `ProvisionApiClient` grants each Access with `actor: api_client`. One credential with `revoked_at` nil per client is the partial unique index `index_recording_studio_api_credentials_on_active_client`. Together that is one active credential per access. An expired credential still holds the slot until it is revoked.
+5. The unique index of one API client per access recording is gone with the column. Provisioning still creates one grant per client, and the credential check rejects a client that is not the grant's actor.
+6. An admin API keys list that includes children uses `self_and_descendants` and keeps the kept rows. The scoped recording itself is included, even when it is trashed. Trash cascades, so a kept recording under a trashed parent is not a separate filter.
+7. Changing an API key's access point still creates the new client, revokes the old credential and its access tokens, then trashes the old client recording. Trashable cascades that trash to the credential and token recordings, writes the trashed events, and leaves those rows in place. The Access grant stays in kept access lists. `RecordingStudio::Access` is not Trashable in this gem. `RevokeRecordingAccess` destroys the grant, and core refuses that destroy while the client recording exists, including after it is trashed. Removing the grant while keeping that history needs Accessible to make Access trashable. API clients, credentials, and access tokens include Trashable. A host that registers one of those types as an API resource trashes it on `DELETE`. Access does not.
+
 ## Upgrading to 1.15.0
 
 Behavior change. No migration. A role is read on the recording being checked.

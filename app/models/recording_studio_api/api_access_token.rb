@@ -1,8 +1,11 @@
 # frozen_string_literal: true
 
+require "recording_studio_trashable"
+
 module RecordingStudioApi
   class ApiAccessToken < ApplicationRecord
     include RecordingStudio::Recordable
+    include RecordingStudio::Capabilities::Trashable.to
 
     self.table_name = "recording_studio_api_api_access_tokens"
 
@@ -48,6 +51,12 @@ module RecordingStudioApi
 
     def revoke!(time: Time.current)
       update_columns(revoked_at: time, updated_at: time)
+    end
+
+    def reload(*)
+      remove_instance_variable(:@recording) if instance_variable_defined?(:@recording)
+      remove_instance_variable(:@credential_recording) if instance_variable_defined?(:@credential_recording)
+      super
     end
 
     def readonly?

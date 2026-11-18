@@ -61,7 +61,9 @@ module RecordingStudioApi
         end
 
         def rows
-          visible_api_clients.flat_map do |api_client|
+          clients = visible_api_clients.to_a
+          RecordingStudioApi::ApiClient.preload_recordings(clients)
+          clients.flat_map do |api_client|
             access_recording = api_client.access_recording
             next [] if access_recording.nil?
 
@@ -105,12 +107,7 @@ module RecordingStudioApi
 
         def api_credentials
           @api_credentials ||= RecordingStudioApi::ApiCredential
-                               .includes(
-                                 api_client: [
-                                   :credentials,
-                                   { access_recording: [:recordable, :root_recording, { parent_recording: [:recordable, :parent_recording] }] }
-                                 ]
-                               )
+                               .includes(api_client: :credentials)
                                .where(api_client_id: visible_api_clients.select(:id))
                                .reorder(:created_at, :id)
                                .to_a
@@ -118,22 +115,17 @@ module RecordingStudioApi
 
         def visible_api_clients
           @visible_api_clients ||= RecordingStudioApi::ApiClient
-                                   .includes(
-                                     :credentials,
-                                     access_recording: [:recordable, :root_recording, { parent_recording: [:recordable, :parent_recording] }]
-                                   )
-                                   .where(access_recording_id: visible_api_client_access_recordings.select(:id))
+                                   .includes(:credentials)
+                                   .under_access_recordings(visible_api_client_access_recordings)
                                    .where(api_key: RecordingStudioApi::Admin::ApiContext.key_from_context(context))
                                    .reorder(:created_at, :id)
         end
 
         def visible_api_client_access_recordings
           @visible_api_client_access_recordings ||= begin
-            scope = RecordingStudio::Recording.unscoped
-                                              .where(id: RecordingStudioApi::ApiClient.select(:access_recording_id))
-                                              .where(recordable_type: "RecordingStudio::Access")
-                                              .kept
-                                              .where(parent_recording_id: accessible_access_point_recordings.select(:id))
+            scope = RecordingStudioApi::ApiClient.access_recordings
+                                                 .kept
+                                                 .where(parent_recording_id: accessible_access_point_recordings.select(:id))
             scope = scope.where(root_recording_id: scoped_root_recording.id) if scoped_root_recording
             scope = scope.where(root_recording_id: root_recordings_for_type.select(:id)) if root_type_filter.present?
             scope = scope.where(parent_recording_id: scoped_recording_relation.select(:id)) if scoped_recording_relation
@@ -218,29 +210,11 @@ module RecordingStudioApi
           return if scoped_recording.nil?
           return RecordingStudio::Recording.unscoped.where(id: scoped_recording.id) unless include_children?
 
-          RecordingStudio::Recording.unscoped.where(
-            "#{recordings_table}.id IN (#{scoped_recording_ids_sql(scoped_recording)})"
-          )
-        end
-
-        def scoped_recording_ids_sql(scoped_recording)
-          scoped_recording_id = connection.quote(scoped_recording.id)
-
-          <<~SQL.squish
-            WITH RECURSIVE scoped_tree AS (
-              SELECT id
-              FROM #{recordings_table}
-              WHERE id = #{scoped_recording_id}
-
-              UNION
-
-              SELECT child.id
-              FROM #{recordings_table} child
-              INNER JOIN scoped_tree parent ON child.parent_recording_id = parent.id
-              WHERE #{RecordingStudio.kept_sql('child')}
-            )
-            SELECT id FROM scoped_tree
-          SQL
+          # self_and_descendants returns records. kept drops trashed rows.
+          # The seed stays even when it is trashed. Trash cascades, so a kept
+          # recording under a trashed parent is not filtered here.
+          kept_ids = scoped_recording.self_and_descendants.select(&:kept?).map(&:id)
+          RecordingStudio::Recording.unscoped.where(id: kept_ids | [scoped_recording.id])
         end
 
         def include_children?
@@ -256,14 +230,6 @@ module RecordingStudioApi
 
         def root_recordings_for_type
           RecordingStudioApi::Admin::RootRecordings.for_types(root_type_filter)
-        end
-
-        def recordings_table
-          RecordingStudio::Recording.table_name
-        end
-
-        def connection
-          RecordingStudio::Recording.connection
         end
 
         def expires_at_for(credential)

@@ -1,8 +1,11 @@
 # frozen_string_literal: true
 
+require "recording_studio_trashable"
+
 module RecordingStudioApi
   class ApiCredential < ApplicationRecord
     include RecordingStudio::Recordable
+    include RecordingStudio::Capabilities::Trashable.to
 
     self.table_name = "recording_studio_api_api_credentials"
 
@@ -16,10 +19,6 @@ module RecordingStudioApi
     belongs_to :api_client,
                class_name: "RecordingStudioApi::ApiClient",
                inverse_of: :credentials
-    # Legacy compatibility column. Recording topology is authoritative.
-    belongs_to :access_recording,
-               class_name: "RecordingStudio::Recording",
-               inverse_of: false
 
     has_many :access_tokens,
          class_name: "RecordingStudioApi::ApiAccessToken",
@@ -30,7 +29,7 @@ module RecordingStudioApi
     validates :token_public_id, presence: true, uniqueness: true
     validates :token_digest, presence: true, uniqueness: true
     validates :token_prefix, presence: true
-    validate :access_recording_must_match_api_client
+    validate :access_grant_actor_must_be_the_client, on: :create
     validate :recording_topology_must_resolve_access, unless: :new_record?
 
     scope :active, lambda {
@@ -93,6 +92,12 @@ module RecordingStudioApi
       revoke_outstanding_access_tokens!(time: time)
     end
 
+    def reload(*)
+      remove_instance_variable(:@recording) if instance_variable_defined?(:@recording)
+      remove_instance_variable(:@effective_access_recording) if instance_variable_defined?(:@effective_access_recording)
+      super
+    end
+
     # Credentials remain mutable during transition while recordables become authoritative.
     def readonly?
       false
@@ -104,11 +109,17 @@ module RecordingStudioApi
 
     private
 
-    def access_recording_must_match_api_client
-      return if api_client.blank? || effective_access_recording.blank?
-      return if api_client.access_recording_id == effective_access_recording_id
+    # ProvisionApiClient grants the Access with actor: api_client, so one grant
+    # belongs to one client. The partial unique index on api_client_id then
+    # allows one credential with revoked_at nil for that access.
+    def access_grant_actor_must_be_the_client
+      return if api_client.blank?
 
-      errors.add(:access_recording, "must match the api client access recording")
+      access = api_client.recording&.parent_recording
+      grant = access&.recordable
+      return if access&.recordable_type == "RecordingStudio::Access" && grant&.actor == api_client
+
+      errors.add(:base, "must sit under an access grant for this API client")
     end
 
     def recording_topology_must_resolve_access

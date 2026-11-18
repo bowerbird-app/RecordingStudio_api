@@ -1,8 +1,11 @@
 # frozen_string_literal: true
 
+require "recording_studio_trashable"
+
 module RecordingStudioApi
   class ApiClient < ApplicationRecord
     include RecordingStudio::Recordable
+    include RecordingStudio::Capabilities::Trashable.to
 
     self.table_name = "recording_studio_api_api_clients"
 
@@ -13,11 +16,6 @@ module RecordingStudioApi
       allowed_parent_types: ["RecordingStudio::Access"]
     )
 
-    belongs_to :access_recording,
-               class_name: "RecordingStudio::Recording",
-               inverse_of: false,
-               optional: true
-
     belongs_to :owner, polymorphic: true, optional: true
 
     has_many :credentials,
@@ -27,15 +25,64 @@ module RecordingStudioApi
 
     validates :name, presence: true
     validates :api_key, presence: true, inclusion: { in: ->(_) { RecordingStudioApi.configuration.api_names } }
-    validate :access_recording_must_reference_access
     validate :api_key_must_not_change, on: :update
 
+    scope :under_access_recordings, lambda { |access_recordings_or_ids|
+      client_ids = RecordingStudio::Recording.unscoped.where(
+        recordable_type: name,
+        parent_recording_id: access_parent_ids(access_recordings_or_ids)
+      ).select(:recordable_id)
+      where(id: client_ids)
+    }
+
+    def self.access_parent_ids(access_recordings_or_ids)
+      if access_recordings_or_ids.is_a?(ActiveRecord::Relation)
+        access_recordings_or_ids.reselect(:id)
+      else
+        Array(access_recordings_or_ids).filter_map { |record| record.respond_to?(:id) ? record.id : record }
+      end
+    end
+
+    def self.access_recordings
+      parent_ids = RecordingStudio::Recording.unscoped
+                                             .where(recordable_type: name)
+                                             .where.not(parent_recording_id: nil)
+                                             .select(:parent_recording_id)
+      RecordingStudio::Recording.unscoped.where(id: parent_ids, recordable_type: "RecordingStudio::Access")
+    end
+
+    def self.preload_recordings(clients)
+      clients = Array(clients).compact
+      return clients if clients.empty?
+
+      recordings = RecordingStudio::Recording.unscoped
+                                             .includes(
+                                               :root_recording,
+                                               parent_recording: [
+                                                 :recordable,
+                                                 :root_recording,
+                                                 { parent_recording: [:recordable, :parent_recording] }
+                                               ]
+                                             )
+                                             .where(recordable_type: name, recordable_id: clients.map(&:id))
+                                             .to_a
+      by_recordable_id = recordings.index_by { |recording| recording.recordable_id.to_s }
+      clients.each do |client|
+        recording = by_recordable_id[client.id.to_s]
+        client.recording = recording if recording
+      end
+      clients
+    end
+
     def recording
-      @recording ||= RecordingStudio::Recording.unscoped.find_by(
-        recordable_type: self.class.name,
-        recordable_id: id,
-        parent_recording_id: access_recording_id
-      )
+      @recording ||= RecordingStudio::Recording.unscoped.find_by(recordable: self)
+    end
+
+    attr_writer :recording
+
+    def access_recording
+      parent = recording&.parent_recording
+      parent if parent&.recordable_type == "RecordingStudio::Access"
     end
 
     def root_recording
@@ -46,18 +93,16 @@ module RecordingStudioApi
       access_recording&.recordable
     end
 
+    def reload(*)
+      remove_instance_variable(:@recording) if instance_variable_defined?(:@recording)
+      super
+    end
+
     def readonly?
       false
     end
 
     private
-
-    def access_recording_must_reference_access
-      return if access_recording.blank?
-      return if access_recording.recordable_type == "RecordingStudio::Access"
-
-      errors.add(:access_recording, "must point to a RecordingStudio::Access recording")
-    end
 
     def api_key_must_not_change
       errors.add(:api_key, "cannot be changed") if will_save_change_to_api_key?

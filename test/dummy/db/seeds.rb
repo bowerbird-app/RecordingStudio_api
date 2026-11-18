@@ -443,7 +443,7 @@ end
 seeded_client_ids = seeded_api_clients.map { |entry| entry.fetch(:api_client).id }
 
 supplemental_seeded_api_clients = RecordingStudioApi::ApiClient
-  .where(access_recording_id: admin_access_recording.id)
+  .under_access_recordings(admin_access_recording)
   .where.not(id: seeded_client_ids)
   .order(created_at: :asc, id: :asc)
   .map do |api_client|

@@ -33,7 +33,11 @@ class ProvisionApiClientTest < ActiveSupport::TestCase
     refute_equal @access_recording.id, client_access_recording.id
     assert_equal @root_recording.id, client_access_recording.parent_recording_id
     assert_equal payload.fetch(:api_client), client_access_recording.recordable.actor
-    assert_equal client_access_recording.id, payload.fetch(:api_client).access_recording_id
+    assert_equal client_access_recording, payload.fetch(:api_client).access_recording
+    assert_equal client_access_recording, payload.fetch(:api_client).recording.parent_recording
+    assert_equal payload.fetch(:api_client), payload.fetch(:api_client).recording.recordable
+    refute payload.fetch(:api_client).has_attribute?(:access_recording_id)
+    refute payload.fetch(:credential).has_attribute?(:access_recording_id)
     assert_equal client_access_recording.id, payload.fetch(:recording).parent_recording_id
     assert_equal payload.fetch(:api_client).id, payload.fetch(:credential).api_client_id
     assert_equal client_access_recording.id, payload.fetch(:credential).effective_access_recording_id
@@ -238,23 +242,22 @@ class ProvisionApiClientTest < ActiveSupport::TestCase
     end
   end
 
-  test "uses recording topology over legacy access_recording column" do
+  test "finds the client through the recording whose recordable is that client" do
     result = RecordingStudioApi::Services::ProvisionApiClient.call(
       access_recording: @access_recording,
-      name: "Compatibility token"
+      name: "Lookup token"
     )
 
     assert result.success?, result.error
 
-    _other_root, other_access_recording = create_access_recording_for(
-      user: @user,
-      workspace_name: "Other workspace"
-    )
-
+    client = result.value.fetch(:api_client)
+    recording = RecordingStudio::Recording.unscoped.find_by(recordable: client)
     credential = result.value.fetch(:credential)
-    credential.update_column(:access_recording_id, other_access_recording.id)
 
-    assert_equal result.value.fetch(:access_recording).id, credential.reload.effective_access_recording_id
+    assert_equal recording, client.recording
+    assert_equal result.value.fetch(:access_recording), client.access_recording
+    assert_equal result.value.fetch(:access_recording).id, credential.effective_access_recording_id
+    assert_equal recording.id, credential.recording.parent_recording_id
   end
 
   test "a folder admin provisions on that folder and its descendants only" do

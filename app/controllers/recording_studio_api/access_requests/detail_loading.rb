@@ -9,9 +9,10 @@ module RecordingStudioApi
 
       def load_api_access_detail
         @api_client = RecordingStudioApi::ApiClient
-          .includes(:credentials, access_recording: [:recordable, { parent_recording: :parent_recording }])
+          .includes(:credentials)
           .where(id: visible_api_client_ids)
           .find(params[:id])
+        RecordingStudioApi::ApiClient.preload_recordings([@api_client])
 
         @access_recording = @api_client.access_recording
         @root_recording = @access_recording&.root_recording
@@ -112,23 +113,14 @@ module RecordingStudioApi
 
         apply_credential_expiry!(result.value.fetch(:credential), expires_at)
         retire_api_client!(@api_client)
-        remove_access_children!(@access_recording)
-        revoked = RecordingStudioAccessible::Services::RevokeRecordingAccess.call(
-          recording: @access_recording.parent_recording,
+        retired = RecordingStudioApi::Services::RetireApiAccess.call(
           access_recording: @access_recording,
-          manager_actor: current_request_actor
+          actor: current_request_actor
         )
-        return revoked.error.to_s if revoked.failure?
+        return retired.error.to_s if retired.failure?
 
         @replacement_payload = result.value
         nil
-      end
-
-      def remove_access_children!(access_recording)
-        RecordingStudio::Recording.unscoped.where(parent_recording_id: access_recording.id).find_each do |child|
-          remove_access_children!(child)
-          child.destroy!
-        end
       end
 
       def change_access_role!(role)
