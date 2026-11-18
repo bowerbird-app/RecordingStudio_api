@@ -39,6 +39,10 @@ module RecordingStudioApi
       render_error(code: "invalid_input", message: error.message, status: :unprocessable_entity, details: error.validation_details)
     end
 
+    rescue_from RecordingStudioApi::IdempotencyKeyMismatchError do |error|
+      render_error(code: error.code, message: error.message, status: :unprocessable_entity)
+    end
+
     rescue_from RecordingStudioApi::InvalidPaginationTokenError do |error|
       render_error(code: "invalid_pagination_token", message: error.message, status: :unprocessable_entity)
     end

@@ -35,6 +35,24 @@ class IdempotencyTest < ActiveSupport::TestCase
     end
   end
 
+  test "a capability replay fingerprint is enforced by IdempotencyStore" do
+    RecordingStudioApi::IdempotencyStore.stub(:redis, nil) do
+      replay(input: { "name" => "A" }) { { json: { "id" => "rec-1" }, status: :created } }
+      storage_key = JSON.generate(%w[mint rec-1 same])
+      stored = RecordingStudioApi::IdempotencyStore.fetch(api: "public", client_id: "client-1", key: storage_key)
+      fingerprint = stored.fetch("fingerprint")
+
+      assert_equal "rec-1", RecordingStudioApi::IdempotencyStore.fetch(
+        api: "public", client_id: "client-1", key: storage_key, fingerprint: fingerprint
+      ).dig("json", "id")
+      assert_raises(RecordingStudioApi::IdempotencyKeyMismatchError) do
+        RecordingStudioApi::IdempotencyStore.fetch(
+          api: "public", client_id: "client-1", key: storage_key, fingerprint: "other"
+        )
+      end
+    end
+  end
+
   test "replay refuses the same key when the input changes" do
     calls = 0
 
@@ -43,7 +61,7 @@ class IdempotencyTest < ActiveSupport::TestCase
         calls += 1
         { json: { "id" => "rec-1" }, status: :created }
       end
-      error = assert_raises(RecordingStudioApi::InvalidActionInputError) do
+      error = assert_raises(RecordingStudioApi::IdempotencyKeyMismatchError) do
         replay(input: { "name" => "B" }) do
           calls += 1
           { json: { "id" => "rec-2" }, status: :created }
@@ -51,7 +69,8 @@ class IdempotencyTest < ActiveSupport::TestCase
       end
 
       assert_equal 1, calls
-      assert_equal "Idempotency-Key was already used with different input", error.message
+      assert_equal "idempotency_key_reused", error.code
+      assert_equal "Idempotency key already used with different parameters", error.message
     end
   end
 

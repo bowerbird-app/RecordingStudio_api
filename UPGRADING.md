@@ -1,5 +1,17 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.19.0
+
+Built-in create now compares a request fingerprint. No migration. Stay on Recording Studio `>= 7.7.0`, `< 8.0`.
+
+1. Bump the host gem to `1.19.0`.
+2. A built-in create that repeats an `Idempotency-Key` with the same HTTP method, path, and body still returns the stored response for 24 hours.
+3. A repeat with a different body returns 422 and does not create a record. The body is `{ "error": { "code": "idempotency_key_reused", "message": "Idempotency key already used with different parameters" } }`.
+4. Create entries stored before this version have no fingerprint. They still replay until they expire, including when the new request body differs.
+5. `Idempotency.replay` passes its digest to `IdempotencyStore.fetch`. A `creates: true` action that reused a key with different input now raises `RecordingStudioApi::IdempotencyKeyMismatchError` (`idempotency_key_reused`) instead of `invalid_input`.
+6. Other gems call `RecordingStudioApi::IdempotencyStore.fetch` and `write` with `fingerprint:`. Compute a request digest with `IdempotencyStore.fingerprint(method:, path:, params:)`, or pass `fingerprint:` to `Idempotency.replay`. A mismatch raises `IdempotencyKeyMismatchError`. Rescue that class and pass `code` and `message` through. Omit `fingerprint:` to keep the previous replay behavior.
+7. Keys stay isolated per API and client. A `register_resource_handler` for `create` still replays without comparing the body.
+
 ## Upgrading to 1.18.0
 
 Additive for existing actions. No migration. An action that does not pass `creates: true` ignores `Idempotency-Key`. Plain create still returns the first stored response when a retry sends a different body.

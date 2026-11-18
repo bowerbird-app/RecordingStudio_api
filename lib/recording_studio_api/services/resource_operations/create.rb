@@ -20,6 +20,7 @@ module RecordingStudioApi
             api: api_key,
             client_id: idempotency_client_id,
             key: key,
+            fingerprint: request_fingerprint,
             &block
           )
         end
@@ -39,6 +40,19 @@ module RecordingStudioApi
             json: serialize_recording(created_recording, context: relationship_context_for([created_recording])),
             status: :created
           }
+        end
+
+        def request_fingerprint
+          RecordingStudioApi::IdempotencyStore.fingerprint(
+            method: "POST",
+            path: fingerprint_path,
+            params: request_payload
+          )
+        end
+
+        def fingerprint_path
+          parent = context.parent_recording
+          parent ? "#{resource_name}/#{parent.id}" : resource_name.to_s
         end
 
         def record_child!(recordable_class, parent_recording)

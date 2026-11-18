@@ -53,6 +53,66 @@ class ResourceOperationsNilApiClientTest < ActiveSupport::TestCase
     assert_equal "recording_studio_api:idempotency:public:#{actor_scope_key}:#{Digest::SHA256.hexdigest(key)}", cache_key
   end
 
+  test "create with the same idempotency key and a different body raises and stores nothing new" do
+    key = "folder-mismatch-#{SecureRandom.hex(8)}"
+
+    RecordingStudioApi::IdempotencyStore.stub(:redis, nil) do
+      assert_difference("Folder.count", 1) do
+        RecordingStudioApi::Services::ResourceOperations::Create.call(
+          resource_context(
+            recordable_type: "Folder",
+            resource_name: "folders",
+            idempotency_key: key,
+            attributes: { "name" => "Original", "parent_id" => @root_recording.id },
+            parent_recording: @root_recording
+          )
+        )
+      end
+
+      assert_no_difference("Folder.count") do
+        error = assert_raises(RecordingStudioApi::IdempotencyKeyMismatchError) do
+          RecordingStudioApi::Services::ResourceOperations::Create.call(
+            resource_context(
+              recordable_type: "Folder",
+              resource_name: "folders",
+              idempotency_key: key,
+              attributes: { "name" => "Changed", "parent_id" => @root_recording.id },
+              parent_recording: @root_recording
+            )
+          )
+        end
+        assert_equal "idempotency_key_reused", error.code
+        assert_equal "Idempotency key already used with different parameters", error.message
+      end
+    end
+
+    assert_equal 0, Folder.where(name: "Changed").count
+  end
+
+  test "a legacy idempotency entry without a fingerprint replays a different body" do
+    key = "folder-legacy-#{SecureRandom.hex(8)}"
+    cache_key = RecordingStudioApi::IdempotencyStore.redis_key(api: "public", client_id: actor_scope_key, key: key)
+    stored = { "id" => "legacy-recording", "name" => "Stored before fingerprints" }
+    Rails.cache.write(cache_key, JSON.generate("json" => stored, "status" => "created"))
+
+    RecordingStudioApi::IdempotencyStore.stub(:redis, nil) do
+      assert_no_difference("Folder.count") do
+        @replay = RecordingStudioApi::Services::ResourceOperations::Create.call(
+          resource_context(
+            recordable_type: "Folder",
+            resource_name: "folders",
+            idempotency_key: key,
+            attributes: { "name" => "Different body", "parent_id" => @root_recording.id },
+            parent_recording: @root_recording
+          )
+        )
+      end
+    end
+
+    assert_equal :created, @replay.fetch(:status)
+    assert_equal stored, stringify(@replay.fetch(:json))
+  end
+
   test "index with no api client succeeds and paginates" do
     pages = Array.new(3) { |index| create_page_recording(root_recording: @root_recording, page_title: "Listed page #{index}") }
     now = Time.current

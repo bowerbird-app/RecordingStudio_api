@@ -26,6 +26,20 @@ module RecordingStudioApi
 
   class ConfigurationError < Error; end
   class InvalidPaginationTokenError < Error; end
+
+  class IdempotencyKeyMismatchError < Error
+    CODE = "idempotency_key_reused"
+    DEFAULT_MESSAGE = "Idempotency key already used with different parameters"
+
+    def initialize(message = DEFAULT_MESSAGE)
+      super
+    end
+
+    def code
+      CODE
+    end
+  end
+
   class NotFoundError < Error; end
   class UnsupportedActionError < Error; end
 

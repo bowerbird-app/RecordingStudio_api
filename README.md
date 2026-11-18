@@ -255,10 +255,25 @@ read or write logs one warning and does not repeat it in the process:
 [RecordingStudioApi] idempotency keys are not durable. Redis is unavailable (Redis client is missing) and Rails.cache is ActiveSupport::Cache::MemoryStore, which is process-local and keeps keys in this process only.
 ```
 
-A reachable Redis client does not log that warning. Replay is unchanged.
+A reachable Redis client does not log that warning.
 `NullStore` still cannot replay. A shared cache fallback does not log the warning.
-A later create with the same `Idempotency-Key` from the same API client
-returns that stored JSON for 24 hours, including when the second body differs.
+A later built-in create with the same `Idempotency-Key` from the same API client
+returns that stored JSON for 24 hours when the fingerprint matches.
+The fingerprint is `IdempotencyStore.fingerprint(method:, path:, params:)`.
+It is the SHA256 of the HTTP method, the path or resource type, and the
+request body. Hash keys are sorted at every level. Header values are not
+included. The same key with a different fingerprint raises
+`RecordingStudioApi::IdempotencyKeyMismatchError` (`code` is
+`idempotency_key_reused`, `message` is
+"Idempotency key already used with different parameters").
+Built-in HTTP create renders that as 422
+`{ "error": { "code": "idempotency_key_reused", "message": "Idempotency key already used with different parameters" } }`
+and does not create a record. Rescue the same error in another gem and pass
+`code` and `message` through.
+`fetch` and `write` take an optional `fingerprint:`. Omit it and fetch
+replays whatever is stored. Pass it, and a stored fingerprint that differs
+raises. A stored entry with no fingerprint, including create entries written before
+1.19.0, still replays for the rest of its 24 hours.
 The stored key is
 `{namespace}:idempotency:{api}:{api_client.id}:{digest}`. Index cursors use
 the same client id as `client:{api_client.id}` inside the pagination token.
@@ -272,16 +287,20 @@ sharing a cursor scope. `null_store` cannot replay.
 
 `RecordingStudioApi::Idempotency.replay` is the shared entry point for that
 store. `RecordingStudioApi::Idempotency.client_id` builds the client id above.
-Plain create calls `replay` without `input`, so a different body still returns
-the first response. A `register_resource_handler` for `create`, including a
-nested create, uses that same call.
+Built-in create calls `replay` with `fingerprint:` from
+`IdempotencyStore.fingerprint`. A different body raises
+`IdempotencyKeyMismatchError` and creates nothing. A `register_resource_handler`
+for `create`, including a nested create, calls `replay` without `input` or
+`fingerprint`, so a different body still returns the first response.
 
 A member action does not replay unless `register_capability_action` or the
 member `register_resource_handler` passes `creates: true`. Either flag is
 enough. The header is read on both member paths and copied to
 `ActionContext#idempotency_key`. The store key adds the action name and the
-target recording id. The same key and the same input return the first
-successful JSON and status. The same key with different input returns 422.
+target recording id. `replay` hashes `input` and passes that digest to
+`IdempotencyStore.fetch`. The same key and the same input return the first
+successful JSON and status. The same key with different input raises
+`IdempotencyKeyMismatchError` (422 `idempotency_key_reused`).
 OpenAPI lists `Idempotency-Key` on flagged actions only.
 
 MCP should call `replay` for an action instead of `IdempotencyStore` directly.
@@ -1642,3 +1661,5 @@ with Draft off to load a new pack. See
 ## Documentation
 
 The original gem template documentation is preserved in this repository under `docs/gem_template/` as architectural reference material. Those files are for contributors reviewing the repo, not packaged gem docs; the README and dummy app are now the source of truth for the Recording Studio API design handoff.
+
+Idempotency key reuse is described in [docs/idempotency.md](docs/idempotency.md).
