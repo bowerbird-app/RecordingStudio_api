@@ -210,32 +210,11 @@ module RecordingStudioApi
           return if scoped_recording.nil?
           return RecordingStudio::Recording.unscoped.where(id: scoped_recording.id) unless include_children?
 
-          RecordingStudio::Recording.unscoped.where(id: lineage_ids_stopping_at_trash(scoped_recording))
-        end
-
-        # self_and_descendants includes a kept grandchild under a trashed child.
-        # Recording.kept.within does too. This walk does not. The seed stays, even when it is trashed.
-        def lineage_ids_stopping_at_trash(scoped_recording)
-          nodes = scoped_recording.self_and_descendants
-          children_by_parent = nodes.group_by(&:parent_recording_id)
-          ids = []
-          seen = {}
-          frontier = [scoped_recording]
-
-          until frontier.empty?
-            parent = frontier.shift
-            next if seen[parent.id]
-
-            seen[parent.id] = true
-            ids << parent.id
-            Array(children_by_parent[parent.id]).each do |child|
-              next unless child.kept?
-
-              frontier << child
-            end
-          end
-
-          ids
+          # self_and_descendants returns records. kept drops trashed rows.
+          # The seed stays even when it is trashed. Trash cascades, so a kept
+          # recording under a trashed parent is not filtered here.
+          kept_ids = scoped_recording.self_and_descendants.select(&:kept?).map(&:id)
+          RecordingStudio::Recording.unscoped.where(id: kept_ids | [scoped_recording.id])
         end
 
         def include_children?

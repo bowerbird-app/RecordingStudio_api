@@ -47,10 +47,12 @@ creates one through the same write path.
 
 API client role edits call `RecordingStudioAccessible::Services::UpdateRecordingAccess`.
 Moving the access point creates a new client with `ProvisionApiClient` under a
-new Access grant on the selected recording, then revokes the old Access grant
-and the old client's credentials and access tokens in the same transaction.
-A refused provision or revoke leaves the previous client, its tokens, and its
-Access unchanged. The edit form still uses Save changes. The response shows the new
+new Access grant on the selected recording, then revokes the old client's
+credentials and access tokens and trashes the old client recording in that
+same transaction. The trash cascades to the credential and token recordings.
+The old Access grant stays, because Accessible cannot destroy it while the
+client recording is still a child. A refused provision or retirement leaves
+the previous client, its tokens, and its Access unchanged. The edit form still uses Save changes. The response shows the new
 secret once. The client name and credential expiry are columns on this gem's
 tables.
 
@@ -558,7 +560,7 @@ Each action declares its verb, capability mapping, handler, and serializer so ad
 - the built-in resource and move handlers already perform their own grant checks
 - `AccessGrant#accessible_recordings` is the owner's live `authorized_recordings`, rooted at the grant anchor. Callers pass the recording scope (a list passes its type and filters). Pagination applies the keyset, order, and limit on that relation. A root anchor uses `Recording.within`. A nested anchor does not walk the subtree into an id list before the limit. `authorize!` uses the lower of the grant role and `RecordingStudioAccessible.role_for` on that recording. `role_for` walks the recording and its ancestors. A trashed recording uses that same call, which is how Trashable authorizes restore and purge. `include_trashed: true` puts the trashed recording in scope. It does not move the role check to the parent. If the owner loses access, the token loses it on the next request. A key with no owner sees nothing. Trashed recordings stay out of the default scope. A kept recording under a trashed ancestor stays visible when the owner can still view it. `accessible_recording_ids` returns those ids when a caller asks for the list.
 - `ApiClient` is the API credential principal for audit metadata, while the `RecordingStudio::Access` actor remains the Recording Studio authorization actor
-- each access recording owns at most one active API credential record
+- each access recording belongs to one API client, because the grant's actor is that client, and that client has at most one credential with `revoked_at` nil
 - raw secrets should only be revealed at creation or rotation time
 
 `ApiClient` is an immutable Recording Studio recordable. It is recorded as a child of a `RecordingStudio::Access` recording, while mutable credential and issued-token state lives in `ApiCredential` and `ApiAccessToken` with digest, rotation, revocation, and last-used tracking.

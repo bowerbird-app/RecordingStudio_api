@@ -18,7 +18,7 @@ class RetireApiAccessTest < ActiveSupport::TestCase
     Current.actor = nil if defined?(Current)
   end
 
-  test "trashing the grant keeps the subtree and writes trashed events" do
+  test "trashing keeps the subtree rows and writes trashed events" do
     payload = provision_api_client_for(access_recording: @access_recording, name: "Retiring key")
     client = payload.fetch(:api_client)
     credential = payload.fetch(:credential)
@@ -41,14 +41,14 @@ class RetireApiAccessTest < ActiveSupport::TestCase
 
     assert result.success?, result.error
     access.reload
-    assert_predicate access.trashed_at, :present?
-    assert access.trash_root
-    assert_equal @user, access.events(actions: "trashed").first.actor
+    assert_nil access.trashed_at
     client_recording = RecordingStudio::Recording.unscoped.find_by!(recordable: client)
     credential_recording = RecordingStudio::Recording.unscoped.find_by!(recordable: credential)
     assert_predicate client_recording.trashed_at, :present?
-    refute client_recording.trash_root
+    assert client_recording.trash_root
+    assert_equal @user, client_recording.events(actions: "trashed").first.actor
     assert_predicate credential_recording.trashed_at, :present?
+    refute credential_recording.trash_root
     assert_predicate token_recording.reload.trashed_at, :present?
     assert_equal "trashed", client_recording.events(actions: "trashed").first.action
     assert RecordingStudioApi::ApiClient.exists?(client.id)
@@ -56,10 +56,20 @@ class RetireApiAccessTest < ActiveSupport::TestCase
     assert RecordingStudioApi::ApiAccessToken.exists?(token.id)
     assert RecordingStudio::Access.exists?(access.recordable_id)
     assert_nil credential.reload.revoked_at
-    refute_includes RecordingStudioAccessible.access_grants_for(actor: client).pluck(:id), access.id
+    assert_includes RecordingStudioAccessible.access_grants_for(actor: client).pluck(:id), access.id
+
+    revoked = RecordingStudioAccessible.revoke_access(
+      recording: access.parent_recording,
+      access_recording: access,
+      manager_actor: @user
+    )
+
+    assert revoked.failure?
+    assert_nil access.reload.trashed_at
+    assert RecordingStudio::Recording.unscoped.exists?(access.id)
   end
 
-  test "refuses to trash the grant that is the last admin" do
+  test "leaves the last admin grant in place" do
     client = RecordingStudioApi::ApiClient.create!(name: "Only admin #{SecureRandom.hex(4)}")
     root = RecordingStudio::Recording.create!(recordable: Workspace.create!(name: "Last admin #{SecureRandom.hex(4)}"))
     bootstrap = RecordingStudioAccessible.bootstrap_owner_access!(recording: root, actor: client)
@@ -76,8 +86,9 @@ class RetireApiAccessTest < ActiveSupport::TestCase
 
     result = RecordingStudioApi::Services::RetireApiAccess.call(access_recording: access, actor: client)
 
-    assert result.failure?
+    assert result.success?, result.error
     assert_nil access.reload.trashed_at
+    assert_predicate RecordingStudio::Recording.unscoped.find_by!(recordable: client).trashed_at, :present?
     assert_includes RecordingStudioAccessible.access_grants_for(actor: client).pluck(:id), access.id
   end
 end

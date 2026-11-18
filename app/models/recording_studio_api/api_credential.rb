@@ -29,7 +29,7 @@ module RecordingStudioApi
     validates :token_public_id, presence: true, uniqueness: true
     validates :token_digest, presence: true, uniqueness: true
     validates :token_prefix, presence: true
-    validate :one_active_credential_per_access, on: :create
+    validate :access_grant_actor_must_be_the_client, on: :create
     validate :recording_topology_must_resolve_access, unless: :new_record?
 
     scope :active, lambda {
@@ -109,34 +109,17 @@ module RecordingStudioApi
 
     private
 
-    # The credential row is inserted before its recording exists, so the access
-    # grant is the API client's parent. Locking that grant keeps two creates
-    # from both seeing an empty slot. A revoked credential does not hold the slot.
-    # An expired credential does, until it is revoked.
-    def one_active_credential_per_access
-      return if revoked_at.present?
+    # ProvisionApiClient grants the Access with actor: api_client, so one grant
+    # belongs to one client. The partial unique index on api_client_id then
+    # allows one credential with revoked_at nil for that access.
+    def access_grant_actor_must_be_the_client
       return if api_client.blank?
 
       access = api_client.recording&.parent_recording
-      unless access&.recordable_type == "RecordingStudio::Access"
-        errors.add(:base, "must sit under an API client on an access grant")
-        return
-      end
+      grant = access&.recordable
+      return if access&.recordable_type == "RecordingStudio::Access" && grant&.actor == api_client
 
-      locked = RecordingStudio::Recording.lock_ids!([access.id]).load
-      if locked.empty?
-        errors.add(:base, "must sit under an API client on an access grant")
-        return
-      end
-
-      sibling_client_ids = RecordingStudio::Recording.unscoped
-                                                     .where(recordable_type: "RecordingStudioApi::ApiClient", parent_recording_id: access.id)
-                                                     .select(:recordable_id)
-      conflict = self.class.where(revoked_at: nil, api_client_id: sibling_client_ids)
-      conflict = conflict.where.not(id: id) if id.present?
-      return unless conflict.exists?
-
-      errors.add(:base, "already has an active credential")
+      errors.add(:base, "must sit under an access grant for this API client")
     end
 
     def recording_topology_must_resolve_access

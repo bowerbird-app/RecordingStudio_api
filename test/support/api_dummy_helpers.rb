@@ -81,7 +81,6 @@ module ApiDummyHelpers # rubocop:disable Metrics/ModuleLength
     RecordingStudio.enable_capability(:api_access_point, on: "AdminRoot") if defined?(AdminRoot)
     RecordingStudio.enable_capability(:movable, on: "Folder")
     RecordingStudio.enable_capability(:trashable, on: "Folder")
-    RecordingStudio.enable_capability(:trashable, on: "RecordingStudio::Access")
     RecordingStudio.enable_capability(:trashable, on: "RecordingStudioApi::ApiClient")
     RecordingStudio.enable_capability(:trashable, on: "RecordingStudioApi::ApiCredential")
     RecordingStudio.enable_capability(:trashable, on: "RecordingStudioApi::ApiAccessToken")

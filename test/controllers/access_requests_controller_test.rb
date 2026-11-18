@@ -974,18 +974,17 @@ class AccessRequestsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :created
     assert_select %(pre[data-secret-reveal-target="secret"]), count: 1
-    refute_includes RecordingStudioAccessible.access_grants_for(actor: api_client).pluck(:id), old_access.id
+    assert_includes RecordingStudioAccessible.access_grants_for(actor: api_client).pluck(:id), old_access.id
     assert RecordingStudio::Recording.unscoped.exists?(old_access.id)
     old_access.reload
-    assert_predicate old_access.trashed_at, :present?
-    assert old_access.trash_root
-    assert_equal "trashed", old_access.events(actions: "trashed").first.action
-    assert_equal @user, old_access.events(actions: "trashed").first.actor
+    assert_nil old_access.trashed_at
     client_recording = RecordingStudio::Recording.unscoped.find_by!(recordable: api_client)
     credential_recording = RecordingStudio::Recording.unscoped.find_by!(recordable: credential)
     assert_predicate client_recording.trashed_at, :present?
-    refute client_recording.trash_root
+    assert client_recording.trash_root
+    assert_equal @user, client_recording.events(actions: "trashed").first.actor
     assert_predicate credential_recording.trashed_at, :present?
+    refute credential_recording.trash_root
     assert_predicate token_recording.reload.trashed_at, :present?
     assert_equal "trashed", client_recording.events(actions: "trashed").first.action
     assert RecordingStudioApi::ApiClient.exists?(api_client.id)
