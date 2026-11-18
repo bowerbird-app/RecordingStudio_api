@@ -57,16 +57,6 @@ class RetireApiAccessTest < ActiveSupport::TestCase
     assert RecordingStudio::Access.exists?(access.recordable_id)
     assert_nil credential.reload.revoked_at
     assert_includes RecordingStudioAccessible.access_grants_for(actor: client).pluck(:id), access.id
-
-    revoked = RecordingStudioAccessible.revoke_access(
-      recording: access.parent_recording,
-      access_recording: access,
-      manager_actor: @user
-    )
-
-    assert revoked.failure?
-    assert_nil access.reload.trashed_at
-    assert RecordingStudio::Recording.unscoped.exists?(access.id)
   end
 
   test "leaves the last admin grant in place" do

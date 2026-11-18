@@ -6,11 +6,9 @@ module RecordingStudioApi
     # This trashes the client recording. Trashable cascades to the credential
     # and token recordings, writes trashed events, and leaves the rows.
     #
-    # The Access grant stays. RecordingStudio::Access is Accessible's model
-    # and is not Trashable here. RevokeRecordingAccess destroys the grant, and
-    # core refuses that destroy while the client recording is still a child,
-    # including after it is trashed. When no child remains, the grant is
-    # removed through Accessible.
+    # The Access grant stays kept. RecordingStudio::Access is Accessible's
+    # model and is not Trashable here, and the trashed client recording is
+    # still a child, so the grant cannot be destroyed.
     class RetireApiAccess < RecordingStudio::Services::BaseService
       def initialize(access_recording:, actor:)
         @access_recording = access_recording
@@ -33,7 +31,6 @@ module RecordingStudioApi
           actor: actor,
           metadata: { source: "recording_studio_api", reason: "api_client_retired" }
         )
-        remove_grant_when_childless
 
         success(access_recording)
       rescue ArgumentError => e
@@ -48,19 +45,6 @@ module RecordingStudioApi
           recordable: client,
           parent_recording_id: access_recording.id
         )
-      end
-
-      def remove_grant_when_childless
-        return if access_recording.child_recordings.exists?
-
-        revoked = RecordingStudioAccessible.revoke_access(
-          recording: access_recording.parent_recording,
-          access_recording: access_recording,
-          manager_actor: actor
-        )
-        return if revoked.success?
-
-        raise ArgumentError, revoked.error.to_s
       end
 
       def service_args
