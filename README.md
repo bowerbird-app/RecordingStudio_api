@@ -556,7 +556,7 @@ Each action declares its verb, capability mapping, handler, and serializer so ad
 - `RecordingStudioApi::AccessGrant` carries `api_client`, `credential`, `access_recording`, `root_recording`, and the access actor into handlers
 - capability handlers own authorization and should call `context.access_grant.authorize!` or `RecordingStudioAccessible.authorized?` before doing work
 - the built-in resource and move handlers already perform their own grant checks
-- `AccessGrant#accessible_recordings` is the owner's live `authorized_recordings`, rooted at the grant anchor. Callers pass the recording scope (a list passes its type and filters). Pagination applies the keyset, order, and limit on that relation. A root anchor uses `Recording.within`. A nested anchor does not walk the subtree into an id list before the limit. `authorize!` uses the lower of the grant role and the owner's role on that recording. If the owner loses access, the token loses it on the next request. A key with no owner sees nothing. Trashed recordings stay out unless the caller passes `include_trashed: true`. A kept recording under a trashed ancestor stays visible when the owner can still view it. `accessible_recording_ids` returns those ids when a caller asks for the list.
+- `AccessGrant#accessible_recordings` is the owner's live `authorized_recordings`, rooted at the grant anchor. Callers pass the recording scope (a list passes its type and filters). Pagination applies the keyset, order, and limit on that relation. A root anchor uses `Recording.within`. A nested anchor does not walk the subtree into an id list before the limit. `authorize!` uses the lower of the grant role and `RecordingStudioAccessible.role_for` on that recording. `role_for` walks the recording and its ancestors. A trashed recording uses that same call, which is how Trashable authorizes restore and purge. `include_trashed: true` puts the trashed recording in scope. It does not move the role check to the parent. If the owner loses access, the token loses it on the next request. A key with no owner sees nothing. Trashed recordings stay out of the default scope. A kept recording under a trashed ancestor stays visible when the owner can still view it. `accessible_recording_ids` returns those ids when a caller asks for the list.
 - `ApiClient` is the API credential principal for audit metadata, while the `RecordingStudio::Access` actor remains the Recording Studio authorization actor
 - each access recording owns at most one active API credential record
 - raw secrets should only be revealed at creation or rotation time
@@ -1125,6 +1125,8 @@ Defaults:
 This means users with view-level access can inspect API access in the UI, but only admin-level access can mutate API access.
 
 `AccessManagementPolicy#can_view_recording?` and `#can_manage_recording?` ask Recording Studio Accessible about that recording. A grant on a folder covers that folder and its descendants. It does not cover a sibling folder or the workspace root. Lists of recordings someone can manage use `authorized_recordings` and `authorized_recording_ids` for the edit role. `root_recordings_for` only finds the workspaces to ask about.
+
+`maximum_assignable_role_for` is `RecordingStudioAccessible.role_for` for that actor and recording. `can_assign_role?` is an early check for forms and provisioning: the actor can manage the recording, and Accessible's role ceiling allows the role. `GrantRecordingAccess` and `UpdateRecordingAccess` enforce that ceiling when the grant is written.
 
 Example overrides:
 

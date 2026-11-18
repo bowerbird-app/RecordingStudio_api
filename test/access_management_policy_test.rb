@@ -47,10 +47,81 @@ class AccessManagementPolicyTest < ActiveSupport::TestCase
     policy = RecordingStudioApi::AccessManagementPolicy.new(actor: user)
 
     assert_equal :edit, policy.maximum_assignable_role_for(root_recording)
+    assert_equal :edit, RecordingStudioAccessible.role_for(actor: user, recording: root_recording)
     assert policy.can_assign_role?(root_recording, :view)
     assert policy.can_assign_role?(root_recording, :edit)
     refute policy.can_assign_role?(root_recording, :admin)
     refute policy.can_assign_role?(root_recording, :owner)
+  end
+
+  test "a viewer cannot assign above the role they hold" do
+    user = create_user(email: "policy-ceiling-view@example.com")
+    root_recording, = create_access_recording_for(user: user, role: :view)
+    RecordingStudioApi.configuration.access_management_edit_role = :view
+
+    policy = RecordingStudioApi::AccessManagementPolicy.new(actor: user)
+
+    assert policy.can_manage_recording?(root_recording)
+    assert_equal :view, policy.maximum_assignable_role_for(root_recording)
+    assert policy.can_assign_role?(root_recording, :view)
+    refute policy.can_assign_role?(root_recording, :edit)
+    refute policy.can_assign_role?(root_recording, :admin)
+  end
+
+  test "an inherited role several levels up is the assignable ceiling" do
+    tree = build_folder_access
+    grandchild = nested_folder_recording("Grandchild", tree.fetch(:child))
+    great_grandchild = nested_folder_recording("Great grandchild", grandchild)
+    folder_policy = RecordingStudioApi::AccessManagementPolicy.new(actor: tree.fetch(:folder_admin))
+
+    assert_equal :admin, RecordingStudioAccessible.role_for(actor: tree.fetch(:folder_admin), recording: great_grandchild)
+    assert_equal :admin, folder_policy.maximum_assignable_role_for(great_grandchild)
+    assert folder_policy.can_assign_role?(great_grandchild, :admin)
+    refute folder_policy.can_assign_role?(great_grandchild, :owner)
+    assert_equal :view, folder_policy.maximum_assignable_role_for(tree.fetch(:root))
+    refute folder_policy.can_assign_role?(tree.fetch(:root), :view)
+
+    editor = create_user(email: "policy-deep-edit-#{SecureRandom.hex(4)}@example.com")
+    grant_or_bootstrap_access!(recording: tree.fetch(:root), actor: editor, role: :edit)
+    RecordingStudioApi.configuration.access_management_edit_role = :edit
+    editor_policy = RecordingStudioApi::AccessManagementPolicy.new(actor: editor)
+
+    assert_equal :edit, editor_policy.maximum_assignable_role_for(great_grandchild)
+    assert editor_policy.can_assign_role?(great_grandchild, :edit)
+    refute editor_policy.can_assign_role?(great_grandchild, :admin)
+  end
+
+  test "a trashed descendant keeps the inherited assignable role" do
+    user = create_user(email: "policy-trashed-assign@example.com")
+    root_recording, = create_access_recording_for(user: user, role: :edit)
+    folder = nested_folder_recording("Trashed parent", root_recording)
+    page = nested_folder_recording("Trashed page", folder)
+    page.update_column(:trashed_at, Time.current)
+    page.reload
+    RecordingStudioApi.configuration.access_management_edit_role = :edit
+
+    policy = RecordingStudioApi::AccessManagementPolicy.new(actor: user)
+
+    assert_equal false, page.kept?
+    assert_equal :edit, RecordingStudioAccessible.role_for(actor: user, recording: page)
+    assert_equal :edit, policy.maximum_assignable_role_for(page)
+    assert policy.can_assign_role?(page, :view)
+    assert policy.can_assign_role?(page, :edit)
+    refute policy.can_assign_role?(page, :admin)
+  end
+
+  test "missing actor access cannot assign a role" do
+    root_recording, = create_access_recording_for(user: create_user, role: :admin)
+    stranger = create_user(email: "policy-stranger-#{SecureRandom.hex(4)}@example.com")
+    stranger_policy = RecordingStudioApi::AccessManagementPolicy.new(actor: stranger)
+    blank_policy = RecordingStudioApi::AccessManagementPolicy.new(actor: nil)
+
+    assert_nil stranger_policy.maximum_assignable_role_for(root_recording)
+    refute stranger_policy.can_assign_role?(root_recording, :view)
+    assert_nil blank_policy.maximum_assignable_role_for(root_recording)
+    refute blank_policy.can_assign_role?(root_recording, :view)
+    assert_nil stranger_policy.maximum_assignable_role_for(nil)
+    refute stranger_policy.can_assign_role?(nil, :admin)
   end
 
   test "descendant access recording visibility follows RecordingStudioAccessible authorization" do
