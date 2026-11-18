@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_17_200004) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_18_010026) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -156,20 +156,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_17_200004) do
   end
 
   create_table "recording_studio_api_api_clients", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.uuid "access_recording_id"
     t.string "api_key", default: "public", null: false
     t.datetime "created_at", null: false
     t.string "name", null: false
     t.datetime "updated_at", null: false
     t.string "owner_type"
     t.uuid "owner_id"
-    t.index ["access_recording_id"], name: "index_recording_studio_api_api_clients_on_access_recording_id", unique: true
     t.index ["api_key"], name: "index_recording_studio_api_api_clients_on_api_key"
     t.index ["owner_type", "owner_id"], name: "index_rs_api_clients_on_owner"
   end
 
   create_table "recording_studio_api_api_credentials", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.uuid "access_recording_id", null: false
     t.uuid "api_client_id", null: false
     t.datetime "created_at", null: false
     t.datetime "expires_at"
@@ -179,7 +176,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_17_200004) do
     t.string "token_prefix", null: false
     t.string "token_public_id", null: false
     t.datetime "updated_at", null: false
-    t.index ["access_recording_id"], name: "idx_on_access_recording_id_103368144f"
     t.index ["api_client_id"], name: "index_recording_studio_api_api_credentials_on_api_client_id"
     t.index ["api_client_id"], name: "index_recording_studio_api_credentials_on_active_client", unique: true, where: "(revoked_at IS NULL)"
     t.index ["token_digest"], name: "index_recording_studio_api_api_credentials_on_token_digest", unique: true

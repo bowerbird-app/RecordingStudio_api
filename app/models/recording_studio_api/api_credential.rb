@@ -1,8 +1,11 @@
 # frozen_string_literal: true
 
+require "recording_studio_trashable"
+
 module RecordingStudioApi
   class ApiCredential < ApplicationRecord
     include RecordingStudio::Recordable
+    include RecordingStudio::Capabilities::Trashable.to
 
     self.table_name = "recording_studio_api_api_credentials"
 
@@ -16,10 +19,6 @@ module RecordingStudioApi
     belongs_to :api_client,
                class_name: "RecordingStudioApi::ApiClient",
                inverse_of: :credentials
-    # Legacy compatibility column. Recording topology is authoritative.
-    belongs_to :access_recording,
-               class_name: "RecordingStudio::Recording",
-               inverse_of: false
 
     has_many :access_tokens,
          class_name: "RecordingStudioApi::ApiAccessToken",
@@ -30,7 +29,7 @@ module RecordingStudioApi
     validates :token_public_id, presence: true, uniqueness: true
     validates :token_digest, presence: true, uniqueness: true
     validates :token_prefix, presence: true
-    validate :access_recording_must_match_api_client
+    validate :one_active_credential_per_access, on: :create
     validate :recording_topology_must_resolve_access, unless: :new_record?
 
     scope :active, lambda {
@@ -40,7 +39,9 @@ module RecordingStudioApi
     }
 
     def recording
-      @recording ||= RecordingStudio::Recording.unscoped.find_by(
+      return @recording if defined?(@recording)
+
+      @recording = RecordingStudio::Recording.unscoped.find_by(
         recordable_type: self.class.name,
         recordable_id: id,
         parent_recording_id: api_client&.recording&.id
@@ -48,7 +49,9 @@ module RecordingStudioApi
     end
 
     def effective_access_recording
-      @effective_access_recording ||= begin
+      return @effective_access_recording if defined?(@effective_access_recording)
+
+      @effective_access_recording = begin
         parent_recording = recording&.parent_recording
         parent_access = parent_recording&.parent_recording
         parent_access if parent_access&.recordable_type == "RecordingStudio::Access"
@@ -93,6 +96,12 @@ module RecordingStudioApi
       revoke_outstanding_access_tokens!(time: time)
     end
 
+    def reload(*)
+      remove_instance_variable(:@recording) if instance_variable_defined?(:@recording)
+      remove_instance_variable(:@effective_access_recording) if instance_variable_defined?(:@effective_access_recording)
+      super
+    end
+
     # Credentials remain mutable during transition while recordables become authoritative.
     def readonly?
       false
@@ -104,11 +113,34 @@ module RecordingStudioApi
 
     private
 
-    def access_recording_must_match_api_client
-      return if api_client.blank? || effective_access_recording.blank?
-      return if api_client.access_recording_id == effective_access_recording_id
+    # The credential row is inserted before its recording exists, so the access
+    # grant is the API client's parent. Locking that grant keeps two creates
+    # from both seeing an empty slot. A revoked credential does not hold the slot.
+    # An expired credential does, until it is revoked.
+    def one_active_credential_per_access
+      return if revoked_at.present?
+      return if api_client.blank?
 
-      errors.add(:access_recording, "must match the api client access recording")
+      access = api_client.recording&.parent_recording
+      unless access&.recordable_type == "RecordingStudio::Access"
+        errors.add(:base, "must sit under an API client on an access grant")
+        return
+      end
+
+      locked = RecordingStudio::Recording.lock_ids!([access.id]).load
+      if locked.empty?
+        errors.add(:base, "must sit under an API client on an access grant")
+        return
+      end
+
+      sibling_client_ids = RecordingStudio::Recording.unscoped
+                                                     .where(recordable_type: "RecordingStudioApi::ApiClient", parent_recording_id: access.id)
+                                                     .select(:recordable_id)
+      conflict = self.class.where(revoked_at: nil, api_client_id: sibling_client_ids)
+      conflict = conflict.where.not(id: id) if id.present?
+      return unless conflict.exists?
+
+      errors.add(:base, "already has an active credential")
     end
 
     def recording_topology_must_resolve_access

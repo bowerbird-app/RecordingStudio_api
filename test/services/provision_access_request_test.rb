@@ -34,7 +34,7 @@ class ProvisionAccessRequestTest < ActiveSupport::TestCase
     assert_equal @root_recording.id, payload.fetch(:access_recording).root_recording_id
     assert_equal @root_recording.id, payload.fetch(:access_recording).parent_recording_id
     assert_equal "RecordingStudio::Access", payload.fetch(:access_recording).recordable_type
-    assert_equal payload.fetch(:access_recording).id, payload.fetch(:api_client).access_recording_id
+    assert_equal payload.fetch(:access_recording), payload.fetch(:api_client).access_recording
     assert_equal payload.fetch(:api_client).recording.id, payload.fetch(:credential).recording.parent_recording_id
     assert_not_empty payload.fetch(:token)
   end

@@ -57,7 +57,7 @@ class ApiAuthorizationTest < ActiveSupport::TestCase
       access = RecordingStudio::Access.create!(actor: client, role: :admin)
       RecordingStudio::Recording.create!(recordable: access, parent_recording: @root_recording)
     end
-    client.update_columns(access_recording_id: access_recording.id, updated_at: Time.current)
+    RecordingStudio::Recording.create!(recordable: client, parent_recording: access_recording)
 
     assert_no_writes do
       policy = RecordingStudioApi::ApiClientManagementPolicy.new(actor: @actor)

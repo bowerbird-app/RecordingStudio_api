@@ -117,10 +117,12 @@ module RecordingStudioApi
       RecordingStudio::RecordableDeclarations.install_active_record_macro! if defined?(RecordingStudio::RecordableDeclarations)
       RecordingStudioApi::Engine.load_recordable_models!
       RecordingStudioApi::Engine.register_recordable_types!
+      RecordingStudioApi::Engine.enable_access_trashable!
 
       config.to_prepare do
         RecordingStudioApi.prepare_recordable_registries_for_reload!
         RecordingStudioApi::Engine.register_recordable_types!
+        RecordingStudioApi::Engine.enable_access_trashable!
         RecordingStudio::DelegatedTypeRegistrar.apply! if defined?(RecordingStudio::DelegatedTypeRegistrar)
       end
     end
@@ -224,6 +226,17 @@ module RecordingStudioApi
       end
 
       register_recordable_type_names!(recordable_type_names_to_register)
+    end
+
+    def self.enable_access_trashable!
+      access = "RecordingStudio::Access".safe_constantize
+      return if access.nil?
+      return if access.instance_variable_get(:@recording_studio_api_trashable)
+
+      access.class_eval do
+        include RecordingStudio::Capabilities::Trashable.to
+      end
+      access.instance_variable_set(:@recording_studio_api_trashable, true)
     end
 
     def self.load_recordable_models!

@@ -197,6 +197,32 @@ class ApiAccessClientsQueryTest < ActiveSupport::TestCase
     assert_includes workspace_scope, @root_recording.id
   end
 
+  test "a kept key under a trashed ancestor stays hidden" do
+    tree = build_folder_access
+    owner = tree.fetch(:owner)
+    root = tree.fetch(:root)
+    kept_key = provisioned_client_id(tree.fetch(:folder), owner, "Kept folder key")
+    kept_child_key = provisioned_client_id(tree.fetch(:child), owner, "Kept child key")
+    hidden_child = nested_folder_recording("Under the trashed folder", tree.fetch(:sibling))
+    hidden_key = provisioned_client_id(hidden_child, owner, "Hidden grandchild key")
+    tree.fetch(:sibling).update!(trashed_at: Time.current)
+
+    from_root = visible_client_ids(actor: owner, root_recording: root, params: { include_children: true })
+
+    assert_includes from_root, kept_key
+    assert_includes from_root, kept_child_key
+    refute_includes from_root, hidden_key
+
+    from_trashed_seed = visible_client_ids(
+      actor: owner,
+      root_recording: root,
+      params: { parent_recording_id: tree.fetch(:sibling).id, include_children: true }
+    )
+
+    assert_includes from_trashed_seed, hidden_key
+    refute_includes from_trashed_seed, kept_key
+  end
+
   test "a workspace admin sees every key in the workspace" do
     tree = build_folder_access
     owner = tree.fetch(:owner)
