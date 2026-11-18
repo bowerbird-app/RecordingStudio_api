@@ -1,5 +1,33 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.18.0
+
+Additive for existing actions. No migration. An action that does not pass `creates: true` ignores `Idempotency-Key`. Plain create still returns the first stored response when a retry sends a different body.
+
+1. Bump the host gem to `1.18.0`. Stay on Recording Studio `>= 7.7.0`, `< 8.0`.
+2. Pass `creates: true` on a capability action that creates a record. Pass it on `register_resource_handler` when that handler is the member action. The member path replays when either registration sets the flag.
+3. Send `Idempotency-Key`. The same key and the same input return the first successful JSON and status for 24 hours. The same key with different input returns 422 `invalid_input`. A new key runs the action again.
+4. A `register_resource_handler` for `create`, including a nested create, now replays that header. The handler runs once. The retry returns the stored JSON. The body is not compared, matching plain create.
+5. MCP should call `RecordingStudioApi::Idempotency.replay` for an action. `client_id` comes from `RecordingStudioApi::Idempotency.client_id`. Pass `action`, `recording_id`, and `input`. The block returns `{ json:, status: }`. Omit `input` only when a different body should still replay the first response. Omit `action` and `recording_id` only for the plain create key.
+
+```ruby
+RecordingStudioApi.register_capability_action(
+  :attach,
+  capability: :attachable,
+  creates: true,
+  handler: AttachFile
+)
+
+RecordingStudioApi::Idempotency.replay(
+  api: context.api_key,
+  client_id: RecordingStudioApi::Idempotency.client_id(api_client: context.api_client, actor: context.actor),
+  key: context.idempotency_key,
+  action: "attach",
+  recording_id: context.recording&.id,
+  input: context.params
+) { { json: payload, status: :created } }
+```
+
 ## Upgrading to 1.17.1
 
 Dependency pins only. No migration in this gem. Behavior of this gem is unchanged.

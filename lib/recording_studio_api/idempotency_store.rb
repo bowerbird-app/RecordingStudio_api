@@ -21,12 +21,14 @@ module RecordingStudioApi
         nil
       end
 
-      def write(api:, client_id:, key:, payload:, status:, ttl: DEFAULT_TTL_SECONDS)
+      def write(api:, client_id:, key:, payload:, status:, ttl: DEFAULT_TTL_SECONDS, fingerprint: nil)
         return if key.blank? || client_id.blank?
 
+        body = { "json" => payload, "status" => status }
+        body["fingerprint"] = fingerprint if fingerprint
         write_raw(
           storage_key(api: api, client_id: client_id, key: key),
-          JSON.generate("json" => payload, "status" => status),
+          JSON.generate(body),
           ttl.to_i
         )
       end

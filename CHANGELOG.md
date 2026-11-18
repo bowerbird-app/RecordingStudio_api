@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Development and dummy Gemfiles pin `recording_studio_admin` to GitHub tag `v2.19.1`.
 
+## [1.18.0] - 2026-11-18
+
+### Added
+- `register_capability_action` and `register_resource_handler` accept `creates: true`. A flagged member action reads `Idempotency-Key`. The same key and the same input return the first response and the same record. A new key runs the action again. The same key with different input returns 422.
+- `RecordingStudioApi::Idempotency.replay` is the shared replay entry point. `RecordingStudioApi::Idempotency.client_id` is the client id used in the store key. Pass `action`, `recording_id`, and `input` when replaying an action. Omit `input` for plain create, which still returns the first response when the body differs.
+- Flagged actions list the `Idempotency-Key` header in the documentation catalog and OpenAPI.
+
+### Changed
+- A registered resource handler for `create` replays `Idempotency-Key` through `Idempotency.replay`. That includes a nested create handler.
+
+### Upgrade notes
+- Bump to `1.18.0`. No migration. Stay on Recording Studio `>= 7.7.0`, `< 8.0`.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.17.1] - 2026-11-18
 
 ### Changed

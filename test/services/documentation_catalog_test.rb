@@ -746,6 +746,34 @@ module RecordingStudioApi
         RecordingStudioApi.instance_variable_set(:@configuration, original_configuration) if original_configuration
       end
 
+      def test_creates_actions_list_the_idempotency_key_header
+        original_configuration = RecordingStudioApi.configuration
+        api_singleton = RecordingStudioApi.singleton_class
+        original_recordable_types = RecordingStudioApi.method(:api_recordable_types)
+
+        RecordingStudioApi.instance_variable_set(:@configuration, RecordingStudioApi::Configuration.new)
+        RecordingStudioApi.register_capability_action(:mint, capability: :echoable, creates: true, handler: ->(_context) { :ok })
+        RecordingStudioApi.register_capability_action(:shout, capability: :echoable, handler: ->(_context) { :ok })
+        RecordingStudioApi.register_recordable_type_api("Page")
+        api_singleton.send(:define_method, :api_recordable_types) { %w[Page] }
+
+        RecordingStudio.stub(:capability_enabled?, ->(capability, **) { capability == :echoable }) do
+          catalog = DocumentationCatalog.call
+          mint = action_endpoint_for(catalog, "pages", "mint")
+          shout = action_endpoint_for(catalog, "pages", "shout")
+          mint_names = mint.fetch(:openapi).fetch(:parameters).map { |parameter| parameter.fetch(:name) }
+          shout_names = shout.fetch(:openapi).fetch(:parameters).map { |parameter| parameter.fetch(:name) }
+
+          assert_includes mint_names, "Idempotency-Key"
+          assert_includes mint.fetch(:description), "`Idempotency-Key`"
+          refute_includes shout_names, "Idempotency-Key"
+          refute_includes shout.fetch(:description), "Idempotency-Key"
+        end
+      ensure
+        api_singleton.send(:define_method, :api_recordable_types, original_recordable_types) if api_singleton && original_recordable_types
+        RecordingStudioApi.instance_variable_set(:@configuration, original_configuration) if original_configuration
+      end
+
       def test_catalog_applies_per_type_capability_action_openapi
         original_configuration = RecordingStudioApi.configuration
         api_singleton = RecordingStudioApi.singleton_class

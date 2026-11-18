@@ -11,7 +11,8 @@ module RecordingStudioApi
     :params,
     :progress_reporter,
     :id,
-    :recordable_type
+    :recordable_type,
+    :idempotency_key
   ) do
     include ProgressReporting
     include AuthorizedBy::Context
@@ -26,7 +27,8 @@ module RecordingStudioApi
       params:,
       progress_reporter: nil,
       id: nil,
-      recordable_type: nil
+      recordable_type: nil,
+      idempotency_key: nil
     )
       super
     end

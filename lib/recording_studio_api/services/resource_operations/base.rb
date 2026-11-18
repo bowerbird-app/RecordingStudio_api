@@ -62,10 +62,7 @@ module RecordingStudioApi
         # An in-process grant with only an actor uses `actor:<Type>:<id>`
         # for both the idempotency client slot and the pagination scope.
         def idempotency_client_id
-          client = api_client
-          return client.id if client
-
-          actor_scope_key
+          RecordingStudioApi::Idempotency.client_id(api_client: api_client, actor: access_grant.actor)
         end
 
         def pagination_scope_key

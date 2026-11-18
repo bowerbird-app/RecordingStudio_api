@@ -25,22 +25,56 @@ module RecordingStudioApi
           recordable_type = resolve_recordable_type!
           handler = RecordingStudioApi.resource_handler(recordable_type, action.name, api: current_api_key)
           if handler
-            registration = RecordingStudioApi.resource_handler_registration(recordable_type, action.name, api: current_api_key)
-            handler_context = member_handler_context(action, recordable_type, registration)
-            result = run_authorized_handler { handler.call(handler_context) }
-            return if performed?
-
-            render json: result.fetch(:json), status: result.fetch(:status, :ok)
+            render_member_handler(action, recordable_type, handler)
           else
-            context = capability_action_context(action)
-            result = run_authorized_handler { action.handler.call(context) }
-            return if performed?
-
-            render json: serialize_result(action, result)
+            render_capability_action(action)
           end
         end
 
         private
+
+        def render_member_handler(action, recordable_type, handler)
+          registration = RecordingStudioApi.resource_handler_registration(recordable_type, action.name, api: current_api_key)
+          context = member_handler_context(action, recordable_type, registration)
+          result = replay_creating_action(action, context, creates: registration.creates? || action.creates?) do
+            run_authorized_handler { handler.call(context) }
+          end
+          return if performed?
+
+          render json: result.fetch(:json), status: result.fetch(:status, :ok)
+        end
+
+        def render_capability_action(action)
+          context = capability_action_context(action)
+          result = replay_creating_action(action, context, creates: action.creates?) do
+            raw = run_authorized_handler { action.handler.call(context) }
+            next if performed?
+
+            { json: serialize_result(action, raw), status: :ok }
+          end
+          return if performed?
+
+          render json: result.fetch(:json), status: result.fetch(:status, :ok)
+        end
+
+        def replay_creating_action(action, context, creates:, &block)
+          key = context.idempotency_key
+          return block.call unless creates && key.present?
+
+          RecordingStudioApi::Idempotency.replay(
+            api: context.api_key,
+            client_id: RecordingStudioApi::Idempotency.client_id(api_client: context.api_client, actor: context.actor),
+            key: key,
+            action: action.name,
+            recording_id: context.recording&.id || context.id,
+            input: context.params,
+            &block
+          )
+        end
+
+        def idempotency_key_header
+          request.headers["Idempotency-Key"].presence
+        end
 
         def resolve_action_definition!
           action = RecordingStudioApi.capability_action(params[:action_name], version: current_api_version, api: current_api_key)
@@ -101,7 +135,8 @@ module RecordingStudioApi
             root_recording: current_root_recording,
             params: action_params(action, ignored_keys: ROUTE_PARAM_KEYS),
             id: params[:id],
-            recordable_type: recordable_type
+            recordable_type: recordable_type,
+            idempotency_key: idempotency_key_header
           )
         end
 
@@ -114,7 +149,8 @@ module RecordingStudioApi
             access_grant: current_access_grant,
             root_recording: current_root_recording,
             params: action_params(action, ignored_keys: ignored_keys),
-            id: params[:id]
+            id: params[:id],
+            idempotency_key: idempotency_key_header
           )
         end
 

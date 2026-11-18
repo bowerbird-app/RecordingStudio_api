@@ -1079,6 +1079,56 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "a registered create handler replays the same Idempotency-Key and stores a new record for a new key" do
+    calls = []
+    RecordingStudioApi.register_resource_handler("Page", :create, handler: lambda { |context|
+      page = Page.create!(title: context.params[:title].to_s)
+      recording = RecordingStudio::Recording.create!(recordable: page, parent_recording: @root_recording)
+      calls << recording.id
+      { json: { id: recording.id, title: page.title }, status: :created }
+    })
+    previous_cache = Rails.cache
+    Rails.cache = ActiveSupport::Cache::MemoryStore.new
+    key = "page-handler-#{SecureRandom.hex(4)}"
+    headers = authorization_headers.merge("Idempotency-Key" => key)
+
+    begin
+      RecordingStudioApi::IdempotencyStore.stub(:redis, nil) do
+        assert_difference("Page.count", 1) do
+          post "/recording_studio_api/api/v1/pages", params: {
+            parent_id: @root_recording.id,
+            title: "Handler page"
+          }, headers: headers
+        end
+        assert_response :created
+        first_id = JSON.parse(response.body).fetch("id")
+
+        assert_no_difference("Page.count") do
+          post "/recording_studio_api/api/v1/pages", params: {
+            parent_id: @root_recording.id,
+            title: "Handler page"
+          }, headers: headers
+        end
+        assert_response :created
+        assert_equal first_id, JSON.parse(response.body).fetch("id")
+        assert_equal "Handler page", JSON.parse(response.body).fetch("title")
+        assert_equal [first_id], calls
+
+        assert_difference("Page.count", 1) do
+          post "/recording_studio_api/api/v1/pages", params: {
+            parent_id: @root_recording.id,
+            title: "Second handler page"
+          }, headers: authorization_headers.merge("Idempotency-Key" => "#{key}-new")
+        end
+        assert_response :created
+        refute_equal first_id, JSON.parse(response.body).fetch("id")
+        assert_equal 2, calls.length
+      end
+    ensure
+      Rails.cache = previous_cache
+    end
+  end
+
   test "ignores update attributes for unregistered page resources" do
     page_recording = create_page_recording(root_recording: @root_recording)
     original_title = page_recording.recordable.title

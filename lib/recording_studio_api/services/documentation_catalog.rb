@@ -580,16 +580,20 @@ module RecordingStudioApi
           .map do |action|
             action_openapi = action_openapi_for(action, recordable_type)
 
+            description = action_openapi.fetch(:description, "Execute the #{action.name} action.")
+            openapi = merge_hashes(default_action_openapi(resource_name, recordable_type, action), action_openapi)
+            description, openapi = apply_creates_idempotency(action, description, openapi)
+
             {
               verb: action.http_verb.to_s.upcase,
               path: "#{api_root_path}/#{resource_name}/:id/actions/#{action.name}",
               action: "member_actions#create",
               summary: action_openapi.fetch(:summary, action.name.humanize),
-              description: action_openapi.fetch(:description, "Execute the #{action.name} action."),
+              description: description,
               action_name: action.capability.to_s,
               capability: action.capability.to_s,
               scope: action.scope.to_s,
-              openapi: merge_hashes(default_action_openapi(resource_name, recordable_type, action), action_openapi)
+              openapi: openapi
             }
           end
       end
@@ -991,17 +995,38 @@ module RecordingStudioApi
         registration.filterable_attributes
       end
 
-      def idempotency_key_parameter
+      def idempotency_key_parameter(description: nil)
         {
           name: "Idempotency-Key",
           in: "header",
           required: false,
-          description: "Optional client-supplied key. Identical create requests from the same API client reuse the first successful response for 24 hours. Redis stores the key when it is reachable. Rails.cache is used when Redis is missing or errors. A process-local cache logs one warning because those keys stay in the current process.",
+          description: description || "Optional client-supplied key. Identical create requests from the same API client reuse the first successful response for 24 hours. Redis stores the key when it is reachable. Rails.cache is used when Redis is missing or errors. A process-local cache logs one warning because those keys stay in the current process.",
           schema: {
             type: "string",
             maxLength: 255
           }
         }
+      end
+
+      def apply_creates_idempotency(action, description, openapi)
+        return [description, openapi] unless action.respond_to?(:creates?) && action.creates?
+
+        note = "Send an `Idempotency-Key` header to reuse the first successful response for 24 hours. The same key with different input is refused."
+        described = description.to_s.include?("Idempotency-Key") ? description : "#{description} #{note}"
+        [described, append_idempotency_parameter(openapi)]
+      end
+
+      def append_idempotency_parameter(openapi)
+        parameters = Array(openapi[:parameters])
+        return openapi if parameters.any? { |parameter| (parameter[:name] || parameter["name"]).to_s == "Idempotency-Key" }
+
+        openapi.merge(
+          parameters: parameters + [
+            idempotency_key_parameter(
+              description: "Optional key for this action. The same key and the same input return the first successful response for 24 hours. The same key with different input is refused."
+            )
+          ]
+        )
       end
 
       def resource_item_responses(recordable_type, relationship_examples: {})

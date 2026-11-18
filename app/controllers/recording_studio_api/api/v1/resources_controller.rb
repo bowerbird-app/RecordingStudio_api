@@ -71,7 +71,8 @@ module RecordingStudioApi
             registration = RecordingStudioApi.resource_handler_registration(recordable_type, operation_name, api: current_api_key)
             render_registered_resource_handler!(
               handler,
-              registered_resource_context(operation_name, recordable_type, registration)
+              registered_resource_context(operation_name, recordable_type, registration),
+              operation_name: operation_name
             )
             return
           end
@@ -83,11 +84,28 @@ module RecordingStudioApi
           render json: result.fetch(:json), status: result.fetch(:status, :ok)
         end
 
-        def render_registered_resource_handler!(handler, context)
-          result = run_authorized_handler { handler.call(context) }
+        def render_registered_resource_handler!(handler, context, operation_name: nil)
+          result = call_registered_handler(context, operation_name) do
+            run_authorized_handler { handler.call(context) }
+          end
           return if performed?
 
           render json: result.fetch(:json), status: result.fetch(:status, :ok)
+        end
+
+        def call_registered_handler(context, operation_name, &block)
+          key = context.idempotency_key
+          return block.call unless operation_name&.to_sym == :create && key.present?
+
+          RecordingStudioApi::Idempotency.replay(
+            api: context.api_key,
+            client_id: RecordingStudioApi::Idempotency.client_id(
+              api_client: context.api_client,
+              actor: context.access_grant&.actor
+            ),
+            key: key,
+            &block
+          )
         end
 
         def registered_resource_context(operation_name, recordable_type, registration)

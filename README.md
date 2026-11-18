@@ -258,7 +258,8 @@ read or write logs one warning and does not repeat it in the process:
 A reachable Redis client does not log that warning. Replay is unchanged.
 `NullStore` still cannot replay. A shared cache fallback does not log the warning.
 A later create with the same `Idempotency-Key` from the same API client
-returns that stored JSON for 24 hours. The stored key is
+returns that stored JSON for 24 hours, including when the second body differs.
+The stored key is
 `{namespace}:idempotency:{api}:{api_client.id}:{digest}`. Index cursors use
 the same client id as `client:{api_client.id}` inside the pagination token.
 An in-process grant with an actor and no API client (MCP tools running for
@@ -267,8 +268,36 @@ storage is `{namespace}:idempotency:{api}:actor:{ActorType}:{actor id}:{digest}`
 The pagination scope is `actor:{ActorType}:{actor id}`. Actor type is the
 record's polymorphic name. A request with neither an API client nor an actor
 raises `AuthorizationError` instead of skipping the idempotency store or
-sharing a cursor scope. `null_store` cannot replay. A
-`register_resource_handler` for `create` does not use this store.
+sharing a cursor scope. `null_store` cannot replay.
+
+`RecordingStudioApi::Idempotency.replay` is the shared entry point for that
+store. `RecordingStudioApi::Idempotency.client_id` builds the client id above.
+Plain create calls `replay` without `input`, so a different body still returns
+the first response. A `register_resource_handler` for `create`, including a
+nested create, uses that same call.
+
+A member action does not replay unless `register_capability_action` or the
+member `register_resource_handler` passes `creates: true`. Either flag is
+enough. The header is read on both member paths and copied to
+`ActionContext#idempotency_key`. The store key adds the action name and the
+target recording id. The same key and the same input return the first
+successful JSON and status. The same key with different input returns 422.
+OpenAPI lists `Idempotency-Key` on flagged actions only.
+
+MCP should call `replay` for an action instead of `IdempotencyStore` directly.
+Pass `action`, `recording_id`, and `input`. The block returns
+`{ json:, status: }`. A blank key runs the block and stores nothing.
+
+```ruby
+RecordingStudioApi::Idempotency.replay(
+  api: context.api_key,
+  client_id: RecordingStudioApi::Idempotency.client_id(api_client: context.api_client, actor: context.actor),
+  key: context.idempotency_key,
+  action: "attach",
+  recording_id: context.recording&.id,
+  input: context.params
+) { { json: payload, status: :created } }
+```
 
 Read and write rate limits use this same Redis. See [Rate limits](#rate-limits).
 

@@ -35,6 +35,7 @@ require "recording_studio_api/token"
 require "recording_studio_api/oauth_access_token"
 require "recording_studio_api/oauth_error_mapper"
 require "recording_studio_api/idempotency_store"
+require "recording_studio_api/idempotency"
 require "recording_studio_api/rate_limit"
 require "recording_studio_api/rate_limit/process_window"
 require "recording_studio_api/openapi_helpers"
@@ -199,7 +200,7 @@ module RecordingStudioApi
       end || []
     end
 
-    def register_resource_handler(recordable_type, action, api: :public, handler:, include_trashed: false, owns_scoping: false, trashed_semantics: nil)
+    def register_resource_handler(recordable_type, action, api: :public, handler:, include_trashed: false, owns_scoping: false, trashed_semantics: nil, creates: false)
       configuration.api(api).resource_handler_registry.register(
         recordable_type,
         action,
@@ -207,6 +208,7 @@ module RecordingStudioApi
         include_trashed: include_trashed,
         owns_scoping: owns_scoping,
         trashed_semantics: trashed_semantics,
+        creates: creates,
         api: api
       )
     end

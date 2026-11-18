@@ -489,10 +489,191 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
     assert_response :forbidden
   end
 
+  test "a creates action replays one record for the same key and stores another record for a new key" do
+    register_mint_action(creates: true)
+    folder = @page_recording.parent_recording
+    other_folder = RecordingStudio::Recording.create!(
+      recordable: Folder.create!(name: "Other mint parent"),
+      parent_recording: @root_recording
+    )
+    key = "mint-#{SecureRandom.hex(4)}"
+
+    with_idempotency_cache do
+      assert_difference("Folder.count", 1) do
+        post mint_path(folder), params: { name: "First mint" }, headers: idempotency_headers(key)
+      end
+      assert_response :success
+      first = JSON.parse(response.body)
+      assert_equal "First mint", first.fetch("name")
+      assert_equal [key], @mint_keys
+
+      assert_no_difference("Folder.count") do
+        post mint_path(folder), params: { name: "First mint" }, headers: idempotency_headers(key)
+      end
+      assert_response :success
+      second = JSON.parse(response.body)
+      assert_equal first.fetch("id"), second.fetch("id")
+      assert_equal "First mint", second.fetch("name")
+      assert_equal [key], @mint_keys
+
+      assert_difference("Folder.count", 1) do
+        post mint_path(folder), params: { name: "Second mint" }, headers: idempotency_headers("#{key}-new")
+      end
+      assert_response :success
+      third = JSON.parse(response.body)
+      refute_equal first.fetch("id"), third.fetch("id")
+      assert_equal "Second mint", third.fetch("name")
+
+      assert_difference("Folder.count", 1) do
+        post mint_path(other_folder), params: { name: "First mint" }, headers: idempotency_headers(key)
+      end
+      assert_response :success
+      refute_equal first.fetch("id"), JSON.parse(response.body).fetch("id")
+    end
+  end
+
+  test "a creates action refuses the same Idempotency-Key when the input changes" do
+    register_mint_action(creates: true)
+    folder = @page_recording.parent_recording
+    key = "mint-mismatch-#{SecureRandom.hex(4)}"
+
+    with_idempotency_cache do
+      post mint_path(folder), params: { name: "Kept mint" }, headers: idempotency_headers(key)
+      assert_response :success
+      kept_id = JSON.parse(response.body).fetch("id")
+
+      assert_no_difference("Folder.count") do
+        post mint_path(folder), params: { name: "Changed mint" }, headers: idempotency_headers(key)
+      end
+      assert_response :unprocessable_entity
+      payload = JSON.parse(response.body)
+      assert_equal "invalid_input", payload.dig("error", "code")
+      assert_equal "Idempotency-Key was already used with different input", payload.dig("error", "message")
+      assert_equal kept_id, RecordingStudio::Recording.find(kept_id).id
+      assert_equal 1, @mint_keys.length
+    end
+  end
+
+  test "an action without creates runs again for the same Idempotency-Key" do
+    register_mint_action(creates: false)
+    folder = @page_recording.parent_recording
+    key = "mint-open-#{SecureRandom.hex(4)}"
+
+    with_idempotency_cache do
+      assert_difference("Folder.count", 2) do
+        post mint_path(folder), params: { name: "Open mint" }, headers: idempotency_headers(key)
+        assert_response :success
+        first_id = JSON.parse(response.body).fetch("id")
+
+        post mint_path(folder), params: { name: "Open mint again" }, headers: idempotency_headers(key)
+        assert_response :success
+        refute_equal first_id, JSON.parse(response.body).fetch("id")
+      end
+      assert_equal [key, key], @mint_keys
+    end
+  end
+
+  test "a member resource handler with creates replays the Idempotency-Key" do
+    register_mint_handler(creates: true)
+    folder = @page_recording.parent_recording
+    key = "mint-handler-#{SecureRandom.hex(4)}"
+
+    with_idempotency_cache do
+      assert_difference("Folder.count", 1) do
+        post mint_path(folder), params: { name: "Handler mint" }, headers: idempotency_headers(key)
+      end
+      assert_response :created
+      first_id = JSON.parse(response.body).fetch("id")
+
+      assert_no_difference("Folder.count") do
+        post mint_path(folder), params: { name: "Handler mint" }, headers: idempotency_headers(key)
+      end
+      assert_response :created
+      assert_equal first_id, JSON.parse(response.body).fetch("id")
+      assert_equal "Handler mint", JSON.parse(response.body).fetch("name")
+      assert_equal [key], @mint_keys
+    end
+  end
+
+  test "a member resource handler without creates runs again for the same Idempotency-Key" do
+    register_mint_handler(creates: false)
+    folder = @page_recording.parent_recording
+    key = "mint-handler-open-#{SecureRandom.hex(4)}"
+
+    with_idempotency_cache do
+      assert_difference("Folder.count", 2) do
+        post mint_path(folder), params: { name: "Handler open" }, headers: idempotency_headers(key)
+        assert_response :created
+        first_id = JSON.parse(response.body).fetch("id")
+
+        post mint_path(folder), params: { name: "Handler open again" }, headers: idempotency_headers(key)
+        assert_response :created
+        refute_equal first_id, JSON.parse(response.body).fetch("id")
+      end
+      assert_equal [key, key], @mint_keys
+    end
+  end
+
   private
 
   def authorization_headers
     { "Authorization" => "Bearer #{@access_token}" }
+  end
+
+  def idempotency_headers(key)
+    authorization_headers.merge("Idempotency-Key" => key)
+  end
+
+  def mint_path(folder)
+    "/recording_studio_api/api/v1/folders/#{folder.id}/actions/mint"
+  end
+
+  def with_idempotency_cache(&)
+    previous_cache = Rails.cache
+    Rails.cache = ActiveSupport::Cache::MemoryStore.new
+    RecordingStudioApi::IdempotencyStore.stub(:redis, nil, &)
+  ensure
+    Rails.cache = previous_cache
+  end
+
+  def register_mint_action(creates:)
+    RecordingStudio.enable_capability(:echoable, on: "Folder")
+    @mint_keys = []
+    keys = @mint_keys
+    RecordingStudioApi.register_capability_action(
+      :mint,
+      capability: :echoable,
+      http_verb: :post,
+      creates: creates,
+      handler: lambda do |context|
+        keys << context.idempotency_key
+        folder = Folder.create!(name: context.params[:name].to_s)
+        RecordingStudio::Recording.create!(recordable: folder, parent_recording: context.recording)
+      end
+    )
+  end
+
+  def register_mint_handler(creates:)
+    RecordingStudio.enable_capability(:echoable, on: "Folder")
+    @mint_keys = []
+    keys = @mint_keys
+    RecordingStudioApi.register_capability_action(
+      :mint,
+      capability: :echoable,
+      http_verb: :post,
+      handler: ->(*) { raise "capability handler should not run" }
+    )
+    RecordingStudioApi.register_resource_handler(
+      "Folder",
+      :mint,
+      creates: creates,
+      handler: lambda do |context|
+        keys << context.idempotency_key
+        folder = Folder.create!(name: context.params[:name].to_s)
+        recording = RecordingStudio::Recording.create!(recordable: folder, parent_recording: context.recording)
+        { json: { id: recording.id, name: folder.name }, status: :created }
+      end
+    )
   end
 
   def bearer(token)

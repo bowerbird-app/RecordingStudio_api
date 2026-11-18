@@ -52,6 +52,19 @@ class ResourceHandlerRegistryTest < Minitest::Test
     end
   end
 
+  def test_creates_defaults_to_false_and_rejects_other_values
+    RecordingStudioApi.register_resource_handler("Page", :create, handler: ->(*) { {} })
+    refute RecordingStudioApi.resource_handler_registration("Page", :create).creates?
+
+    RecordingStudioApi.register_resource_handler("Folder", :attach, creates: true, handler: ->(*) { {} })
+    assert RecordingStudioApi.resource_handler_registration("Folder", :attach).creates?
+
+    error = assert_raises(RecordingStudioApi::ConfigurationError) do
+      RecordingStudioApi.register_resource_handler("Workspace", :attach, creates: "yes", handler: ->(*) { {} })
+    end
+    assert_includes error.message, "creates must be true or false"
+  end
+
   def test_configuration_snapshot_lists_registered_handlers
     RecordingStudioApi.register_resource_handler("Page", :update, handler: NamedResourceHandler)
 
