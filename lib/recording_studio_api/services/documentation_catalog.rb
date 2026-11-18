@@ -847,10 +847,11 @@ module RecordingStudioApi
             description: "Present when include_total=true. Records matching this list's filters across all pages."
           }
         }
+        example_sort, example_order = list_example_order(recordable_type)
         meta_example = {
           limit: 50,
-          sort: "created_at",
-          order: "asc",
+          sort: example_sort,
+          order: example_order,
           has_more: false,
           next_pagination_token: nil
         }
@@ -906,6 +907,7 @@ module RecordingStudioApi
 
       def pagination_parameters(recordable_type)
         allowed_sorts = sortable_attributes_for(recordable_type)
+        sort_parameter, order_parameter = sort_query_parameters(recordable_type, allowed_sorts)
 
         [
           {
@@ -929,31 +931,47 @@ module RecordingStudioApi
               type: "string"
             }
           },
-          {
-            name: "sort",
-            in: "query",
-            required: false,
-            description: "Sort field for this resource.",
-            schema: {
-              type: "string",
-              enum: allowed_sorts,
-              default: "created_at"
-            }
-          },
-          {
-            name: "order",
-            in: "query",
-            required: false,
-            description: "Sort order for created_at and id.",
-            schema: {
-              type: "string",
-              enum: %w[asc desc],
-              default: "asc"
-            }
-          },
+          sort_parameter,
+          order_parameter,
           COUNT_PARAMETER,
           INCLUDE_TOTAL_PARAMETER
         ]
+      end
+
+      def sort_query_parameters(recordable_type, allowed_sorts)
+        list_order = recordable_registration_for(recordable_type)&.default_order
+        sort_schema = { type: "string", enum: allowed_sorts }
+        order_schema = { type: "string", enum: %w[asc desc] }
+        sort_description = "Sort field for this resource."
+        order_description = "Sort order for created_at and id."
+
+        if list_order.nil?
+          sort_schema[:default] = "created_at"
+          order_schema[:default] = "asc"
+        elsif list_order.column? && allowed_sorts.include?(list_order.column)
+          sort_schema[:default] = list_order.column
+          order_schema[:default] = list_order.direction
+          sort_description = "Sort field for this resource. When sort is omitted, the default is #{list_order.column}. An explicit sort uses order, which defaults to asc."
+        elsif list_order.column?
+          sort_description = "Sort field for this resource. When sort is omitted, results are ordered by #{list_order.column} #{list_order.direction}."
+          order_schema[:default] = "asc"
+        else
+          sort_description = "Sort field for this resource. Omit sort to use the registered default order. Pass sort to replace it."
+          order_description = "Sort direction when sort is set. Omit sort and order together to keep the registered default order."
+        end
+
+        [
+          { name: "sort", in: "query", required: false, description: sort_description, schema: sort_schema },
+          { name: "order", in: "query", required: false, description: order_description, schema: order_schema }
+        ]
+      end
+
+      def list_example_order(recordable_type)
+        list_order = recordable_registration_for(recordable_type)&.default_order
+        return ["created_at", "asc"] if list_order.nil?
+        return [list_order.column, list_order.direction] if list_order.column?
+
+        [DefaultListOrder::CALLABLE_SORT, "asc"]
       end
 
       def collection_filter_parameters(recordable_type)
@@ -972,7 +990,7 @@ module RecordingStudioApi
           name: "Idempotency-Key",
           in: "header",
           required: false,
-          description: "Optional client-supplied key. Identical create requests from the same API client reuse the first successful response for 24 hours. Redis stores the key when it is reachable. Rails.cache is used when Redis is missing or errors.",
+          description: "Optional client-supplied key. Identical create requests from the same API client reuse the first successful response for 24 hours. Redis stores the key when it is reachable. Rails.cache is used when Redis is missing or errors. A process-local cache logs one warning because those keys stay in the current process.",
           schema: {
             type: "string",
             maxLength: 255
@@ -1463,14 +1481,15 @@ module RecordingStudioApi
         return record unless collection
 
         resource_name = RecordingStudioApi.resource_name_for(recordable_type)
+        example_sort, example_order = list_example_order(recordable_type)
         {
           resource: resource_name,
           type: resource_name.to_s.singularize,
           records: [record],
           meta: {
             limit: 50,
-            sort: "created_at",
-            order: "asc",
+            sort: example_sort,
+            order: example_order,
             has_more: false,
             next_pagination_token: nil
           }

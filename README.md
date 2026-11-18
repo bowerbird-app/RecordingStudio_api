@@ -247,7 +247,16 @@ infrastructure.
 Create idempotency uses that same Redis client
 (`rate_limit_redis_url` and `rate_limit_redis_namespace`). When Redis is missing or raises
 `Redis::BaseError`, `IdempotencyStore` writes the first response to
-`Rails.cache` with `unless_exist` and logs one warning. Redis uses `SET NX`.
+`Rails.cache` with `unless_exist`. Redis uses `SET NX`.
+If that cache is process-local (`MemoryStore` or `NullStore`), the first
+read or write logs one warning and does not repeat it in the process:
+
+```
+[RecordingStudioApi] idempotency keys are not durable. Redis is unavailable (Redis client is missing) and Rails.cache is ActiveSupport::Cache::MemoryStore, which is process-local and keeps keys in this process only.
+```
+
+A reachable Redis client does not log that warning. Replay is unchanged.
+`NullStore` still cannot replay. A shared cache fallback does not log the warning.
 A later create with the same `Idempotency-Key` from the same API client
 returns that stored JSON for 24 hours. The stored key is
 `{namespace}:idempotency:{api}:{api_client.id}:{digest}`. Index cursors use
@@ -652,6 +661,57 @@ REST paths, the JSON `type`, and OpenAPI keep the full class name and the existi
 
 `writable_attributes` is an explicit allowlist for API create and update operations. OpenAPI
 field metadata describes response data only and never grants write access.
+
+### Default list order
+
+`default_order:` is the order for a collection when the client omits `sort`.
+Leave it unset and the list stays on `created_at` ascending, with `id` as the tiebreaker.
+
+A column names one field and a direction. `asc` and `desc` are the only directions.
+A column that exists on the recording, such as `created_at` or `updated_at`, orders that table.
+Any other column must exist on the recordable table. Registration raises `ConfigurationError` for a bad shape, a bad direction, or a column on neither table.
+
+```ruby
+RecordingStudioApi.register_recordable_type_api(
+  "Folder",
+  serializer: ->(folder, **) { { name: folder.name } },
+  output_keys: %i[name],
+  sortable_attributes: %i[name],
+  default_order: { name: :asc }
+)
+```
+
+`recording_studio_orderable` stores the position on the recording as `recording_studio_orderable_position`.
+This gem does not depend on that gem. A host that has the column can pass it directly.
+
+```ruby
+RecordingStudioApi.register_recordable_type_api(
+  "RecordingStudioPresskits::KitSection",
+  default_order: { recording_studio_orderable_position: :asc }
+)
+```
+
+A callable takes the authorized relation and returns an ordered relation of the same model.
+Use it when the position lives on another table. The callable's joins stay.
+If it drops the authorization filters, the list intersects the result with the authorized ids.
+`id` ascending is appended so ties stay stable. Send `sort` to replace this order. `order` without `sort` is 422.
+
+```ruby
+RecordingStudioApi.register_recordable_type_api(
+  "RecordingStudioPresskits::KitSection",
+  default_order: ->(recordings) {
+    recordings.joins(<<~SQL.squish)
+      LEFT OUTER JOIN section_positions
+        ON section_positions.recording_id = recording_studio_recordings.id
+    SQL
+    .reorder(Arel.sql("section_positions.position ASC"))
+  }
+)
+```
+
+An explicit `sort` always wins. For a column default, `order` without `sort` changes that column's direction.
+OpenAPI shows a column default on the `sort` and `order` parameters when the column is one of the client sort fields.
+A callable's OpenAPI description says the registered order applies when `sort` is omitted. The list `meta.sort` is then `default_order`.
 
 ### Recordable metrics
 

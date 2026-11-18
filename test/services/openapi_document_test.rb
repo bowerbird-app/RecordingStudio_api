@@ -1175,8 +1175,61 @@ module RecordingStudioApi
 
       private
 
+      def test_sort_parameter_reflects_a_column_default_order
+        document = with_recordable_registration(
+          "Folder",
+          openapi: {},
+          sortable_attributes: %i[name],
+          default_order: { name: :desc }
+        ) do
+          with_recordable_types(["Folder"]) { OpenapiDocument.call }
+        end
+
+        sort_parameter = sort_parameter_for(document, "/recording_studio_api/api/v1/folders")
+        order_parameter = order_parameter_for(document, "/recording_studio_api/api/v1/folders")
+        assert_equal "name", sort_parameter.fetch("schema").fetch("default")
+        assert_equal "desc", order_parameter.fetch("schema").fetch("default")
+        assert_includes sort_parameter.fetch("description"), "name"
+
+        list_operation = document.fetch(:paths).fetch("/recording_studio_api/api/v1/folders").fetch("get")
+        meta = schema_branch(list_response_schema(list_operation), "Resource list").fetch("properties").fetch("meta")
+        assert_equal "name", meta.fetch("example").fetch("sort")
+        assert_equal "desc", meta.fetch("example").fetch("order")
+      end
+
+      def test_sort_parameter_describes_a_callable_default_order
+        document = with_recordable_registration(
+          "Folder",
+          openapi: {},
+          sortable_attributes: %i[name],
+          default_order: ->(relation) { relation }
+        ) do
+          with_recordable_types(["Folder"]) { OpenapiDocument.call }
+        end
+
+        sort_parameter = sort_parameter_for(document, "/recording_studio_api/api/v1/folders")
+        assert_includes sort_parameter.fetch("description"), "registered default order"
+        assert_nil sort_parameter.fetch("schema")["default"]
+
+        list_operation = document.fetch(:paths).fetch("/recording_studio_api/api/v1/folders").fetch("get")
+        meta = schema_branch(list_response_schema(list_operation), "Resource list").fetch("properties").fetch("meta")
+        assert_equal "default_order", meta.fetch("example").fetch("sort")
+      end
+
       def schema_branch(schema, title)
         schema.fetch("oneOf").find { |branch| branch.fetch("title") == title }
+      end
+
+      def sort_parameter_for(document, path)
+        document.fetch(:paths).fetch(path).fetch("get").fetch(:parameters).find { |parameter| parameter.fetch("name") == "sort" }
+      end
+
+      def order_parameter_for(document, path)
+        document.fetch(:paths).fetch(path).fetch("get").fetch(:parameters).find { |parameter| parameter.fetch("name") == "order" }
+      end
+
+      def list_response_schema(operation)
+        operation.fetch(:responses).fetch("200").fetch("content").fetch("application/json").fetch("schema")
       end
 
       def query_parameter_names(operation)
@@ -1260,7 +1313,7 @@ module RecordingStudioApi
         Object.const_set(class_name, existing_class) if existing_class
       end
 
-      def with_recordable_registration(recordable_type, openapi:, serializer: nil, output_keys: nil, fields: nil, relationships: nil, operations: nil, sortable_attributes: nil, writable_attributes: nil)
+      def with_recordable_registration(recordable_type, openapi:, serializer: nil, output_keys: nil, fields: nil, relationships: nil, operations: nil, sortable_attributes: nil, writable_attributes: nil, default_order: nil)
         registry = RecordingStudioApi.configuration.recordable_registry
         registrations = registry.instance_variable_get(:@registrations)
         key = recordable_type.to_s
@@ -1275,7 +1328,8 @@ module RecordingStudioApi
           openapi: openapi,
           operations: operations,
           sortable_attributes: sortable_attributes,
-          writable_attributes: writable_attributes
+          writable_attributes: writable_attributes,
+          default_order: default_order
         )
         yield
       ensure

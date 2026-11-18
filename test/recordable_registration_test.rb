@@ -218,6 +218,58 @@ class RecordableRegistrationTest < Minitest::Test
     end
   end
 
+  def test_default_order_accepts_a_column_or_a_callable_and_rejects_a_bad_option
+    column = RecordingStudioApi::RecordableRegistration.new(
+      recordable_type: "KitSection",
+      default_order: { title: :asc }
+    )
+    assert_equal "title", column.default_order.column
+    assert_equal "asc", column.default_order.direction
+    assert column.default_order_supplied?
+
+    callable = ->(relation) { relation }
+    computed = RecordingStudioApi::RecordableRegistration.new(
+      recordable_type: "KitSection",
+      default_order: callable
+    )
+    assert_equal callable, computed.default_order.callable
+    assert_predicate computed.default_order, :callable?
+
+    assert_configuration_error("column and direction or a callable") do
+      RecordingStudioApi::RecordableRegistration.new(recordable_type: "KitSection", default_order: "title")
+    end
+    assert_configuration_error("must name one column") do
+      RecordingStudioApi::RecordableRegistration.new(recordable_type: "KitSection", default_order: { title: :asc, name: :asc })
+    end
+    assert_configuration_error("column is invalid") do
+      RecordingStudioApi::RecordableRegistration.new(recordable_type: "KitSection", default_order: { "title name" => :asc })
+    end
+    assert_configuration_error("asc or desc") do
+      RecordingStudioApi::RecordableRegistration.new(recordable_type: "KitSection", default_order: { title: :sideways })
+    end
+    assert_configuration_error("must take the scoped relation") do
+      RecordingStudioApi::RecordableRegistration.new(recordable_type: "KitSection", default_order: -> {})
+    end
+  end
+
+  def test_registry_keeps_an_omitted_default_order_and_replaces_it_on_reload
+    registry = RecordingStudioApi::RecordableRegistry.new
+    registry.register("KitSection", default_order: { title: :asc })
+    registry.register("KitSection", sortable_attributes: [:title])
+
+    kept = registry.fetch("KitSection")
+    assert_equal "title", kept.default_order.column
+    assert_equal ["title"], kept.sortable_attributes
+
+    assert_configuration_error("Default order cannot be redefined") do
+      registry.register("KitSection", default_order: { title: :desc })
+    end
+
+    registry.prepare_for_reload!
+    registry.register("KitSection", default_order: { title: :desc })
+    assert_equal "desc", registry.fetch("KitSection").default_order.direction
+  end
+
   def test_auto_capability_actions_defaults_to_true_and_rejects_non_booleans
     registration = RecordingStudioApi::RecordableRegistration.new(recordable_type: "Page")
 

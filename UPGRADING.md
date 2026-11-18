@@ -1,5 +1,17 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.16.0
+
+Additive. No migration. Lists that do not declare `default_order` still sort by `created_at`. Idempotent creates still replay the first response.
+
+1. Bump the host gem to `1.16.0`. Stay on Recording Studio `>= 7.7.0`, `< 8.0`.
+2. Pass `default_order:` to `register_recordable_type_api` when a collection should not default to `created_at`. A column is `{ name: :asc }` or `{ created_at: :desc }`. A column on the recording is ordered there. `recording_studio_orderable` stores position on the recording as `recording_studio_orderable_position`, so `{ recording_studio_orderable_position: :asc }` is enough when that column exists. Any other column must be on the recordable table. A callable receives the already authorized relation and returns an ordered relation of the same model. Use a callable to join a position that is not a column on the recording. This gem does not depend on orderable.
+3. An explicit `sort` query parameter replaces `default_order`. For a column default, an `order` parameter without `sort` changes that column's direction. For a callable, pass `sort` before `order`. Sending `order` alone returns 422.
+4. `id` is the tiebreaker, in the same direction as a column sort. A callable gets `id` ascending after its own order. Column sorts keep keyset pagination. A callable uses an offset cursor so the page stays on that order.
+5. The order runs on the relation the list already authorized. A callable that drops those filters is intersected back to that relation. A record outside the grant stays out of the list. Show of that record is still 404. A view key is still 403 on a write.
+6. OpenAPI sets the `sort` and `order` defaults from a column `default_order` when that column is a client sort field. A callable removes the `created_at` default and says the registered order applies when `sort` is omitted. The response `meta.sort` is `default_order` in that case. Pass that value back, or omit `sort`, to keep the callable order.
+7. When Redis is unavailable and `Rails.cache` is `MemoryStore` or `NullStore`, the first idempotency read or write logs: `[RecordingStudioApi] idempotency keys are not durable. Redis is unavailable (Redis client is missing) and Rails.cache is ActiveSupport::Cache::MemoryStore, which is process-local and keeps keys in this process only.` A reachable Redis client does not log it. `NullStore` still cannot replay.
+
 ## Upgrading to 1.15.0
 
 Behavior change. No migration. A role is read on the recording being checked.

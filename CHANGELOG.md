@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-11-18
+
+### Added
+- `register_recordable_type_api` accepts `default_order:`. Pass a column and direction, `{ name: :asc }`, or a callable that takes the authorized relation and returns an ordered relation. A list uses that order when the client omits `sort`. An explicit `sort` still wins. `id` breaks ties. A type that omits `default_order` still sorts by `created_at`.
+- `IdempotencyStore` logs one warning the first time a key is stored in a process-local cache (`MemoryStore` or `NullStore`) because Redis is unavailable. Replay is unchanged.
+
+### Upgrade notes
+- Bump to `1.16.0`. No migration. Stay on Recording Studio `>= 7.7.0`, `< 8.0`.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.15.0] - 2026-11-18
 
 ### Changed

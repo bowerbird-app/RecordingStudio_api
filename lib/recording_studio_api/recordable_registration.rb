@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "default_list_order"
+
 module RecordingStudioApi
   class RecordableRegistration
     DEFAULT_OPERATIONS = %i[index show create update destroy].freeze
@@ -76,14 +78,15 @@ module RecordingStudioApi
 
     attr_reader :recordable_type, :public_name, :serializer, :output_keys, :fields, :openapi,
                 :sortable_attributes, :writable_attributes, :immutable_fields, :relationships,
-                :immutable_relationships, :operations, :capability_actions, :auto_capability_actions, :metric_names
+                :immutable_relationships, :operations, :capability_actions, :auto_capability_actions, :metric_names,
+                :default_order
 
     def initialize(recordable_type:, serializer: nil, output_keys: nil, fields: nil, openapi: nil,
                    sortable_attributes: nil, writable_attributes: nil, immutable_fields: nil,
                    relationships: nil, immutable_relationships: nil, operations: nil, capability_actions: nil,
                    auto_capability_actions: nil, metrics: nil, operations_supplied: nil,
                    capability_actions_supplied: nil, auto_capability_actions_supplied: nil, metrics_supplied: nil,
-                   public_name: nil, public_name_supplied: nil)
+                   public_name: nil, public_name_supplied: nil, default_order: nil, default_order_supplied: nil)
       @recordable_type = recordable_type.to_s
       assign_public_name(public_name, public_name_supplied)
       @serializer = serializer
@@ -107,8 +110,14 @@ module RecordingStudioApi
       @capability_actions = normalize_capability_actions(capability_actions)
       @auto_capability_actions = normalize_auto_capability_actions(auto_capability_actions)
       @metric_names = normalize_metric_names(metrics)
+      @default_order_supplied = default_order_supplied.nil? ? !default_order.nil? : default_order_supplied
+      @default_order = DefaultListOrder.parse(default_order, recordable_type: @recordable_type)
       validate!
       freeze
+    end
+
+    def default_order_supplied?
+      @default_order_supplied
     end
 
     def validate!
@@ -188,7 +197,8 @@ module RecordingStudioApi
         writable_attributes: writable_attributes, immutable_fields: immutable_fields,
         relationships: relationships.transform_values(&:to_h), immutable_relationships: immutable_relationships,
         operations: operations, capability_actions: capability_actions,
-        auto_capability_actions: auto_capability_actions, metric_names: metric_names
+        auto_capability_actions: auto_capability_actions, metric_names: metric_names,
+        default_order: default_order&.as_json
       }
     end
 
