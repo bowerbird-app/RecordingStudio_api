@@ -72,7 +72,7 @@ module RecordingStudioApi
     include RateLimitValidation
     include BillingCodeList
 
-    attr_reader :hooks, :action_registry, :registered_endpoint_registry, :recordable_registry, :resource_handler_registry, :default_api_version, :api_version_profiles, :capability_action_roles, :logs_summaries_enabled, :layout, :layout_name
+    attr_reader :hooks, :action_registry, :registered_endpoint_registry, :recordable_registry, :resource_handler_registry, :default_api_version, :api_version_profiles, :capability_action_roles, :layout, :layout_name
 
     # rubocop:disable-next Metrics/AbcSize
     def initialize
@@ -147,7 +147,6 @@ module RecordingStudioApi
       @api_request_log_allowed_param_keys = []
       @api_request_log_retention_days = 30
       @api_daily_metric_retention_days = nil
-      @logs_summaries_enabled = false
       @billing_codes = BillingCodes::Registry.new
       @hooks = RecordingStudio::Hooks.new
       @action_registry = ActionRegistry.new
@@ -218,7 +217,6 @@ module RecordingStudioApi
         api_request_log_allowed_param_keys: api_request_log_allowed_param_keys,
         api_request_log_retention_days: api_request_log_retention_days,
         api_daily_metric_retention_days: api_daily_metric_retention_days,
-        logs_summaries_enabled: logs_summaries_enabled,
         billing_codes: billing_codes.codes,
         action_registrations: action_registry.to_h,
         registered_endpoint_registrations: registered_endpoint_registry.to_h,
@@ -226,11 +224,6 @@ module RecordingStudioApi
         resource_handlers: resource_handler_registry.to_h,
         hooks_registered: hooks.instance_variable_get(:@registry).transform_values(&:size)
       }
-    end
-
-    def logs_summaries_enabled=(value)
-      @logs_summaries_enabled = ActiveModel::Type::Boolean.new.cast(value)
-      Rails.logger&.warn("[RecordingStudioApi] config.logs_summaries_enabled is unused.") if defined?(Rails)
     end
 
     def merge!(hash)

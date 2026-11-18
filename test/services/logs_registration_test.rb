@@ -44,14 +44,16 @@ class LogsRegistrationTest < ActiveSupport::TestCase
     names = RecordingStudioLogs.registry.aggregations.map(&:name)
     refute_includes names, "api/request_counts"
     refute_includes names, "api/request_latency"
-    api_aggregations = RecordingStudioLogs.registry.aggregations_for(
-      RecordingStudioLogs.registry.log_for(RecordingStudioApi::LogsRegistration::SOURCE_MODEL)
-    )
+    log = RecordingStudioLogs.registry.log_for(RecordingStudioApi::LogsRegistration::SOURCE_MODEL)
+    api_aggregations = RecordingStudioLogs.registry.aggregations_for(log)
     assert_empty api_aggregations
+    error = assert_raises(RecordingStudioLogs::InvalidRegistration) do
+      log.contract.allow_group!(:api_key)
+    end
+    assert_includes error.message, "api_key"
   end
 
-  test "setting logs_summaries_enabled does not stop legacy aggregate or prune" do
-    RecordingStudioApi.configuration.logs_summaries_enabled = true
+  test "legacy aggregate and prune still run for request logs" do
     day = Date.new(2026, 10, 1)
     RecordingStudioApi::ApiRequestLog.delete_all
     RecordingStudioApi::ApiDailyMetric.delete_all
