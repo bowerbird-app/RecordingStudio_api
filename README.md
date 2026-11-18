@@ -5,7 +5,7 @@
 `RecordingStudioApi` is a mountable Rails engine that provides authenticated, capability-backed JSON APIs for Recording Studio addons.
 
 Companion pins on current main: Trashable `>= 0.17.0, < 2.0` / `v1.2.3`
-(query-only), Admin `v2.19.0` (development and dummy only), Moveable `>= 5.0, < 7.0` / `v6.0.3`, Root Switchable
+(query-only), Admin `v2.19.1` (development and dummy only), Moveable `>= 5.0, < 7.0` / `v6.0.3`, Root Switchable
 `v0.16.1`, Cache `v0.7.1` (development/test), Icons `v0.4.2`, Accessible `>= 0.50.0, < 2.0`
 (`tag: v0.54.1`), RecordingStudio `v7.7.2`
 (`>= 7.7.0, < 8.0`), Flatpack `0.1.379`
