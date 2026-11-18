@@ -12,7 +12,7 @@ module RecordingStudioApi
     ALLOWED_HTTP_VERBS = %i[get post patch put delete].freeze
     ALLOWED_SCOPES = %i[collection resource member].freeze
 
-    attr_reader :name, :capability, :version, :version_notes, :deprecation, :http_verb, :handler, :serializer, :scope, :openapi, :input_contract, :required_role, :ui, :include_trashed, :owns_scoping, :trashed_semantics
+    attr_reader :name, :capability, :version, :version_notes, :deprecation, :http_verb, :handler, :serializer, :scope, :openapi, :input_contract, :required_role, :ui, :include_trashed, :owns_scoping, :trashed_semantics, :creates
 
     def initialize(name:, capability:, http_verb:, handler:, version: nil, version_notes: nil, deprecation: nil, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil, **options)
       @name = name.to_s
@@ -32,6 +32,7 @@ module RecordingStudioApi
       @owns_scoping = HandlerScope.flag(options.delete(:owns_scoping) { false }, name: :owns_scoping)
       @trashed_semantics = HandlerScope.trashed_semantics(options.delete(:trashed_semantics), name: @name)
       @ui = UiWidgetId.normalize(options.delete(:ui), name: name)
+      @creates = HandlerScope.flag(options.delete(:creates) { false }, name: :creates)
       raise ArgumentError, "unknown keywords: #{options.keys.join(', ')}" if options.any?
     end
 
@@ -73,6 +74,10 @@ module RecordingStudioApi
 
     def owns_scoping?
       owns_scoping
+    end
+
+    def creates?
+      creates
     end
 
     def applicable_to?(recordable_type)

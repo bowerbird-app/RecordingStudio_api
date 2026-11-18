@@ -722,6 +722,31 @@ module RecordingStudioApi
         end
       end
 
+      def test_creates_actions_list_the_idempotency_key_parameter
+        with_isolated_configuration do
+          singleton = RecordingStudioApi.singleton_class
+          original_recordable_types = RecordingStudioApi.method(:api_recordable_types)
+          singleton.send(:define_method, :api_recordable_types) { %w[Page] }
+          RecordingStudioApi.register_capability_action(:mint, capability: :echoable, creates: true, handler: ->(_context) { :ok })
+          RecordingStudioApi.register_capability_action(:shout, capability: :echoable, handler: ->(_context) { :ok })
+          RecordingStudioApi.register_recordable_type_api("Page")
+
+          RecordingStudio.stub(:capability_enabled?, ->(capability, **) { capability == :echoable }) do
+            document = OpenapiDocument.call
+            mint = document.fetch(:paths).fetch("/recording_studio_api/api/v1/pages/{id}/actions/mint").fetch("post")
+            shout = document.fetch(:paths).fetch("/recording_studio_api/api/v1/pages/{id}/actions/shout").fetch("post")
+            mint_header = mint.fetch(:parameters).find { |parameter| parameter.fetch("name") == "Idempotency-Key" }
+
+            assert_equal "header", mint_header.fetch("in")
+            assert_equal false, mint_header.fetch("required")
+            assert_includes mint.fetch(:description), "`Idempotency-Key`"
+            refute(shout.fetch(:parameters).any? { |parameter| parameter.fetch("name") == "Idempotency-Key" })
+          end
+        ensure
+          singleton.send(:define_method, :api_recordable_types, original_recordable_types)
+        end
+      end
+
       def test_components_only_include_shared_schemas
         document = with_recordable_types(["Page"]) { OpenapiDocument.call }
 

@@ -5,10 +5,26 @@ module RecordingStudioApi
     module ResourceOperations
       class Create < Base
         def call
-          if (cached = cached_idempotent_response)
-            return cached
-          end
+          with_idempotency { create_record }
+        rescue RecordingStudio::InvalidParent => e
+          raise invalid_parent_input_error(e.message)
+        end
 
+        private
+
+        def with_idempotency(&block)
+          key = context.idempotency_key
+          return block.call if key.blank?
+
+          RecordingStudioApi::Idempotency.replay(
+            api: api_key,
+            client_id: idempotency_client_id,
+            key: key,
+            &block
+          )
+        end
+
+        def create_record
           recordable_class = recordable_type.safe_constantize
           raise RecordingStudioApi::NotFoundError, "Unknown API resource #{resource_name}" if recordable_class.nil?
 
@@ -19,46 +35,10 @@ module RecordingStudioApi
           assert_parent_allowed!(parent_recording)
           created_recording = record_child!(recordable_class, parent_recording)
 
-          result = {
+          {
             json: serialize_recording(created_recording, context: relationship_context_for([created_recording])),
             status: :created
           }
-          store_idempotent_response(result)
-          result
-        rescue RecordingStudio::InvalidParent => e
-          raise invalid_parent_input_error(e.message)
-        end
-
-        private
-
-        def cached_idempotent_response
-          key = context.idempotency_key
-          return nil if key.blank?
-
-          payload = RecordingStudioApi::IdempotencyStore.fetch(
-            api: api_key,
-            client_id: idempotency_client_id,
-            key: key
-          )
-          return nil if payload.blank?
-
-          {
-            json: payload.fetch("json"),
-            status: payload.fetch("status", "created").to_sym
-          }
-        end
-
-        def store_idempotent_response(result)
-          key = context.idempotency_key
-          return if key.blank?
-
-          RecordingStudioApi::IdempotencyStore.write(
-            api: api_key,
-            client_id: idempotency_client_id,
-            key: key,
-            payload: result.fetch(:json),
-            status: result.fetch(:status, :created).to_s
-          )
         end
 
         def record_child!(recordable_class, parent_recording)

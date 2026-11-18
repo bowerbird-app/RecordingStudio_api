@@ -57,7 +57,7 @@ module RecordingStudioApi
         def create
           if (handler = nested_resource_handler(:create))
             reject_nested_type_or_parent_input!
-            render_registered_resource_handler!(handler, nested_handler_context(:create))
+            render_registered_resource_handler!(handler, nested_handler_context(:create), operation_name: :create)
             return
           end
 
