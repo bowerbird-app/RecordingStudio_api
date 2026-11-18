@@ -1,5 +1,13 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.17.1
+
+Dependency pins only. No migration in this gem. Behavior of this gem is unchanged.
+
+1. Bump the host gem to `1.17.1`. Gemspec ranges stay Recording Studio `>= 7.7.0`, `< 8.0`, Accessible `>= 0.50.0`, `< 2.0`, Logs `>= 0.8.0`, `< 2.0`, Metrics `>= 0.9.0`, `< 2.0`, Moveable `>= 5.0`, `< 7.0`, Trashable `>= 0.17.0`, `< 2.0`, and FlatPack `>= 0.1.356`, `< 2.0`.
+2. Development and dummy pins are Recording Studio `v7.7.2`, FlatPack `v0.1.379`, Accessible `v0.54.1`, Cache `v0.7.1`, Icons `v0.4.2`, Logs `v0.8.2`, Metrics `v0.9.2`, Moveable `v6.0.3`, Root Switchable `v0.16.1`, and Trashable `v1.2.3`. Admin stays `v2.19.0`.
+3. Host apps MUST run the Recording Studio 7.4, 7.5 and 7.7 migrations. The dummy app already includes those migrations. Do not add another copy.
+
 ## Upgrading to 1.17.0
 
 Additive. No migration. A column `default_order` and an unnamed callable keep their current behavior.

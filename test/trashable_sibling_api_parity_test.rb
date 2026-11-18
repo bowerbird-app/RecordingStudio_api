@@ -20,7 +20,7 @@ class TrashableSiblingApiParityTest < ActiveSupport::TestCase
 
   test "query helpers expose kept sql and predicates with the Trashable engine" do
     assert defined?(RecordingStudioTrashable)
-    assert_equal "1.0.1", RecordingStudioTrashable::VERSION
+    assert_equal "1.2.3", RecordingStudioTrashable::VERSION
     assert defined?(RecordingStudioTrashable::Engine)
 
     recording = RecordingStudio::Recording

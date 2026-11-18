@@ -8,7 +8,7 @@ class RecordingStudioApiTest < Minitest::Test
   end
 
   def test_version_pin
-    assert_equal "1.17.0", ::RecordingStudioApi::VERSION
+    assert_equal "1.17.1", ::RecordingStudioApi::VERSION
   end
 
   def test_preproduction_backfill_and_summary_migrations_are_gone
@@ -72,16 +72,16 @@ class RecordingStudioApiTest < Minitest::Test
     assert_includes gemspec, '"recording_studio_moveable", ">= 5.0", "< 7.0"'
     %w[Gemfile test/dummy/Gemfile].each do |path|
       contents = File.read(File.join(root, path))
-      assert_includes contents, 'RecordingStudio", tag: "v7.7.0"', path
-      assert_includes contents, 'flatpack", tag: "v0.1.377"', path
-      assert_includes contents, 'RecordingStudio_accessible", tag: "v0.50.0"', path
-      assert_includes contents, 'RecordingStudio_trashable", tag: "v1.0.1"', path
-      assert_includes contents, 'RecordingStudio_root_switchable", tag: "v0.16.0"', path
-      assert_includes contents, 'RecordingStudio_moveable", tag: "v6.0.0"', path
-      assert_includes contents, 'RecordingStudio_cache", tag: "v0.7.0"', path
-      assert_includes contents, 'RecordingStudio_metrics", tag: "v0.9.0"', path
-      assert_includes contents, 'RecordingStudio_logs", tag: "v0.8.0"', path
-      assert_includes contents, 'RecordingStudio_icons", tag: "v0.4.0"', path
+      assert_includes contents, 'RecordingStudio", tag: "v7.7.2"', path
+      assert_includes contents, 'flatpack", tag: "v0.1.379"', path
+      assert_includes contents, 'RecordingStudio_accessible", tag: "v0.54.1"', path
+      assert_includes contents, 'RecordingStudio_trashable", tag: "v1.2.3"', path
+      assert_includes contents, 'RecordingStudio_root_switchable", tag: "v0.16.1"', path
+      assert_includes contents, 'RecordingStudio_moveable", tag: "v6.0.3"', path
+      assert_includes contents, 'RecordingStudio_cache", tag: "v0.7.1"', path
+      assert_includes contents, 'RecordingStudio_metrics", tag: "v0.9.2"', path
+      assert_includes contents, 'RecordingStudio_logs", tag: "v0.8.2"', path
+      assert_includes contents, 'RecordingStudio_icons", tag: "v0.4.2"', path
       assert_includes contents, 'RecordingStudio_admin", tag: "v2.19.0"', path
       refute_includes contents, "allow_unauthorized_writes", path
     end
@@ -180,8 +180,8 @@ class RecordingStudioApiTest < Minitest::Test
 
     assert_includes readme_source, "preserved in this repository under `docs/gem_template/`"
     assert_includes readme_source, "not packaged gem docs"
-    assert_includes readme_source, "| RecordingStudio | v7.7.0 (pinned in `test/dummy/Gemfile`) |"
-    assert_includes readme_source, "| FlatPack        | v0.1.377 (pinned in `test/dummy/Gemfile`) |"
+    assert_includes readme_source, "| RecordingStudio | v7.7.2 (pinned in `test/dummy/Gemfile`) |"
+    assert_includes readme_source, "| FlatPack        | v0.1.379 (pinned in `test/dummy/Gemfile`) |"
   end
 
   def test_dummy_readme_explains_dummy_app_purpose
