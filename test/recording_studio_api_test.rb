@@ -8,7 +8,7 @@ class RecordingStudioApiTest < Minitest::Test
   end
 
   def test_version_pin
-    assert_equal "1.18.0", ::RecordingStudioApi::VERSION
+    assert_equal "1.19.0", ::RecordingStudioApi::VERSION
   end
 
   def test_preproduction_backfill_and_summary_migrations_are_gone

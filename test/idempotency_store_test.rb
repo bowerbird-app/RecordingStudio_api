@@ -191,6 +191,120 @@ class IdempotencyStoreTest < ActiveSupport::TestCase
     assert_empty logger.messages
   end
 
+  test "fingerprint is a sha256 of method path and params with sorted keys" do
+    left = RecordingStudioApi::IdempotencyStore.fingerprint(
+      method: "post",
+      path: "folders",
+      params: { name: "A", parent_id: "1", meta: { b: 1, a: 2 } }
+    )
+    right = RecordingStudioApi::IdempotencyStore.fingerprint(
+      method: "POST",
+      path: "folders",
+      params: { "parent_id" => "1", "meta" => { "a" => 2, "b" => 1 }, "name" => "A" }
+    )
+    different_body = RecordingStudioApi::IdempotencyStore.fingerprint(
+      method: "POST",
+      path: "folders",
+      params: { "name" => "B", "parent_id" => "1" }
+    )
+    different_path = RecordingStudioApi::IdempotencyStore.fingerprint(
+      method: "POST",
+      path: "pages",
+      params: { "name" => "A", "parent_id" => "1", "meta" => { "a" => 2, "b" => 1 } }
+    )
+
+    assert_equal 64, left.length
+    assert_equal left, right
+    refute_equal left, different_body
+    refute_equal left, different_path
+    refute_equal(
+      RecordingStudioApi::IdempotencyStore.fingerprint(method: "POST", path: "folders", params: { tags: %w[a b] }),
+      RecordingStudioApi::IdempotencyStore.fingerprint(method: "POST", path: "folders", params: { tags: %w[b a] })
+    )
+  end
+
+  test "same fingerprint replays and a different fingerprint raises without replacing the payload" do
+    fingerprint = RecordingStudioApi::IdempotencyStore.fingerprint(
+      method: "POST", path: "folders", params: { "name" => "A" }
+    )
+    other = RecordingStudioApi::IdempotencyStore.fingerprint(
+      method: "POST", path: "folders", params: { "name" => "B" }
+    )
+
+    RecordingStudioApi::IdempotencyStore.stub(:redis, nil) do
+      write_payload(key: "fp", payload: { "id" => "first" }, fingerprint: fingerprint)
+
+      cached = fetch_payload(key: "fp", fingerprint: fingerprint)
+      assert_equal "first", cached.fetch("json").fetch("id")
+      assert_equal fingerprint, cached.fetch("fingerprint")
+
+      error = assert_raises(RecordingStudioApi::IdempotencyKeyMismatchError) do
+        fetch_payload(key: "fp", fingerprint: other)
+      end
+      assert_equal "idempotency_key_reused", error.code
+      assert_equal "Idempotency key already used with different parameters", error.message
+      assert_kind_of RecordingStudioApi::Error, error
+
+      write_payload(key: "fp", payload: { "id" => "second" }, fingerprint: other)
+      assert_equal "first", fetch_payload(key: "fp", fingerprint: fingerprint).fetch("json").fetch("id")
+    end
+  end
+
+  test "a stored entry without a fingerprint still replays" do
+    fingerprint = RecordingStudioApi::IdempotencyStore.fingerprint(
+      method: "POST", path: "folders", params: { "name" => "Later" }
+    )
+
+    RecordingStudioApi::IdempotencyStore.stub(:redis, nil) do
+      write_payload(key: "legacy", payload: { "id" => "legacy" })
+
+      cached = fetch_payload(key: "legacy", fingerprint: fingerprint)
+      assert_equal "legacy", cached.fetch("json").fetch("id")
+      assert_nil cached["fingerprint"]
+    end
+  end
+
+  test "the same key on another client or named API does not replay or mismatch" do
+    fingerprint = RecordingStudioApi::IdempotencyStore.fingerprint(
+      method: "POST", path: "folders", params: { "name" => "A" }
+    )
+    other = RecordingStudioApi::IdempotencyStore.fingerprint(
+      method: "POST", path: "folders", params: { "name" => "B" }
+    )
+
+    RecordingStudioApi::IdempotencyStore.stub(:redis, AtomicRedis.new) do
+      write_payload(key: "isolated", payload: { "id" => "public-client" }, fingerprint: fingerprint)
+
+      assert_nil fetch_payload(key: "isolated", api: "operations", fingerprint: other)
+      assert_nil fetch_payload(key: "isolated", client_id: "client-2", fingerprint: other)
+      assert_equal "public-client", fetch_payload(key: "isolated", fingerprint: fingerprint).fetch("json").fetch("id")
+    end
+  end
+
+  test "a fingerprint mismatch on the Rails.cache fallback does not replay" do
+    fingerprint = RecordingStudioApi::IdempotencyStore.fingerprint(method: "POST", path: "folders", params: { "name" => "A" })
+    other = RecordingStudioApi::IdempotencyStore.fingerprint(method: "POST", path: "folders", params: { "name" => "B" })
+
+    RecordingStudioApi::IdempotencyStore.stub(:redis, FailingRedis.new) do
+      write_payload(key: "fallback-mismatch", payload: { "id" => "cached" }, fingerprint: fingerprint)
+
+      assert_raises(RecordingStudioApi::IdempotencyKeyMismatchError) do
+        fetch_payload(key: "fallback-mismatch", fingerprint: other)
+      end
+      assert_equal "cached", fetch_payload(key: "fallback-mismatch", fingerprint: fingerprint).fetch("json").fetch("id")
+    end
+  end
+
+  test "NullStore fallback stores nothing so a fingerprint does not raise" do
+    Rails.cache = ActiveSupport::Cache::NullStore.new
+    fingerprint = RecordingStudioApi::IdempotencyStore.fingerprint(method: "POST", path: "folders", params: { "name" => "A" })
+
+    RecordingStudioApi::IdempotencyStore.stub(:redis, nil) do
+      write_payload(key: "null-fingerprint", payload: { "id" => "gone" }, fingerprint: fingerprint)
+      assert_nil fetch_payload(key: "null-fingerprint", fingerprint: fingerprint)
+    end
+  end
+
   test "concurrent writes store only one payload" do
     RecordingStudioApi::IdempotencyStore.stub(:redis, nil) do
       gate = Queue.new
@@ -211,21 +325,23 @@ class IdempotencyStoreTest < ActiveSupport::TestCase
 
   private
 
-  def write_payload(key:, payload:)
+  def write_payload(key:, payload:, api: "public", client_id: "client-1", fingerprint: nil)
     RecordingStudioApi::IdempotencyStore.write(
-      api: "public",
-      client_id: "client-1",
+      api: api,
+      client_id: client_id,
       key: key,
       payload: payload,
-      status: "created"
+      status: "created",
+      fingerprint: fingerprint
     )
   end
 
-  def fetch_payload(key:)
+  def fetch_payload(key:, api: "public", client_id: "client-1", fingerprint: nil)
     RecordingStudioApi::IdempotencyStore.fetch(
-      api: "public",
-      client_id: "client-1",
-      key: key
+      api: api,
+      client_id: client_id,
+      key: key,
+      fingerprint: fingerprint
     )
   end
 

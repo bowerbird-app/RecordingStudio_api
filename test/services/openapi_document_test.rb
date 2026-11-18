@@ -213,6 +213,13 @@ module RecordingStudioApi
           refute_includes index_description, "`status`"
 
           assert_includes create_operation.fetch(:description), "`Idempotency-Key`"
+          assert_includes create_operation.fetch(:description), "`idempotency_key_reused`"
+          conflict = create_operation.fetch(:responses).fetch("422")
+          example = conflict.dig("content", "application/json", "example", "error")
+          assert_equal "Idempotency-Key was already used with different parameters. Nothing is created.", conflict.fetch("description")
+          assert_equal "idempotency_key_reused", example.fetch("code")
+          assert_equal "Idempotency key already used with different parameters", example.fetch("message")
+          assert_equal "#/components/schemas/Error", conflict.dig("content", "application/json", "schema", "$ref")
           assert_includes create_operation.fetch(:description), "`parent_id`"
           assert_includes create_operation.fetch(:description), "`title`"
           assert_includes create_operation.fetch(:description), "Requires edit access."
@@ -223,6 +230,32 @@ module RecordingStudioApi
           refute_includes update_operation.fetch(:description), "`parent_id`"
           assert_includes delete_operation.fetch(:description), "Delete Page by destroying the recording."
           refute_includes delete_operation.fetch(:description), "the caller can access"
+        end
+      end
+
+      def test_relationship_create_documents_an_idempotency_key_mismatch
+        relationships = {
+          comments: {
+            source: :children,
+            child_type: "Comment",
+            many: true,
+            endpoints: %i[create],
+            limit: 20,
+            serializer: ->(*) { { body: "Body" } },
+            output_keys: %i[body]
+          }
+        }
+
+        with_recordable_registration("Page", relationships: relationships, openapi: {}, writable_attributes: %i[title]) do
+          document = with_recordable_types(["Page"]) { OpenapiDocument.call }
+          operation = document.fetch(:paths).fetch("/recording_studio_api/api/v1/pages/{id}/comments").fetch("post")
+          parameter_names = operation.fetch(:parameters).map { |parameter| parameter.fetch("name") }
+
+          assert_includes parameter_names, "Idempotency-Key"
+          assert_equal(
+            "idempotency_key_reused",
+            operation.dig(:responses, "422", "content", "application/json", "example", "error", "code")
+          )
         end
       end
 

@@ -61,7 +61,7 @@ module RecordingStudioApi
         join_sentences(
           "Creates #{noun_phrase}. Requires edit access.",
           write_sentence(create_write_names),
-          "Send an `Idempotency-Key` header to reuse the first successful response for 24 hours."
+          "Send an `Idempotency-Key` header to reuse the first successful response for 24 hours. A different request with that key returns 422 `idempotency_key_reused` and creates nothing."
         )
       end
 

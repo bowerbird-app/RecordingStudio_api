@@ -1000,7 +1000,7 @@ module RecordingStudioApi
           name: "Idempotency-Key",
           in: "header",
           required: false,
-          description: description || "Optional client-supplied key. Identical create requests from the same API client reuse the first successful response for 24 hours. Redis stores the key when it is reachable. Rails.cache is used when Redis is missing or errors. A process-local cache logs one warning because those keys stay in the current process.",
+          description: description || "Optional client-supplied key. Identical create requests from the same API client reuse the first successful response for 24 hours. A different request with that key returns 422 idempotency_key_reused and creates nothing. Redis stores the key when it is reachable. Rails.cache is used when Redis is missing or errors. A process-local cache logs one warning because those keys stay in the current process. An entry stored before fingerprints still replays until it expires.",
           schema: {
             type: "string",
             maxLength: 255
@@ -1011,7 +1011,7 @@ module RecordingStudioApi
       def apply_creates_idempotency(action, description, openapi)
         return [description, openapi] unless action.respond_to?(:creates?) && action.creates?
 
-        note = "Send an `Idempotency-Key` header to reuse the first successful response for 24 hours. The same key with different input is refused."
+        note = "Send an `Idempotency-Key` header to reuse the first successful response for 24 hours. The same key with different input returns 422 `idempotency_key_reused`."
         described = description.to_s.include?("Idempotency-Key") ? description : "#{description} #{note}"
         [described, append_idempotency_parameter(openapi)]
       end
@@ -1023,7 +1023,7 @@ module RecordingStudioApi
         openapi.merge(
           parameters: parameters + [
             idempotency_key_parameter(
-              description: "Optional key for this action. The same key and the same input return the first successful response for 24 hours. The same key with different input is refused."
+              description: "Optional key for this action. The same key and the same input return the first successful response for 24 hours. The same key with different input returns 422 idempotency_key_reused."
             )
           ]
         )
@@ -1058,7 +1058,7 @@ module RecordingStudioApi
               }
             }
           }
-        }
+        }.merge(idempotency_conflict_response)
       end
 
       def resource_delete_responses(recordable_type)
@@ -1582,6 +1582,26 @@ module RecordingStudioApi
 
       def relationship_create_responses(relationship)
         relationship_response("201", "Resource created.", relationship_recording_schema(relationship, operation: :create))
+          .merge(idempotency_conflict_response)
+      end
+
+      def idempotency_conflict_response
+        {
+          "422" => {
+            description: "Idempotency-Key was already used with different parameters. Nothing is created.",
+            content: {
+              "application/json" => {
+                schema: { "$ref" => "#/components/schemas/Error" },
+                example: {
+                  error: {
+                    code: RecordingStudioApi::IdempotencyKeyMismatchError::CODE,
+                    message: RecordingStudioApi::IdempotencyKeyMismatchError::DEFAULT_MESSAGE
+                  }
+                }
+              }
+            }
+          }
+        }
       end
 
       def relationship_item_responses(relationship, operation:)

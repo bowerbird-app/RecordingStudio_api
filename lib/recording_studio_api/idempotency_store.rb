@@ -9,13 +9,15 @@ module RecordingStudioApi
     DEFAULT_TTL_SECONDS = 24 * 60 * 60
 
     class << self
-      def fetch(api:, client_id:, key:)
+      def fetch(api:, client_id:, key:, fingerprint: nil)
         return nil if key.blank? || client_id.blank?
 
         raw = read_raw(storage_key(api: api, client_id: client_id, key: key))
         return nil if raw.blank?
 
-        JSON.parse(raw)
+        stored = JSON.parse(raw)
+        assert_fingerprint!(stored, fingerprint)
+        stored
       rescue JSON::ParserError => e
         Rails.logger.warn("[RecordingStudioApi] idempotency fetch failed: #{e.class}: #{e.message}")
         nil
@@ -24,13 +26,17 @@ module RecordingStudioApi
       def write(api:, client_id:, key:, payload:, status:, ttl: DEFAULT_TTL_SECONDS, fingerprint: nil)
         return if key.blank? || client_id.blank?
 
-        body = { "json" => payload, "status" => status }
-        body["fingerprint"] = fingerprint if fingerprint
+        record = { "json" => payload, "status" => status }
+        record["fingerprint"] = fingerprint.to_s if fingerprint.present?
         write_raw(
           storage_key(api: api, client_id: client_id, key: key),
-          JSON.generate(body),
+          JSON.generate(record),
           ttl.to_i
         )
+      end
+
+      def fingerprint(method:, path:, params: {})
+        Digest::SHA256.hexdigest(canonical_request(method, path, params))
       end
 
       def redis_key(api:, client_id:, key:)
@@ -54,6 +60,42 @@ module RecordingStudioApi
       def storage_key(api:, client_id:, key:)
         namespace = RecordingStudioApi.configuration.rate_limit_redis_namespace.presence || "recording_studio_api"
         "#{namespace}:idempotency:#{api}:#{client_id}:#{Digest::SHA256.hexdigest(key.to_s)}"
+      end
+
+      def assert_fingerprint!(stored, fingerprint)
+        return unless stored.is_a?(Hash)
+        return if fingerprint.blank?
+
+        stored_fingerprint = stored["fingerprint"].to_s
+        return if stored_fingerprint.blank?
+        return if stored_fingerprint == fingerprint.to_s
+
+        raise IdempotencyKeyMismatchError
+      end
+
+      def canonical_request(method, path, params)
+        [
+          method.to_s.upcase,
+          path.to_s,
+          JSON.generate(normalize_fingerprint_value(params || {}))
+        ].join("\n")
+      end
+
+      def normalize_fingerprint_value(value)
+        case value
+        when ActionController::Parameters
+          normalize_fingerprint_value(value.to_unsafe_h)
+        when Hash
+          value.each_with_object({}) do |(key, child), normalized|
+            normalized[key.to_s] = normalize_fingerprint_value(child)
+          end.sort.to_h
+        when Array
+          value.map { |child| normalize_fingerprint_value(child) }
+        when Symbol
+          value.to_s
+        else
+          value
+        end
       end
 
       def read_raw(key)

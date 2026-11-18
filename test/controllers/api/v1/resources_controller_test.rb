@@ -1065,7 +1065,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
         assert_no_difference("Folder.count") do
           post "/recording_studio_api/api/v1/folders", params: {
             parent_id: @root_recording.id,
-            name: "Second idempotent folder"
+            name: "First idempotent folder"
           }, headers: headers
         end
         assert_response :created
@@ -1123,6 +1123,46 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
         assert_response :created
         refute_equal first_id, JSON.parse(response.body).fetch("id")
         assert_equal 2, calls.length
+      end
+    ensure
+      Rails.cache = previous_cache
+    end
+  end
+
+  test "rejects a reused Idempotency-Key when the create body differs and creates nothing" do
+    previous_cache = Rails.cache
+    Rails.cache = ActiveSupport::Cache::MemoryStore.new
+    key = "folder-mismatch-#{SecureRandom.hex(8)}"
+    headers = authorization_headers.merge("Idempotency-Key" => key)
+
+    begin
+      RecordingStudioApi::IdempotencyStore.stub(:redis, nil) do
+        assert_difference("Folder.count", 1) do
+          post "/recording_studio_api/api/v1/folders", params: {
+            parent_id: @root_recording.id,
+            name: "Original folder"
+          }, headers: headers
+        end
+        assert_response :created
+
+        assert_no_difference("Folder.count") do
+          post "/recording_studio_api/api/v1/folders", params: {
+            parent_id: @root_recording.id,
+            name: "Different folder"
+          }, headers: headers
+        end
+        assert_response :unprocessable_entity
+        assert_equal(
+          {
+            "error" => {
+              "code" => "idempotency_key_reused",
+              "message" => "Idempotency key already used with different parameters"
+            }
+          },
+          JSON.parse(response.body)
+        )
+        assert_equal 1, Folder.where(name: "Original folder").count
+        assert_equal 0, Folder.where(name: "Different folder").count
       end
     ensure
       Rails.cache = previous_cache

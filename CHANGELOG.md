@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Development and dummy Gemfiles pin `recording_studio_admin` to GitHub tag `v2.19.1`.
 
+## [1.19.0] - 2026-11-18
+
+### Added
+- `IdempotencyStore.fetch` and `write` take an optional `fingerprint:`. `IdempotencyStore.fingerprint(method:, path:, params:)` is the SHA256 of the HTTP method, the path or resource type, and the request body with sorted keys. Headers are not included.
+- `RecordingStudioApi::IdempotencyKeyMismatchError` (`idempotency_key_reused`). Built-in create returns 422 with that code and the message "Idempotency key already used with different parameters" when the same key is reused with a different fingerprint, and it does not create a record. The same key and fingerprint still replay. OpenAPI documents that 422 on create endpoints that accept `Idempotency-Key`.
+- `Idempotency.replay` accepts `fingerprint:` and passes it to the store. A `creates: true` action hashes `input` and uses that same check. A different input raises `IdempotencyKeyMismatchError`.
+
+### Upgrade notes
+- Bump to `1.19.0`. No migration. Stay on Recording Studio `>= 7.7.0`, `< 8.0`.
+- A stored entry with no fingerprint still replays for the rest of its 24 hours.
+- A `creates: true` action that reused a key with different input now returns `idempotency_key_reused` instead of `invalid_input`.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.18.0] - 2026-11-18
 
 ### Added

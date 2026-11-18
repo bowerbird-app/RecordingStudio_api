@@ -8,21 +8,18 @@ module RecordingStudioApi
     SKIP_INPUT = Object.new
     private_constant :SKIP_INPUT
 
-    MISMATCH_MESSAGE = "Idempotency-Key was already used with different input"
-    private_constant :MISMATCH_MESSAGE
-
     class << self
-      def replay(api:, client_id:, key:, action: nil, recording_id: nil, input: SKIP_INPUT)
+      def replay(api:, client_id:, key:, action: nil, recording_id: nil, input: SKIP_INPUT, fingerprint: nil)
         return yield if key.blank?
 
-        fingerprint = fingerprint_for(input)
+        digest = fingerprint.presence || fingerprint_for(input)
         stored = IdempotencyStore.fetch(
           api: api,
           client_id: client_id,
-          key: storage_key(key, action: action, recording_id: recording_id)
+          key: storage_key(key, action: action, recording_id: recording_id),
+          fingerprint: digest
         )
         if stored.present?
-          refuse_mismatched_input!(stored, fingerprint)
           return {
             json: stored.fetch("json"),
             status: stored.fetch("status", "ok").to_sym
@@ -30,7 +27,7 @@ module RecordingStudioApi
         end
 
         result = yield
-        remember(api, client_id, key, action, recording_id, fingerprint, result)
+        remember(api, client_id, key, action, recording_id, digest, result)
         result
       end
 
@@ -56,25 +53,6 @@ module RecordingStudioApi
         return key.to_s if action.nil? && recording_id.nil?
 
         JSON.generate([action.to_s, recording_id.to_s, key.to_s])
-      end
-
-      def refuse_mismatched_input!(stored, fingerprint)
-        return if fingerprint.nil?
-
-        stored_fingerprint = stored["fingerprint"].to_s
-        return if stored_fingerprint.present? && stored_fingerprint == fingerprint
-
-        raise InvalidActionInputError.new(
-          MISMATCH_MESSAGE,
-          details: [
-            {
-              attribute: "Idempotency-Key",
-              message: "was already used with different input",
-              full_message: MISMATCH_MESSAGE,
-              type: :conflict
-            }
-          ]
-        )
       end
 
       def remember(api, client_id, key, action, recording_id, fingerprint, result)

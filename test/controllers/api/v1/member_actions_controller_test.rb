@@ -547,8 +547,8 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
       end
       assert_response :unprocessable_entity
       payload = JSON.parse(response.body)
-      assert_equal "invalid_input", payload.dig("error", "code")
-      assert_equal "Idempotency-Key was already used with different input", payload.dig("error", "message")
+      assert_equal "idempotency_key_reused", payload.dig("error", "code")
+      assert_equal "Idempotency key already used with different parameters", payload.dig("error", "message")
       assert_equal kept_id, RecordingStudio::Recording.find(kept_id).id
       assert_equal 1, @mint_keys.length
     end
