@@ -14,25 +14,9 @@ class RemoveMobileOauthFromRecordingStudioApi < ActiveRecord::Migration[8.1]
       remove_column :recording_studio_api_api_request_logs, :oauth_grant_session_id, :uuid
     end
 
-    if table_exists?(:recording_studio_recordings)
-      if table_exists?(:recording_studio_events)
-        execute <<~SQL
-          WITH RECURSIVE mobile_recordings AS (
-            SELECT id FROM recording_studio_recordings
-            WHERE recordable_type IN (#{quoted_mobile_recordable_types})
+    return unless table_exists?(:recording_studio_recordings)
 
-            UNION
-
-            SELECT child.id FROM recording_studio_recordings child
-            INNER JOIN mobile_recordings parent
-              ON child.parent_recording_id = parent.id
-              OR child.root_recording_id = parent.id
-          )
-          DELETE FROM recording_studio_events
-          WHERE recording_id IN (SELECT id FROM mobile_recordings)
-        SQL
-      end
-
+    if table_exists?(:recording_studio_events)
       execute <<~SQL
         WITH RECURSIVE mobile_recordings AS (
           SELECT id FROM recording_studio_recordings
@@ -45,10 +29,26 @@ class RemoveMobileOauthFromRecordingStudioApi < ActiveRecord::Migration[8.1]
             ON child.parent_recording_id = parent.id
             OR child.root_recording_id = parent.id
         )
-        DELETE FROM recording_studio_recordings
-        WHERE id IN (SELECT id FROM mobile_recordings)
+        DELETE FROM recording_studio_events
+        WHERE recording_id IN (SELECT id FROM mobile_recordings)
       SQL
     end
+
+    execute <<~SQL
+      WITH RECURSIVE mobile_recordings AS (
+        SELECT id FROM recording_studio_recordings
+        WHERE recordable_type IN (#{quoted_mobile_recordable_types})
+
+        UNION
+
+        SELECT child.id FROM recording_studio_recordings child
+        INNER JOIN mobile_recordings parent
+          ON child.parent_recording_id = parent.id
+          OR child.root_recording_id = parent.id
+      )
+      DELETE FROM recording_studio_recordings
+      WHERE id IN (SELECT id FROM mobile_recordings)
+    SQL
   end
 
   def down
