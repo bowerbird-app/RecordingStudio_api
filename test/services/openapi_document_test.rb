@@ -1173,8 +1173,6 @@ module RecordingStudioApi
         assert_equal ["resource"], path_parameter_names(alias_catalog)
       end
 
-      private
-
       def test_sort_parameter_reflects_a_column_default_order
         document = with_recordable_registration(
           "Folder",
@@ -1215,6 +1213,31 @@ module RecordingStudioApi
         meta = schema_branch(list_response_schema(list_operation), "Resource list").fetch("properties").fetch("meta")
         assert_equal "default_order", meta.fetch("example").fetch("sort")
       end
+
+      def test_sort_parameter_lists_a_named_default_order
+        document = with_recordable_registration(
+          "Folder",
+          openapi: {},
+          sortable_attributes: %i[name],
+          default_order: { name: "position", order: ->(relation, _direction) { relation } }
+        ) do
+          with_recordable_types(["Folder"]) { OpenapiDocument.call }
+        end
+
+        sort_parameter = sort_parameter_for(document, "/recording_studio_api/api/v1/folders")
+        order_parameter = order_parameter_for(document, "/recording_studio_api/api/v1/folders")
+        assert_equal %w[created_at name position], sort_parameter.fetch("schema").fetch("enum")
+        assert_equal "position", sort_parameter.fetch("schema").fetch("default")
+        assert_equal "asc", order_parameter.fetch("schema").fetch("default")
+        assert_includes sort_parameter.fetch("description"), "position"
+
+        list_operation = document.fetch(:paths).fetch("/recording_studio_api/api/v1/folders").fetch("get")
+        meta = schema_branch(list_response_schema(list_operation), "Resource list").fetch("properties").fetch("meta")
+        assert_equal "position", meta.fetch("example").fetch("sort")
+        assert_equal "asc", meta.fetch("example").fetch("order")
+      end
+
+      private
 
       def schema_branch(schema, title)
         schema.fetch("oneOf").find { |branch| branch.fetch("title") == title }

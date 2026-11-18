@@ -127,6 +127,77 @@ class ApiV1DefaultListOrderTest < ActionDispatch::IntegrationTest
     assert_equal "order requires sort when this resource uses a computed default order", JSON.parse(response.body).dig("error", "message")
   end
 
+  test "applies a named position order when sort is omitted and keeps other records out" do
+    early = create_folder_recording(root_recording: @root_recording, name: "Later name")
+    late = create_folder_recording(root_recording: @root_recording, name: "Earlier name")
+    tied = create_folder_recording(root_recording: @root_recording, name: "Tied name")
+    other_root, = create_access_recording_for(user: create_user(email: "hidden-named@example.com"))
+    hidden = create_folder_recording(root_recording: other_root, name: "Hidden first")
+
+    with_section_positions do |connection|
+      insert_position(connection, early, 2)
+      insert_position(connection, late, 1)
+      insert_position(connection, tied, 2)
+      insert_position(connection, hidden, 0)
+      register_named_position_order
+
+      expected = position_ids([early, late, tied], "ASC")
+      assert_equal expected, page_ids("/recording_studio_api/api/v1/folders", limit: 1)
+      assert_not_includes expected, hidden.id
+
+      get "/recording_studio_api/api/v1/folders", params: { limit: 1 }, headers: authorization_headers
+      assert_response :success
+      payload = JSON.parse(response.body)
+      assert_equal "position", payload.dig("meta", "sort")
+      assert_equal "asc", payload.dig("meta", "order")
+      assert payload.dig("meta", "next_pagination_token").present?
+
+      get "/recording_studio_api/api/v1/folders/#{hidden.id}", headers: authorization_headers
+      assert_response :not_found
+      assert_equal "Resource was not found in this API scope", JSON.parse(response.body).dig("error", "message")
+
+      view_root, view_access = create_access_recording_for(user: create_user(email: "view-named@example.com"), role: :view)
+      view_folder = create_folder_recording(root_recording: view_root, name: "Viewable")
+      view_headers = { "Authorization" => "Bearer #{issue_oauth_access_token_for(access_recording: view_access, name: 'View named order')}" }
+
+      get "/recording_studio_api/api/v1/folders", headers: view_headers
+      assert_response :success
+      assert_equal([view_folder.id], JSON.parse(response.body).fetch("records").map { |row| row.fetch("id") })
+
+      patch "/recording_studio_api/api/v1/folders/#{view_folder.id}", params: { name: "Blocked" }, headers: view_headers
+      assert_response :forbidden
+      assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
+    end
+  end
+
+  test "sorts a named position ascending and descending across pages" do
+    early = create_folder_recording(root_recording: @root_recording, name: "Later name")
+    late = create_folder_recording(root_recording: @root_recording, name: "Earlier name")
+    tied = create_folder_recording(root_recording: @root_recording, name: "Tied name")
+
+    with_section_positions do |connection|
+      insert_position(connection, early, 2)
+      insert_position(connection, late, 1)
+      insert_position(connection, tied, 2)
+      register_named_position_order
+
+      path = "/recording_studio_api/api/v1/folders"
+      assert_equal position_ids([early, late, tied], "ASC"), page_ids(path, limit: 1, sort: "position", order: "asc")
+      assert_equal position_ids([early, late, tied], "DESC"), page_ids(path, limit: 1, sort: "position", order: "desc")
+      assert_equal position_ids([early, late, tied], "DESC"), page_ids(path, limit: 1, order: "desc")
+    end
+  end
+
+  test "rejects an unknown sort when a named order is registered" do
+    create_folder_recording(root_recording: @root_recording, name: "Only")
+    register_named_position_order
+
+    get "/recording_studio_api/api/v1/folders", params: { sort: "nope" }, headers: authorization_headers
+
+    assert_response :unprocessable_entity
+    assert_equal "sort must be one of: created_at, name, position", JSON.parse(response.body).dig("error", "message")
+  end
+
   test "rejects a default order column that is not on the recordable or the recording" do
     error = assert_raises(RecordingStudioApi::ConfigurationError) do
       RecordingStudioApi.register_recordable_type_api("Folder", default_order: { missing: :asc })
@@ -143,6 +214,27 @@ class ApiV1DefaultListOrderTest < ActionDispatch::IntegrationTest
 
   def register_folder_order(column_order)
     RecordingStudioApi.register_recordable_type_api("Folder", default_order: column_order)
+  end
+
+  def register_named_position_order
+    RecordingStudioApi.register_recordable_type_api(
+      "Folder",
+      default_order: {
+        name: "position",
+        order: lambda { |scope, direction|
+          sql_direction = direction == "desc" ? "DESC" : "ASC"
+          scope.unscope(:where).joins(position_join_sql).reorder(Arel.sql("section_positions.position #{sql_direction}"))
+        }
+      }
+    )
+  end
+
+  def position_ids(recordings, sql_direction)
+    table = RecordingStudio::Recording.table_name
+    RecordingStudio::Recording.where(id: recordings.map(&:id))
+                              .joins(position_join_sql)
+                              .order(Arel.sql("section_positions.position #{sql_direction}, #{table}.id #{sql_direction}"))
+                              .pluck(:id)
   end
 
   def register_position_order

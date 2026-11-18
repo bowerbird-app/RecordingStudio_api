@@ -940,6 +940,7 @@ module RecordingStudioApi
 
       def sort_query_parameters(recordable_type, allowed_sorts)
         list_order = recordable_registration_for(recordable_type)&.default_order
+        allowed_sorts += [list_order.name] if list_order&.named? && !allowed_sorts.include?(list_order.name)
         sort_schema = { type: "string", enum: allowed_sorts }
         order_schema = { type: "string", enum: %w[asc desc] }
         sort_description = "Sort field for this resource."
@@ -955,6 +956,10 @@ module RecordingStudioApi
         elsif list_order.column?
           sort_description = "Sort field for this resource. When sort is omitted, results are ordered by #{list_order.column} #{list_order.direction}."
           order_schema[:default] = "asc"
+        elsif list_order.named?
+          sort_schema[:default] = list_order.name
+          order_schema[:default] = list_order.direction
+          sort_description = "Sort field for this resource. When sort is omitted, the default is #{list_order.name}. An explicit sort uses order, which defaults to asc."
         else
           sort_description = "Sort field for this resource. Omit sort to use the registered default order. Pass sort to replace it."
           order_description = "Sort direction when sort is set. Omit sort and order together to keep the registered default order."
@@ -970,6 +975,7 @@ module RecordingStudioApi
         list_order = recordable_registration_for(recordable_type)&.default_order
         return ["created_at", "asc"] if list_order.nil?
         return [list_order.column, list_order.direction] if list_order.column?
+        return [list_order.name, list_order.direction] if list_order.named?
 
         [DefaultListOrder::CALLABLE_SORT, "asc"]
       end

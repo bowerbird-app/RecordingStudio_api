@@ -713,6 +713,27 @@ An explicit `sort` always wins. For a column default, `order` without `sort` cha
 OpenAPI shows a column default on the `sort` and `order` parameters when the column is one of the client sort fields.
 A callable's OpenAPI description says the registered order applies when `sort` is omitted. The list `meta.sort` is then `default_order`.
 
+Give that callable a name when clients should request it. `name` is the sort value. `order` takes the authorized relation and `"asc"` or `"desc"`. `direction:` is optional and defaults to `asc`. Use that direction in the order expression. `id` is added afterward, in the same direction. Omitting `sort` still uses this order. `sort=position&order=desc` reverses it. `order=desc` without `sort` does the same. The name is an allowed sort value and an OpenAPI `sort` enum entry.
+
+```ruby
+RecordingStudioApi.register_recordable_type_api(
+  "RecordingStudioPresskits::KitSection",
+  default_order: {
+    name: "position",
+    order: ->(recordings, direction) {
+      sql_direction = direction == "desc" ? "DESC" : "ASC"
+      recordings.joins(<<~SQL.squish)
+        LEFT OUTER JOIN section_positions
+          ON section_positions.recording_id = recording_studio_recordings.id
+      SQL
+      .reorder(Arel.sql("section_positions.position #{sql_direction}"))
+    }
+  }
+)
+```
+
+`GET /recording_studio_api/api/v1/kit_sections?sort=position&order=desc` returns that order. An unknown `sort` is still rejected. A column hash and an unnamed callable are unchanged.
+
 ### Recordable metrics
 
 An owning gem registers the calculation with Recording Studio Metrics, then

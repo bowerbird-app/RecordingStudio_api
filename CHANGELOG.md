@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.17.0] - 2026-11-18
+
+### Added
+- `default_order:` accepts a named order, `{ name: "position", order: ->(relation, direction) { relation } }`. `direction:` is optional and defaults to `asc`. Clients request that order with `sort=position` and `order=asc` or `order=desc`. The name is an allowed sort value and an OpenAPI `sort` enum entry. `id` breaks ties in the same direction. Omitting `sort` still uses the named order. A column default and an unnamed callable stay as they are.
+
+### Upgrade notes
+- Bump to `1.17.0`. No migration. Stay on Recording Studio `>= 7.7.0`, `< 8.0`.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.16.0] - 2026-11-18
 
 ### Added

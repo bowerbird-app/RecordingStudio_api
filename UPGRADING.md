@@ -1,5 +1,34 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.17.0
+
+Additive. No migration. A column `default_order` and an unnamed callable keep their current behavior.
+
+1. Bump the host gem to `1.17.0`. Stay on Recording Studio `>= 7.7.0`, `< 8.0`.
+2. Pass a name when clients should request a computed order. `order` takes the authorized relation and a direction, `"asc"` or `"desc"`. `direction:` is optional and defaults to `asc`. That direction is used when the client omits `order`.
+
+```ruby
+RecordingStudioApi.register_recordable_type_api(
+  "RecordingStudioPresskits::KitSection",
+  default_order: {
+    name: "position",
+    order: ->(recordings, direction) {
+      sql_direction = direction == "desc" ? "DESC" : "ASC"
+      recordings.joins(<<~SQL.squish)
+        LEFT OUTER JOIN section_positions
+          ON section_positions.recording_id = recording_studio_recordings.id
+      SQL
+      .reorder(Arel.sql("section_positions.position #{sql_direction}"))
+    }
+  }
+)
+```
+
+3. `sort=position&order=desc` runs that callable inside the already authorized relation. The list intersects the result with those authorized ids. `id` is the tiebreaker in the same direction. Pages use an offset cursor, the same cursor an unnamed callable uses.
+4. Omitting `sort` still applies the named order. `order=desc` without `sort` changes its direction. An unnamed callable still returns 422 for `order` without `sort`, and still appends `id` ascending.
+5. The name is added to the allowed sort values and to the OpenAPI `sort` enum. An unknown sort is still 422 with `sort must be one of: ...`.
+6. Registration raises `ConfigurationError` for an invalid name, a reserved name (`created_at` or `default_order`), a name that is already a sortable attribute, a direction other than `asc` or `desc`, or a callable that does not take the relation and a direction.
+
 ## Upgrading to 1.16.0
 
 Additive. No migration. Lists that do not declare `default_order` still sort by `created_at`. Idempotent creates still replay the first response.

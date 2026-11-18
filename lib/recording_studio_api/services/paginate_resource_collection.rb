@@ -141,6 +141,10 @@ module RecordingStudioApi
       end
 
       def ordered_relation(normalized_sort, normalized_order, sortable_context)
+        if (named = named_sort(normalized_sort))
+          return named.apply_callable(relation, direction: normalized_order)
+        end
+
         if normalized_sort == DefaultListOrder::CALLABLE_SORT
           return default_order.apply_callable(relation)
         end
@@ -157,7 +161,7 @@ module RecordingStudioApi
       end
 
       def apply_pagination_token(current_relation, pagination_token_payload, normalized_sort, normalized_order, sortable_context)
-        if normalized_sort == DefaultListOrder::CALLABLE_SORT
+        if offset_sort?(normalized_sort)
           return current_relation.offset(callable_offset(pagination_token_payload))
         end
 
@@ -190,7 +194,7 @@ module RecordingStudioApi
           "order" => normalized_order,
           "last_id" => last.id
         }
-        if normalized_sort == DefaultListOrder::CALLABLE_SORT
+        if offset_sort?(normalized_sort)
           payload["last_sort_value"] = last.id
           payload["offset"] = callable_offset_base(pagination_token_payload) + items.length
         else
@@ -202,7 +206,7 @@ module RecordingStudioApi
 
       def normalize_sort(sortable_context)
         if sort.to_s == DefaultListOrder::CALLABLE_SORT
-          return DefaultListOrder::CALLABLE_SORT if default_order&.callable?
+          return DefaultListOrder::CALLABLE_SORT if default_order&.callable? && !default_order.named?
 
           raise RecordingStudioApi::InvalidPaginationTokenError,
                 "sort must be one of: #{sortable_context.fetch(:allowed_sort_attributes).join(', ')}"
@@ -220,6 +224,7 @@ module RecordingStudioApi
         end
 
         return default_order.column if default_order&.column?
+        return default_order.name if default_order&.named?
         return DefaultListOrder::CALLABLE_SORT if default_order&.callable?
 
         "created_at"
@@ -230,7 +235,7 @@ module RecordingStudioApi
         active_default = explicit_sort? ? nil : default_order
 
         if supplied.blank?
-          return active_default.direction if active_default&.column?
+          return active_default.direction if active_default&.column? || active_default&.named?
 
           return "asc"
         end
@@ -238,7 +243,7 @@ module RecordingStudioApi
         unless SUPPORTED_ORDERS.include?(supplied)
           raise RecordingStudioApi::InvalidPaginationTokenError, "order must be asc or desc"
         end
-        if active_default&.callable?
+        if active_default&.callable? && !active_default.named?
           raise RecordingStudioApi::InvalidPaginationTokenError,
                 "order requires sort when this resource uses a computed default order"
         end
@@ -328,6 +333,8 @@ module RecordingStudioApi
         allowed_sort_attributes = RecordingStudioApi.sortable_attributes_for(recordable_type, api: api_key).select do |attribute|
           attribute == "created_at" || recordable_class.column_names.include?(attribute)
         end
+        named_sort_name = default_order&.name
+        allowed_sort_attributes << named_sort_name if named_sort_name && !allowed_sort_attributes.include?(named_sort_name)
 
         {
           recordable_class: recordable_class,
@@ -428,6 +435,17 @@ module RecordingStudioApi
         return unless list_order&.column? && list_order.column == normalized_sort && !explicit_sort?
 
         list_order.ensure_column!(sortable_context.fetch(:recordable_class), relation.klass)
+      end
+
+      def named_sort(normalized_sort)
+        list_order = default_order
+        return unless list_order&.named? && list_order.name == normalized_sort
+
+        list_order
+      end
+
+      def offset_sort?(normalized_sort)
+        normalized_sort == DefaultListOrder::CALLABLE_SORT || named_sort(normalized_sort)
       end
 
       def callable_offset(payload)

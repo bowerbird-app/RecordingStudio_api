@@ -120,6 +120,13 @@ module RecordingStudioApi
       @default_order_supplied
     end
 
+    def validate_named_default_order!
+      return unless default_order&.named? && sortable_attributes.include?(default_order.name)
+
+      raise ConfigurationError, "Default order name #{default_order.name} is already a sortable attribute for #{recordable_type}"
+    end
+    private :validate_named_default_order!
+
     def validate!
       raise ConfigurationError, "Recordable type is required" if recordable_type.blank?
       raise ConfigurationError, "Serializer must respond to call for #{recordable_type}" if serializer && !serializer.respond_to?(:call)
@@ -153,6 +160,8 @@ module RecordingStudioApi
       if invalid_actions.any?
         raise ConfigurationError, "Capability actions are invalid for #{recordable_type}: #{invalid_actions.join(', ')}"
       end
+
+      validate_named_default_order!
 
       true
     end
