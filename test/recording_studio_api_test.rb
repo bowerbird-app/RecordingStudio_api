@@ -82,7 +82,7 @@ class RecordingStudioApiTest < Minitest::Test
       assert_includes contents, 'RecordingStudio_metrics", tag: "v0.9.2"', path
       assert_includes contents, 'RecordingStudio_logs", tag: "v0.8.2"', path
       assert_includes contents, 'RecordingStudio_icons", tag: "v0.4.2"', path
-      assert_includes contents, 'RecordingStudio_admin", tag: "v2.19.0"', path
+      assert_includes contents, 'RecordingStudio_admin", tag: "v2.19.1"', path
       refute_includes contents, "allow_unauthorized_writes", path
     end
     %w[test/dummy/db/schema.rb test/dummy/db/api_logging_schema.rb].each do |path|
