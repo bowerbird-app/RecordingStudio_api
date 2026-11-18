@@ -250,6 +250,78 @@ class RecordableRegistrationTest < Minitest::Test
     assert_configuration_error("must take the scoped relation") do
       RecordingStudioApi::RecordableRegistration.new(recordable_type: "KitSection", default_order: -> {})
     end
+
+    named = ->(relation, _direction) { relation }
+    positioned = RecordingStudioApi::RecordableRegistration.new(
+      recordable_type: "KitSection",
+      default_order: { name: "position", order: named }
+    )
+    assert_equal "position", positioned.default_order.name
+    assert_equal "asc", positioned.default_order.direction
+    assert_equal named, positioned.default_order.callable
+    assert_predicate positioned.default_order, :named?
+
+    descending = RecordingStudioApi::RecordableRegistration.new(
+      recordable_type: "KitSection",
+      default_order: { name: "position", direction: :desc, order: named }
+    )
+    assert_equal "desc", descending.default_order.direction
+
+    assert_configuration_error("name is invalid") do
+      RecordingStudioApi::RecordableRegistration.new(
+        recordable_type: "KitSection",
+        default_order: { name: "section position", order: named }
+      )
+    end
+    assert_configuration_error("default_order is reserved") do
+      RecordingStudioApi::RecordableRegistration.new(
+        recordable_type: "KitSection",
+        default_order: { name: "default_order", order: named }
+      )
+    end
+    assert_configuration_error("created_at is reserved") do
+      RecordingStudioApi::RecordableRegistration.new(
+        recordable_type: "KitSection",
+        default_order: { name: "created_at", order: named }
+      )
+    end
+    assert_configuration_error("asc or desc") do
+      RecordingStudioApi::RecordableRegistration.new(
+        recordable_type: "KitSection",
+        default_order: { name: "position", direction: :sideways, order: named }
+      )
+    end
+    assert_configuration_error("must pass a callable as order") do
+      RecordingStudioApi::RecordableRegistration.new(
+        recordable_type: "KitSection",
+        default_order: { name: "position", order: "position" }
+      )
+    end
+    assert_configuration_error("relation and a direction") do
+      RecordingStudioApi::RecordableRegistration.new(
+        recordable_type: "KitSection",
+        default_order: { name: "position", order: ->(relation) { relation } }
+      )
+    end
+    assert_configuration_error("relation and a direction") do
+      RecordingStudioApi::RecordableRegistration.new(
+        recordable_type: "KitSection",
+        default_order: { name: "position", order: ->(relation, direction:) { [relation, direction] } }
+      )
+    end
+    assert_configuration_error("only accepts name, order, and direction") do
+      RecordingStudioApi::RecordableRegistration.new(
+        recordable_type: "KitSection",
+        default_order: { name: "position", order: named, extra: true }
+      )
+    end
+    assert_configuration_error("already a sortable attribute") do
+      RecordingStudioApi::RecordableRegistration.new(
+        recordable_type: "KitSection",
+        sortable_attributes: [:position],
+        default_order: { name: "position", order: named }
+      )
+    end
   end
 
   def test_registry_keeps_an_omitted_default_order_and_replaces_it_on_reload
