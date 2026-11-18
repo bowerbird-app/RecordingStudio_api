@@ -39,9 +39,7 @@ module RecordingStudioApi
     }
 
     def recording
-      return @recording if defined?(@recording)
-
-      @recording = RecordingStudio::Recording.unscoped.find_by(
+      @recording ||= RecordingStudio::Recording.unscoped.find_by(
         recordable_type: self.class.name,
         recordable_id: id,
         parent_recording_id: api_client&.recording&.id
@@ -49,9 +47,7 @@ module RecordingStudioApi
     end
 
     def effective_access_recording
-      return @effective_access_recording if defined?(@effective_access_recording)
-
-      @effective_access_recording = begin
+      @effective_access_recording ||= begin
         parent_recording = recording&.parent_recording
         parent_access = parent_recording&.parent_recording
         parent_access if parent_access&.recordable_type == "RecordingStudio::Access"

@@ -67,14 +67,15 @@ module RecordingStudioApi
                                              .where(recordable_type: name, recordable_id: clients.map(&:id))
                                              .to_a
       by_recordable_id = recordings.index_by { |recording| recording.recordable_id.to_s }
-      clients.each { |client| client.recording = by_recordable_id[client.id.to_s] }
+      clients.each do |client|
+        recording = by_recordable_id[client.id.to_s]
+        client.recording = recording if recording
+      end
       clients
     end
 
     def recording
-      return @recording if defined?(@recording)
-
-      @recording = RecordingStudio::Recording.unscoped.find_by(recordable: self)
+      @recording ||= RecordingStudio::Recording.unscoped.find_by(recordable: self)
     end
 
     attr_writer :recording

@@ -1148,10 +1148,16 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
     credential = payload.fetch(:credential)
     expired_payload = provision_api_client_for(access_recording: access_recording, name: "Expired chart key")
     expired_payload.fetch(:credential).update_columns(expires_at: 1.day.ago, updated_at: Time.current)
-    RecordingStudioApi::ApiClient.create!(
+    missing_client = RecordingStudioApi::ApiClient.create!(
       name: "Missing chart key",
-      api_key: "public",
-      access_recording: access_recording
+      api_key: "public"
+    )
+    RecordingStudio.record!(
+      action: "created",
+      recordable: missing_client,
+      parent_recording: access_recording,
+      root_recording: access_recording.root_recording,
+      actor: @user
     )
 
     [
