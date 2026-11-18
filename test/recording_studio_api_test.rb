@@ -35,6 +35,16 @@ class RecordingStudioApiTest < Minitest::Test
     end
     assert(engine_names.any? { |file| file.include?("remove_mobile_oauth_from_recording_studio_api") })
     assert(dummy_names.any? { |file| file.include?("remove_mobile_oauth_from_recording_studio_api") })
+    [
+      "db/migrate/20260609000015_remove_mobile_oauth_from_recording_studio_api.rb",
+      "test/dummy/db/migrate/20260609010015_remove_mobile_oauth_from_recording_studio_api.rb"
+    ].each do |path|
+      source = File.read(File.join(root, path))
+      refute_includes source, "drop_table", path
+      assert_includes source, "oauth_grant_session_id", path
+      assert_includes source, "DELETE FROM recording_studio_events", path
+      assert_includes source, "DELETE FROM recording_studio_recordings", path
+    end
     refute File.exist?(File.join(root, "lib/recording_studio_api/services/backfill_api_request_log_classifications.rb"))
     refute File.exist?(File.join(root, "lib/tasks/recording_studio_api_request_logs.rake"))
   end

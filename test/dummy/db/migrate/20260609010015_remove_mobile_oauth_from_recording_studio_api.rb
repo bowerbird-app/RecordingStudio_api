@@ -49,12 +49,6 @@ class RemoveMobileOauthFromRecordingStudioApi < ActiveRecord::Migration[8.1]
         WHERE id IN (SELECT id FROM mobile_recordings)
       SQL
     end
-
-    drop_table :recording_studio_api_oauth_refresh_tokens, if_exists: true
-    drop_table :recording_studio_api_oauth_session_access_tokens, if_exists: true
-    drop_table :recording_studio_api_oauth_grant_sessions, if_exists: true
-    drop_table :recording_studio_api_oauth_authorization_codes, if_exists: true
-    drop_table :recording_studio_api_oauth_clients, if_exists: true
   end
 
   def down

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 - Pre-production migrations that created the mobile OAuth tables, backfilled credential, access-token, and client-access recordings with raw inserts, and created then dropped request-log summary tables.
+- `drop_table` calls in `remove_mobile_oauth_from_recording_studio_api`. Those OAuth tables are not created. The migration still removes `oauth_grant_session_id` from request logs and deletes leftover mobile OAuth recordings and events.
 - `RecordingStudioApi::Services::BackfillApiRequestLogClassifications` and `recording_studio_api:api_request_logs:backfill_classifications`.
 - `config.logs_summaries_enabled`.
 - The Logs `aggregatable:` column list on API request logs. Logs screens and jobs read registered aggregations, and this gem registers none.
