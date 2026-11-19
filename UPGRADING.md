@@ -1,5 +1,13 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.21.3
+
+Additive lookup metadata. No migration. HTTP responses and OpenAPI stay the same.
+
+1. Bump the host gem to `1.21.3`. Gemspec ranges stay the same.
+2. `RecordingStudioApi.lookup` create and update field hashes now copy `required`, `enum`, and nested `items` / `properties` from that type's `openapi: { details_schema: }` when present. Fields without that schema stay `{ type: :string, required: false, allow_blank: true }`.
+3. Compare [v1.21.2...v1.21.3](https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.2...v1.21.3).
+
 ## Upgrading to 1.21.2
 
 Controller extensions reach `ActionController::API` controllers. No migration. Routes, parameters, and authentication are unchanged.

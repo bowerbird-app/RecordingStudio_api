@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.21.3] - 2026-11-19
+
+### Added
+- `RecordingStudioApi.lookup` input contracts for create and update include `required`, `enum`, and nested object shape (`items` / `properties`) from the recordable `details_schema` that OpenAPI already uses. HTTP responses and OpenAPI documents are unchanged.
+
+### Upgrade notes
+- Bump to `1.21.3`. No migration. Host apps are unchanged.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.21.2] - 2026-11-19
 
 ### Fixed
@@ -1701,7 +1710,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.2...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.3...HEAD
+[1.21.3]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.2...v1.21.3
 [1.21.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.1...v1.21.2
 [1.21.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.0...v1.21.1
 [1.21.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.20.0...v1.21.0
