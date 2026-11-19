@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.21.2] - 2026-11-19
+
+### Fixed
+- `config.hooks.extend_controller` now applies to `ActionController::API` controllers, including `RecordingStudioApi::ApiController`. The prepare hook only walked `ActionController::Base` descendants. `ActionController::API` does not inherit from `Base`, and those controllers are often loaded after that first prepare, so a rescue registered for `ApiController` never ran on a real API request.
+
+### Upgrade notes
+- Bump to `1.21.2`. No migration. Gemspec ranges stay as in `1.21.1`.
+- An extension registered for `ApiController` now runs on API requests. Moveable's move conflict rescue returns 409 `conflict` instead of an unhandled 500 when `RecordingStudio::Moveable::Api::Conflict` is raised.
+- Compare [v1.21.1...v1.21.2](https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.1...v1.21.2).
+
 ## [1.21.1] - 2026-11-19
 
 ### Changed
@@ -1691,7 +1701,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.1...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.2...HEAD
+[1.21.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.1...v1.21.2
 [1.21.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.0...v1.21.1
 [1.21.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.20.0...v1.21.0
 [1.17.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.17.0...v1.17.1

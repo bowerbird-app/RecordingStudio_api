@@ -1,5 +1,14 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.21.2
+
+Controller extensions reach `ActionController::API` controllers. No migration. Routes, parameters, and authentication are unchanged.
+
+1. Bump the host gem to `1.21.2`. Gemspec ranges stay as in `1.21.1`.
+2. `config.hooks.extend_controller` applies to `ActionController::Base` and `ActionController::API`, including `RecordingStudioApi::ApiController`. Register the extension before that controller loads. Prepare applies it to controllers already loaded, and autoload applies it when the controller loads.
+3. A rescue registered for `:ApiController` now handles API requests. Moveable's move conflict rescue returns 409 with code `conflict` instead of an unhandled 500 when `RecordingStudio::Moveable::Api::Conflict` is raised.
+4. Compare [v1.21.1...v1.21.2](https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.1...v1.21.2).
+
 ## Upgrading to 1.21.1
 
 CI only. No migration. Host apps are unchanged.

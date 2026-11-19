@@ -49,12 +49,59 @@ module RecordingStudioApi
         apply_extensions(target, collected_extensions(target, :controller_extensions_for))
       end
 
+      def apply_loaded_controller_extensions
+        each_action_controller { |controller| apply_controller_extensions(controller) }
+      end
+
+      def action_controller_subclass?(value)
+        return false unless value.is_a?(Class)
+
+        action_controller_parents.any? { |parent| value < parent }
+      end
+
+      def watch_autoloaded_controllers
+        return if @watching_autoloaded_controllers
+        return unless defined?(Rails) && Rails.application
+
+        @watching_autoloaded_controllers = true
+        Rails.autoloaders.each do |loader|
+          loader.on_load do |_constant_path, value, _file|
+            next unless RecordingStudioApi::Engine.action_controller_subclass?(value)
+
+            RecordingStudioApi::Engine.apply_controller_extensions(value)
+          end
+        end
+      end
+
       private
+
+      def each_action_controller(&block)
+        action_controller_parents.each do |parent|
+          parent.descendants.each(&block)
+        end
+      end
+
+      def action_controller_parents
+        %w[ActionController::Base ActionController::API].filter_map do |parent_name|
+          parent = loaded_constant(parent_name)
+          parent if parent.respond_to?(:descendants)
+        end
+      end
+
+      def loaded_constant(name)
+        name.split("::").reduce(Object) do |namespace, part|
+          return nil unless namespace.const_defined?(part, false)
+          return nil if namespace.autoload?(part)
+
+          namespace.const_get(part, false)
+        end
+      end
 
       def apply_extensions(target, extensions)
         return unless target
 
         applied = target.instance_variable_get(:@recording_studio_api_applied_extensions) || identity_hash
+        target.instance_variable_set(:@recording_studio_api_applied_extensions, applied)
 
         extensions.flatten.compact.each do |extension|
           next if applied[extension]
@@ -62,8 +109,6 @@ module RecordingStudioApi
           target.class_eval(&extension)
           applied[extension] = true
         end
-
-        target.instance_variable_set(:@recording_studio_api_applied_extensions, applied)
       end
 
       def collected_extensions(target, reader)
@@ -154,14 +199,12 @@ module RecordingStudioApi
       end
     end
 
-    # Apply controller extensions
+    # Apply controller extensions to ActionController::Base and ActionController::API.
     initializer "recording_studio_api.apply_controller_extensions" do
-      config.to_prepare do
-        next unless defined?(ActionController::Base)
+      RecordingStudioApi::Engine.watch_autoloaded_controllers
 
-        ActionController::Base.descendants.each do |controller|
-          RecordingStudioApi::Engine.apply_controller_extensions(controller)
-        end
+      config.to_prepare do
+        RecordingStudioApi::Engine.apply_loaded_controller_extensions
       end
     end
 
