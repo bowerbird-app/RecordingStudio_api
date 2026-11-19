@@ -211,11 +211,10 @@ class EngineTest < Minitest::Test
       find_initializer("recording_studio_api.apply_controller_extensions").block.call
     end
 
-    with_temporary_nested_constant(:ActionController, :Base, action_controller_base) do
-      with_temporary_nested_constant(:ActionController, :API, action_controller_api) do
-        RecordingStudioApi::Engine.stub(:apply_controller_extensions, ->(controller) { applied << controller }) do
-          to_prepare_blocks.first.call
-        end
+    parents = [action_controller_base, action_controller_api]
+    RecordingStudioApi::Engine.stub(:action_controller_parents, parents) do
+      RecordingStudioApi::Engine.stub(:apply_controller_extensions, ->(controller) { applied << controller }) do
+        to_prepare_blocks.first.call
       end
     end
 

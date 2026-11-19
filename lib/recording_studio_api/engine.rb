@@ -50,6 +50,7 @@ module RecordingStudioApi
       end
 
       def apply_loaded_controller_extensions
+        load_engine_api_controller
         each_action_controller { |controller| apply_controller_extensions(controller) }
       end
 
@@ -84,6 +85,15 @@ module RecordingStudioApi
       end
 
       private
+
+      def load_engine_api_controller
+        return unless defined?(Rails) && Rails.application
+        return if loaded_constant("RecordingStudioApi::ApiController")
+
+        RecordingStudioApi::ApiController
+      rescue NameError
+        nil
+      end
 
       def each_action_controller(&block)
         action_controller_parents.each do |parent|
