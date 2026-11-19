@@ -34,6 +34,14 @@ module RecordingStudioApi
           new(api: api).recording_schema(recordable_type)
         end
 
+        def attributes_schema_for(recordable_type, mutable: false, api: :public)
+          new(api: api).attributes_schema_for(recordable_type, mutable: mutable)
+        end
+
+        def contract_type_for(openapi_type)
+          new.contract_type_for(openapi_type)
+        end
+
         def filter_query_parameters(attributes)
           parameters = [
             {
@@ -800,6 +808,11 @@ module RecordingStudioApi
         end
       end
 
+      def contract_type_for(openapi_type)
+        %i[integer float boolean array hash].find { |t| openapi_type_for(t) == openapi_type.to_s } || :string
+      end
+      public :contract_type_for
+
       def openapi_tag_for(resource_name, recordable_type)
         docs_resource_name_for(resource_name, recordable_type)
       end
@@ -1237,6 +1250,7 @@ module RecordingStudioApi
         mutable_schema[:properties] = mutable_schema.fetch(:properties).except(*immutable_property_keys)
         mutable_schema
       end
+      public :attributes_schema_for
 
       def recordable_details_schema(recordable_type)
         return if recordable_type.blank?

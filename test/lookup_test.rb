@@ -293,6 +293,100 @@ class LookupTest < Minitest::Test
     assert_equal true, endpoint.sensitive
   end
 
+  def test_page_create_lookup_marks_title_required_and_not_blank
+    register_page(
+      writable_attributes: %i[title],
+      openapi: {
+        details_schema: {
+          type: "object",
+          properties: { title: { type: "string", minLength: 1 } },
+          required: ["title"]
+        }
+      }
+    )
+
+    create = RecordingStudioApi.lookup(recordable_type: "Page", operation: :create)
+    update = RecordingStudioApi.lookup(recordable_type: "Page", operation: :update)
+
+    assert_equal true, create.input_contract[:title][:required]
+    assert_equal false, create.input_contract[:title][:allow_blank]
+    assert_equal false, update.input_contract[:title][:required]
+    assert_equal false, update.input_contract[:title][:allow_blank]
+  end
+
+  def test_page_body_field_includes_enum_from_details_schema
+    register_page(
+      writable_attributes: %i[title body],
+      openapi: {
+        details_schema: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            body: { type: "string", enum: %w[short long] }
+          }
+        }
+      }
+    )
+
+    create = RecordingStudioApi.lookup(recordable_type: "Page", operation: :create)
+
+    assert_equal %w[short long], create.input_contract[:body][:enum]
+  end
+
+  def test_page_items_field_includes_nested_object_shape
+    register_page(
+      writable_attributes: %i[items],
+      openapi: {
+        details_schema: {
+          type: "object",
+          properties: {
+            items: {
+              type: "object",
+              properties: {
+                heading: { type: "string" }
+              }
+            }
+          }
+        }
+      }
+    )
+
+    create = RecordingStudioApi.lookup(recordable_type: "Page", operation: :create)
+
+    assert_equal :hash, create.input_contract[:items][:type]
+    assert_equal({ heading: { type: "string" } }, create.input_contract[:items][:properties])
+  end
+
+  def test_page_update_lookup_drops_immutable_fields_and_keeps_shape
+    register_page(
+      writable_attributes: %i[title body items],
+      immutable_fields: %i[title],
+      openapi: {
+        details_schema: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            body: { type: "string", enum: %w[short long] },
+            items: {
+              type: "object",
+              properties: {
+                heading: { type: "string" }
+              }
+            }
+          }
+        }
+      }
+    )
+
+    update = RecordingStudioApi.lookup(recordable_type: "Page", operation: :update)
+
+    refute update.input_contract.key?(:title)
+    assert_equal false, update.input_contract[:body][:required]
+    assert_equal %w[short long], update.input_contract[:body][:enum]
+    assert_equal :hash, update.input_contract[:items][:type]
+    assert_equal({ heading: { type: "string" } }, update.input_contract[:items][:properties])
+  end
+
   def test_lookup_deep_dups_schema_and_contract
     register_page(writable_attributes: %i[title])
     first = RecordingStudioApi.lookup(recordable_type: "Page", operation: :create)

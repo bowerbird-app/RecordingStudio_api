@@ -1,5 +1,14 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.21.3
+
+Additive lookup metadata. No migration. HTTP responses and OpenAPI stay the same.
+
+1. Bump the host gem to `1.21.3`. Gemspec ranges stay the same.
+2. `RecordingStudioApi.lookup` create and update field hashes now copy `enum` and nested `items` / `properties` from `DocumentationCatalog.attributes_schema_for` (the same write schema OpenAPI already uses). Create sets `required: true` and `allow_blank: false` when `details_schema` lists the field as required. Update always reports `required: false`. `allow_blank` is also false when the field schema has `minLength` of 1 or more. Fields without that schema stay `{ type: :string, required: false, allow_blank: true }`.
+3. A field listed in `details_schema`'s `required` list is now advertised to MCP as required on create.
+4. Compare [v1.21.2...v1.21.3](https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.2...v1.21.3).
+
 ## Upgrading to 1.21.2
 
 Controller extensions reach `ActionController::API` controllers. No migration. Routes, parameters, and authentication are unchanged.

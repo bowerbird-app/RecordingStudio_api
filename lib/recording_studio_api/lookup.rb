@@ -115,7 +115,45 @@ module RecordingStudioApi
 
       names = Array(registration.writable_attributes).map(&:to_s)
       names -= Array(registration.immutable_fields).map(&:to_s) if operation == :update
-      names.to_h { |name| [name.to_sym, { type: :string, required: false, allow_blank: true }] }
+      schema = Services::DocumentationCatalog.attributes_schema_for(
+        @recordable_type,
+        mutable: operation == :update,
+        api: @api
+      )
+      properties = Hash(schema[:properties]).transform_keys { |key| key.to_s.to_sym }
+      required_names = create_required_names(registration, operation)
+
+      names.to_h do |name|
+        [name.to_sym, write_field_contract(name, properties[name.to_sym], required_names)]
+      end
+    end
+
+    def create_required_names(registration, operation)
+      return [] unless operation == :create
+
+      details = registration.openapi&.dig(:details_schema)
+      return [] unless details.is_a?(Hash)
+
+      Array(details[:required] || details["required"]).map(&:to_s)
+    end
+
+    def write_field_contract(name, overlay, required_names)
+      required = required_names.include?(name)
+      field = {
+        type: :string,
+        required: required,
+        allow_blank: !required
+      }
+      return field unless overlay.is_a?(Hash)
+
+      overlay = overlay.deep_dup.deep_symbolize_keys
+      field[:type] = Services::DocumentationCatalog.contract_type_for(overlay[:type]) if overlay[:type]
+      field[:enum] = overlay[:enum] if overlay[:enum].is_a?(Array)
+      field[:items] = overlay[:items] if overlay[:items]
+      field[:properties] = overlay[:properties] if overlay[:properties]
+      min_length = overlay[:minLength]
+      field[:allow_blank] = false if min_length.is_a?(Numeric) && min_length >= 1
+      field
     end
 
     def contract_fields(contract)
