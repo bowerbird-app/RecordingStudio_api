@@ -48,6 +48,12 @@ module RecordingStudioApi
         assert document.fetch(:components).fetch(:securitySchemes).key?(:oauthHttpBasic)
       end
 
+      def test_call_omits_sensitive_registration_keys
+        document = OpenapiDocument.call
+
+        refute_sensitive_key(document)
+      end
+
       def test_call_uses_configured_openapi_title_when_present
         original_configuration_defined = RecordingStudioApi.instance_variable_defined?(:@configuration)
         original_configuration = RecordingStudioApi.instance_variable_get(:@configuration)
@@ -1319,6 +1325,17 @@ module RecordingStudioApi
 
       def path_parameter_names(operation)
         operation.fetch(:parameters).select { |parameter| parameter.fetch("in") == "path" }.map { |parameter| parameter.fetch("name") }
+      end
+
+      def refute_sensitive_key(value)
+        case value
+        when Hash
+          refute value.key?(:sensitive)
+          refute value.key?("sensitive")
+          value.each_value { |child| refute_sensitive_key(child) }
+        when Array
+          value.each { |child| refute_sensitive_key(child) }
+        end
       end
 
       def with_isolated_configuration

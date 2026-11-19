@@ -79,14 +79,15 @@ module RecordingStudioApi
     attr_reader :recordable_type, :public_name, :serializer, :output_keys, :fields, :openapi,
                 :sortable_attributes, :writable_attributes, :immutable_fields, :relationships,
                 :immutable_relationships, :operations, :capability_actions, :auto_capability_actions, :metric_names,
-                :default_order
+                :default_order, :sensitive_operations
 
     def initialize(recordable_type:, serializer: nil, output_keys: nil, fields: nil, openapi: nil,
                    sortable_attributes: nil, writable_attributes: nil, immutable_fields: nil,
                    relationships: nil, immutable_relationships: nil, operations: nil, capability_actions: nil,
                    auto_capability_actions: nil, metrics: nil, operations_supplied: nil,
                    capability_actions_supplied: nil, auto_capability_actions_supplied: nil, metrics_supplied: nil,
-                   public_name: nil, public_name_supplied: nil, default_order: nil, default_order_supplied: nil)
+                   public_name: nil, public_name_supplied: nil, default_order: nil, default_order_supplied: nil,
+                   sensitive: nil, sensitive_supplied: nil)
       @recordable_type = recordable_type.to_s
       assign_public_name(public_name, public_name_supplied)
       @serializer = serializer
@@ -112,6 +113,8 @@ module RecordingStudioApi
       @metric_names = normalize_metric_names(metrics)
       @default_order_supplied = default_order_supplied.nil? ? !default_order.nil? : default_order_supplied
       @default_order = DefaultListOrder.parse(default_order, recordable_type: @recordable_type)
+      @sensitive_supplied = sensitive_supplied.nil? ? !sensitive.nil? : sensitive_supplied
+      @sensitive_operations = normalize_sensitive_operations(sensitive)
       validate!
       freeze
     end
@@ -192,6 +195,16 @@ module RecordingStudioApi
 
     def public_name_supplied?
       @public_name_supplied
+    end
+
+    def sensitive_supplied?
+      @sensitive_supplied
+    end
+
+    def sensitive_operation?(operation, api: :public)
+      return true if SensitiveFlag.default?(api)
+
+      sensitive_operations.include?(operation.to_sym)
     end
 
     def filterable_attributes
@@ -408,6 +421,16 @@ module RecordingStudioApi
 
     def normalize_operations(value)
       (Array(value).presence || DEFAULT_OPERATIONS).map { |operation| operation.to_s.to_sym }.uniq.sort.freeze
+    end
+
+    def normalize_sensitive_operations(value)
+      names = Array(value).map { |operation| operation.to_s.to_sym }.uniq
+      unknown = names - DEFAULT_OPERATIONS
+      if unknown.any?
+        raise ConfigurationError, "Unknown API operations in sensitive for #{recordable_type}: #{unknown.join(', ')}"
+      end
+
+      names.sort.freeze
     end
 
     def normalize_capability_actions(value)

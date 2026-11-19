@@ -30,6 +30,10 @@ module RecordingStudioApi
           new(version: version, mount_path: mount_path, api_mount_path: api_mount_path, api: api).call
         end
 
+        def recording_schema(recordable_type, api: :public)
+          new(api: api).recording_schema(recordable_type)
+        end
+
         def filter_query_parameters(attributes)
           parameters = [
             {
@@ -1137,6 +1141,7 @@ module RecordingStudioApi
           required: %w[id type root_id created_at updated_at]
         }
       end
+      public :recording_schema
 
       def field_properties_for(recordable_type, output_keys: nil)
         registration = recordable_registration_for(recordable_type)

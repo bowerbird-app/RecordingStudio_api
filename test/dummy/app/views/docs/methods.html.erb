@@ -14,8 +14,9 @@
 			RecordingStudioApi.configure { |config| config.access_token_ttl = 1.hour }
 			RecordingStudioApi.register_recordable_type_api(
 			  "Page",
-			  output_keys: %i[title],
-			  fields: { title: :title }
+			  operations: %i[index show],
+			  serializer: ->(recordable, **) { { title: recordable.title } },
+			  output_keys: %i[title]
 			)
 			RecordingStudioApi.register_capability_action(
 			  :publish,
@@ -38,6 +39,8 @@
 			RecordingStudioApi.capability_action(:publish)
 			RecordingStudioApi.resource_action(:show)
 			RecordingStudioApi.registered_endpoint(:ping)
+			RecordingStudioApi.lookup(api: :public, recordable_type: "Page", operation: :show)
+			RecordingStudioApi.lookup(api: :public, endpoint: :ping)
 		CODE
 	) %>
 
