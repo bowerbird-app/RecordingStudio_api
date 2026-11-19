@@ -330,38 +330,73 @@ class EngineTest < Minitest::Test
     move.instance_variable_set(:@conflict_response_installed, previous)
   end
 
-  def test_apply_extensions_flattens_compacts_and_tracks_identity
-    target = Class.new
-    extension = proc do
-      def generated_method
-        :generated
+  def test_applying_an_extension_twice_does_not_duplicate_the_rescue
+    require "action_controller"
+    controller = Class.new(ActionController::API) do
+      def self.name
+        "OnceApiController"
       end
     end
 
-    RecordingStudioApi::Engine.send(:apply_extensions, target, [nil, [extension, extension]])
+    RecordingStudioApi.configuration.hooks.extend_controller(:OnceApiController) do
+      rescue_from StandardError do
+        # The handler body is unused. The count is the assertion.
+      end
+    end
 
-    assert_equal :generated, target.new.generated_method
-    assert_equal true, target.instance_variable_get(:@recording_studio_api_applied_extensions).compare_by_identity?
+    RecordingStudioApi::Engine.apply_controller_extensions(controller)
+    RecordingStudioApi::Engine.apply_controller_extensions(controller)
+
+    assert_equal 1, controller.rescue_handlers.map(&:first).count("StandardError")
   end
 
-  def test_apply_extensions_does_not_repeat_a_completed_extension_after_a_later_one_raises
-    target = Class.new do
+  def test_distinct_extensions_with_the_same_effect_both_apply
+    require "action_controller"
+    controller = Class.new(ActionController::API) do
+      def self.name
+        "EqualProcsController"
+      end
+    end
+
+    RecordingStudioApi.configuration.hooks.extend_controller(:EqualProcsController) do
+      rescue_from ArgumentError do
+        # First of two equal rescues.
+      end
+    end
+    RecordingStudioApi.configuration.hooks.extend_controller(:EqualProcsController) do
+      rescue_from ArgumentError do
+        # Second of two equal rescues.
+      end
+    end
+
+    RecordingStudioApi::Engine.apply_controller_extensions(controller)
+
+    assert_equal 2, controller.rescue_handlers.map(&:first).count("ArgumentError")
+  end
+
+  def test_a_later_failure_does_not_replay_an_applied_extension
+    controller = Class.new do
+      def self.name
+        "PartialApplyController"
+      end
+
       class << self
         attr_accessor :runs
       end
     end
-    target.runs = 0
-    completed = proc { target.runs += 1 }
-    failing = proc { raise "stop applying" }
+    controller.runs = 0
 
-    assert_raises(RuntimeError) do
-      RecordingStudioApi::Engine.send(:apply_extensions, target, [completed, failing])
+    RecordingStudioApi.configuration.hooks.extend_controller(:PartialApplyController) do
+      controller.runs += 1
     end
-    assert_raises(RuntimeError) do
-      RecordingStudioApi::Engine.send(:apply_extensions, target, [completed, failing])
+    RecordingStudioApi.configuration.hooks.extend_controller(:PartialApplyController) do
+      raise "stop applying"
     end
 
-    assert_equal 1, target.runs
+    assert_raises(RuntimeError) { RecordingStudioApi::Engine.apply_controller_extensions(controller) }
+    assert_raises(RuntimeError) { RecordingStudioApi::Engine.apply_controller_extensions(controller) }
+
+    assert_equal 1, controller.runs
   end
 
   def test_apply_extensions_returns_without_target
