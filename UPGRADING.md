@@ -1,5 +1,12 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.21.1
+
+CI only. No migration. Host apps are unchanged.
+
+1. Bump the host gem to `1.21.1`. Gemspec ranges stay the same.
+2. Compare [v1.21.0...v1.21.1](https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.0...v1.21.1).
+
 ## Upgrading to 1.21.0
 
 Dependency pins only. No migration in this gem. Behavior of this gem is unchanged.

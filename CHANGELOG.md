@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.21.1] - 2026-11-19
+
+### Changed
+- CI starts Redis 7 on port 6379 and sets `REDIS_URL` and `RECORDING_STUDIO_API_RATE_LIMIT_REDIS_URL` to `redis://127.0.0.1:6379/0`, so the idempotency Redis round-trip runs.
+- CI passes the existing Actions secret `RAILS_MASTER_KEY` into the gem and dummy test steps. An empty value is unset, so those credential tests keep skipping and the job still passes.
+
+### Upgrade notes
+- Bump to `1.21.1`. No migration. Host apps are unchanged.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.21.0] - 2026-11-19
 
 ### Changed
@@ -1681,7 +1691,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.1...HEAD
+[1.21.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.0...v1.21.1
 [1.21.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.20.0...v1.21.0
 [1.17.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.17.0...v1.17.1
 [1.0.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.26.0...v1.0.0

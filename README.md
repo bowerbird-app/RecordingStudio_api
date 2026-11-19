@@ -1647,6 +1647,8 @@ Sign in with:
 
 Dummy credentials (`test/dummy/config/credentials.yml.enc`) are encrypted with the shared RecordingStudio_* development master key. Set `RAILS_MASTER_KEY` or put that key in `test/dummy/config/master.key` (gitignored). Keep the encrypted file; do not generate a per-repo dummy key.
 
+GitHub Actions (`.github/workflows/ci.yml`) starts Postgres 16 and Redis 7. The test job sets `REDIS_URL` and `RECORDING_STUDIO_API_RATE_LIMIT_REDIS_URL` to `redis://127.0.0.1:6379/0`, which is the URL `IdempotencyStore` reads through `rate_limit_redis_url`. The gem and dummy test steps receive `RAILS_MASTER_KEY` from the Actions secret of the same name. When that secret is empty, those steps unset it and the credential tests skip.
+
 ## Cloud Agent boot
 
 Cloud Agent Builds run `.cursor/install.sh`, then `.cursor/fetch-skills.sh`.
