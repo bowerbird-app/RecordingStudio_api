@@ -61,19 +61,6 @@ module RecordingStudioApi
       @definition
     end
 
-    def field_descriptors
-      fields.transform_values do |rules|
-        descriptor = {
-          type: rules[:type].to_sym,
-          required: rules.fetch(:required, false),
-          allow_blank: rules.fetch(:allow_blank, true)
-        }
-        descriptor[:description] = rules[:description] if rules[:description]
-        descriptor[:example] = rules[:example] if rules.key?(:example)
-        descriptor
-      end
-    end
-
     private
 
     def normalize_definition(definition)

@@ -63,8 +63,8 @@ module RecordingStudioApi
 
       Result.new(
         handler: handler,
-        input_contract: type_operation_input_contract(registration, operation),
-        output_schema: Services::DocumentationCatalog.recording_schema(@recordable_type, api: @api),
+        input_contract: dup_payload(type_operation_input_contract(registration, operation)),
+        output_schema: dup_payload(Services::DocumentationCatalog.recording_schema(@recordable_type, api: @api)),
         sensitive: registration.sensitive_operation?(operation, api: @api),
         apis: apis_for { |api| type_operation_on?(api, operation) }
       )
@@ -79,8 +79,8 @@ module RecordingStudioApi
 
       Result.new(
         handler: handler,
-        input_contract: contract_descriptors(action.input_contract),
-        output_schema: action_output_schema(action),
+        input_contract: contract_fields(action.input_contract),
+        output_schema: dup_payload(action_output_schema(action)),
         sensitive: action.sensitive,
         apis: apis_for { |api| RecordingStudioApi.capability_action(@action, version: @version, api: api) }
       )
@@ -92,8 +92,8 @@ module RecordingStudioApi
 
       Result.new(
         handler: endpoint.handler,
-        input_contract: contract_descriptors(endpoint.input_contract),
-        output_schema: endpoint_output_schema(endpoint),
+        input_contract: contract_fields(endpoint.input_contract),
+        output_schema: dup_payload(endpoint_output_schema(endpoint)),
         sensitive: endpoint.sensitive,
         apis: apis_for { |api| RecordingStudioApi.registered_endpoint(@endpoint, api: api) }
       )
@@ -118,10 +118,18 @@ module RecordingStudioApi
       names.to_h { |name| [name.to_sym, { type: :string, required: false, allow_blank: true }] }
     end
 
-    def contract_descriptors(contract)
+    def contract_fields(contract)
       return {} unless contract
 
-      contract.field_descriptors
+      payload = contract.as_json
+      fields = payload.is_a?(Hash) ? payload[:fields] || payload["fields"] : nil
+      dup_payload(fields)
+    end
+
+    def dup_payload(value)
+      copied = value.nil? ? {} : value.deep_dup
+      copied.freeze if copied.respond_to?(:freeze)
+      copied
     end
 
     def action_output_schema(action)
@@ -148,4 +156,6 @@ module RecordingStudioApi
       json.is_a?(Hash) ? json[:schema] || json["schema"] : nil
     end
   end
+
+  def self.lookup(...) = Lookup.call(...)
 end

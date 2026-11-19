@@ -202,9 +202,9 @@ module RecordingStudioApi
     end
 
     def sensitive_operation?(operation, api: :public)
-      return sensitive_operations.include?(operation.to_sym) if sensitive_supplied?
+      return true if SensitiveFlag.default?(api)
 
-      SensitiveFlag.default?(api)
+      sensitive_operations.include?(operation.to_sym)
     end
 
     def filterable_attributes
@@ -220,7 +220,7 @@ module RecordingStudioApi
         relationships: relationships.transform_values(&:to_h), immutable_relationships: immutable_relationships,
         operations: operations, capability_actions: capability_actions,
         auto_capability_actions: auto_capability_actions, metric_names: metric_names,
-        default_order: default_order&.as_json, sensitive: sensitive_operations
+        default_order: default_order&.as_json
       }
     end
 

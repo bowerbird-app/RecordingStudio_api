@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.20.0] - 2026-11-19
 
 ### Added
-- `register_recordable_type_api` accepts `sensitive:` as operation names (`%i[destroy]`). `register_capability_action` and `register_endpoint` accept `sensitive: true` or `false`. Public items default to not sensitive. Items registered only on an operations or other named API default to sensitive. An unknown operation name in `sensitive:` raises `ConfigurationError`. Repeat type registrations still merge with the existing explicit-set rules.
+- `register_recordable_type_api` accepts `sensitive:` as operation names (`%i[destroy]`). Those names add to the named API's defaults and do not remove them. Public items default to not sensitive. Items registered only on an operations or other named API stay sensitive for every operation. `register_capability_action` and `register_endpoint` accept `sensitive: true` or `false`. An unknown operation name in `sensitive:` raises `ConfigurationError`. Repeat type registrations still merge with the existing explicit-set rules. The flag is omitted from registration `as_json` dumps and OpenAPI.
 - `RecordingStudioApi.lookup(api:, recordable_type:, operation:, action:, endpoint:, version:)` returns the HTTP handler, input contract, output schema, effective sensitive flag, and the named APIs that expose that target. HTTP routes and OpenAPI are unchanged.
 
 ### Upgrade notes

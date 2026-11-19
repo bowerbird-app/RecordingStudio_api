@@ -5,7 +5,7 @@
 Additive. No migration. HTTP responses and OpenAPI stay the same.
 
 1. Bump the host gem to `1.20.0`. Stay on Recording Studio `>= 7.7.0`, `< 8.0`.
-2. Pass `sensitive: %i[destroy]` on `register_recordable_type_api` to mark those operations. Pass `sensitive: true` or `false` on `register_capability_action` and `register_endpoint`. Omit the keyword to keep the default: not sensitive on the public API, sensitive on an operations or other named API.
+2. Pass `sensitive: %i[destroy]` on `register_recordable_type_api` to add those operations to the named API's defaults. Public registrations stay not sensitive except the listed names. An operations or other named API stays sensitive for every operation. Pass `sensitive: true` or `false` on `register_capability_action` and `register_endpoint`. Omit the keyword to keep the default: not sensitive on the public API, sensitive on an operations or other named API.
 3. An unknown operation name in `sensitive:` raises `RecordingStudioApi::ConfigurationError` at registration.
 4. Call `RecordingStudioApi.lookup` to read the registered handler, input contract, output schema, sensitive flag, and named APIs for a type operation, capability action, or named endpoint. Dispatch still goes through that handler so Accessible authorization is unchanged.
 

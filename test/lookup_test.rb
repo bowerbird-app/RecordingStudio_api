@@ -62,6 +62,25 @@ class LookupTest < Minitest::Test
     refute RecordingStudioApi.lookup(api: :public, recordable_type: "Page", operation: :show)
   end
 
+  def test_operations_api_keeps_every_operation_sensitive_when_listing_destroy
+    RecordingStudioApi.configuration.api(:operations)
+    RecordingStudioApi.register_default_resource_actions!(api: :operations)
+    RecordingStudioApi.register_recordable_type_api(
+      "Page",
+      api: :operations,
+      operations: %i[index show destroy],
+      serializer: Serializer,
+      output_keys: %i[title],
+      sensitive: %i[destroy]
+    )
+
+    show = RecordingStudioApi.lookup(api: :operations, recordable_type: "Page", operation: :show)
+    destroy = RecordingStudioApi.lookup(api: :operations, recordable_type: "Page", operation: :destroy)
+
+    assert_equal true, show.sensitive
+    assert_equal true, destroy.sensitive
+  end
+
   def test_unknown_sensitive_operation_raises_at_registration
     error = assert_raises(RecordingStudioApi::ConfigurationError) do
       register_page(sensitive: %i[export])
@@ -203,7 +222,7 @@ class LookupTest < Minitest::Test
     assert_equal OpsPingHandler, operations_ping.handler
     assert_equal false, public_ping.sensitive
     assert_equal %i[public operations], public_ping.apis
-    assert_equal({ token: { type: :string, required: false, allow_blank: true } }, public_ping.input_contract)
+    assert_equal({ token: { type: :string, required: false } }, public_ping.input_contract)
     assert_equal({ type: "object" }, public_ping.output_schema)
     assert_equal true, operations_ping.sensitive
     assert_equal false, health.sensitive
@@ -244,6 +263,47 @@ class LookupTest < Minitest::Test
       )
     end
     assert_includes error.message, "sensitive must be true or false"
+  end
+
+  def test_registration_as_json_omits_sensitive
+    register_page(sensitive: %i[destroy])
+    RecordingStudioApi.register_capability_action(
+      :secret_publish,
+      capability: :publishable,
+      handler: PublishHandler,
+      sensitive: true
+    )
+    RecordingStudioApi.register_endpoint(
+      :secret_ping,
+      http_verb: :get,
+      path: "secret-ping",
+      handler: PingHandler,
+      sensitive: true
+    )
+
+    page = RecordingStudioApi.configuration.recordable_registry.fetch("Page")
+    action = RecordingStudioApi.capability_action(:secret_publish)
+    endpoint = RecordingStudioApi.registered_endpoint(:secret_ping)
+
+    refute page.as_json.key?(:sensitive)
+    refute action.as_json.key?(:sensitive)
+    refute endpoint.as_json.key?(:sensitive)
+    assert_equal %i[destroy], page.sensitive_operations
+    assert_equal true, action.sensitive
+    assert_equal true, endpoint.sensitive
+  end
+
+  def test_lookup_deep_dups_schema_and_contract
+    register_page(writable_attributes: %i[title])
+    first = RecordingStudioApi.lookup(recordable_type: "Page", operation: :create)
+    second = RecordingStudioApi.lookup(recordable_type: "Page", operation: :create)
+    catalog = RecordingStudioApi::Services::DocumentationCatalog.recording_schema("Page")
+
+    first.input_contract[:title][:type] = :integer
+    first.output_schema[:required] << "hijacked"
+
+    assert_equal :string, second.input_contract[:title][:type]
+    refute_includes catalog[:required], "hijacked"
   end
 
   def test_lookup_returns_nil_for_unknown_targets

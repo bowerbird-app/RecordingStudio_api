@@ -88,7 +88,7 @@ require "recording_studio_api/admin"
 require "recording_studio_api/metrics"
 require "recording_studio_api/metrics/endpoints"
 
-# rubocop:disable-next Metrics/ModuleLength, Metrics/ClassLength
+# rubocop:disable-next Metrics/ModuleLength
 module RecordingStudioApi
   class << self
     include OpenapiHelpers
@@ -160,17 +160,6 @@ module RecordingStudioApi
 
     def oauth_error_status(error)
       Integration.oauth_error_status(error)
-    end
-
-    def lookup(api: :public, recordable_type: nil, operation: nil, action: nil, endpoint: nil, version: nil)
-      Lookup.call(
-        api: api,
-        recordable_type: recordable_type,
-        operation: operation,
-        action: action,
-        endpoint: endpoint,
-        version: version
-      )
     end
 
     def register_endpoint(name, api: :public, http_verb:, path:, handler:, serializer: nil, openapi: nil, input_contract: nil, ui: nil, trashed_semantics: nil, sensitive: nil, **)
@@ -282,9 +271,7 @@ module RecordingStudioApi
         capability_actions: capability_actions,
         auto_capability_actions: auto_capability_actions,
         metrics: metrics,
-        public_name: public_name,
-        default_order: default_order,
-        sensitive: sensitive
+        public_name: public_name, default_order: default_order, sensitive: sensitive
       )
     end
 

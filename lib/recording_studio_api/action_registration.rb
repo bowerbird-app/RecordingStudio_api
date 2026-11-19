@@ -33,7 +33,7 @@ module RecordingStudioApi
       @trashed_semantics = HandlerScope.trashed_semantics(options.delete(:trashed_semantics), name: @name)
       @ui = UiWidgetId.normalize(options.delete(:ui), name: name)
       @creates = HandlerScope.flag(options.delete(:creates) { false }, name: :creates)
-      @sensitive = coerce_sensitive_flag(options.delete(:sensitive))
+      @sensitive = SensitiveFlag.boolean!(options.delete(:sensitive) { false }, name: name)
       raise ArgumentError, "unknown keywords: #{options.keys.join(', ')}" if options.any?
     end
 
@@ -118,8 +118,7 @@ module RecordingStudioApi
         required_role: required_role,
         openapi: openapi,
         input_contract: input_contract&.as_json,
-        ui: ui,
-        sensitive: sensitive
+        ui: ui
       }
     end
 
@@ -214,12 +213,6 @@ module RecordingStudioApi
       return if value.nil?
 
       value.to_s.strip.to_sym
-    end
-
-    def coerce_sensitive_flag(value)
-      return false if value.nil?
-
-      SensitiveFlag.boolean!(value, name: name)
     end
 
     def valid_access_roles

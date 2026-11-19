@@ -31,7 +31,7 @@ module RecordingStudioApi
         end
 
         def recording_schema(recordable_type, api: :public)
-          new(api: api).send(:recording_schema, recordable_type)
+          new(api: api).recording_schema(recordable_type)
         end
 
         def filter_query_parameters(attributes)
@@ -1141,6 +1141,7 @@ module RecordingStudioApi
           required: %w[id type root_id created_at updated_at]
         }
       end
+      public :recording_schema
 
       def field_properties_for(recordable_type, output_keys: nil)
         registration = recordable_registration_for(recordable_type)
