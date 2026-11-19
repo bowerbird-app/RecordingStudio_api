@@ -8,7 +8,7 @@ class RecordingStudioApiTest < Minitest::Test
   end
 
   def test_version_pin
-    assert_equal "1.20.0", ::RecordingStudioApi::VERSION
+    assert_equal "1.21.0", ::RecordingStudioApi::VERSION
   end
 
   def test_preproduction_backfill_and_summary_migrations_are_gone
@@ -72,17 +72,17 @@ class RecordingStudioApiTest < Minitest::Test
     assert_includes gemspec, '"recording_studio_moveable", ">= 5.0", "< 7.0"'
     %w[Gemfile test/dummy/Gemfile].each do |path|
       contents = File.read(File.join(root, path))
-      assert_includes contents, 'RecordingStudio", tag: "v7.7.2"', path
-      assert_includes contents, 'flatpack", tag: "v0.1.379"', path
-      assert_includes contents, 'RecordingStudio_accessible", tag: "v0.54.1"', path
-      assert_includes contents, 'RecordingStudio_trashable", tag: "v1.2.3"', path
-      assert_includes contents, 'RecordingStudio_root_switchable", tag: "v0.16.1"', path
-      assert_includes contents, 'RecordingStudio_moveable", tag: "v6.0.3"', path
-      assert_includes contents, 'RecordingStudio_cache", tag: "v0.7.1"', path
-      assert_includes contents, 'RecordingStudio_metrics", tag: "v0.9.2"', path
-      assert_includes contents, 'RecordingStudio_logs", tag: "v0.8.2"', path
-      assert_includes contents, 'RecordingStudio_icons", tag: "v0.4.2"', path
-      assert_includes contents, 'RecordingStudio_admin", tag: "v2.19.1"', path
+      assert_includes contents, 'gem "recording_studio", "~> 7.8", github: "bowerbird-app/RecordingStudio", tag: "v7.8.0"', path
+      assert_includes contents, 'gem "flat_pack", "~> 0.2", github: "bowerbird-app/flatpack", tag: "v0.2.0"', path
+      assert_includes contents, 'gem "recording_studio_accessible", "~> 0.58", github: "bowerbird-app/RecordingStudio_accessible", tag: "v0.58.0"', path
+      assert_includes contents, 'gem "recording_studio_trashable", "~> 1.3", github: "bowerbird-app/RecordingStudio_trashable", tag: "v1.3.0"', path
+      assert_includes contents, 'gem "recording_studio_root_switchable", "~> 0.17", github: "bowerbird-app/RecordingStudio_root_switchable", tag: "v0.17.0"', path
+      assert_includes contents, 'gem "recording_studio_moveable", "~> 6.1", github: "bowerbird-app/RecordingStudio_moveable", tag: "v6.1.0"', path
+      assert_includes contents, 'gem "recording_studio_cache", "~> 0.8", github: "bowerbird-app/RecordingStudio_cache", tag: "v0.8.0"', path
+      assert_includes contents, 'gem "recording_studio_metrics", "~> 0.10", github: "bowerbird-app/RecordingStudio_metrics", tag: "v0.10.0"', path
+      assert_includes contents, 'gem "recording_studio_logs", "~> 0.9", github: "bowerbird-app/RecordingStudio_logs", tag: "v0.9.0"', path
+      assert_includes contents, 'gem "recording_studio_icons", "~> 0.5", github: "bowerbird-app/RecordingStudio_icons", tag: "v0.5.0"', path
+      assert_includes contents, 'gem "recording_studio_admin", "~> 2.19", github: "bowerbird-app/RecordingStudio_admin", tag: "v2.19.1"', path
       refute_includes contents, "allow_unauthorized_writes", path
     end
     %w[test/dummy/db/schema.rb test/dummy/db/api_logging_schema.rb].each do |path|
@@ -180,8 +180,8 @@ class RecordingStudioApiTest < Minitest::Test
 
     assert_includes readme_source, "preserved in this repository under `docs/gem_template/`"
     assert_includes readme_source, "not packaged gem docs"
-    assert_includes readme_source, "| RecordingStudio | v7.7.2 (pinned in `test/dummy/Gemfile`) |"
-    assert_includes readme_source, "| FlatPack        | v0.1.379 (pinned in `test/dummy/Gemfile`) |"
+    assert_includes readme_source, "| RecordingStudio | v7.8.0 (pinned in `test/dummy/Gemfile`) |"
+    assert_includes readme_source, "| FlatPack        | v0.2.0 (pinned in `test/dummy/Gemfile`) |"
   end
 
   def test_dummy_readme_explains_dummy_app_purpose

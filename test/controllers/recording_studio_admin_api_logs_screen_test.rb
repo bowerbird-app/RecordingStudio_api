@@ -1054,7 +1054,7 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
       assert_response :success
       assert_includes response.body, "Expiring soon"
       assert_includes response.body, "Expire in the next #{RecordingStudioApi::Admin::ApiKeyHealthWidgets.window_days(RecordingStudioApi::Metrics::EXPIRING_SOON_WINDOW)} days"
-      assert_includes response.body, 'data-flat-pack--icon-name-value="clock"'
+      assert_includes response.body, 'd="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"'
       assert_includes response.body, "health=expiring_soon"
       assert_includes response.body, expiring_count.to_s
 
@@ -1064,7 +1064,7 @@ class RecordingStudioAdminApiScreensTest < ActionDispatch::IntegrationTest
       assert_response :success
       assert_includes response.body, "Stale keys"
       assert_includes response.body, "Unused for #{RecordingStudioApi::Admin::ApiKeyHealthWidgets.window_days(RecordingStudioApi::Metrics::STALE_AFTER)}+ days"
-      assert_includes response.body, 'data-flat-pack--icon-name-value="pause"'
+      assert_includes response.body, 'd="M15.75 5.25v13.5m-7.5-13.5v13.5"'
       assert_includes response.body, "health=stale"
       assert_includes response.body, stale_count.to_s
 

@@ -1,5 +1,15 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.21.0
+
+Dependency pins only. No migration in this gem. Behavior of this gem is unchanged.
+
+1. Bump the host gem to `1.21.0`. Gemspec ranges stay Recording Studio `>= 7.7.0`, `< 8.0`, Accessible `>= 0.50.0`, `< 2.0`, Logs `>= 0.8.0`, `< 2.0`, Metrics `>= 0.9.0`, `< 2.0`, Moveable `>= 5.0`, `< 7.0`, Trashable `>= 0.17.0`, `< 2.0`, and FlatPack `>= 0.1.356`, `< 2.0`.
+2. Development and dummy pins are Recording Studio `~> 7.8` / `v7.8.0`, FlatPack `~> 0.2` / `v0.2.0`, Accessible `~> 0.58` / `v0.58.0`, Cache `~> 0.8` / `v0.8.0`, Icons `~> 0.5` / `v0.5.0`, Logs `~> 0.9` / `v0.9.0`, Metrics `~> 0.10` / `v0.10.0`, Moveable `~> 6.1` / `v6.1.0`, Root Switchable `~> 0.17` / `v0.17.0`, and Trashable `~> 1.3` / `v1.3.0`. Admin stays `~> 2.19` / `v2.19.1`.
+3. Host apps MUST run the Recording Studio 7.4, 7.5 and 7.7 migrations if they have not. The dummy app already includes those migrations. Do not add another copy.
+4. flat_pack 0.2.0 is supported; hosts moving to 0.2 must remove the manual `flat_pack/heroicons` importmap pin and any `flat-pack--icon` controller registration.
+5. Compare [v1.20.0...v1.21.0](https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.20.0...v1.21.0).
+
 ## Upgrading to 1.20.0
 
 Additive. No migration. HTTP responses and OpenAPI stay the same.

@@ -115,7 +115,7 @@
       <%= render FlatPack::List::Item.new(icon: :x_circle) do %>
         <span>Missing, malformed, inactive, or invalid tokens return <code>401 Unauthorized</code> with a JSON <code>error</code> message.</span>
       <% end %>
-      <%= render FlatPack::List::Item.new(icon: :ban) do %>
+      <%= render FlatPack::List::Item.new(icon: :no_symbol) do %>
         <span>Authorization failures during action execution return <code>403 Forbidden</code>.</span>
       <% end %>
       <%= render FlatPack::List::Item.new(icon: :clock) do %>
