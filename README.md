@@ -713,7 +713,7 @@ RecordingStudioApi.register_recordable_type_api(
 )
 ```
 
-`registration.public_name` returns `"PressKit"`. `RecordingStudioApi.recordable_type_for_public_name("PressKit", api: :public)` returns `"RecordingStudioPresskits::PressKit"`. It checks the public name first, then the exact full class name. A miss returns nil. Pass `api:` for a named API. The full class name still finds the registration through `recordable_registration_for`.
+`registration.public_name` returns `"PressKit"`. `RecordingStudioApi.recordable_type_for_public_name("PressKit", api: :public)` returns `"RecordingStudioPresskits::PressKit"`. It checks the public name first, then the exact full class name. A miss returns nil. Pass `api:` for a named API. The full class name still finds the registration through `recordable_registration_for`. A create that is missing `parent_id` names that public type (`parent_id is required for PressKit`). When there is no registration, the message still uses the class name.
 
 Resolved public names are unique inside one named API, including the public API. A clash raises `RecordingStudioApi::ConfigurationError` and names both classes and the public name. The same public name may be registered on two different named APIs. A later registration of the same type keeps the established public name. Passing a different `public_name:` raises `ConfigurationError`.
 
