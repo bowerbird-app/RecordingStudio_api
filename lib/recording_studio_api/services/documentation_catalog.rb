@@ -24,13 +24,6 @@ module RecordingStudioApi
                      "Omitted by default so list reads do not count the scope.",
         schema: { type: "boolean", default: false }
       }.freeze
-      OPENAPI_CONTRACT_TYPES = {
-        integer: "integer",
-        float: "number",
-        boolean: "boolean",
-        array: "array",
-        hash: "object"
-      }.freeze
 
       class << self
         def call(version: nil, mount_path: nil, api_mount_path: nil, api: :public)
@@ -46,7 +39,7 @@ module RecordingStudioApi
         end
 
         def contract_type_for(openapi_type)
-          OPENAPI_CONTRACT_TYPES.key(openapi_type.to_s) || :string
+          new.contract_type_for(openapi_type)
         end
 
         def filter_query_parameters(attributes)
@@ -799,8 +792,26 @@ module RecordingStudioApi
       end
 
       def openapi_type_for(contract_type)
-        OPENAPI_CONTRACT_TYPES.fetch(contract_type.to_sym, "string")
+        case contract_type.to_sym
+        when :integer
+          "integer"
+        when :float
+          "number"
+        when :boolean
+          "boolean"
+        when :array
+          "array"
+        when :hash
+          "object"
+        else
+          "string"
+        end
       end
+
+      def contract_type_for(openapi_type)
+        %i[integer float boolean array hash].find { |t| openapi_type_for(t) == openapi_type.to_s } || :string
+      end
+      public :contract_type_for
 
       def openapi_tag_for(resource_name, recordable_type)
         docs_resource_name_for(resource_name, recordable_type)

@@ -11,7 +11,7 @@ class ResourceOperationsCreatePageTest < ActiveSupport::TestCase
     @user = create_user
     @root_recording, @access_recording = create_access_recording_for(user: @user, role: :edit)
     @folder = create_page_recording(root_recording: @root_recording).parent_recording
-    RecordingStudio.configuration.authorize_write = method(:accessible_edit_write_allowed?)
+    RecordingStudioAuthorizedWrites.install!
     RecordingStudioApi.register_recordable_type_api(
       "Page",
       serializer: ->(recordable, **) { { title: recordable.title } },
@@ -43,15 +43,6 @@ class ResourceOperationsCreatePageTest < ActiveSupport::TestCase
   end
 
   private
-
-  def accessible_edit_write_allowed?(actor:, action:, recording: nil, root_recording: nil, **)
-    return false unless actor.is_a?(ActiveRecord::Base) && action.to_s.strip.present?
-
-    target = recording || root_recording
-    return false if target.nil?
-
-    RecordingStudioAccessible.authorized?(actor: actor, recording: target, role: :edit)
-  end
 
   def create_page_context(title:)
     api_client = RecordingStudioApi::ApiClient.create!(name: "Page writer", api_key: "public")
