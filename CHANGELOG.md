@@ -7,7 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Development and dummy Gemfiles pin `recording_studio_admin` to GitHub tag `v2.19.1`.
+## [1.21.0] - 2026-11-19
+
+### Changed
+- Development and dummy Gemfiles pin Recording Studio `~> 7.8` / `v7.8.0`, FlatPack `~> 0.2` / `v0.2.0`, Accessible `~> 0.58` / `v0.58.0`, Cache `~> 0.8` / `v0.8.0`, Icons `~> 0.5` / `v0.5.0`, Logs `~> 0.9` / `v0.9.0`, Metrics `~> 0.10` / `v0.10.0`, Moveable `~> 6.1` / `v6.1.0`, Root Switchable `~> 0.17` / `v0.17.0`, and Trashable `~> 1.3` / `v1.3.0`. Admin stays `~> 2.19` / `v2.19.1`. Gemspec ranges are unchanged.
+
+### Upgrade notes
+- Bump to `1.21.0`. No migration in this gem. Host apps MUST run the Recording Studio 7.4, 7.5 and 7.7 migrations if they have not.
+- flat_pack 0.2.0 is supported; hosts moving to 0.2 must remove the manual `flat_pack/heroicons` importmap pin and any `flat-pack--icon` controller registration.
+- Compare [v1.20.0...v1.21.0](https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.20.0...v1.21.0).
 
 ## [1.20.0] - 2026-11-19
 
@@ -1673,7 +1681,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.0...HEAD
+[1.21.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.20.0...v1.21.0
 [1.17.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.17.0...v1.17.1
 [1.0.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.26.0...v1.0.0
 [0.26.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v0.25.0...v0.26.0
