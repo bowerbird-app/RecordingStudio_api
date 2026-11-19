@@ -50,18 +50,7 @@ module RecordingStudioApi
       end
 
       def apply_loaded_controller_extensions
-        load_engine_api_controller
         each_action_controller { |controller| apply_controller_extensions(controller) }
-      end
-
-      def apply_named_controller_extensions(controller_name)
-        needle = controller_name.to_s
-        each_action_controller do |controller|
-          names = [controller.name, controller.name&.demodulize].compact
-          next unless names.include?(needle)
-
-          apply_controller_extensions(controller)
-        end
       end
 
       def action_controller_subclass?(value)
@@ -85,15 +74,6 @@ module RecordingStudioApi
       end
 
       private
-
-      def load_engine_api_controller
-        return unless defined?(Rails) && Rails.application
-        return if loaded_constant("RecordingStudioApi::ApiController")
-
-        RecordingStudioApi::ApiController
-      rescue NameError
-        nil
-      end
 
       def each_action_controller(&block)
         action_controller_parents.each do |parent|
@@ -121,6 +101,7 @@ module RecordingStudioApi
         return unless target
 
         applied = target.instance_variable_get(:@recording_studio_api_applied_extensions) || identity_hash
+        target.instance_variable_set(:@recording_studio_api_applied_extensions, applied)
 
         extensions.flatten.compact.each do |extension|
           next if applied[extension]
@@ -128,8 +109,6 @@ module RecordingStudioApi
           target.class_eval(&extension)
           applied[extension] = true
         end
-
-        target.instance_variable_set(:@recording_studio_api_applied_extensions, applied)
       end
 
       def collected_extensions(target, reader)

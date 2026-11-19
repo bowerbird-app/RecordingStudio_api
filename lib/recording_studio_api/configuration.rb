@@ -9,7 +9,6 @@ require_relative "api_version_profile"
 require_relative "recordable_registry"
 require_relative "resource_handler_registry"
 require_relative "api_definition"
-require_relative "hooks"
 
 module RecordingStudioApi
   class Configuration
@@ -150,7 +149,6 @@ module RecordingStudioApi
       @api_daily_metric_retention_days = nil
       @billing_codes = BillingCodes::Registry.new
       @hooks = RecordingStudio::Hooks.new
-      @hooks.singleton_class.prepend(RecordingStudioApi::AppliesControllerExtensions)
       @action_registry = ActionRegistry.new
       @registered_endpoint_registry = RegisteredEndpointRegistry.new
       @recordable_registry = RecordableRegistry.new

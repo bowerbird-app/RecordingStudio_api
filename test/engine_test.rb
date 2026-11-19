@@ -192,51 +192,40 @@ class EngineTest < Minitest::Test
     assert_equal [concrete_model], applied
   end
 
-  def test_controller_extension_initializer_applies_all_controllers
-    to_prepare_blocks = []
-    config_stub = Object.new
-    config_stub.define_singleton_method(:to_prepare) do |&block|
-      to_prepare_blocks << block
-    end
+  def test_apply_loaded_controller_extensions_reaches_base_and_api_controllers
+    require "action_controller"
+    base_parent = ActionController::Base
+    api_parent = ActionController::API
 
-    base_controller = Class.new
-    api_controller = Class.new
-    applied = []
-    action_controller_base = Class.new
-    action_controller_base.define_singleton_method(:descendants) { [base_controller] }
-    action_controller_api = Class.new
-    action_controller_api.define_singleton_method(:descendants) { [api_controller] }
-
-    RecordingStudioApi::Engine.stub(:config, config_stub) do
-      find_initializer("recording_studio_api.apply_controller_extensions").block.call
-    end
-
-    parents = [action_controller_base, action_controller_api]
-    RecordingStudioApi::Engine.stub(:action_controller_parents, parents) do
-      RecordingStudioApi::Engine.stub(:apply_controller_extensions, ->(controller) { applied << controller }) do
-        to_prepare_blocks.first.call
-      end
-    end
-
-    assert_equal [base_controller, api_controller], applied
-  end
-
-  def test_extend_controller_applies_to_an_already_loaded_api_controller
-    require "action_controller/api"
-
-    controller = Class.new(ActionController::API) do
+    base_controller = Class.new(base_parent) do
       def self.name
-        "LoadedApiController"
+        "PreparedBaseController"
+      end
+    end
+    api_controller = Class.new(api_parent) do
+      def self.name
+        "PreparedApiController"
       end
     end
 
-    RecordingStudioApi.configuration.hooks.extend_controller(:LoadedApiController) do
-      def loaded_api_extension
+    RecordingStudioApi.configuration.hooks.extend_controller(:PreparedBaseController) do
+      def prepared_base_extension
+        :applied
+      end
+    end
+    RecordingStudioApi.configuration.hooks.extend_controller(:PreparedApiController) do
+      def prepared_api_extension
         :applied
       end
     end
 
-    assert controller.method_defined?(:loaded_api_extension)
+    refute base_controller.method_defined?(:prepared_base_extension)
+    refute api_controller.method_defined?(:prepared_api_extension)
+
+    RecordingStudioApi::Engine.apply_loaded_controller_extensions
+
+    assert base_controller.method_defined?(:prepared_base_extension)
+    assert api_controller.method_defined?(:prepared_api_extension)
   end
 
   def test_apply_model_extensions_adds_registered_methods_once
@@ -353,6 +342,26 @@ class EngineTest < Minitest::Test
 
     assert_equal :generated, target.new.generated_method
     assert_equal true, target.instance_variable_get(:@recording_studio_api_applied_extensions).compare_by_identity?
+  end
+
+  def test_apply_extensions_does_not_repeat_a_completed_extension_after_a_later_one_raises
+    target = Class.new do
+      class << self
+        attr_accessor :runs
+      end
+    end
+    target.runs = 0
+    completed = proc { target.runs += 1 }
+    failing = proc { raise "stop applying" }
+
+    assert_raises(RuntimeError) do
+      RecordingStudioApi::Engine.send(:apply_extensions, target, [completed, failing])
+    end
+    assert_raises(RuntimeError) do
+      RecordingStudioApi::Engine.send(:apply_extensions, target, [completed, failing])
+    end
+
+    assert_equal 1, target.runs
   end
 
   def test_apply_extensions_returns_without_target
