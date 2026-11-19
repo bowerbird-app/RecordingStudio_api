@@ -15,7 +15,7 @@ module RecordingStudioApi
 
     RECORDING_ID_TOKENS = %w[:id :recording_id].freeze
 
-    attr_reader :name, :http_verb, :path, :handler, :serializer, :openapi, :input_contract, :ui, :recordable_type, :include_trashed, :owns_scoping, :required_role, :scopes_recording, :trashed_semantics
+    attr_reader :name, :http_verb, :path, :handler, :serializer, :openapi, :input_contract, :ui, :recordable_type, :include_trashed, :owns_scoping, :required_role, :scopes_recording, :trashed_semantics, :sensitive
 
     def initialize(name:, http_verb:, path:, handler:, serializer: nil, openapi: nil, input_contract: nil, ui: nil, recordable_type: nil, include_trashed: false, owns_scoping: false, required_role: nil, **options)
       @name = name.to_s
@@ -31,6 +31,7 @@ module RecordingStudioApi
       @include_trashed = HandlerScope.flag(include_trashed, name: :include_trashed)
       @owns_scoping = HandlerScope.flag(owns_scoping, name: :owns_scoping)
       @required_role = normalize_required_role(required_role)
+      @sensitive = coerce_sensitive_flag(options.delete(:sensitive))
       scope_id = options.delete(:scope_id)
       @trashed_semantics = HandlerScope.trashed_semantics(options.delete(:trashed_semantics), name: @name)
       raise ArgumentError, "unknown keywords: #{options.keys.join(', ')}" if options.any?
@@ -123,7 +124,8 @@ module RecordingStudioApi
         path: path,
         openapi: openapi,
         input_contract: input_contract&.as_json,
-        ui: ui
+        ui: ui,
+        sensitive: sensitive
       }
     end
 
@@ -162,6 +164,12 @@ module RecordingStudioApi
       return if value.nil?
 
       value.to_s.strip.to_sym
+    end
+
+    def coerce_sensitive_flag(value)
+      return false if value.nil?
+
+      SensitiveFlag.boolean!(value, name: name)
     end
 
     def valid_access_roles

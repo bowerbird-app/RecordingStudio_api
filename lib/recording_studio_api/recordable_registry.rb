@@ -15,14 +15,14 @@ module RecordingStudioApi
     def register(recordable_type, serializer: nil, output_keys: nil, fields: nil, openapi: nil,
                  sortable_attributes: nil, writable_attributes: nil, immutable_fields: nil,
                  relationships: nil, immutable_relationships: nil, operations: nil, capability_actions: nil,
-                 auto_capability_actions: nil, metrics: nil, public_name: nil, default_order: nil)
+                 auto_capability_actions: nil, metrics: nil, public_name: nil, default_order: nil, sensitive: nil)
       incoming = RecordableRegistration.new(
         recordable_type: recordable_type, serializer: serializer, output_keys: output_keys, fields: fields,
         openapi: openapi, sortable_attributes: sortable_attributes, writable_attributes: writable_attributes,
         immutable_fields: immutable_fields, relationships: relationships,
         immutable_relationships: immutable_relationships, operations: operations,
         capability_actions: capability_actions, auto_capability_actions: auto_capability_actions, metrics: metrics,
-        public_name: public_name, default_order: default_order
+        public_name: public_name, default_order: default_order, sensitive: sensitive
       )
       key = incoming.recordable_type
       @mutex.synchronize do
@@ -93,7 +93,12 @@ module RecordingStudioApi
         public_name: merged_public_name(existing, incoming),
         public_name_supplied: existing.public_name_supplied? || incoming.public_name_supplied?,
         **merged_default_order(existing, incoming, replace: replace_metrics),
-        **merged_explicit_sets(existing, incoming)
+        **merged_explicit_sets(existing, incoming),
+        sensitive: merge_explicit_set(
+          "sensitive operations", existing.sensitive_operations, incoming.sensitive_operations,
+          existing.sensitive_supplied?, incoming.sensitive_supplied?
+        ),
+        sensitive_supplied: existing.sensitive_supplied? || incoming.sensitive_supplied?
       )
     end
 

@@ -38,6 +38,9 @@
 			RecordingStudioApi.capability_action(:publish)
 			RecordingStudioApi.resource_action(:show)
 			RecordingStudioApi.registered_endpoint(:ping)
+			RecordingStudioApi.lookup(api: :public, recordable_type: "Page", operation: :destroy)
+			RecordingStudioApi.lookup(api: :public, action: :publish)
+			RecordingStudioApi.lookup(api: :public, endpoint: :ping)
 		CODE
 	) %>
 

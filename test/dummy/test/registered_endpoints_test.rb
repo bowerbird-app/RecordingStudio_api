@@ -11,4 +11,12 @@ class RegisteredEndpointsTest < ActiveSupport::TestCase
     assert_includes initializer, 'path: "ping"'
     refute_includes initializer, "RecordingStudioApi.register_action"
   end
+
+  test "lookup resolves the dummy ping endpoint through the registered handler" do
+    result = RecordingStudioApi.lookup(api: :public, endpoint: :ping)
+
+    assert_equal false, result.sensitive
+    assert_includes result.apis, :public
+    assert_equal({ ok: true }, result.handler.call(nil))
+  end
 end

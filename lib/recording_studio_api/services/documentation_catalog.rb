@@ -30,6 +30,10 @@ module RecordingStudioApi
           new(version: version, mount_path: mount_path, api_mount_path: api_mount_path, api: api).call
         end
 
+        def recording_schema(recordable_type, api: :public)
+          new(api: api).send(:recording_schema, recordable_type)
+        end
+
         def filter_query_parameters(attributes)
           parameters = [
             {

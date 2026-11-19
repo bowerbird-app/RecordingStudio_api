@@ -28,6 +28,7 @@ see [UPGRADING.md](UPGRADING.md).
 - capability-backed action registry with automatic action exposure when a recordable type enables that capability
 - `register_endpoint` for named JSON endpoints that are not a recordable collection
 - optional `ui:` widget id on those registrations, plus `ui_for` / `actions_for_ui` lookups
+- optional `sensitive:` on type operations, capability actions, and named endpoints, plus `lookup` for the registered handler, input contract, and output schema
 - site-wide API usage metrics on the operations API via Recording Studio Metrics
 - preserved template reference material in `docs/gem_template/`
 - shared fixed-window rate limits through `RecordingStudioApi::RateLimit`
@@ -655,7 +656,8 @@ RecordingStudioApi.register_recordable_type_api(
     cover_image_url: { resolver: ->(context) { context.recordable.cover_image_url }, include: true }
   },
   writable_attributes: %i[title],
-  operations: %i[index show create update],
+  operations: %i[index show create update destroy],
+  sensitive: %i[destroy],
   capability_actions: %i[publish]
 )
 RecordingStudioApi.register_capability_action(
@@ -678,6 +680,16 @@ RecordingStudioApi.register_endpoint(
   path: "ping",
   handler: ->(_context) { { ok: true } }
 )
+```
+
+`sensitive:` is optional. On `register_recordable_type_api` it is a list of operation names (`index`, `show`, `create`, `update`, `destroy`). An unknown name raises `ConfigurationError`. On `register_capability_action` and `register_endpoint` it is `true` or `false`. Public registrations default to not sensitive. A registration that exists only on an operations or other named API defaults to sensitive. Repeat registrations still merge with the existing explicit-set rules.
+
+`RecordingStudioApi.lookup` is the read-only resolver for one named API. Pass exactly one of `operation` (with `recordable_type`), `action`, or `endpoint`. The handler is the same callable HTTP uses, so Accessible authorization stays in the handler. The result also has the input contract fields (`type`, `required`, `allow_blank`, plus `description` and `example` when set), the output schema, the effective `sensitive` flag, and the named APIs that expose the target.
+
+```ruby
+RecordingStudioApi.lookup(api: :public, recordable_type: "Page", operation: :destroy)
+RecordingStudioApi.lookup(api: :public, action: :publish)
+RecordingStudioApi.lookup(api: :public, endpoint: :ping)
 ```
 
 Member actions require `:edit` by default. A host can override an action's role without replacing its handler:

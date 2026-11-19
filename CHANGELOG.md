@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Development and dummy Gemfiles pin `recording_studio_admin` to GitHub tag `v2.19.1`.
 
+## [1.20.0] - 2026-11-19
+
+### Added
+- `register_recordable_type_api` accepts `sensitive:` as operation names (`%i[destroy]`). `register_capability_action` and `register_endpoint` accept `sensitive: true` or `false`. Public items default to not sensitive. Items registered only on an operations or other named API default to sensitive. An unknown operation name in `sensitive:` raises `ConfigurationError`. Repeat type registrations still merge with the existing explicit-set rules.
+- `RecordingStudioApi.lookup(api:, recordable_type:, operation:, action:, endpoint:, version:)` returns the HTTP handler, input contract, output schema, effective sensitive flag, and the named APIs that expose that target. HTTP routes and OpenAPI are unchanged.
+
+### Upgrade notes
+- Bump to `1.20.0`. No migration. Stay on Recording Studio `>= 7.7.0`, `< 8.0`.
+- Existing registrations keep their defaults. Pass `sensitive:` only when the default is wrong.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.19.0] - 2026-11-18
 
 ### Added
