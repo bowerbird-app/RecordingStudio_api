@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.21.3] - 2026-11-19
 
 ### Added
-- `RecordingStudioApi.lookup` input contracts for create and update include `required`, `enum`, and nested object shape (`items` / `properties`) from the recordable `details_schema` that OpenAPI already uses. HTTP responses and OpenAPI documents are unchanged.
+- `RecordingStudioApi.lookup` create and update field hashes copy `enum` and nested `items` / `properties` from `DocumentationCatalog.attributes_schema_for`. Create marks `required` and `allow_blank: false` when `details_schema` lists the field as required (HTTP create rejects a missing Page title). Update always reports `required: false`. `allow_blank` is also false when the field schema has `minLength` of 1 or more. HTTP responses and OpenAPI documents are unchanged.
 
 ### Upgrade notes
 - Bump to `1.21.3`. No migration. Host apps are unchanged.
