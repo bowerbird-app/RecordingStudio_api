@@ -199,23 +199,45 @@ class EngineTest < Minitest::Test
       to_prepare_blocks << block
     end
 
-    first_controller = Class.new
-    second_controller = Class.new
+    base_controller = Class.new
+    api_controller = Class.new
     applied = []
     action_controller_base = Class.new
-    action_controller_base.define_singleton_method(:descendants) { [first_controller, second_controller] }
+    action_controller_base.define_singleton_method(:descendants) { [base_controller] }
+    action_controller_api = Class.new
+    action_controller_api.define_singleton_method(:descendants) { [api_controller] }
 
     RecordingStudioApi::Engine.stub(:config, config_stub) do
       find_initializer("recording_studio_api.apply_controller_extensions").block.call
     end
 
     with_temporary_nested_constant(:ActionController, :Base, action_controller_base) do
-      RecordingStudioApi::Engine.stub(:apply_controller_extensions, ->(controller) { applied << controller }) do
-        to_prepare_blocks.first.call
+      with_temporary_nested_constant(:ActionController, :API, action_controller_api) do
+        RecordingStudioApi::Engine.stub(:apply_controller_extensions, ->(controller) { applied << controller }) do
+          to_prepare_blocks.first.call
+        end
       end
     end
 
-    assert_equal [first_controller, second_controller], applied
+    assert_equal [base_controller, api_controller], applied
+  end
+
+  def test_extend_controller_applies_to_an_already_loaded_api_controller
+    require "action_controller/api"
+
+    controller = Class.new(ActionController::API) do
+      def self.name
+        "LoadedApiController"
+      end
+    end
+
+    RecordingStudioApi.configuration.hooks.extend_controller(:LoadedApiController) do
+      def loaded_api_extension
+        :applied
+      end
+    end
+
+    assert controller.method_defined?(:loaded_api_extension)
   end
 
   def test_apply_model_extensions_adds_registered_methods_once
