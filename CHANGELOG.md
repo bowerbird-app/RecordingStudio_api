@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.21.5] - 2026-11-20
+
+### Added
+- `register_recordable_type_api` accepts `create_only_inputs:`. Each name is a create input that is not a writable attribute. `RecordingStudioApi.lookup` includes those fields on the `:create` input contract and omits them on `:update`. Types that omit the option keep the previous create and update contracts. Built-in create passes the declared names through with writable attributes. Update does not.
+
+### Upgrade notes
+- Bump to `1.21.5`. No migration. Host apps are unchanged until they pass `create_only_inputs:`.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.21.4] - 2026-11-19
 
 ### Fixed
@@ -1720,7 +1729,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.4...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.5...HEAD
+[1.21.5]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.4...v1.21.5
 [1.21.4]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.3...v1.21.4
 [1.21.3]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.2...v1.21.3
 [1.21.2]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.1...v1.21.2

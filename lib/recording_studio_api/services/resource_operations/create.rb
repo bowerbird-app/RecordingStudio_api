@@ -90,6 +90,15 @@ module RecordingStudioApi
         def invalid_parent_input_error(message)
           RecordingStudioApi::InvalidParentInput.call(message, recordable_type: recordable_type)
         end
+
+        def allowed_attribute_keys
+          super + create_only_attribute_keys
+        end
+
+        def create_only_attribute_keys
+          registration = RecordingStudioApi.recordable_registration_for(recordable_type, api: api_key)
+          Array(registration&.create_only_inputs).map { |name, _| name.to_sym }
+        end
       end
     end
   end

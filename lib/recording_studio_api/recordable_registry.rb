@@ -14,12 +14,13 @@ module RecordingStudioApi
 
     def register(recordable_type, serializer: nil, output_keys: nil, fields: nil, openapi: nil,
                  sortable_attributes: nil, writable_attributes: nil, immutable_fields: nil,
-                 relationships: nil, immutable_relationships: nil, operations: nil, capability_actions: nil,
-                 auto_capability_actions: nil, metrics: nil, public_name: nil, default_order: nil, sensitive: nil)
+                 create_only_inputs: nil, relationships: nil, immutable_relationships: nil, operations: nil,
+                 capability_actions: nil, auto_capability_actions: nil, metrics: nil, public_name: nil,
+                 default_order: nil, sensitive: nil)
       incoming = RecordableRegistration.new(
         recordable_type: recordable_type, serializer: serializer, output_keys: output_keys, fields: fields,
         openapi: openapi, sortable_attributes: sortable_attributes, writable_attributes: writable_attributes,
-        immutable_fields: immutable_fields, relationships: relationships,
+        immutable_fields: immutable_fields, create_only_inputs: create_only_inputs, relationships: relationships,
         immutable_relationships: immutable_relationships, operations: operations,
         capability_actions: capability_actions, auto_capability_actions: auto_capability_actions, metrics: metrics,
         public_name: public_name, default_order: default_order, sensitive: sensitive
@@ -88,6 +89,7 @@ module RecordingStudioApi
         sortable_attributes: existing.sortable_attributes | incoming.sortable_attributes,
         writable_attributes: existing.writable_attributes | incoming.writable_attributes,
         immutable_fields: existing.immutable_fields | incoming.immutable_fields,
+        create_only_inputs: merge_definitions("create-only input", existing.create_only_inputs, incoming.create_only_inputs),
         relationships: merge_definitions("relationship", existing.relationships, incoming.relationships),
         immutable_relationships: existing.immutable_relationships | incoming.immutable_relationships,
         public_name: merged_public_name(existing, incoming),

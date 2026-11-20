@@ -387,6 +387,60 @@ class LookupTest < Minitest::Test
     assert_equal({ heading: { type: "string" } }, update.input_contract[:items][:properties])
   end
 
+  def test_create_only_inputs_appear_on_create_and_not_on_update
+    register_page(
+      writable_attributes: %i[title],
+      create_only_inputs: {
+        credit_id: { type: :string, required: false }
+      }
+    )
+
+    create = RecordingStudioApi.lookup(recordable_type: "Page", operation: :create)
+    update = RecordingStudioApi.lookup(recordable_type: "Page", operation: :update)
+
+    assert_equal({ type: :string, required: false, allow_blank: true }, create.input_contract[:credit_id])
+    assert_equal({ type: :string, required: false, allow_blank: true }, create.input_contract[:title])
+    refute update.input_contract.key?(:credit_id)
+    assert_equal({ type: :string, required: false, allow_blank: true }, update.input_contract[:title])
+  end
+
+  def test_create_only_input_shape_is_copied_onto_create_contract
+    register_page(
+      writable_attributes: %i[title],
+      create_only_inputs: {
+        credit_id: {
+          type: :string,
+          required: true,
+          allow_blank: false,
+          enum: %w[lead support]
+        },
+        extras: {
+          type: :object,
+          properties: { heading: { type: "string" } }
+        }
+      }
+    )
+
+    create = RecordingStudioApi.lookup(recordable_type: "Page", operation: :create)
+
+    assert_equal true, create.input_contract[:credit_id][:required]
+    assert_equal false, create.input_contract[:credit_id][:allow_blank]
+    assert_equal %w[lead support], create.input_contract[:credit_id][:enum]
+    assert_equal :hash, create.input_contract[:extras][:type]
+    assert_equal({ heading: { type: "string" } }, create.input_contract[:extras][:properties])
+    assert_equal false, create.input_contract[:extras][:required]
+  end
+
+  def test_types_without_create_only_inputs_keep_writable_create_contract
+    register_page(writable_attributes: %i[title])
+
+    create = RecordingStudioApi.lookup(recordable_type: "Page", operation: :create)
+    update = RecordingStudioApi.lookup(recordable_type: "Page", operation: :update)
+
+    assert_equal({ title: { type: :string, required: false, allow_blank: true } }, create.input_contract)
+    assert_equal({ title: { type: :string, required: false, allow_blank: true } }, update.input_contract)
+  end
+
   def test_lookup_deep_dups_schema_and_contract
     register_page(writable_attributes: %i[title])
     first = RecordingStudioApi.lookup(recordable_type: "Page", operation: :create)

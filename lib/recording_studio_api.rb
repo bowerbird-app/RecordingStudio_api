@@ -249,9 +249,9 @@ module RecordingStudioApi
 
     def register_recordable_type_api(recordable_type, serializer: nil, output_keys: nil, fields: nil, openapi: nil,
                                      sortable_attributes: nil, writable_attributes: nil, immutable_fields: nil,
-                                     relationships: nil, immutable_relationships: nil, operations: nil,
-                                     capability_actions: nil, auto_capability_actions: nil, metrics: nil,
-                                     public_name: nil, default_order: nil, api: :public, sensitive: nil)
+                                     create_only_inputs: nil, relationships: nil, immutable_relationships: nil,
+                                     operations: nil, capability_actions: nil, auto_capability_actions: nil,
+                                     metrics: nil, public_name: nil, default_order: nil, api: :public, sensitive: nil)
       definition = configuration.api(api)
       resolved_operations = operations
       resolved_operations = %i[index show] if resolved_operations.nil? && definition.respond_to?(:default_access) && definition.default_access == :read_only
@@ -265,6 +265,7 @@ module RecordingStudioApi
         sortable_attributes: sortable_attributes,
         writable_attributes: writable_attributes,
         immutable_fields: immutable_fields,
+        create_only_inputs: create_only_inputs,
         relationships: relationships,
         immutable_relationships: immutable_relationships,
         operations: resolved_operations,

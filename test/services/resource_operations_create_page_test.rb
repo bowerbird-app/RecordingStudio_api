@@ -33,6 +33,19 @@ class ResourceOperationsCreatePageTest < ActiveSupport::TestCase
     Current.actor = nil if defined?(Current)
   end
 
+  test "create handler keeps declared create-only inputs on the attribute payload" do
+    RecordingStudioApi.register_recordable_type_api(
+      "Page",
+      create_only_inputs: { credit_id: { type: :string } }
+    )
+    context = create_page_context(title: "Named", extra: { "credit_id" => "cred-1" })
+
+    attributes = RecordingStudioApi::Services::ResourceOperations::Create.new(context).send(:resource_attributes)
+
+    assert_equal "Named", attributes[:title]
+    assert_equal "cred-1", attributes[:credit_id]
+  end
+
   test "create handler rejects a page with no title" do
     error = assert_raises(ActiveRecord::RecordInvalid) do
       RecordingStudioApi::Services::ResourceOperations::Create.call(create_page_context(title: nil))
@@ -44,7 +57,7 @@ class ResourceOperationsCreatePageTest < ActiveSupport::TestCase
 
   private
 
-  def create_page_context(title:)
+  def create_page_context(title:, extra: {})
     api_client = RecordingStudioApi::ApiClient.create!(name: "Page writer", api_key: "public")
     grant = RecordingStudioApi::AccessGrant.new(
       api_client: api_client,
@@ -54,6 +67,7 @@ class ResourceOperationsCreatePageTest < ActiveSupport::TestCase
     )
     params = { "parent_id" => @folder.id }
     params["title"] = title unless title.nil?
+    params.merge!(extra)
 
     RecordingStudioApi::ResourceOperationContext.new(
       recording: nil,

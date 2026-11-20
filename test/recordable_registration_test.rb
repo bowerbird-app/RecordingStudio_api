@@ -342,6 +342,40 @@ class RecordableRegistrationTest < Minitest::Test
     assert_equal "desc", registry.fetch("KitSection").default_order.direction
   end
 
+  def test_create_only_inputs_default_to_optional_and_reject_unknown_options
+    omitted = RecordingStudioApi::RecordableRegistration.new(recordable_type: "Page")
+    declared = RecordingStudioApi::RecordableRegistration.new(
+      recordable_type: "Page",
+      create_only_inputs: { credit_id: { type: :string } }
+    )
+
+    assert_equal({}, omitted.create_only_inputs)
+    assert_equal({ "credit_id" => { type: "string" } }, declared.create_only_inputs)
+    assert_includes declared.as_json[:create_only_inputs].keys, "credit_id"
+
+    assert_configuration_error("must be a hash") do
+      RecordingStudioApi::RecordableRegistration.new(recordable_type: "Page", create_only_inputs: :credit_id)
+    end
+    assert_configuration_error("options are invalid") do
+      RecordingStudioApi::RecordableRegistration.new(
+        recordable_type: "Page",
+        create_only_inputs: { credit_id: { type: :string, column: :credit_id } }
+      )
+    end
+  end
+
+  def test_registry_merges_create_only_inputs_and_rejects_incompatible_redefinitions
+    registry = RecordingStudioApi::RecordableRegistry.new
+    registry.register("Page", create_only_inputs: { credit_id: { type: :string } })
+    registry.register("Page", create_only_inputs: { credit_id: { type: :string }, note: { type: :string } })
+
+    assert_equal %w[credit_id note], registry.fetch("Page").create_only_inputs.keys.sort
+
+    assert_configuration_error("Create-only input") do
+      registry.register("Page", create_only_inputs: { credit_id: { type: :integer } })
+    end
+  end
+
   def test_auto_capability_actions_defaults_to_true_and_rejects_non_booleans
     registration = RecordingStudioApi::RecordableRegistration.new(recordable_type: "Page")
 
