@@ -154,7 +154,7 @@ module RecordingStudioApi
             return access_scope_recording if root_recordable_type?
 
             raise RecordingStudioApi::InvalidActionInputError.new(
-              "parent_id is required for #{recordable_type}",
+              "parent_id is required for #{public_recordable_name}",
               details: [
                 {
                   attribute: :parent_id,
@@ -170,6 +170,10 @@ module RecordingStudioApi
           raise RecordingStudioApi::NotFoundError, "Parent resource was not found in this API scope" if parent_recording.nil?
 
           parent_recording
+        end
+
+        def public_recordable_name
+          RecordingStudioApi.recordable_registration_for(recordable_type, api: api_key)&.public_name || recordable_type
         end
 
         def root_recordable_type?

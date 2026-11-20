@@ -104,6 +104,69 @@ class ResourceOperationsWriteActorTest < ActiveSupport::TestCase
     assert_equal 0, Workspace.where(name: "Root without a parent").count
   end
 
+  test "a missing parent_id names the registered public type" do
+    RecordingStudioApi.register_recordable_type_api("RecordingStudioPresskits::PressKit")
+    grant = RecordingStudioApi::AccessGrant.new(
+      api_client: nil,
+      credential: nil,
+      access_recording: @access_recording,
+      root_recording: @root_recording
+    )
+    context = RecordingStudioApi::ResourceOperationContext.new(
+      recording: nil,
+      recordable_type: "RecordingStudioPresskits::PressKit",
+      resource_name: "press_kits",
+      api_client: nil,
+      credential: nil,
+      access_recording: @access_recording,
+      access_grant: grant,
+      root_recording: @root_recording,
+      api_version: "v1",
+      params: {},
+      request_params: { "title" => "Orphan kit" },
+      scoped_recordings: grant.accessible_recordings,
+      parent_recording: nil
+    )
+
+    error = assert_raises(RecordingStudioApi::InvalidActionInputError) do
+      RecordingStudioApi::Services::ResourceOperations::Create.new(context).send(:parent_recording_for_create)
+    end
+
+    assert_equal "PressKit", RecordingStudioApi.recordable_registration_for("RecordingStudioPresskits::PressKit").public_name
+    assert_equal "parent_id is required for PressKit", error.message
+  end
+
+  test "a missing parent_id falls back to the class name when the type is unregistered" do
+    grant = RecordingStudioApi::AccessGrant.new(
+      api_client: nil,
+      credential: nil,
+      access_recording: @access_recording,
+      root_recording: @root_recording
+    )
+    context = RecordingStudioApi::ResourceOperationContext.new(
+      recording: nil,
+      recordable_type: "Addon::UnregisteredKit",
+      resource_name: "unregistered_kits",
+      api_client: nil,
+      credential: nil,
+      access_recording: @access_recording,
+      access_grant: grant,
+      root_recording: @root_recording,
+      api_version: "v1",
+      params: {},
+      request_params: { "title" => "Orphan kit" },
+      scoped_recordings: grant.accessible_recordings,
+      parent_recording: nil
+    )
+
+    error = assert_raises(RecordingStudioApi::InvalidActionInputError) do
+      RecordingStudioApi::Services::ResourceOperations::Create.new(context).send(:parent_recording_for_create)
+    end
+
+    assert_nil RecordingStudioApi.recordable_registration_for("Addon::UnregisteredKit")
+    assert_equal "parent_id is required for Addon::UnregisteredKit", error.message
+  end
+
   test "a client-credentials grant with no user still writes as the API client" do
     payload = provision_api_client_for(access_recording: @access_recording, name: "Machine writer")
     api_client = payload.fetch(:api_client)

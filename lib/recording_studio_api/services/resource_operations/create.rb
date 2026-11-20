@@ -73,7 +73,7 @@ module RecordingStudioApi
         end
 
         def missing_parent_error
-          message = "A parent recording is required to create #{recordable_type}"
+          message = "A parent recording is required to create #{public_recordable_name}"
           RecordingStudioApi::InvalidActionInputError.new(
             message,
             details: [

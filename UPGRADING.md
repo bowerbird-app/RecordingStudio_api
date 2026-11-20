@@ -1,5 +1,13 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.21.4
+
+Create `parent_id` errors name the public type. No migration. HTTP status stays 422.
+
+1. Bump the host gem to `1.21.4`. Gemspec ranges stay the same.
+2. A top-level create that is missing `parent_id` now says `parent_id is required for PressKit` (the registered `public_name`) instead of `parent_id is required for RecordingStudioPresskits::PressKit`. The create-with-no-parent message uses the same public name. An unregistered type still uses the class name.
+3. Compare [v1.21.3...v1.21.4](https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.3...v1.21.4).
+
 ## Upgrading to 1.21.3
 
 Additive lookup metadata. No migration. HTTP responses and OpenAPI stay the same.
