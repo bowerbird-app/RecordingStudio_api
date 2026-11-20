@@ -115,7 +115,6 @@ module RecordingStudioApi
 
       names = Array(registration.writable_attributes).map(&:to_s)
       names -= Array(registration.immutable_fields).map(&:to_s) if operation == :update
-      names |= create_only_input_names(registration) if operation == :create
       schema = Services::DocumentationCatalog.attributes_schema_for(
         @recordable_type,
         mutable: operation == :update,
@@ -123,35 +122,19 @@ module RecordingStudioApi
       )
       properties = Hash(schema[:properties]).transform_keys { |key| key.to_s.to_sym }
       required_names = create_required_names(registration, operation)
-      create_only = operation == :create ? registration.create_only_inputs : {}
 
       names.to_h do |name|
-        overlay = write_overlay(properties[name.to_sym], create_only[name])
-        [name.to_sym, write_field_contract(name, overlay, required_names)]
+        [name.to_sym, write_field_contract(name, properties[name.to_sym], required_names)]
       end
-    end
-
-    def create_only_input_names(registration)
-      Array(registration.create_only_inputs).map { |name, _| name.to_s }
-    end
-
-    def write_overlay(schema_overlay, create_only_overlay)
-      overlay = {}
-      overlay.merge!(schema_overlay) if schema_overlay.is_a?(Hash)
-      overlay.merge!(create_only_overlay) if create_only_overlay.is_a?(Hash)
-      overlay.presence
     end
 
     def create_required_names(registration, operation)
       return [] unless operation == :create
 
-      names = []
       details = registration.openapi&.dig(:details_schema)
-      names.concat(Array(details[:required] || details["required"])) if details.is_a?(Hash)
-      registration.create_only_inputs.each do |name, overlay|
-        names << name if overlay.is_a?(Hash) && overlay[:required]
-      end
-      names.map(&:to_s)
+      return [] unless details.is_a?(Hash)
+
+      Array(details[:required] || details["required"]).map(&:to_s)
     end
 
     def write_field_contract(name, overlay, required_names)
@@ -165,14 +148,11 @@ module RecordingStudioApi
 
       overlay = overlay.deep_dup.deep_symbolize_keys
       field[:type] = Services::DocumentationCatalog.contract_type_for(overlay[:type]) if overlay[:type]
-      field[:required] = overlay[:required] if [true, false].include?(overlay[:required])
       field[:enum] = overlay[:enum] if overlay[:enum].is_a?(Array)
       field[:items] = overlay[:items] if overlay[:items]
       field[:properties] = overlay[:properties] if overlay[:properties]
-      field[:allow_blank] = !field[:required]
       min_length = overlay[:minLength]
       field[:allow_blank] = false if min_length.is_a?(Numeric) && min_length >= 1
-      field[:allow_blank] = overlay[:allow_blank] if [true, false].include?(overlay[:allow_blank])
       field
     end
 

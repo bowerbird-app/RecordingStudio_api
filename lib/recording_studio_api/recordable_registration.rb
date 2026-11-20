@@ -76,17 +76,15 @@ module RecordingStudioApi
       end
     end
 
-    CREATE_ONLY_INPUT_OPTIONS = %i[type required allow_blank enum items properties].freeze
-
     attr_reader :recordable_type, :public_name, :serializer, :output_keys, :fields, :openapi,
-                :sortable_attributes, :writable_attributes, :immutable_fields, :create_only_inputs, :relationships,
+                :sortable_attributes, :writable_attributes, :immutable_fields, :relationships,
                 :immutable_relationships, :operations, :capability_actions, :auto_capability_actions, :metric_names,
                 :default_order, :sensitive_operations
 
     def initialize(recordable_type:, serializer: nil, output_keys: nil, fields: nil, openapi: nil,
                    sortable_attributes: nil, writable_attributes: nil, immutable_fields: nil,
-                   create_only_inputs: nil, relationships: nil, immutable_relationships: nil, operations: nil,
-                   capability_actions: nil, auto_capability_actions: nil, metrics: nil, operations_supplied: nil,
+                   relationships: nil, immutable_relationships: nil, operations: nil, capability_actions: nil,
+                   auto_capability_actions: nil, metrics: nil, operations_supplied: nil,
                    capability_actions_supplied: nil, auto_capability_actions_supplied: nil, metrics_supplied: nil,
                    public_name: nil, public_name_supplied: nil, default_order: nil, default_order_supplied: nil,
                    sensitive: nil, sensitive_supplied: nil)
@@ -99,7 +97,6 @@ module RecordingStudioApi
       @sortable_attributes = normalize_names(sortable_attributes, "Sortable attributes").sort.freeze
       @writable_attributes = normalize_names(writable_attributes, "Writable attributes").sort.freeze
       @immutable_fields = normalize_names(immutable_fields, "Immutable fields").sort.freeze
-      @create_only_inputs = normalize_create_only_inputs(create_only_inputs)
       @relationships = normalize_relationships(relationships)
       @immutable_relationships = normalize_names(immutable_relationships, "Immutable relationships").sort.freeze
       @operations_supplied = operations_supplied.nil? ? !operations.nil? : operations_supplied
@@ -220,7 +217,6 @@ module RecordingStudioApi
         serializer: serializer, output_keys: output_keys,
         fields: fields.transform_values(&:to_h), openapi: openapi, sortable_attributes: sortable_attributes,
         writable_attributes: writable_attributes, immutable_fields: immutable_fields,
-        create_only_inputs: create_only_inputs,
         relationships: relationships.transform_values(&:to_h), immutable_relationships: immutable_relationships,
         operations: operations, capability_actions: capability_actions,
         auto_capability_actions: auto_capability_actions, metric_names: metric_names,
@@ -245,53 +241,6 @@ module RecordingStudioApi
       raise ConfigurationError, "Public name is invalid for #{@recordable_type}: #{name}" unless name.match?(FIELD_NAME_PATTERN)
 
       name.freeze
-    end
-
-    def normalize_create_only_inputs(value)
-      return {}.freeze if value.nil?
-      raise ConfigurationError, "Create-only inputs must be a hash for #{recordable_type}" unless value.is_a?(Hash)
-
-      value.each_with_object({}) do |(name, options), inputs|
-        field_name = normalize_name(name, "Create-only input")
-        raise ConfigurationError, "Create-only input #{field_name} must be a hash for #{recordable_type}" unless options.is_a?(Hash)
-
-        normalized = symbolize_keys(options)
-        reject_unknown_options!(normalized, CREATE_ONLY_INPUT_OPTIONS, "Create-only input #{field_name}")
-
-        field = {}
-        field[:type] = normalized[:type].to_s if normalized.key?(:type) && !normalized[:type].nil?
-        field[:required] = normalize_flag(normalized[:required], "Create-only input #{field_name} required") if normalized.key?(:required)
-        if normalized.key?(:allow_blank)
-          field[:allow_blank] = normalize_flag(normalized[:allow_blank], "Create-only input #{field_name} allow_blank")
-        end
-        field[:enum] = normalize_enum(normalized[:enum], field_name) if normalized.key?(:enum)
-        field[:items] = deep_freeze(normalized[:items]) if normalized.key?(:items)
-        field[:properties] = normalize_nested_hash(normalized[:properties], "Create-only input #{field_name} properties") if normalized.key?(:properties)
-
-        inputs[field_name] = deep_freeze(field)
-      end.freeze
-    end
-
-    def normalize_flag(value, label)
-      return value if [true, false].include?(value)
-
-      raise ConfigurationError, "#{label} must be true or false for #{recordable_type}"
-    end
-
-    def normalize_enum(value, field_name)
-      unless value.is_a?(Array)
-        raise ConfigurationError, "Create-only input #{field_name} enum must be an array for #{recordable_type}"
-      end
-
-      value.dup.freeze
-    end
-
-    def normalize_nested_hash(value, label)
-      unless value.is_a?(Hash)
-        raise ConfigurationError, "#{label} must be a hash for #{recordable_type}"
-      end
-
-      deep_freeze(symbolize_keys(value))
     end
 
     def normalize_fields(value)

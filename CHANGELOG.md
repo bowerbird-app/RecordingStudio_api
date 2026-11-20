@@ -9,11 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.21.5] - 2026-11-20
 
-### Added
-- `register_recordable_type_api` accepts `create_only_inputs:`. Each name is a create input that is not a writable attribute. `RecordingStudioApi.lookup` includes those fields on the `:create` input contract and omits them on `:update`. Types that omit the option keep the previous create and update contracts. Built-in create passes the declared names through with writable attributes. Update does not.
+### Changed
+- Document create-only inputs as a writable attribute that is also listed in `immutable_fields`. `RecordingStudioApi.lookup` already includes those names on `:create` and omits them on `:update`. Built-in create assigns them. Update ignores them. Put the field on `details_schema` when lookup should advertise a type other than string. There is no separate registration option.
 
 ### Upgrade notes
-- Bump to `1.21.5`. No migration. Host apps are unchanged until they pass `create_only_inputs:`.
+- Bump to `1.21.5`. No migration. Host apps are unchanged.
 - See [UPGRADING.md](UPGRADING.md).
 
 ## [1.21.4] - 2026-11-19

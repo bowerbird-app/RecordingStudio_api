@@ -31,11 +31,6 @@ class AdminLogsControllerTest < ActionDispatch::IntegrationTest
 
     @admin_root, @admin_root_recording = create_admin_root_recording
     create_access_recording(parent_recording: @admin_root_recording, user: @user, role: :admin)
-    RecordingStudioApi::Admin::ApiAuthorization.provision!(
-      api: :public,
-      root_recording: @admin_root_recording,
-      actor: @user
-    )
 
     ensure_api_request_logs_table!
 
