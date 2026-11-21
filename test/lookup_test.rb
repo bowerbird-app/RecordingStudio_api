@@ -387,6 +387,28 @@ class LookupTest < Minitest::Test
     assert_equal({ heading: { type: "string" } }, update.input_contract[:items][:properties])
   end
 
+  def test_non_column_writable_immutable_field_is_create_only
+    register_page(
+      writable_attributes: %i[credit_id],
+      immutable_fields: %i[credit_id],
+      openapi: {
+        details_schema: {
+          type: "object",
+          properties: {
+            credit_id: { type: "string" }
+          }
+        }
+      }
+    )
+
+    create = RecordingStudioApi.lookup(recordable_type: "Page", operation: :create)
+    update = RecordingStudioApi.lookup(recordable_type: "Page", operation: :update)
+
+    assert_equal({ type: :string, required: false, allow_blank: true }, create.input_contract[:credit_id])
+    refute update.input_contract.key?(:credit_id)
+    assert_equal({}, update.input_contract)
+  end
+
   def test_lookup_deep_dups_schema_and_contract
     register_page(writable_attributes: %i[title])
     first = RecordingStudioApi.lookup(recordable_type: "Page", operation: :create)

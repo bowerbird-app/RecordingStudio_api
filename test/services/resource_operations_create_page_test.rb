@@ -33,6 +33,38 @@ class ResourceOperationsCreatePageTest < ActiveSupport::TestCase
     Current.actor = nil if defined?(Current)
   end
 
+  test "non-column writable immutable field reaches create and is ignored on update" do
+    RecordingStudioApi.register_recordable_type_api(
+      "Page",
+      writable_attributes: %i[title credit_id],
+      immutable_fields: %i[credit_id],
+      openapi: {
+        details_schema: {
+          type: "object",
+          properties: {
+            title: { type: "string", minLength: 1 },
+            credit_id: { type: "string" }
+          },
+          required: ["title"]
+        }
+      }
+    )
+
+    error = assert_raises(ActiveModel::UnknownAttributeError) do
+      RecordingStudioApi::Services::ResourceOperations::Create.call(
+        create_page_context(title: "Named", extra: { "credit_id" => "cred-1" })
+      )
+    end
+    assert_match(/credit_id/, error.message)
+
+    page_recording = create_page_recording(root_recording: @root_recording)
+    RecordingStudioApi::Services::ResourceOperations::Update.call(
+      update_page_context(page_recording, extra: { "credit_id" => "cred-2", "title" => "Renamed" })
+    )
+
+    assert_equal "Renamed", page_recording.reload.recordable.title
+  end
+
   test "create handler rejects a page with no title" do
     error = assert_raises(ActiveRecord::RecordInvalid) do
       RecordingStudioApi::Services::ResourceOperations::Create.call(create_page_context(title: nil))
@@ -44,7 +76,18 @@ class ResourceOperationsCreatePageTest < ActiveSupport::TestCase
 
   private
 
-  def create_page_context(title:)
+  def create_page_context(title:, extra: {})
+    params = { "parent_id" => @folder.id }
+    params["title"] = title unless title.nil?
+    params.merge!(extra)
+    page_context(recording: nil, params: params, parent_recording: @folder)
+  end
+
+  def update_page_context(recording, extra: {})
+    page_context(recording: recording, params: extra, parent_recording: nil)
+  end
+
+  def page_context(recording:, params:, parent_recording:)
     api_client = RecordingStudioApi::ApiClient.create!(name: "Page writer", api_key: "public")
     grant = RecordingStudioApi::AccessGrant.new(
       api_client: api_client,
@@ -52,11 +95,9 @@ class ResourceOperationsCreatePageTest < ActiveSupport::TestCase
       access_recording: @access_recording,
       root_recording: @root_recording
     )
-    params = { "parent_id" => @folder.id }
-    params["title"] = title unless title.nil?
 
     RecordingStudioApi::ResourceOperationContext.new(
-      recording: nil,
+      recording: recording,
       recordable_type: "Page",
       resource_name: "pages",
       api_client: api_client,
@@ -68,7 +109,7 @@ class ResourceOperationsCreatePageTest < ActiveSupport::TestCase
       params: {},
       request_params: params,
       scoped_recordings: grant.accessible_recordings,
-      parent_recording: @folder
+      parent_recording: parent_recording
     )
   end
 end

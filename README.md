@@ -722,6 +722,30 @@ REST paths, the JSON `type`, and OpenAPI keep the full class name and the existi
 `writable_attributes` is an explicit allowlist for API create and update operations. OpenAPI
 field metadata describes response data only and never grants write access.
 
+A create-only input is a writable attribute listed in `immutable_fields`. It may be a column or
+another name the recordable accepts on create. `RecordingStudioApi.lookup` includes it on `:create`
+and omits it on `:update`. Built-in create assigns it. Update ignores it. Put the field on
+`details_schema` when lookup should copy a type. Authorization stays in Accessible.
+
+```ruby
+RecordingStudioApi.register_recordable_type_api(
+  "RecordingStudioPresskits::CreditLine",
+  serializer: ->(line, **) { { role: line.role } },
+  output_keys: %i[role],
+  writable_attributes: %i[role credit_id],
+  immutable_fields: %i[credit_id],
+  openapi: {
+    details_schema: {
+      type: "object",
+      properties: {
+        role: { type: "string" },
+        credit_id: { type: "string" }
+      }
+    }
+  }
+)
+```
+
 ### Default list order
 
 `default_order:` is the order for a collection when the client omits `sort`.

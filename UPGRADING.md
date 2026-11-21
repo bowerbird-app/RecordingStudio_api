@@ -1,5 +1,30 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.21.5
+
+Create-only inputs use the existing writable and immutable lists. No migration. Registration options stay the same.
+
+1. Bump the host gem to `1.21.5`. Gemspec ranges stay the same.
+2. A create-only input is a name in `writable_attributes` and `immutable_fields`. `RecordingStudioApi.lookup` shows it on `:create` and omits it on `:update`. Built-in create assigns it with the other writable attributes. Update ignores it. Put the field on `details_schema` when the create contract should copy a type. Authorization stays in Accessible.
+3. Compare [v1.21.4...v1.21.5](https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.4...v1.21.5).
+
+```ruby
+RecordingStudioApi.register_recordable_type_api(
+  "RecordingStudioPresskits::CreditLine",
+  writable_attributes: %i[role credit_id],
+  immutable_fields: %i[credit_id],
+  openapi: {
+    details_schema: {
+      type: "object",
+      properties: {
+        role: { type: "string" },
+        credit_id: { type: "string" }
+      }
+    }
+  }
+)
+```
+
 ## Upgrading to 1.21.4
 
 Create `parent_id` errors name the public type. No migration. HTTP status stays 422.
