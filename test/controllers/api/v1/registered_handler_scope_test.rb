@@ -72,11 +72,11 @@ class ApiV1RegisteredHandlerScopeTest < ActionDispatch::IntegrationTest
 
     get "/recording_studio_api/api/v1/pages/#{@folder_recording.id}", headers: headers
     assert_response :not_found
-    assert_equal "Resource type does not match Page", JSON.parse(response.body).dig("error", "message")
+    assert_equal "Expected a Page, but this id is a Folder. Pass the id of a Page recording (the id returned when that resource was created or looked up).", JSON.parse(response.body).dig("error", "message")
 
     get "/recording_studio_api/api/v1/scoped-pages/#{@folder_recording.id}", headers: headers
     assert_response :not_found
-    assert_equal "Resource type does not match Page", JSON.parse(response.body).dig("error", "message")
+    assert_equal "Expected a Page, but this id is a Folder. Pass the id of a Page recording (the id returned when that resource was created or looked up).", JSON.parse(response.body).dig("error", "message")
     assert_empty @calls
   end
 

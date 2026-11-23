@@ -66,7 +66,7 @@ class HandlerGuardTest < ActiveSupport::TestCase
     error = assert_raises(RecordingStudioApi::NotFoundError) do
       guard_resource(grant, show, :show, page.parent_recording.id)
     end
-    assert_equal "Resource type does not match Page", error.message
+    assert_equal type_mismatch_message("Page", "Folder"), error.message
 
     page.update_column(:trashed_at, Time.current)
     assert_missing { guard_resource(grant, show, :show, page.id) }
@@ -130,7 +130,7 @@ class HandlerGuardTest < ActiveSupport::TestCase
     error = assert_raises(RecordingStudioApi::NotFoundError) do
       guard_capability(edit_grant, action, page.parent_recording.id)
     end
-    assert_equal "Resource type does not match Page", error.message
+    assert_equal type_mismatch_message("Page", "Folder"), error.message
   end
 
   test "required_role view authorizes a view grant on a post" do
@@ -333,7 +333,7 @@ class HandlerGuardTest < ActiveSupport::TestCase
     error = assert_raises(RecordingStudioApi::NotFoundError) do
       guard_endpoint(edit_grant, read, edit_page.parent_recording.id)
     end
-    assert_equal "Resource type does not match Page", error.message
+    assert_equal type_mismatch_message("Page", "Folder"), error.message
   end
 
   test "an unscoped endpoint authorizes the grant anchor" do
@@ -520,5 +520,9 @@ class HandlerGuardTest < ActiveSupport::TestCase
   def assert_forbidden(&)
     error = assert_raises(RecordingStudioApi::AuthorizationError, &)
     assert_equal "API access grant is not authorized for this capability", error.message
+  end
+
+  def type_mismatch_message(expected, actual)
+    "Expected a #{expected}, but this id is a #{actual}. Pass the id of a #{expected} recording (the id returned when that resource was created or looked up)."
   end
 end
