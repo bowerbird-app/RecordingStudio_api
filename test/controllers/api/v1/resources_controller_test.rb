@@ -1004,7 +1004,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
 
     payload = JSON.parse(response.body)
-    assert_equal "can't be blank", payload.dig("error", "message")
+    assert_equal "Title can't be blank", payload.dig("error", "message")
     assert_equal [
       {
         "attribute" => "title",

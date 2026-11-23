@@ -56,7 +56,7 @@ module RecordingStudioApi
     def render_validation_error(record)
       render_error(
         code: "validation_failed",
-        message: record.errors.map(&:message).to_sentence,
+        message: record.errors.full_messages.to_sentence,
         status: :unprocessable_entity,
         details: validation_error_details(record)
       )

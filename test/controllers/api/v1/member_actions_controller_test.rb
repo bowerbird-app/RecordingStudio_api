@@ -124,6 +124,26 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
     assert_equal unauthorized_role_message(:edit), JSON.parse(response.body).dig("error", "message")
   end
 
+  test "denies an edit grant on a remove action that requires admin" do
+    RecordingStudioApi.register_capability_action(
+      :clear,
+      capability: :echoable,
+      http_verb: :post,
+      required_role: :admin,
+      handler: ->(context) { context.recording }
+    )
+    edit_user = create_user(email: "edit-clear-actions@example.com")
+    edit_root_recording, edit_access_recording = create_access_recording_for(user: edit_user, role: :edit)
+    edit_page_recording = create_page_recording(root_recording: edit_root_recording)
+    edit_token = issue_oauth_access_token_for(access_recording: edit_access_recording, name: "Edit clear token")
+
+    post "/recording_studio_api/api/v1/pages/#{edit_page_recording.id}/actions/clear",
+         headers: { "Authorization" => "Bearer #{edit_token}" }
+
+    assert_response :forbidden
+    assert_equal unauthorized_role_message(:admin), JSON.parse(response.body).dig("error", "message")
+  end
+
   test "dispatches a registered capability action with OAuth2 bearer authentication" do
     post "/recording_studio_api/api/v1/pages/#{@page_recording.id}/actions/echo",
          headers: authorization_headers
