@@ -49,7 +49,7 @@ class ApiV1WriteActorControllerTest < ActionDispatch::IntegrationTest
           headers: { "Authorization" => "Bearer #{token}" }
 
     assert_response :forbidden
-    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
+    assert_equal unauthorized_role_message(:edit), JSON.parse(response.body).dig("error", "message")
     assert_not_equal "Blocked over HTTP", folder.reload.recordable.name
     assert_nil latest_update_event(folder)
   end

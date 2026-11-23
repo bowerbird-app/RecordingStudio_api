@@ -84,7 +84,7 @@ class ApiV1DefaultListOrderTest < ActionDispatch::IntegrationTest
 
       get "/recording_studio_api/api/v1/folders/#{hidden.id}", headers: authorization_headers
       assert_response :not_found
-      assert_equal "Resource was not found in this API scope", JSON.parse(response.body).dig("error", "message")
+      assert_equal api_scope_missing_message("Folder"), JSON.parse(response.body).dig("error", "message")
     end
   end
 
@@ -102,7 +102,7 @@ class ApiV1DefaultListOrderTest < ActionDispatch::IntegrationTest
 
     get "/recording_studio_api/api/v1/folders/#{hidden.id}", headers: authorization_headers
     assert_response :not_found
-    assert_equal "Resource was not found in this API scope", JSON.parse(response.body).dig("error", "message")
+    assert_equal api_scope_missing_message("Folder"), JSON.parse(response.body).dig("error", "message")
 
     view_root, view_access = create_access_recording_for(user: create_user(email: "view-order@example.com"), role: :view)
     view_folder = create_folder_recording(root_recording: view_root, name: "Viewable")
@@ -114,7 +114,7 @@ class ApiV1DefaultListOrderTest < ActionDispatch::IntegrationTest
 
     patch "/recording_studio_api/api/v1/folders/#{view_folder.id}", params: { name: "Blocked" }, headers: view_headers
     assert_response :forbidden
-    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
+    assert_equal unauthorized_role_message(:edit), JSON.parse(response.body).dig("error", "message")
   end
 
   test "rejects order without sort when the default order is a callable" do
@@ -154,7 +154,7 @@ class ApiV1DefaultListOrderTest < ActionDispatch::IntegrationTest
 
       get "/recording_studio_api/api/v1/folders/#{hidden.id}", headers: authorization_headers
       assert_response :not_found
-      assert_equal "Resource was not found in this API scope", JSON.parse(response.body).dig("error", "message")
+      assert_equal api_scope_missing_message("Folder"), JSON.parse(response.body).dig("error", "message")
 
       view_root, view_access = create_access_recording_for(user: create_user(email: "view-named@example.com"), role: :view)
       view_folder = create_folder_recording(root_recording: view_root, name: "Viewable")
@@ -166,7 +166,7 @@ class ApiV1DefaultListOrderTest < ActionDispatch::IntegrationTest
 
       patch "/recording_studio_api/api/v1/folders/#{view_folder.id}", params: { name: "Blocked" }, headers: view_headers
       assert_response :forbidden
-      assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
+      assert_equal unauthorized_role_message(:edit), JSON.parse(response.body).dig("error", "message")
     end
   end
 

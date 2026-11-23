@@ -33,7 +33,7 @@ class ApiV1RegisteredHandlerScopeTest < ActionDispatch::IntegrationTest
 
     get "/recording_studio_api/api/v1/pages/#{@foreign_page.id}", headers: headers
     assert_response :not_found
-    assert_equal "Resource was not found in this API scope", JSON.parse(response.body).dig("error", "message")
+    assert_equal api_scope_missing_message("Page"), JSON.parse(response.body).dig("error", "message")
 
     post "/recording_studio_api/api/v1/pages/#{@foreign_page.id}/actions/echo", headers: headers
     assert_response :not_found
@@ -159,7 +159,7 @@ class ApiV1RegisteredHandlerScopeTest < ActionDispatch::IntegrationTest
 
     patch "/recording_studio_api/api/v1/pages/#{view_page.id}", params: { title: "Nope" }, headers: view_headers
     assert_response :forbidden
-    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
+    assert_equal unauthorized_role_message(:edit), JSON.parse(response.body).dig("error", "message")
     assert_equal(["show"], @calls.map { |call| call[:name] })
 
     patch "/recording_studio_api/api/v1/pages/#{@page_recording.id}", params: { title: "Ok" }, headers: headers
@@ -424,7 +424,7 @@ class ApiV1RegisteredHandlerScopeTest < ActionDispatch::IntegrationTest
     post "/recording_studio_api/api/v1/notes", headers: view_headers, as: :json
     assert_response :forbidden
     assert_equal "forbidden", JSON.parse(response.body).dig("error", "code")
-    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
+    assert_equal unauthorized_role_message(:edit), JSON.parse(response.body).dig("error", "message")
 
     patch "/recording_studio_api/api/v1/notes", headers: view_headers, as: :json
     assert_response :forbidden
@@ -498,7 +498,7 @@ class ApiV1RegisteredHandlerScopeTest < ActionDispatch::IntegrationTest
     @calls.clear
     post "/recording_studio_api/api/v1/owner-notes", headers: bearer, as: :json
     assert_response :forbidden
-    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
+    assert_equal unauthorized_role_message(:edit), JSON.parse(response.body).dig("error", "message")
     assert_empty @calls
   end
 
@@ -609,13 +609,13 @@ class ApiV1RegisteredHandlerScopeTest < ActionDispatch::IntegrationTest
 
     post restore_path(@foreign_page), headers: headers
     assert_response :not_found
-    assert_equal "Resource was not found in this API scope", JSON.parse(response.body).dig("error", "message")
+    assert_equal api_scope_missing_message("Page"), JSON.parse(response.body).dig("error", "message")
 
     view_headers, view_page = view_client
     view_page.update_column(:trashed_at, Time.current)
     post restore_path(view_page), headers: view_headers
     assert_response :forbidden
-    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
+    assert_equal unauthorized_role_message(:edit), JSON.parse(response.body).dig("error", "message")
     recording_ids = @calls.map { |call| call[:recording_id] }
     assert_equal [@page_recording.id], recording_ids
   end

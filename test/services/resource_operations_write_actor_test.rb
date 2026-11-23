@@ -55,7 +55,7 @@ class ResourceOperationsWriteActorTest < ActiveSupport::TestCase
       )
     end
 
-    assert_equal "API access grant is not authorized for this capability", error.message
+    assert_equal unauthorized_role_message(:edit), error.message
     assert_not_equal "Blocked for a viewer", folder.reload.recordable.name
     assert_nil latest_update_event(folder)
   end

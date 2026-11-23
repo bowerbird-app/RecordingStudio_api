@@ -770,10 +770,23 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_equal([direct_child.id], JSON.parse(response.body).fetch("records").map { |record| record.fetch("id") })
 
-    [other_parent.id, descendant.id, wrong_type.id].each do |child_id|
-      get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders/#{child_id}", headers: authorization_headers
-      assert_response :not_found
-    end
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders/#{@root_recording.id}", headers: authorization_headers
+    assert_response :not_found
+    assert_equal api_type_mismatch_message("Folder", "Workspace"), JSON.parse(response.body).dig("error", "message")
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders/#{wrong_type.id}", headers: authorization_headers
+    assert_response :not_found
+    assert_equal api_type_mismatch_message("Folder", "Page"), JSON.parse(response.body).dig("error", "message")
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders/#{descendant.id}", headers: authorization_headers
+    assert_response :not_found
+    assert_equal RecordingStudioApi::ScopedRecording.unexpected_id_message("Folder", api: :public),
+                 JSON.parse(response.body).dig("error", "message")
+    refute_includes JSON.parse(response.body).dig("error", "message"), "Expected a"
+
+    get "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders/#{other_parent.id}", headers: authorization_headers
+    assert_response :not_found
+    assert_equal "Relationship resource was not found in this API scope", JSON.parse(response.body).dig("error", "message")
 
     post "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders", params: {
       type: "folders", name: "Blocked type"
@@ -991,7 +1004,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     assert_response :unprocessable_entity
 
     payload = JSON.parse(response.body)
-    assert_equal "Title can't be blank", payload.dig("error", "message")
+    assert_equal "can't be blank", payload.dig("error", "message")
     assert_equal [
       {
         "attribute" => "title",
@@ -1221,7 +1234,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     get "/recording_studio_api/api/v1/pages/#{hidden_page.id}", headers: authorization_headers
 
     assert_response :not_found
-    assert_equal "Resource was not found in this API scope", JSON.parse(response.body).dig("error", "message")
+    assert_equal api_scope_missing_message("Page"), JSON.parse(response.body).dig("error", "message")
   end
 
   test "deletes a non-trashable resource by destroying its recording" do
@@ -1267,7 +1280,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     }, headers: { "Authorization" => "Bearer #{view_token}" }
 
     assert_response :forbidden
-    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
+    assert_equal unauthorized_role_message(:edit), JSON.parse(response.body).dig("error", "message")
   end
 
   test "view token cannot inherit another access recording owned by the same actor" do
@@ -1286,7 +1299,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     }, headers: { "Authorization" => "Bearer #{view_token}" }
 
     assert_response :forbidden
-    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
+    assert_equal unauthorized_role_message(:edit), JSON.parse(response.body).dig("error", "message")
   end
 
   test "forbids update for clients with view-only access" do
@@ -1302,7 +1315,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     }, headers: { "Authorization" => "Bearer #{view_token}" }
 
     assert_response :forbidden
-    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
+    assert_equal unauthorized_role_message(:edit), JSON.parse(response.body).dig("error", "message")
   end
 
   test "forbids destroy for clients with view-only access" do
@@ -1316,7 +1329,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     delete "/recording_studio_api/api/v1/pages/#{page_recording.id}", headers: { "Authorization" => "Bearer #{view_token}" }
 
     assert_response :forbidden
-    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
+    assert_equal unauthorized_role_message(:edit), JSON.parse(response.body).dig("error", "message")
   end
 
   test "rejects delete for resources outside the authenticated root scope" do
@@ -1326,7 +1339,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     delete "/recording_studio_api/api/v1/pages/#{hidden_page.id}", headers: authorization_headers
 
     assert_response :not_found
-    assert_equal "Resource was not found in this API scope", JSON.parse(response.body).dig("error", "message")
+    assert_equal api_scope_missing_message("Page"), JSON.parse(response.body).dig("error", "message")
   end
 
   private

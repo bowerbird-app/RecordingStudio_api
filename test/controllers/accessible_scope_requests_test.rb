@@ -37,13 +37,13 @@ class AccessibleScopeRequestsTest < ActionDispatch::IntegrationTest
   test "show and update outside the folder grant return not found" do
     get "/recording_studio_api/api/v1/folders/#{@sibling_folder.id}", headers: authorization_headers
     assert_response :not_found
-    assert_equal "Resource was not found in this API scope", JSON.parse(response.body).dig("error", "message")
+    assert_equal api_scope_missing_message("Folder"), JSON.parse(response.body).dig("error", "message")
 
     patch "/recording_studio_api/api/v1/folders/#{@sibling_folder.id}",
           params: { name: "Renamed sibling" },
           headers: authorization_headers
     assert_response :not_found
-    assert_equal "Resource was not found in this API scope", JSON.parse(response.body).dig("error", "message")
+    assert_equal api_scope_missing_message("Folder"), JSON.parse(response.body).dig("error", "message")
     assert_equal "Sibling", @sibling_folder.recordable.reload.name
   end
 

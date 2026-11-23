@@ -157,10 +157,19 @@ module RecordingStudioApi
         end
 
         def child_recording(include_trashed: false)
-          child = child_scope(include_trashed: include_trashed).find_by(id: params[:relationship_id])
-          raise RecordingStudioApi::NotFoundError, "Relationship resource was not found in this API scope" if child.nil?
+          child = RecordingStudioApi::ScopedRecording.find!(
+            access_grant: current_access_grant,
+            id: params[:relationship_id],
+            recordable_type: relationship.child_type,
+            include_trashed: include_trashed,
+            missing: "Relationship resource was not found in this API scope"
+          )
+          return child if child.parent_recording_id == parent_recording.id
 
-          child
+          raise RecordingStudioApi::NotFoundError, RecordingStudioApi::ScopedRecording.unexpected_id_message(
+            relationship.child_type,
+            api: current_api_key
+          )
         end
 
         def child_scope(include_trashed: false)

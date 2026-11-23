@@ -105,7 +105,7 @@ class ApiV1TokenOwnerAccessTest < ActionDispatch::IntegrationTest
           params: { title: "Blocked" },
           headers: bearer(token)
     assert_response :forbidden
-    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
+    assert_equal unauthorized_role_message(:edit), JSON.parse(response.body).dig("error", "message")
     refute_equal "Blocked", page.recordable.reload.title
   end
 

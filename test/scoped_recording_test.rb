@@ -74,7 +74,9 @@ class ScopedRecordingTest < ActiveSupport::TestCase
       )
     end
 
-    assert_equal "Resource was not found in this API scope", error.message
+    assert_equal api_scope_missing_message("Page"), error.message
+    refute_match(/Folder|Page recording/, error.message)
+    assert_includes error.message, "Pass the id of a Page"
   end
 
   private
