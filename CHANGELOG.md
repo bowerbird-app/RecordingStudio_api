@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.21.6] - 2026-11-23
+
+### Changed
+- A scoped lookup whose id is in the grant but is the wrong recordable type still raises `NotFoundError` (HTTP 404 `not_found`). The message now names the expected public type, the public type of that id when it is in scope, and asks the caller to pass an id of the expected type. An unregistered type still uses the class name. A custom `type_mismatch:` string still wins.
+
+### Upgrade notes
+- Bump to `1.21.6`. No migration. HTTP status and error code stay `404` / `not_found`.
+- Clients that matched `Resource type does not match Page` must match the new wording instead.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.21.5] - 2026-11-20
 
 ### Changed
@@ -1729,7 +1739,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.5...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.6...HEAD
+[1.21.6]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.5...v1.21.6
 [1.21.5]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.4...v1.21.5
 [1.21.4]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.3...v1.21.4
 [1.21.3]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.2...v1.21.3

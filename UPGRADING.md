@@ -1,5 +1,13 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.21.6
+
+Wrong-type scoped ids keep HTTP 404. The message names public types. No migration.
+
+1. Bump the host gem to `1.21.6`. Gemspec ranges stay the same.
+2. `ScopedRecording.find!` still raises `NotFoundError` when the id is in the grant but the recordable type does not match. The default message now uses the registered public type (the same fallback as a missing `parent_id` on create), names the type of the given id when that recording is in scope, and tells the caller to pass an id of the expected type. Pass `type_mismatch:` to keep a custom string. Authorization is still Accessible.
+3. Compare [v1.21.5...v1.21.6](https://github.com/bowerbird-app/RecordingStudio_API/compare/v1.21.5...v1.21.6).
+
 ## Upgrading to 1.21.5
 
 Create-only inputs use the existing writable and immutable lists. No migration. Registration options stay the same.

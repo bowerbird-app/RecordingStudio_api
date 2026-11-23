@@ -1042,7 +1042,9 @@ and GET, and `:edit` otherwise, unless `required_role:` or
 `capability_action_role_for` says otherwise.
 `include_trashed` and `trashed_semantics` go through
 `HandlerScope.dispatch_include_trashed?`. A blank id on a scoped path raises
-`NotFoundError`.
+`NotFoundError`. An in-scope id of the wrong recordable type is also
+`NotFoundError`. The message names the expected public type, the type of that
+id, and asks the caller to pass an id of the expected type.
 
 Nested relationship handlers still resolve the parent and child in
 `RelationshipResourcesController`, which also authorizes the relationship.

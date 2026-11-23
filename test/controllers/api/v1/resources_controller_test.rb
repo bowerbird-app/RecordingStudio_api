@@ -1204,7 +1204,7 @@ class ApiV1ResourcesControllerTest < ActionDispatch::IntegrationTest
     get "/recording_studio_api/api/v1/pages/#{folder_recording.id}", headers: authorization_headers
 
     assert_response :not_found
-    assert_includes JSON.parse(response.body).dig("error", "message"), "Resource type does not match"
+    assert_equal "Expected a Page, but this id is a Folder. Pass the id of a Page recording (the id returned when that resource was created or looked up).", JSON.parse(response.body).dig("error", "message")
   end
 
   test "rejects unknown API resource" do
