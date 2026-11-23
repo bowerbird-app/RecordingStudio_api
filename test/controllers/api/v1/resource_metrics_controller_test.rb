@@ -142,11 +142,11 @@ class ApiV1ResourceMetricsControllerTest < ActionDispatch::IntegrationTest
     denied = JSON.parse(response.body)
     refute denied.key?("metrics")
     assert_equal "forbidden", denied.dig("error", "code")
-    assert_equal "API access grant is not authorized for this capability", denied.dig("error", "message")
+    assert_equal unauthorized_role_message(:view), denied.dig("error", "message")
 
     get "/recording_studio_api/api/v1/folders/metrics/folders.missing", headers: authorization_headers
     assert_response :forbidden
-    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
+    assert_equal unauthorized_role_message(:view), JSON.parse(response.body).dig("error", "message")
   end
 
   test "pages metrics stays on show and folder routes resolve in the public and named draw blocks" do
@@ -309,7 +309,7 @@ class ApiV1ResourceMetricsControllerTest < ActionDispatch::IntegrationTest
     assert_api_error(:forbidden, "forbidden")
     get "/recording_studio_api/api/v1/folders/metrics/folders.total", headers: bearer(guest_token)
     error = assert_api_error(:forbidden, "forbidden")
-    assert_equal "API access grant is not authorized for this capability", error.fetch("message")
+    assert_equal unauthorized_role_message(:view), error.fetch("message")
   end
 
   test "a missing token is unauthorized" do

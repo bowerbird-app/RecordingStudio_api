@@ -145,7 +145,7 @@ class HandlerGuardTest < ActiveSupport::TestCase
     admin_grant, admin_page = open_grant(:admin)
     action = register_action(:purge, required_role: :admin)
 
-    assert_forbidden { guard_capability(edit_grant, action, edit_page.id) }
+    assert_forbidden(:admin) { guard_capability(edit_grant, action, edit_page.id) }
     assert_equal admin_page, guard_capability(admin_grant, action, admin_page.id).recording
   end
 
@@ -382,7 +382,7 @@ class HandlerGuardTest < ActiveSupport::TestCase
     )
     assert revoked.success?
 
-    assert_forbidden { guard_endpoint(anchor_grant(access, root), endpoint, nil) }
+    assert_forbidden(:view) { guard_endpoint(anchor_grant(access, root), endpoint, nil) }
   end
 
   test "an endpoint required_role view authorizes a view grant on post" do
@@ -512,14 +512,14 @@ class HandlerGuardTest < ActiveSupport::TestCase
     assert_nil result.parent_recording
   end
 
-  def assert_missing(&)
+  def assert_missing(recordable_type = "Page", &)
     error = assert_raises(RecordingStudioApi::NotFoundError, &)
-    assert_equal RecordingStudioApi::HandlerGuard::MISSING, error.message
+    assert_equal api_scope_missing_message(recordable_type), error.message
   end
 
-  def assert_forbidden(&)
+  def assert_forbidden(role = :edit, &)
     error = assert_raises(RecordingStudioApi::AuthorizationError, &)
-    assert_equal "API access grant is not authorized for this capability", error.message
+    assert_equal unauthorized_role_message(role), error.message
   end
 
   def type_mismatch_message(expected, actual)

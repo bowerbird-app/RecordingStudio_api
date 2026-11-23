@@ -109,7 +109,10 @@ module RecordingStudioApi
       end
 
       def find_recording!(access_grant:, id:, recordable_type:, include_trashed:)
-        raise NotFoundError, MISSING if id.blank?
+        if id.blank?
+          api = access_grant.api_client&.api_key.presence || :public
+          raise NotFoundError, ScopedRecording.missing_message(recordable_type, api: api)
+        end
 
         ScopedRecording.find!(
           access_grant: access_grant,

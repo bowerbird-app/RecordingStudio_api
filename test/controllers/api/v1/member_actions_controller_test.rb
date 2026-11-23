@@ -121,7 +121,27 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
          headers: { "Authorization" => "Bearer #{view_token}" }
 
     assert_response :forbidden
-    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
+    assert_equal unauthorized_role_message(:edit), JSON.parse(response.body).dig("error", "message")
+  end
+
+  test "denies an edit grant on a remove action that requires admin" do
+    RecordingStudioApi.register_capability_action(
+      :clear,
+      capability: :echoable,
+      http_verb: :post,
+      required_role: :admin,
+      handler: ->(context) { context.recording }
+    )
+    edit_user = create_user(email: "edit-clear-actions@example.com")
+    edit_root_recording, edit_access_recording = create_access_recording_for(user: edit_user, role: :edit)
+    edit_page_recording = create_page_recording(root_recording: edit_root_recording)
+    edit_token = issue_oauth_access_token_for(access_recording: edit_access_recording, name: "Edit clear token")
+
+    post "/recording_studio_api/api/v1/pages/#{edit_page_recording.id}/actions/clear",
+         headers: { "Authorization" => "Bearer #{edit_token}" }
+
+    assert_response :forbidden
+    assert_equal unauthorized_role_message(:admin), JSON.parse(response.body).dig("error", "message")
   end
 
   test "dispatches a registered capability action with OAuth2 bearer authentication" do
@@ -322,7 +342,7 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
          headers: { "Authorization" => "Bearer #{restricted_oauth_token}" }
 
     assert_response :not_found
-    assert_equal "Resource was not found in this API scope", JSON.parse(response.body).dig("error", "message")
+    assert_equal api_scope_missing_message("Page"), JSON.parse(response.body).dig("error", "message")
   end
 
   test "rejects requests without a bearer token" do
@@ -344,7 +364,7 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
          headers: { "Authorization" => "Bearer #{view_token}" }
 
     assert_response :forbidden
-    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
+    assert_equal unauthorized_role_message(:edit), JSON.parse(response.body).dig("error", "message")
   end
 
   test "allows a handler-backed member action at the required role" do
@@ -369,7 +389,7 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
          headers: { "Authorization" => "Bearer #{view_token}" }
 
     assert_response :forbidden
-    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
+    assert_equal unauthorized_role_message(:edit), JSON.parse(response.body).dig("error", "message")
   end
 
   test "allows the host to lower a custom action role requirement" do
@@ -396,7 +416,7 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
       assert_response :forbidden, name
       body = JSON.parse(response.body)
       assert_equal "forbidden", body.dig("error", "code"), name
-      assert_equal "API access grant is not authorized for this capability", body.dig("error", "message"), name
+      assert_equal unauthorized_role_message(:edit), body.dig("error", "message"), name
       assert_nil body.dig("error", "details"), name
       assert_equal 0, contract.calls, name
       assert_empty ran, name
@@ -447,7 +467,7 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
       assert_response :forbidden, name
       forbidden = JSON.parse(response.body)
       assert_equal "forbidden", forbidden.dig("error", "code"), name
-      assert_equal "API access grant is not authorized for this capability", forbidden.dig("error", "message"), name
+      assert_equal unauthorized_role_message(:edit), forbidden.dig("error", "message"), name
       assert_nil forbidden.dig("error", "details"), name
       refute_includes response.body, "not enabled", name
       refute_includes response.body, "cannot be blank", name
@@ -457,7 +477,7 @@ class ApiV1MemberActionsControllerTest < ActionDispatch::IntegrationTest
       assert_response :not_found, name
       missing = JSON.parse(response.body)
       assert_equal "not_found", missing.dig("error", "code"), name
-      assert_equal "Resource was not found in this API scope", missing.dig("error", "message"), name
+      assert_equal api_scope_missing_message("Page"), missing.dig("error", "message"), name
       refute_includes response.body, "not enabled", name
       refute_includes response.body, name.to_s, name
 

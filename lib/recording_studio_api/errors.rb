@@ -22,6 +22,10 @@ module RecordingStudioApi
 
   class AuthorizationError < Error
     MISSING_REQUEST_PRINCIPAL = "This request has no API client or actor to scope idempotency and pagination"
+
+    def self.for_required_role(role)
+      "This action needs a grant with the #{role} role or higher."
+    end
   end
 
   class ConfigurationError < Error; end

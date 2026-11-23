@@ -319,6 +319,18 @@ module ApiDummyHelpers # rubocop:disable Metrics/ModuleLength
     }
   end
 
+  def api_scope_missing_message(recordable_type, api: :public)
+    RecordingStudioApi::ScopedRecording.missing_message(recordable_type, api: api)
+  end
+
+  def unauthorized_role_message(role)
+    RecordingStudioApi::AuthorizationError.for_required_role(role)
+  end
+
+  def api_type_mismatch_message(expected, actual)
+    "Expected a #{expected}, but this id is a #{actual}. Pass the id of a #{expected} recording (the id returned when that resource was created or looked up)."
+  end
+
   def nested_folder_recording(name, parent)
     RecordingStudio::Recording.create!(
       recordable: Folder.create!(name: name),

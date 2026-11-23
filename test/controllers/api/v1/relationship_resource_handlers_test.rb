@@ -160,7 +160,7 @@ class ApiV1RelationshipResourceHandlersTest < ActionDispatch::IntegrationTest
          params: { name: "Handler owns this" },
          headers: view_headers
     assert_response :forbidden
-    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
+    assert_equal unauthorized_role_message(:edit), JSON.parse(response.body).dig("error", "message")
     assert_empty calls
 
     patch "/recording_studio_api/api/v1/workspaces/#{view_root.id}/folders/#{view_folder.id}",

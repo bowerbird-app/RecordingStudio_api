@@ -1,5 +1,14 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.21.7
+
+Clearer API error wording. No migration. HTTP statuses and error codes stay the same.
+
+1. Bump the host gem to `1.21.7`. Gemspec ranges stay the same.
+2. A scoped id that is not in the grant still returns HTTP 404 `not_found`. The message still starts with `Resource was not found in this API scope` and now adds that the id may belong to a different recording than the one this operation acts on, naming only the expected public type. It does not say what an out-of-scope id actually is. A nested child route that is given a parent or other in-scope recording of the wrong type uses the 1.21.6 type-mismatch wording. A nested child id that is the right type but not a child of that parent uses the generic hint only.
+3. An Accessible role that is too low still returns HTTP 403 `forbidden`. The message names the role the action requires (`This action needs a grant with the admin role or higher.`), not the grant's own role. Role checks stay in Accessible; this gem only changes the wording. Validation `error.message` is still `full_messages`.
+4. Compare [v1.21.6...v1.21.7](https://github.com/bowerbird-app/RecordingStudio_API/compare/v1.21.6...v1.21.7).
+
 ## Upgrading to 1.21.6
 
 Wrong-type scoped ids keep HTTP 404. The message names public types. No migration.

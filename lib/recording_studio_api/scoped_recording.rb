@@ -2,14 +2,25 @@
 
 module RecordingStudioApi
   class ScopedRecording
-    def self.find!(access_grant:, id:, recordable_type:, include_trashed: false, missing: "Resource was not found in this API scope", type_mismatch: nil)
+    def self.find!(access_grant:, id:, recordable_type:, include_trashed: false, missing: nil, type_mismatch: nil)
       recording = access_grant.accessible_recordings(include_trashed: include_trashed).find_by(id: id)
-      raise NotFoundError, missing if recording.nil?
+      api = api_for(access_grant)
+      raise NotFoundError, (missing || missing_message(recordable_type, api: api)) if recording.nil?
 
       expected = recordable_type.to_s
       return recording if recording.recordable_type == expected
 
-      raise NotFoundError, (type_mismatch || type_mismatch_message(expected, recording, api: api_for(access_grant)))
+      raise NotFoundError, (type_mismatch || type_mismatch_message(expected, recording, api: api))
+    end
+
+    def self.missing_message(expected_type, api:)
+      expected_name = public_recordable_name(expected_type, api: api)
+      "#{HandlerGuard::MISSING}. This id may belong to a different recording than the one this operation acts on. Pass the id of a #{expected_name}."
+    end
+
+    def self.unexpected_id_message(expected_type, api:)
+      expected_name = public_recordable_name(expected_type, api: api)
+      "This id may belong to a different recording than the one this operation acts on. Pass the id of a #{expected_name}."
     end
 
     def self.api_for(access_grant)

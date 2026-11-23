@@ -62,7 +62,7 @@ module RecordingStudioApi
     def authorize!(recording:, role:, include_trashed: false)
       return if authorized?(recording: recording, role: role, include_trashed: include_trashed)
 
-      raise RecordingStudioApi::AuthorizationError, "API access grant is not authorized for this capability"
+      raise RecordingStudioApi::AuthorizationError, AuthorizationError.for_required_role(role)
     end
 
     private

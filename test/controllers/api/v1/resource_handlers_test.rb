@@ -132,7 +132,7 @@ class ApiV1ResourceHandlersTest < ActionDispatch::IntegrationTest
 
     post "/recording_studio_api/api/v1/pages/#{view_page.id}/actions/echo", headers: headers
     assert_response :forbidden
-    assert_equal "API access grant is not authorized for this capability", JSON.parse(response.body).dig("error", "message")
+    assert_equal unauthorized_role_message(:edit), JSON.parse(response.body).dig("error", "message")
 
     post "/recording_studio_api/api/v1/workspaces/#{view_root.id}/actions/echo", headers: headers
     assert_response :forbidden
@@ -213,7 +213,7 @@ class ApiV1ResourceHandlersTest < ActionDispatch::IntegrationTest
 
     get "/recording_studio_api/apis/operations/v1/pages/#{page_recording.id}", headers: operations_headers
     assert_response :not_found
-    assert_equal "Resource was not found in this API scope", JSON.parse(response.body).dig("error", "message")
+    assert_equal api_scope_missing_message("Page", api: :operations), JSON.parse(response.body).dig("error", "message")
 
     patch "/recording_studio_api/apis/operations/v1/pages/#{page_recording.id}",
           params: { title: "Should not write" },
@@ -232,13 +232,13 @@ class ApiV1ResourceHandlersTest < ActionDispatch::IntegrationTest
 
     get "/recording_studio_api/apis/operations/v1/folders/#{folder_recording.id}", headers: operations_headers
     assert_response :not_found
-    assert_equal "Resource was not found in this API scope", JSON.parse(response.body).dig("error", "message")
+    assert_equal api_scope_missing_message("Folder", api: :operations), JSON.parse(response.body).dig("error", "message")
 
     post "/recording_studio_api/apis/operations/v1/folders/#{folder_recording.id}/actions/move",
          params: { parent_id: page_recording.root_recording_id },
          headers: operations_headers
     assert_response :not_found
-    assert_equal "Resource was not found in this API scope", JSON.parse(response.body).dig("error", "message")
+    assert_equal api_scope_missing_message("Folder", api: :operations), JSON.parse(response.body).dig("error", "message")
   end
 
   private
