@@ -52,6 +52,30 @@ class ResourceHandlerRegistryTest < Minitest::Test
     end
   end
 
+  def test_create_handler_parent_server_is_opt_in
+    RecordingStudioApi.register_resource_handler("Page", :create, parent: :server, handler: ->(*) { {} })
+
+    registration = RecordingStudioApi.resource_handler_registration("Page", :create)
+    assert registration.server_parent?
+    assert RecordingStudioApi.server_create_parent?("Page")
+    refute RecordingStudioApi.server_create_parent?("Folder")
+
+    error = assert_raises(RecordingStudioApi::ConfigurationError) do
+      RecordingStudioApi.register_resource_handler("Folder", :update, parent: :server, handler: ->(*) { {} })
+    end
+    assert_includes error.message, "parent: :server is only valid for a create handler"
+
+    action_error = assert_raises(RecordingStudioApi::ConfigurationError) do
+      RecordingStudioApi.register_capability_action(
+        :file_note,
+        capability: :notable,
+        parent: :server,
+        handler: ->(*) { {} }
+      )
+    end
+    assert_includes action_error.message, "parent: :server requires creates: true for file_note"
+  end
+
   def test_creates_defaults_to_false_and_rejects_other_values
     RecordingStudioApi.register_resource_handler("Page", :create, handler: ->(*) { {} })
     refute RecordingStudioApi.resource_handler_registration("Page", :create).creates?

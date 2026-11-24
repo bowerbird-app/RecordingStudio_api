@@ -1,5 +1,35 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.22.0
+
+Server-chosen create parent. No migration. Creates that do not opt in are unchanged.
+
+1. Bump the host gem to `1.22.0`. Gemspec ranges stay the same.
+2. Pass `create_parent: :server` and a `parent_resolver:` callable on `register_recordable_type_api` when the built-in create should choose the parent. The resolver receives the resource operation context and returns a recording or an id. The engine loads that recording again from the client's accessible scope and root. A result outside that scope is HTTP 404 `not_found`, the same as an out-of-scope `parent_id`. Omit `parent_resolver` and registration raises `RecordingStudioApi::ConfigurationError`.
+3. Pass `parent: :server` on `register_resource_handler(type, :create, ...)` when a custom create handler chooses the parent. No resolver. The handler's `context.parent_recording` is nil on a top-level create. A nested create still passes the parent from the URL.
+4. Pass `parent: :server` on `register_capability_action(..., creates: true)`. `parent: :server` without `creates: true` raises `ConfigurationError`. `parent_id` is dropped from that action's request schema and ignored if a client still sends it.
+5. OpenAPI and `DocumentationCatalog` omit `parent_id` from that create body. The catalog endpoint includes `parent: "server"`. The OpenAPI operation includes `x-parent: "server"`. MCP should drop `parent_id` from the tool schema when it reads that flag. `root_allowed?` alone still treats a non-root type as requiring `parent_id`.
+6. A client `parent_id` on an opted-in create is ignored. It does not change the parent and it does not change the idempotency fingerprint. Ignoring it keeps a client from placing the record somewhere else, and it lets a caller that still sends the old required field succeed. The resolved parent is checked against the grant, so the ignored value cannot widen access.
+7. Compare [v1.21.7...v1.22.0](https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.7...v1.22.0).
+
+```ruby
+RecordingStudioApi.register_recordable_type_api(
+  "Note",
+  create_parent: :server,
+  parent_resolver: ->(context) { context.root_recording },
+  serializer: ->(note, **) { { body: note.body } },
+  output_keys: %i[body],
+  writable_attributes: %i[body]
+)
+
+RecordingStudioApi.register_resource_handler(
+  "RecordingStudioSupport::SupportTicket",
+  :create,
+  handler: RecordingStudioSupport::Api::TicketOpen,
+  parent: :server
+)
+```
+
 ## Upgrading to 1.21.7
 
 Clearer API error wording. No migration. HTTP statuses and error codes stay the same.

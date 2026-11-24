@@ -179,6 +179,7 @@ module RecordingStudioApi
 
         operation[:deprecated] = metadata[:deprecated] if metadata.key?(:deprecated)
         operation[:externalDocs] = metadata[:externalDocs] if metadata.key?(:externalDocs)
+        operation[:"x-parent"] = endpoint[:parent] if endpoint[:parent].present?
 
         operation
       end

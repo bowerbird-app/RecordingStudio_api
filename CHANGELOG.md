@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.22.0] - 2026-11-24
+
+### Added
+- A create can opt in to a server-chosen parent. `register_recordable_type_api(..., create_parent: :server, parent_resolver:)` is the built-in create path. `register_resource_handler(type, :create, parent: :server)` is the custom create handler path. `register_capability_action(..., creates: true, parent: :server)` is the same option for a creating capability action. The default is still the caller-supplied `parent_id`.
+- When the option is set, the create request schema omits `parent_id`. The documentation catalog endpoint sets `parent` to `"server"`. The generated OpenAPI operation sets `x-parent` to `"server"`. A missing `parent_id` is not an error. A `parent_id` that is still sent is ignored and is left out of the idempotency fingerprint.
+- The built-in path calls `parent_resolver` and loads that recording again inside the client's API scope and root. A parent outside that scope is HTTP 404 `not_found`. Registration without `parent_resolver` on the built-in path raises `RecordingStudioApi::ConfigurationError`. A custom create handler receives a nil parent recording and chooses the parent itself.
+
+### Upgrade notes
+- Bump to `1.22.0`. No migration. Creates that do not opt in are unchanged.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.21.7] - 2026-11-23
 
 ### Changed

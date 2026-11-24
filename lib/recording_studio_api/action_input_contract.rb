@@ -61,6 +61,16 @@ module RecordingStudioApi
       @definition
     end
 
+    def without_field(name)
+      definition = @definition.deep_dup
+      fields = definition[:fields]
+      return self unless fields.is_a?(Hash)
+
+      fields.delete(name.to_sym)
+      fields.delete(name.to_s)
+      self.class.new(definition)
+    end
+
     private
 
     def normalize_definition(definition)

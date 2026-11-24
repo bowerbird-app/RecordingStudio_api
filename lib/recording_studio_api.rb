@@ -7,6 +7,7 @@ require "recording_studio_trashable/query"
 require "recording_studio_logs"
 require "recording_studio_api/engine"
 require "recording_studio_api/errors"
+require "recording_studio_api/create_parent"
 require "recording_studio_api/sensitive_flag"
 require "recording_studio_api/lookup"
 require "recording_studio_api/configuration"
@@ -203,7 +204,7 @@ module RecordingStudioApi
       end || []
     end
 
-    def register_resource_handler(recordable_type, action, api: :public, handler:, include_trashed: false, owns_scoping: false, trashed_semantics: nil, creates: false)
+    def register_resource_handler(recordable_type, action, api: :public, handler:, include_trashed: false, owns_scoping: false, trashed_semantics: nil, creates: false, parent: nil)
       configuration.api(api).resource_handler_registry.register(
         recordable_type,
         action,
@@ -211,7 +212,7 @@ module RecordingStudioApi
         include_trashed: include_trashed,
         owns_scoping: owns_scoping,
         trashed_semantics: trashed_semantics,
-        creates: creates,
+        creates: creates, parent: parent,
         api: api
       )
     end
@@ -224,7 +225,7 @@ module RecordingStudioApi
       configuration.fetch_api(api).resource_handler_registry.registration(recordable_type, action)
     end
 
-    def register_capability_action(name, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil, ui: nil, include_trashed: false, owns_scoping: false, trashed_semantics: nil, api: :public, sensitive: nil, **)
+    def register_capability_action(name, capability:, version: nil, version_notes: nil, deprecation: nil, http_verb: :post, handler:, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil, ui: nil, include_trashed: false, owns_scoping: false, trashed_semantics: nil, api: :public, sensitive: nil, parent: nil, **)
       configuration.api(api).action_registry.register(
         name,
         capability: capability,
@@ -242,7 +243,7 @@ module RecordingStudioApi
         include_trashed: include_trashed,
         owns_scoping: owns_scoping,
         trashed_semantics: trashed_semantics,
-        sensitive: SensitiveFlag.coerce(sensitive, api: api),
+        sensitive: SensitiveFlag.coerce(sensitive, api: api), parent: parent,
         **
       )
     end
@@ -251,7 +252,8 @@ module RecordingStudioApi
                                      sortable_attributes: nil, writable_attributes: nil, immutable_fields: nil,
                                      relationships: nil, immutable_relationships: nil, operations: nil,
                                      capability_actions: nil, auto_capability_actions: nil, metrics: nil,
-                                     public_name: nil, default_order: nil, api: :public, sensitive: nil)
+                                     public_name: nil, default_order: nil, api: :public, sensitive: nil,
+                                     create_parent: nil, parent_resolver: nil)
       definition = configuration.api(api)
       resolved_operations = operations
       resolved_operations = %i[index show] if resolved_operations.nil? && definition.respond_to?(:default_access) && definition.default_access == :read_only
@@ -271,7 +273,7 @@ module RecordingStudioApi
         capability_actions: capability_actions,
         auto_capability_actions: auto_capability_actions,
         metrics: metrics,
-        public_name: public_name, default_order: default_order, sensitive: sensitive
+        public_name: public_name, default_order: default_order, sensitive: sensitive, create_parent: create_parent, parent_resolver: parent_resolver
       )
     end
 
@@ -592,5 +594,12 @@ module RecordingStudioApi
     rescue ConfigurationError
       nil
     end
+  end
+
+  def self.server_create_parent?(recordable_type, api: :public)
+    handler = resource_handler_registration(recordable_type, :create, api: api)
+    return CreateParent.server?(handler.parent) if handler&.parent
+
+    recordable_registration_for(recordable_type, api: api)&.server_create_parent? || false
   end
 end

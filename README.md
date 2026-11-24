@@ -1192,6 +1192,10 @@ Nested creates take their parent from the URL, and updates do not accept `parent
 registered move action to change a record's parent. The legacy `{ attributes: { ... } }` envelope
 is rejected.
 
+A create can opt in to a server-chosen parent so callers do not send `parent_id`. See
+[Server-chosen create parent](docs/create-parent.md). The default stays the same. A non-root
+create without that option still requires `parent_id`.
+
 The engine preloads the recordable for each list row before serialization, and it
 fetches requested `children` relationships from the current page's recording ids,
 one query per response, preventing serializer-driven N+1 queries. Each parent

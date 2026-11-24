@@ -12,7 +12,7 @@ module RecordingStudioApi
     ALLOWED_HTTP_VERBS = %i[get post patch put delete].freeze
     ALLOWED_SCOPES = %i[collection resource member].freeze
 
-    attr_reader :name, :capability, :version, :version_notes, :deprecation, :http_verb, :handler, :serializer, :scope, :openapi, :input_contract, :required_role, :ui, :include_trashed, :owns_scoping, :trashed_semantics, :creates, :sensitive
+    attr_reader :name, :capability, :version, :version_notes, :deprecation, :http_verb, :handler, :serializer, :scope, :openapi, :input_contract, :required_role, :ui, :include_trashed, :owns_scoping, :trashed_semantics, :creates, :parent, :sensitive
 
     def initialize(name:, capability:, http_verb:, handler:, version: nil, version_notes: nil, deprecation: nil, serializer: nil, scope: :member, openapi: nil, input_contract: nil, required_role: nil, **options)
       @name = name.to_s
@@ -33,6 +33,7 @@ module RecordingStudioApi
       @trashed_semantics = HandlerScope.trashed_semantics(options.delete(:trashed_semantics), name: @name)
       @ui = UiWidgetId.normalize(options.delete(:ui), name: name)
       @creates = HandlerScope.flag(options.delete(:creates) { false }, name: :creates)
+      @parent = normalize_parent(options.delete(:parent))
       @sensitive = SensitiveFlag.boolean!(options.delete(:sensitive) { false }, name: name)
       raise ArgumentError, "unknown keywords: #{options.keys.join(', ')}" if options.any?
     end
@@ -51,11 +52,26 @@ module RecordingStudioApi
       raise ConfigurationError, "Input contract must be a RecordingStudioApi::ActionInputContract for #{name}" if input_contract && !input_contract.is_a?(ActionInputContract)
       raise ConfigurationError, "required_role must be one of: #{valid_access_roles.join(', ')} for #{name}" if required_role && !valid_access_roles.include?(required_role)
 
+      validate_parent!
       validate_handler_scope!
 
       raise ConfigurationError, "version_notes must be a string or array of strings for #{name}" unless version_notes.is_a?(Array)
       raise ConfigurationError, "deprecation must be a hash for #{name}" unless deprecation.is_a?(Hash)
     end
+
+    def validate_parent!
+      return unless server_parent?
+      return if creates?
+
+      raise ConfigurationError, "parent: :server requires creates: true for #{name}"
+    end
+
+    def normalize_parent(value)
+      return if value.nil?
+
+      CreateParent.normalize(value, name: "parent for #{name}")
+    end
+    private :validate_parent!, :normalize_parent
 
     def validate_handler_scope!
       HandlerScope.assert_trashed_semantics!(
@@ -79,6 +95,16 @@ module RecordingStudioApi
 
     def creates?
       creates
+    end
+
+    def server_parent?
+      CreateParent.server?(parent)
+    end
+
+    def request_input_contract
+      return input_contract unless server_parent?
+
+      input_contract&.without_field(:parent_id)
     end
 
     def applicable_to?(recordable_type)

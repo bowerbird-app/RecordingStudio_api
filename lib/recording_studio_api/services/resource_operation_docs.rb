@@ -5,11 +5,12 @@ module RecordingStudioApi
     class ResourceOperationDocs
       CANONICAL_FIELDS = %w[id type root_id parent_id created_at updated_at].freeze
 
-      def initialize(resource_name:, docs_resource_name:, registration:, root: false)
+      def initialize(resource_name:, docs_resource_name:, registration:, root: false, server_parent: false)
         @resource_name = resource_name.to_s
         @docs_resource_name = docs_resource_name.to_s
         @registration = registration
         @root = root
+        @server_parent = server_parent
       end
 
       def summary_for(operation)
@@ -60,9 +61,16 @@ module RecordingStudioApi
       def create_description
         join_sentences(
           "Creates #{noun_phrase}. Requires edit access.",
+          server_parent_sentence,
           write_sentence(create_write_names),
           "Send an `Idempotency-Key` header to reuse the first successful response for 24 hours. A different request with that key returns 422 `idempotency_key_reused` and creates nothing."
         )
+      end
+
+      def server_parent_sentence
+        return unless @server_parent
+
+        "The server chooses the parent. A parent_id in the body is ignored."
       end
 
       def update_description
@@ -131,7 +139,7 @@ module RecordingStudioApi
 
       def create_write_names
         names = writable_attribute_names.dup
-        names.unshift("parent_id") unless @root
+        names.unshift("parent_id") unless @root || @server_parent
         names.uniq
       end
 
