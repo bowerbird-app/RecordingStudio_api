@@ -15,14 +15,16 @@ module RecordingStudioApi
     def register(recordable_type, serializer: nil, output_keys: nil, fields: nil, openapi: nil,
                  sortable_attributes: nil, writable_attributes: nil, immutable_fields: nil,
                  relationships: nil, immutable_relationships: nil, operations: nil, capability_actions: nil,
-                 auto_capability_actions: nil, metrics: nil, public_name: nil, default_order: nil, sensitive: nil)
+                 auto_capability_actions: nil, metrics: nil, public_name: nil, default_order: nil, sensitive: nil,
+                 create_parent: nil, parent_resolver: nil)
       incoming = RecordableRegistration.new(
         recordable_type: recordable_type, serializer: serializer, output_keys: output_keys, fields: fields,
         openapi: openapi, sortable_attributes: sortable_attributes, writable_attributes: writable_attributes,
         immutable_fields: immutable_fields, relationships: relationships,
         immutable_relationships: immutable_relationships, operations: operations,
         capability_actions: capability_actions, auto_capability_actions: auto_capability_actions, metrics: metrics,
-        public_name: public_name, default_order: default_order, sensitive: sensitive
+        public_name: public_name, default_order: default_order, sensitive: sensitive,
+        create_parent: create_parent, parent_resolver: parent_resolver
       )
       key = incoming.recordable_type
       @mutex.synchronize do
@@ -98,7 +100,8 @@ module RecordingStudioApi
           "sensitive operations", existing.sensitive_operations, incoming.sensitive_operations,
           existing.sensitive_supplied?, incoming.sensitive_supplied?
         ),
-        sensitive_supplied: existing.sensitive_supplied? || incoming.sensitive_supplied?
+        sensitive_supplied: existing.sensitive_supplied? || incoming.sensitive_supplied?,
+        **merged_create_parent(existing, incoming, replace: @replace_metrics)
       )
     end
 
@@ -109,6 +112,31 @@ module RecordingStudioApi
       raise ConfigurationError, "Default order cannot be redefined incompatibly for #{incoming.recordable_type}" if clash
 
       { default_order: incoming.default_order, default_order_supplied: true }
+    end
+
+    def merged_create_parent(existing, incoming, replace:)
+      create_parent = merge_explicit_set(
+        "create parent", existing.create_parent, incoming.create_parent,
+        existing.create_parent_supplied?, incoming.create_parent_supplied?,
+        replace: replace
+      )
+      parent_resolver = merged_parent_resolver(existing, incoming, replace: replace)
+      parent_resolver = nil unless CreateParent.server?(create_parent)
+
+      {
+        create_parent: create_parent,
+        create_parent_supplied: existing.create_parent_supplied? || incoming.create_parent_supplied?,
+        parent_resolver: parent_resolver
+      }
+    end
+
+    def merged_parent_resolver(existing, incoming, replace:)
+      return existing.parent_resolver unless incoming.parent_resolver
+      return incoming.parent_resolver unless existing.parent_resolver
+      return existing.parent_resolver if existing.parent_resolver == incoming.parent_resolver
+      return incoming.parent_resolver if replace
+
+      raise ConfigurationError, "Parent resolver cannot be redefined incompatibly for #{incoming.recordable_type}"
     end
 
     def merged_public_name(existing, incoming)

@@ -79,7 +79,7 @@ module RecordingStudioApi
     attr_reader :recordable_type, :public_name, :serializer, :output_keys, :fields, :openapi,
                 :sortable_attributes, :writable_attributes, :immutable_fields, :relationships,
                 :immutable_relationships, :operations, :capability_actions, :auto_capability_actions, :metric_names,
-                :default_order, :sensitive_operations
+                :default_order, :sensitive_operations, :create_parent, :parent_resolver
 
     def initialize(recordable_type:, serializer: nil, output_keys: nil, fields: nil, openapi: nil,
                    sortable_attributes: nil, writable_attributes: nil, immutable_fields: nil,
@@ -87,7 +87,8 @@ module RecordingStudioApi
                    auto_capability_actions: nil, metrics: nil, operations_supplied: nil,
                    capability_actions_supplied: nil, auto_capability_actions_supplied: nil, metrics_supplied: nil,
                    public_name: nil, public_name_supplied: nil, default_order: nil, default_order_supplied: nil,
-                   sensitive: nil, sensitive_supplied: nil)
+                   sensitive: nil, sensitive_supplied: nil, create_parent: nil, create_parent_supplied: nil,
+                   parent_resolver: nil)
       @recordable_type = recordable_type.to_s
       assign_public_name(public_name, public_name_supplied)
       @serializer = serializer
@@ -115,6 +116,9 @@ module RecordingStudioApi
       @default_order = DefaultListOrder.parse(default_order, recordable_type: @recordable_type)
       @sensitive_supplied = sensitive_supplied.nil? ? !sensitive.nil? : sensitive_supplied
       @sensitive_operations = normalize_sensitive_operations(sensitive)
+      @create_parent_supplied = create_parent_supplied.nil? ? !create_parent.nil? : create_parent_supplied
+      @create_parent = CreateParent.normalize(create_parent, name: "create_parent for #{@recordable_type}")
+      @parent_resolver = parent_resolver
       validate!
       freeze
     end
@@ -165,9 +169,31 @@ module RecordingStudioApi
       end
 
       validate_named_default_order!
+      validate_create_parent!
 
       true
     end
+
+    def server_create_parent?
+      CreateParent.server?(create_parent)
+    end
+
+    def create_parent_supplied?
+      @create_parent_supplied
+    end
+
+    def validate_create_parent!
+      if server_create_parent?
+        return if parent_resolver.respond_to?(:call)
+
+        raise ConfigurationError, "parent_resolver is required when create_parent is :server for #{recordable_type}"
+      end
+
+      return unless parent_resolver
+
+      raise ConfigurationError, "parent_resolver is only used when create_parent is :server for #{recordable_type}"
+    end
+    private :validate_create_parent!
 
     def supports_operation?(operation)
       operations.include?(operation.to_sym)

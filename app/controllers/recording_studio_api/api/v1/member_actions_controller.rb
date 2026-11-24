@@ -159,9 +159,12 @@ module RecordingStudioApi
           filtered_params = raw_params.except(*RESERVED_ACTION_PARAM_KEYS, *ignored_keys)
           normalized_params = filtered_params.respond_to?(:deep_symbolize_keys) ? filtered_params.deep_symbolize_keys : {}
 
-          return normalized_params if action.input_contract.nil?
+          contract = action.respond_to?(:request_input_contract) ? action.request_input_contract : action.input_contract
+          return normalized_params if contract.nil?
 
-          contract_result = action.input_contract.call(normalized_params)
+          normalized_params = normalized_params.except(:parent_id, "parent_id") if action.respond_to?(:server_parent?) && action.server_parent?
+
+          contract_result = contract.call(normalized_params)
           return contract_result.value if contract_result.success?
 
           raise InvalidActionInputError.new(

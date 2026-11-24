@@ -148,6 +148,7 @@ module RecordingStudioApi
 
         def parent_recording_for_create
           return context.parent_recording if context.parent_recording
+          return parent_recording_from_server if server_picks_create_parent?
 
           parent_id = request_payload["parent_id"] || request_payload[:parent_id]
           if parent_id.blank?
@@ -170,6 +171,51 @@ module RecordingStudioApi
           raise RecordingStudioApi::NotFoundError, "Parent resource was not found in this API scope" if parent_recording.nil?
 
           parent_recording
+        end
+
+        def server_picks_create_parent?
+          RecordingStudioApi.server_create_parent?(recordable_type, api: api_key)
+        end
+
+        def parent_recording_from_server
+          registration = RecordingStudioApi.recordable_registration_for(recordable_type, api: api_key)
+          resolver = registration&.parent_resolver
+          unless resolver.respond_to?(:call)
+            raise RecordingStudioApi::ConfigurationError,
+                  "parent_resolver is required when create_parent is :server for #{public_recordable_name}"
+          end
+
+          candidate = resolver.call(context)
+          return if parent_candidate_id(candidate).blank?
+
+          parent = parent_inside_scope(candidate)
+          raise RecordingStudioApi::NotFoundError, "Parent resource was not found in this API scope" if parent.nil?
+
+          parent
+        end
+
+        def parent_inside_scope(candidate)
+          parent = scoped_recordings.find_by(id: parent_candidate_id(candidate))
+          return if parent.nil?
+          return if outside_grant_root?(parent)
+
+          parent
+        end
+
+        def parent_candidate_id(candidate)
+          return if candidate.nil?
+          return candidate unless candidate.respond_to?(:id)
+
+          candidate.id
+        end
+
+        def outside_grant_root?(parent)
+          root = root_recording
+          return false if root.nil?
+          return false if parent.id == root.id
+
+          root_id = parent.root_recording_id if parent.respond_to?(:root_recording_id)
+          root_id.present? && root_id != root.id
         end
 
         def public_recordable_name

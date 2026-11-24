@@ -46,8 +46,18 @@ module RecordingStudioApi
           RecordingStudioApi::IdempotencyStore.fingerprint(
             method: "POST",
             path: fingerprint_path,
-            params: request_payload
+            params: fingerprint_params
           )
+        end
+
+        def fingerprint_params
+          payload = request_payload
+          return payload unless server_picks_create_parent?
+
+          filtered = payload.respond_to?(:deep_dup) ? payload.deep_dup : payload.dup
+          filtered.delete("parent_id")
+          filtered.delete(:parent_id)
+          filtered
         end
 
         def fingerprint_path

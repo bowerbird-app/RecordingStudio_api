@@ -4,18 +4,23 @@ require_relative "handler_scope"
 
 module RecordingStudioApi
   class ResourceHandlerRegistration
-    attr_reader :handler, :include_trashed, :owns_scoping, :trashed_semantics, :creates
+    attr_reader :handler, :include_trashed, :owns_scoping, :trashed_semantics, :creates, :parent
 
-    def initialize(handler:, include_trashed:, owns_scoping:, trashed_semantics:, creates:)
+    def initialize(handler:, include_trashed:, owns_scoping:, trashed_semantics:, creates:, parent: nil)
       @handler = handler
       @include_trashed = include_trashed
       @owns_scoping = owns_scoping
       @trashed_semantics = trashed_semantics
       @creates = creates
+      @parent = parent
     end
 
     def creates?
       creates
+    end
+
+    def server_parent?
+      CreateParent.server?(parent)
     end
 
     def call(context)
@@ -32,7 +37,7 @@ module RecordingStudioApi
       @handlers = {}
     end
 
-    def register(recordable_type, action, handler:, include_trashed: false, owns_scoping: false, trashed_semantics: nil, creates: false, api: :public)
+    def register(recordable_type, action, handler:, include_trashed: false, owns_scoping: false, trashed_semantics: nil, creates: false, parent: nil, api: :public)
       type_name = normalize_recordable_type(recordable_type)
       action_name = normalize_action(action)
       raise ConfigurationError, "recordable type is required" if type_name.blank?
@@ -43,6 +48,7 @@ module RecordingStudioApi
       include_trashed = HandlerScope.flag(include_trashed, name: :include_trashed)
       owns_scoping = HandlerScope.flag(owns_scoping, name: :owns_scoping)
       creates = HandlerScope.flag(creates, name: :creates)
+      parent = normalize_parent(parent, action_name)
       label = "#{type_name} #{action_name}"
       trashed_semantics = HandlerScope.trashed_semantics(trashed_semantics, name: label)
       if trashed_semantics
@@ -63,7 +69,8 @@ module RecordingStudioApi
         include_trashed: include_trashed,
         owns_scoping: owns_scoping,
         trashed_semantics: trashed_semantics,
-        creates: creates
+        creates: creates,
+        parent: parent
       )
       handler
     end
@@ -94,6 +101,16 @@ module RecordingStudioApi
 
     def normalize_recordable_type(value)
       value.to_s.strip
+    end
+
+    def normalize_parent(value, action_name)
+      return if value.nil?
+
+      parent = CreateParent.normalize(value, name: "parent")
+      return unless CreateParent.server?(parent)
+      return parent if action_name == "create"
+
+      raise ConfigurationError, "parent: :server is only valid for a create handler"
     end
 
     def normalize_action(value)

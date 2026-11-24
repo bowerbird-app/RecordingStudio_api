@@ -6,6 +6,27 @@ class RecordableRegistrationTest < Minitest::Test
   Serializer = ->(*) { {} }
   Resolver = ->(*) {}
 
+  def test_server_create_parent_requires_a_callable_parent_resolver
+    missing = assert_raises(RecordingStudioApi::ConfigurationError) do
+      RecordingStudioApi::RecordableRegistration.new(recordable_type: "Page", create_parent: :server)
+    end
+    assert_includes missing.message, "parent_resolver is required when create_parent is :server for Page"
+
+    unused = assert_raises(RecordingStudioApi::ConfigurationError) do
+      RecordingStudioApi::RecordableRegistration.new(recordable_type: "Page", parent_resolver: ->(*) {})
+    end
+    assert_includes unused.message, "parent_resolver is only used when create_parent is :server for Page"
+
+    registration = RecordingStudioApi::RecordableRegistration.new(
+      recordable_type: "Page",
+      create_parent: :server,
+      parent_resolver: ->(context) { context }
+    )
+    assert_equal :server, registration.create_parent
+    assert registration.server_create_parent?
+    refute RecordingStudioApi::RecordableRegistration.new(recordable_type: "Page").server_create_parent?
+  end
+
   def test_normalizes_the_public_registration_contract
     registration = RecordingStudioApi::RecordableRegistration.new(
       recordable_type: "Page",

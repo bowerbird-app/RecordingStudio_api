@@ -245,7 +245,7 @@ module RecordingStudioApi
           .sort_by { |section| section.fetch(:resource) }
       end
 
-      def default_resource_endpoints(resource_name, recordable_type) # rubocop:disable Metrics/MethodLength
+      def default_resource_endpoints(resource_name, recordable_type)
         openapi_tag = openapi_tag_for(resource_name, recordable_type)
         docs_resource_name = docs_resource_name_for(resource_name, recordable_type)
         registration = recordable_registration_for(recordable_type)
@@ -279,24 +279,7 @@ module RecordingStudioApi
               collection: true
             )
           },
-          {
-            verb: "POST",
-            path: "#{api_root_path}/#{resource_name}",
-            action: "resources#create",
-            summary: operation_docs.summary_for(:create),
-            description: operation_docs.description_for(:create),
-            capability: nil,
-            scope: nil,
-            openapi: merge_openapi(
-              {
-                tags: [openapi_tag],
-                parameters: [idempotency_key_parameter],
-                request_body: resource_write_request_body(recordable_type, operation: :create),
-                responses: resource_create_responses(recordable_type)
-              },
-              openapi_overrides.fetch(:create, {})
-            )
-          },
+          create_resource_endpoint(resource_name, recordable_type, openapi_tag, operation_docs, openapi_overrides),
           {
             verb: "GET",
             path: "#{api_root_path}/#{resource_name}/:id",
@@ -606,7 +589,7 @@ module RecordingStudioApi
               capability: action.capability.to_s,
               scope: action.scope.to_s,
               openapi: openapi
-            }
+            }.merge(action_parent_catalog_flag(action))
           end
       end
 
@@ -655,7 +638,8 @@ module RecordingStudioApi
           resource_name: resource_name,
           docs_resource_name: docs_resource_name_for(resource_name, recordable_type),
           registration: registration,
-          root: root_recordable_type?(recordable_type)
+          root: root_recordable_type?(recordable_type),
+          server_parent: server_create_parent?(recordable_type)
         )
       end
 
@@ -757,7 +741,11 @@ module RecordingStudioApi
       end
 
       def input_contract_request_body(action)
-        contract = action.respond_to?(:input_contract) ? action.input_contract : nil
+        contract = if action.respond_to?(:request_input_contract)
+                     action.request_input_contract
+                   elsif action.respond_to?(:input_contract)
+                     action.input_contract
+                   end
         definition = contract&.as_json
         return unless definition.is_a?(Hash)
 
@@ -1102,7 +1090,7 @@ module RecordingStudioApi
         properties = attributes_schema.fetch(:properties).deep_dup
         required_fields = []
 
-        if operation == :create
+        if operation == :create && !server_create_parent?(recordable_type)
           parent_id_schema = { type: "string" }
           if root_recordable_type?(recordable_type)
             parent_id_schema[:nullable] = true
@@ -1125,6 +1113,42 @@ module RecordingStudioApi
             }
           }
         }
+      end
+
+      def create_resource_endpoint(resource_name, recordable_type, openapi_tag, operation_docs, openapi_overrides)
+        {
+          verb: "POST",
+          path: "#{api_root_path}/#{resource_name}",
+          action: "resources#create",
+          summary: operation_docs.summary_for(:create),
+          description: operation_docs.description_for(:create),
+          capability: nil,
+          scope: nil,
+          openapi: merge_openapi(
+            {
+              tags: [openapi_tag],
+              parameters: [idempotency_key_parameter],
+              request_body: resource_write_request_body(recordable_type, operation: :create),
+              responses: resource_create_responses(recordable_type)
+            },
+            openapi_overrides.fetch(:create, {})
+          )
+        }.merge(create_parent_catalog_flag(recordable_type))
+      end
+
+      def server_create_parent?(recordable_type)
+        RecordingStudioApi.server_create_parent?(recordable_type, api: @api_key)
+      end
+
+      def create_parent_catalog_flag(recordable_type)
+        flag = CreateParent.catalog_flag(server_create_parent?(recordable_type))
+        flag ? { parent: flag } : {}
+      end
+
+      def action_parent_catalog_flag(action)
+        return {} unless action.respond_to?(:server_parent?) && action.server_parent?
+
+        { parent: CreateParent::SERVER_FLAG }
       end
 
       def root_recordable_type?(recordable_type)
