@@ -1,5 +1,14 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.23.0
+
+Delegated OAuth tokens authorize the signed-in user. No migration.
+
+1. Bump the host gem to `1.23.0`. Gemspec ranges stay the same.
+2. On an `authorization_code` token, `AccessGrant#actor` is `authorized_by` (the person who signed in). `#owner` is that same person, not `api_client.owner` and not the app's `RecordingStudio::Access` actor. `authorize!` still takes the lower of the token grant role and `RecordingStudioAccessible.role_for`. Writes use that user as the event actor and keep the API client as `impersonator`.
+3. `client_credentials` and API-key tokens with no `authorized_by` are unchanged. `AccessGrant#actor` stays the access recording actor. `#owner` still prefers `api_client.owner`.
+4. Compare [v1.22.0...v1.23.0](https://github.com/bowerbird-app/RecordingStudio_API/compare/v1.22.0...v1.23.0).
+
 ## Upgrading to 1.22.0
 
 Server-chosen create parent. No migration. Creates that do not opt in are unchanged.

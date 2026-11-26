@@ -2,6 +2,7 @@
 
 module RecordingStudioApi
   # A token sees the owner's live access, limited to the grant anchor.
+  # On a user OAuth token, that owner is `authorized_by`.
   # `authorize!` uses the lower of the grant role and
   # `RecordingStudioAccessible.role_for` on the recording being checked.
   class AccessGrant
@@ -26,7 +27,7 @@ module RecordingStudioApi
     end
 
     def actor
-      access.actor if access.respond_to?(:actor)
+      authorized_by.presence || (access.actor if access.respond_to?(:actor))
     end
 
     def role
@@ -40,7 +41,7 @@ module RecordingStudioApi
     def owner
       return @owner if defined?(@owner)
 
-      @owner = owner_from_client || owner_from_actor
+      @owner = authorized_by.presence || owner_from_client || owner_from_actor
     end
 
     def accessible_recordings(include_trashed: false, scope: nil)

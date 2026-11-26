@@ -54,6 +54,67 @@ class ApiV1WriteActorControllerTest < ActionDispatch::IntegrationTest
     assert_nil latest_update_event(folder)
   end
 
+  test "a delegated viewer cannot write through an admin app grant" do
+    manager = create_user(email: "delegated-http-manager@example.com")
+    root, = create_access_recording_for(user: manager, role: :admin)
+    viewer = create_user(email: "delegated-http-viewer@example.com")
+    grant_or_bootstrap_access!(recording: root, actor: viewer, role: :view)
+    folder = create_page_recording(root_recording: root).parent_recording
+    app = RecordingStudioApi::ApiClient.create!(name: "HTTP delegated app", api_key: "public", owner: manager)
+    app_access = grant_or_bootstrap_access!(recording: root, actor: app, role: :admin)
+    oauth_app = RecordingStudioOauth::OauthClient.find(app.id)
+    token = user_oauth_token(access_recording: app_access, manager: viewer, api_client: oauth_app)
+    install_accessible_edit_write_policy!
+
+    patch "/recording_studio_api/api/v1/folders/#{folder.id}",
+          params: { name: "Delegated view write" },
+          headers: { "Authorization" => "Bearer #{token}" }
+
+    assert_response :forbidden
+    assert_equal unauthorized_role_message(:edit), JSON.parse(response.body).dig("error", "message")
+    assert_not_equal "Delegated view write", folder.reload.recordable.name
+    assert_nil latest_update_event(folder)
+  end
+
+  test "a delegated editor writes as the user and records the app as impersonator" do
+    manager = create_user(email: "delegated-http-edit-manager@example.com")
+    root, = create_access_recording_for(user: manager, role: :admin)
+    editor = create_user(email: "delegated-http-editor@example.com")
+    grant_or_bootstrap_access!(recording: root, actor: editor, role: :edit)
+    folder = create_page_recording(root_recording: root).parent_recording
+    app = RecordingStudioApi::ApiClient.create!(name: "HTTP delegated editor app", api_key: "public", owner: manager)
+    app_access = grant_or_bootstrap_access!(recording: root, actor: app, role: :admin)
+    oauth_app = RecordingStudioOauth::OauthClient.find(app.id)
+    token = user_oauth_token(access_recording: app_access, manager: editor, api_client: oauth_app)
+    install_accessible_edit_write_policy!
+
+    patch "/recording_studio_api/api/v1/folders/#{folder.id}",
+          params: { name: "Delegated editor write" },
+          headers: { "Authorization" => "Bearer #{token}" }
+
+    assert_response :success
+    assert_equal "Delegated editor write", folder.reload.recordable.name
+    event = latest_update_event(folder)
+    assert_equal editor, event.actor
+    assert_equal oauth_app, event.impersonator
+    assert_equal "User", event.metadata["authorized_by_type"]
+    assert_equal editor.id, event.metadata["authorized_by_id"]
+  end
+
+  test "client credentials still write as the api client" do
+    token = issue_oauth_access_token_for(access_recording: @access_recording, name: "Machine writer")
+
+    patch "/recording_studio_api/api/v1/folders/#{@folder.id}",
+          params: { name: "Machine write" },
+          headers: { "Authorization" => "Bearer #{token}" }
+
+    assert_response :success
+    event = latest_update_event(@folder)
+    assert_equal "RecordingStudioApi::ApiClient", event.actor_type
+    assert_nil event.impersonator_id
+    assert_nil event.metadata["authorized_by_type"]
+  end
+
   private
 
   def install_accessible_edit_write_policy!
@@ -69,10 +130,10 @@ class ApiV1WriteActorControllerTest < ActionDispatch::IntegrationTest
     RecordingStudioAccessible.authorized?(actor: actor, recording: target, role: :edit)
   end
 
-  def user_oauth_token(access_recording:, manager:)
+  def user_oauth_token(access_recording:, manager:, api_client: @oauth_client)
     authorization = Struct.new(:manager_actor).new(manager)
     credential = UserChannelCredential.new(
-      api_client: @oauth_client,
+      api_client: api_client,
       access_recording: access_recording,
       authorization: authorization
     )
