@@ -116,6 +116,193 @@ class AccessGrantTest < ActiveSupport::TestCase
     refute grant.authorized?(recording: page_recording, role: :view, include_trashed: false)
   end
 
+  test "a delegated view user cannot take an edit from the app grant" do
+    manager = create_user(email: "delegated-manager-#{SecureRandom.hex(4)}@example.com")
+    root_recording, = create_access_recording_for(user: manager, role: :admin)
+    viewer = create_user(email: "delegated-viewer-#{SecureRandom.hex(4)}@example.com")
+    grant_or_bootstrap_access!(recording: root_recording, actor: viewer, role: :view)
+    page_recording = create_page_recording(root_recording: root_recording)
+    app = RecordingStudioApi::ApiClient.create!(name: "Delegated app", api_key: "public", owner: manager)
+    app_access = grant_or_bootstrap_access!(recording: root_recording, actor: app, role: :admin)
+    grant = access_grant_for(
+      access_recording: app_access,
+      root_recording: root_recording,
+      api_client: app,
+      authorized_by: viewer
+    )
+
+    assert_equal viewer, grant.actor
+    assert_equal viewer, grant.owner
+    assert_equal :admin, RecordingStudioAccessible.role_for(actor: manager, recording: page_recording)
+    assert_equal :admin, RecordingStudioAccessible.role_for(actor: app, recording: page_recording)
+    assert_equal :view, RecordingStudioAccessible.role_for(actor: viewer, recording: page_recording)
+    assert grant.authorized?(recording: page_recording, role: :view)
+    refute grant.authorized?(recording: page_recording, role: :edit)
+    error = assert_raises(RecordingStudioApi::AuthorizationError) do
+      grant.authorize!(recording: page_recording, role: :edit)
+    end
+    assert_equal RecordingStudioApi::AuthorizationError.for_required_role(:edit), error.message
+  end
+
+  test "a delegated edit user cannot take admin from the app grant" do
+    manager = create_user(email: "delegated-edit-manager-#{SecureRandom.hex(4)}@example.com")
+    root_recording, = create_access_recording_for(user: manager, role: :admin)
+    editor = create_user(email: "delegated-editor-#{SecureRandom.hex(4)}@example.com")
+    grant_or_bootstrap_access!(recording: root_recording, actor: editor, role: :edit)
+    page_recording = create_page_recording(root_recording: root_recording)
+    app = RecordingStudioApi::ApiClient.create!(name: "Delegated edit app", api_key: "public", owner: manager)
+    app_access = grant_or_bootstrap_access!(recording: root_recording, actor: app, role: :admin)
+    grant = access_grant_for(
+      access_recording: app_access,
+      root_recording: root_recording,
+      api_client: app,
+      authorized_by: editor
+    )
+
+    assert grant.authorized?(recording: page_recording, role: :edit)
+    refute grant.authorized?(recording: page_recording, role: :admin)
+    error = assert_raises(RecordingStudioApi::AuthorizationError) do
+      grant.authorize!(recording: page_recording, role: :admin)
+    end
+    assert_equal RecordingStudioApi::AuthorizationError.for_required_role(:admin), error.message
+  end
+
+  test "a delegated admin user keeps admin when the app grant is admin" do
+    manager = create_user(email: "delegated-admin-manager-#{SecureRandom.hex(4)}@example.com")
+    root_recording, = create_access_recording_for(user: manager, role: :admin)
+    page_recording = create_page_recording(root_recording: root_recording)
+    app = RecordingStudioApi::ApiClient.create!(name: "Delegated admin app", api_key: "public", owner: manager)
+    app_access = grant_or_bootstrap_access!(recording: root_recording, actor: app, role: :admin)
+    grant = access_grant_for(
+      access_recording: app_access,
+      root_recording: root_recording,
+      api_client: app,
+      authorized_by: manager
+    )
+
+    assert_equal manager, grant.actor
+    assert grant.authorized?(recording: page_recording, role: :admin)
+  end
+
+  test "a delegated token still cannot exceed its consented grant role" do
+    manager = create_user(email: "delegated-scope-manager-#{SecureRandom.hex(4)}@example.com")
+    root_recording, = create_access_recording_for(user: manager, role: :admin)
+    page_recording = create_page_recording(root_recording: root_recording)
+    app = RecordingStudioApi::ApiClient.create!(name: "View-consented app", api_key: "public", owner: manager)
+    app_access = grant_or_bootstrap_access!(recording: root_recording, actor: app, role: :view)
+    grant = access_grant_for(
+      access_recording: app_access,
+      root_recording: root_recording,
+      api_client: app,
+      authorized_by: manager
+    )
+
+    assert grant.authorized?(recording: page_recording, role: :view)
+    refute grant.authorized?(recording: page_recording, role: :edit)
+  end
+
+  test "client credentials still use the client owner when authorized_by is absent" do
+    manager = create_user(email: "cc-manager-#{SecureRandom.hex(4)}@example.com")
+    root_recording, = create_access_recording_for(user: manager, role: :admin)
+    page_recording = create_page_recording(root_recording: root_recording)
+    app = RecordingStudioApi::ApiClient.create!(name: "Machine client", api_key: "public", owner: manager)
+    app_access = grant_or_bootstrap_access!(recording: root_recording, actor: app, role: :edit)
+    grant = access_grant_for(
+      access_recording: app_access,
+      root_recording: root_recording,
+      api_client: app
+    )
+
+    assert_nil grant.authorized_by
+    assert_equal app, grant.actor
+    assert_equal manager, grant.owner
+    assert grant.authorized?(recording: page_recording, role: :edit)
+    refute grant.authorized?(recording: page_recording, role: :admin)
+  end
+
+  test "a delegated token whose user was deleted has no principal" do
+    manager = create_user(email: "deleted-user-manager-#{SecureRandom.hex(4)}@example.com")
+    root_recording, = create_access_recording_for(user: manager, role: :admin)
+    editor = create_user(email: "deleted-user-editor-#{SecureRandom.hex(4)}@example.com")
+    grant_or_bootstrap_access!(recording: root_recording, actor: editor, role: :edit)
+    page_recording = create_page_recording(root_recording: root_recording)
+    app = RecordingStudioApi::ApiClient.create!(name: "Deleted user app", api_key: "public", owner: manager)
+    app_access = grant_or_bootstrap_access!(recording: root_recording, actor: app, role: :admin)
+    authorization = Struct.new(:manager_actor).new(nil)
+    credential = Object.new
+    credential.define_singleton_method(:oauth_authorization) { authorization }
+    grant = RecordingStudioApi::AccessGrant.new(
+      api_client: app,
+      credential: credential,
+      access_recording: app_access,
+      root_recording: root_recording
+    )
+
+    assert_nil grant.authorized_by
+    assert_nil grant.actor
+    assert_nil grant.owner
+    refute grant.authorized?(recording: page_recording, role: :view)
+    error = assert_raises(RecordingStudioApi::AuthorizationError) do
+      grant.authorize!(recording: page_recording, role: :edit)
+    end
+    assert_equal RecordingStudioApi::AuthorizationError.for_required_role(:edit), error.message
+  end
+
+  test "a delegated token honors a later role downgrade" do
+    manager = create_user(email: "downgrade-manager-#{SecureRandom.hex(4)}@example.com")
+    root_recording, = create_access_recording_for(user: manager, role: :admin)
+    editor = create_user(email: "downgrade-editor-#{SecureRandom.hex(4)}@example.com")
+    grant_or_bootstrap_access!(recording: root_recording, actor: editor, role: :edit)
+    page_recording = create_page_recording(root_recording: root_recording)
+    app = RecordingStudioApi::ApiClient.create!(name: "Downgrade app", api_key: "public", owner: manager)
+    app_access = grant_or_bootstrap_access!(recording: root_recording, actor: app, role: :admin)
+    other = create_user(email: "downgrade-other-#{SecureRandom.hex(4)}@example.com")
+    grant_or_bootstrap_access!(recording: root_recording, actor: other, role: :admin)
+    downgraded = RecordingStudioAccessible.grant_access(
+      recording: root_recording,
+      actor: editor,
+      role: :view,
+      manager_actor: other
+    )
+    assert downgraded.success?
+
+    grant = access_grant_for(
+      access_recording: app_access,
+      root_recording: root_recording,
+      api_client: app,
+      authorized_by: editor
+    )
+
+    refute grant.authorized?(recording: page_recording, role: :edit)
+    assert grant.authorized?(recording: page_recording, role: :view)
+  end
+
+  test "a delegated token is refused after the user's access is revoked" do
+    manager = create_user(email: "revoke-manager-#{SecureRandom.hex(4)}@example.com")
+    root_recording, = create_access_recording_for(user: manager, role: :admin)
+    editor = create_user(email: "revoke-editor-#{SecureRandom.hex(4)}@example.com")
+    editor_access = grant_or_bootstrap_access!(recording: root_recording, actor: editor, role: :edit)
+    page_recording = create_page_recording(root_recording: root_recording)
+    app = RecordingStudioApi::ApiClient.create!(name: "Revoke app", api_key: "public", owner: manager)
+    app_access = grant_or_bootstrap_access!(recording: root_recording, actor: app, role: :admin)
+    revoked = RecordingStudioAccessible::Services::RevokeRecordingAccess.call(
+      recording: root_recording,
+      access_recording: editor_access,
+      manager_actor: manager,
+      allow_last_admin_removal: true
+    )
+    assert revoked.success?
+
+    grant = access_grant_for(
+      access_recording: app_access,
+      root_recording: root_recording,
+      api_client: app,
+      authorized_by: editor
+    )
+
+    refute grant.authorized?(recording: page_recording, role: :view)
+  end
+
   test "a trashed grant and a recording in another tree are denied" do
     root_recording, access_recording = create_access_recording_for(user: @user, role: :admin)
     page_recording = trash!(page_under(root_recording))
@@ -148,12 +335,13 @@ class AccessGrantTest < ActiveSupport::TestCase
     recording.reload
   end
 
-  def access_grant_for(access_recording:, root_recording:)
+  def access_grant_for(access_recording:, root_recording:, api_client: nil, authorized_by: RecordingStudioApi::AuthorizedBy::OMITTED)
     RecordingStudioApi::AccessGrant.new(
-      api_client: nil,
+      api_client: api_client,
       credential: nil,
       access_recording: access_recording,
-      root_recording: root_recording
+      root_recording: root_recording,
+      authorized_by: authorized_by
     )
   end
 end
