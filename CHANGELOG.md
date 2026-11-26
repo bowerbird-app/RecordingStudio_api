@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.24.0] - 2026-11-26
 
 ### Added
-- `owns_scoping: true` is allowed on an id write (`update`, a POST capability action, a PATCH endpoint that captures a recording id). Dispatch skips `ScopedRecording.find!` so the handler receives the raw id. The guard still calls `authorize_recording!` on the grant anchor, the same path as an unscoped endpoint. A view-only token is HTTP 403. Nested relationship writes and `destroy` still raise `ConfigurationError`.
+- `owns_scoping: true` is allowed on an id write (`update`, a POST capability action, a PATCH endpoint that captures a recording id). Dispatch skips `ScopedRecording.find!` so the handler receives the raw id. The guard still calls `authorize_recording!` on the grant anchor, the same path as an unscoped endpoint. A view-only token is HTTP 403. Nested relationship writes keep grant lookup. `create` and `destroy` still raise `ConfigurationError`.
 
 ### Upgrade notes
 - Bump to `1.24.0`. No migration.

@@ -953,8 +953,9 @@ lookup and `authorize!`. An id write (`update`, a POST capability action, a
 PATCH endpoint that captures a recording id) skips lookup only. The guard
 still authorizes the write role on the grant anchor through Accessible.
 Dispatch checks the effective role again, so a later `:edit` role on a GET
-keeps grant lookup. Nested relationship writes and `destroy` still raise
-`ConfigurationError`. Support uses this for public help pages and for ticket
+keeps grant lookup. Nested relationship writes keep grant lookup. `create`
+and `destroy` still raise `ConfigurationError`. Support uses this for public
+help pages and for ticket
 writes keyed by SupportTicket id. The handler then owns scoping. On a write
 it must load the recording.
 
@@ -1581,7 +1582,7 @@ rejects it on other actions. The declaration is rejected on a GET, with
 `required_role: :view`, and with `owns_scoping`. Dispatch checks the endpoint
 role again before the lookup.
 
-`owns_scoping: true` skips the lookup and `authorize!` for a GET or built-in index or show whose effective role is still `:view`. An id write skips lookup and still authorizes the grant through Accessible. Dispatch checks the effective role again, so a later edit role on a GET scopes the id. Nested relationship writes and `destroy` still raise `ConfigurationError`. Support uses the opt-out for public help pages and for ticket writes keyed by SupportTicket id. On a write the handler must load the recording.
+`owns_scoping: true` skips the lookup and `authorize!` for a GET or built-in index or show whose effective role is still `:view`. An id write skips lookup and still authorizes the grant through Accessible. Dispatch checks the effective role again, so a later edit role on a GET scopes the id. Nested relationship writes keep grant lookup. `create` and `destroy` still raise `ConfigurationError`. Support uses the opt-out for public help pages and for ticket writes keyed by SupportTicket id. On a write the handler must load the recording.
 
 OpenAPI and Scalar list these routes under the `Endpoints` tag.
 

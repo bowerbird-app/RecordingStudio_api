@@ -320,6 +320,27 @@ class ApiV1RegisteredHandlerScopeTest < ActionDispatch::IntegrationTest
     end
     assert_includes destroy_write.message, "owns_scoping is only allowed on a read action"
     assert_includes unscoped_write.message, "owns_scoping is only allowed on a read action"
+
+    create_write = assert_raises(RecordingStudioApi::ConfigurationError) do
+      RecordingStudioApi.register_resource_handler("Folder", :create, owns_scoping: true, handler: probe("create"))
+    end
+    assert_includes create_write.message, "owns_scoping is only allowed on a read action"
+
+    register_nested_folders
+    RecordingStudioApi.register_resource_handler("Folder", :update, owns_scoping: true, handler: probe("nested-update"))
+    patch "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders/#{@foreign_folder.id}",
+          params: { name: "Nope" },
+          as: :json,
+          headers: headers
+    assert_response :not_found
+    assert_equal calls_after_owned, @calls.size
+
+    patch "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders/#{@folder_recording.id}",
+          params: { name: "Kept" },
+          as: :json,
+          headers: headers
+    assert_response :success
+    assert_equal @folder_recording.id, @calls.last[:recording_id]
   end
 
   test "a nested index scopes the route parent and a flat create leaves the body parent id" do

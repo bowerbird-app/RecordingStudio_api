@@ -7,7 +7,7 @@ Id writes can pass `owns_scoping: true`. No migration. Reads stay as they were i
 1. Bump the host gem to `1.24.0`. Gemspec ranges stay the same.
 2. Registration accepts `owns_scoping: true` on `update`, on a POST/PATCH/PUT capability action with an edit role, and on a POST/PATCH/PUT endpoint that captures a recording id. Dispatch skips `ScopedRecording.find!`. The handler receives a nil recording and the raw route id. The guard still runs `authorize_recording!` on the grant anchor, the same way `authorize_unscoped_endpoint!` does. Auth goes through Accessible. A view-only token is HTTP 403 before the handler runs.
 3. The handler must load the recording (for Support, `TicketAccess.find_recording!`). An unowned or unknown id is HTTP 404 from the handler.
-4. Nested relationship writes and `destroy` still raise `ConfigurationError`. A GET, or built-in index or show, whose effective role is later `:edit` still uses grant lookup. `required_role: :view` on POST is still rejected for `owns_scoping`. `trashed_semantics` is still rejected with `owns_scoping`.
+4. Nested relationship writes keep grant lookup. `create` and `destroy` still raise `ConfigurationError`. A GET, or built-in index or show, whose effective role is later `:edit` still uses grant lookup. `required_role: :view` on POST is still rejected for `owns_scoping`. `trashed_semantics` is still rejected with `owns_scoping`.
 5. Compare [v1.23.0...v1.24.0](https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.23.0...v1.24.0).
 
 ```ruby
