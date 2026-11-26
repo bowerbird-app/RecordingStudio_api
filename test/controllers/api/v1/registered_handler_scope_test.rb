@@ -615,6 +615,18 @@ class ApiV1RegisteredHandlerScopeTest < ActionDispatch::IntegrationTest
       )
     end
     assert_includes view_opt_out.message, "owns_scoping is only allowed on a read action"
+
+    unscoped_post = assert_raises(RecordingStudioApi::ConfigurationError) do
+      RecordingStudioApi.register_capability_action(
+        :unscoped_post,
+        capability: :echoable,
+        http_verb: :post,
+        scope: :collection,
+        owns_scoping: true,
+        handler: ->(_context) { {} }
+      )
+    end
+    assert_includes unscoped_post.message, "owns_scoping is only allowed on a read action"
   end
 
   test "a later edit role revokes owns_scoping before the handler runs" do

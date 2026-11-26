@@ -64,7 +64,7 @@ module RecordingStudioApi
         action_name = action&.name || name
         return true if real_read?(http_verb: verb, required_role: role, action_name: action_name)
 
-        return %i[post patch put].include?(verb&.to_sym) && (role.blank? || edit_or_higher?(role))
+        return %i[post patch put].include?(verb&.to_sym) && edit_or_higher?(role)
       end
 
       real_read?(http_verb: http_verb, required_role: required_role, action_name: action_name)
