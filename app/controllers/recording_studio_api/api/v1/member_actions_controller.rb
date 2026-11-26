@@ -114,7 +114,7 @@ module RecordingStudioApi
             registration: registration,
             before_authorize: ->(recording) { assert_member_action_enabled!(action, recording, recordable_type) }
           ) do |recording|
-            # owns_scoping reads yield nil before lookup and authorize!.
+            # owns_scoping yields nil before lookup. A write still authorizes the grant.
             assert_member_action_enabled!(action, recording, recordable_type) if recording.nil?
             context = yield(recording)
           end

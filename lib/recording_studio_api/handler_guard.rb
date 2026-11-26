@@ -13,6 +13,11 @@ module RecordingStudioApi
         return empty_result if HandlerScope.resource_opt_out?(registration.owns_scoping?, action) || !SCOPED_RESOURCE_ACTIONS.include?(action)
 
         role = HandlerScope.resource_role(action)
+        if registration.owns_scoping?
+          authorize_recording!(access_grant, access_grant.scope_recording, role, false)
+          return empty_result
+        end
+
         include_trashed = include_trashed?(registration, role: role)
         recording = find_recording!(access_grant:, id:, recordable_type:, include_trashed:)
         authorize_recording!(access_grant, recording, role, include_trashed)
@@ -24,6 +29,13 @@ module RecordingStudioApi
         # An owns_scoping read yields nil and returns. The handler owns scoping.
         # Lookup, before_authorize, and authorize! do not run. The block still runs.
         if source.owns_scoping? && dispatch_read?(action, recording: nil, api_client:, access_grant:)
+          yield nil if block_given?
+          return empty_result
+        end
+
+        if source.owns_scoping? && action.http_verb.to_sym != :get
+          role = action_role(action, recording: nil, api_client:, access_grant:)
+          authorize_recording!(access_grant, access_grant.scope_recording, role, false)
           yield nil if block_given?
           return empty_result
         end
@@ -49,6 +61,7 @@ module RecordingStudioApi
       def endpoint!(access_grant:, endpoint:, id:)
         return authorize_unscoped_endpoint!(access_grant, endpoint) unless endpoint.scopes_recording?
         return empty_result if HandlerScope.endpoint_opt_out?(endpoint)
+        return authorize_unscoped_endpoint!(access_grant, endpoint) if endpoint.owns_scoping? && endpoint.http_verb != :get
 
         role = endpoint.authorization_role
         include_trashed = include_trashed?(endpoint, role: role)

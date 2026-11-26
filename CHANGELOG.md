@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.24.0] - 2026-11-26
+
+### Added
+- `owns_scoping: true` is allowed on an id write (`update`, a POST capability action with an edit role, a PATCH endpoint that captures a recording id). Dispatch skips `ScopedRecording.find!` so the handler receives the raw id. The guard still calls `authorize_recording!` on the grant anchor, the same path as an unscoped endpoint. A view-only token is HTTP 403. Nested relationship writes keep grant lookup. `create`, `destroy`, and a POST capability with no `required_role` still raise `ConfigurationError`.
+
+### Upgrade notes
+- Bump to `1.24.0`. No migration.
+- Pass `owns_scoping: true` on a ticket-style write whose URL id is not the grant-scoped recording id. The handler must load that recording. The engine still authorizes the write role through Accessible before the handler runs.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.23.0] - 2026-11-26
 
 ### Fixed
@@ -1771,7 +1781,10 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.7...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.24.0...HEAD
+[1.24.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.23.0...v1.24.0
+[1.23.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.22.0...v1.23.0
+[1.22.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.7...v1.22.0
 [1.21.7]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.6...v1.21.7
 [1.21.6]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.5...v1.21.6
 [1.21.5]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.4...v1.21.5

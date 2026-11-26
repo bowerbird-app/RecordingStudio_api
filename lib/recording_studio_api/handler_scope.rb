@@ -55,11 +55,16 @@ module RecordingStudioApi
 
     def read_opt_out?(action_name:, http_verb:, required_role:, api:)
       name = action_name&.to_s
-      return real_read?(action_name: name, http_verb: http_verb, required_role: required_role || resource_role(name)) if name.present? && RESOURCE_ROLES.key?(name)
+      return name == "update" || real_read?(action_name: name, http_verb: http_verb, required_role: required_role || resource_role(name)) if name.present? && RESOURCE_ROLES.key?(name)
 
       if name.present?
         action = RecordingStudioApi.capability_action(name, api: api)
-        return real_read?(http_verb: action.http_verb, required_role: required_role || action.required_role, action_name: action.name) if action
+        verb = action ? action.http_verb : http_verb
+        role = required_role || action&.required_role
+        action_name = action&.name || name
+        return true if real_read?(http_verb: verb, required_role: role, action_name: action_name)
+
+        return %i[post patch put].include?(verb&.to_sym) && edit_or_higher?(role)
       end
 
       real_read?(http_verb: http_verb, required_role: required_role, action_name: action_name)
