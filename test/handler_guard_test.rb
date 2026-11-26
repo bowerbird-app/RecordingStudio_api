@@ -49,6 +49,23 @@ class HandlerGuardTest < ActiveSupport::TestCase
     assert_nil_guard guard_resource(grant, registration, :update, page.recordable_id)
   end
 
+  test "a view grant is refused on an owns_scoping write" do
+    view_grant, page = open_grant(:view)
+    update = register_handler("Page", :update, owns_scoping: true)
+    action = register_action(:echo, http_verb: :post, required_role: :edit, owns_scoping: true)
+    endpoint = register_endpoint(
+      :write_owned,
+      http_verb: :patch,
+      path: "owned-pages/:id",
+      recordable_type: "Page",
+      owns_scoping: true
+    )
+
+    assert_forbidden { guard_resource(view_grant, update, :update, page.id) }
+    assert_forbidden { guard_capability(view_grant, action, page.recordable_id) }
+    assert_forbidden { guard_endpoint(view_grant, endpoint, page.id) }
+  end
+
   test "show allows view and update requires edit" do
     view_grant, page = open_grant(:view)
     edit_grant, edit_page = open_grant(:edit)

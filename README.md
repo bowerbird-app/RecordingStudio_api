@@ -949,12 +949,14 @@ must see a trashed recording. The default lookup is kept recordings only.
 
 Pass `owns_scoping: true` when the handler owns lookup for the route id.
 A GET, or built-in index or show, whose effective role is `:view` skips grant
-lookup and `authorize!`. A write (`update`, a POST capability action, a PATCH
-endpoint) uses that same skip. Dispatch checks the effective role again, so a
-later `:edit` role on a GET keeps grant lookup. Support uses this for public
-help pages and for ticket writes keyed by SupportTicket id. The handler then
-owns scoping. On a write it must load the recording and call `authorize!` with
-the write role.
+lookup and `authorize!`. An id write (`update`, a POST capability action, a
+PATCH endpoint that captures a recording id) skips lookup only. The guard
+still authorizes the write role on the grant anchor through Accessible.
+Dispatch checks the effective role again, so a later `:edit` role on a GET
+keeps grant lookup. Nested relationship writes and `destroy` still raise
+`ConfigurationError`. Support uses this for public help pages and for ticket
+writes keyed by SupportTicket id. The handler then owns scoping. On a write
+it must load the recording.
 
 Pass `include_trashed: true` for a read, for built-in restore or destroy, or
 with `trashed_semantics: :restore` or `:destroy`. Registration rejects it on
@@ -1032,12 +1034,14 @@ It raises `UnsupportedActionError` only when `authorize!` would succeed. When
 the token would get 403, that 403 is the response. A missing recording is 404
 from the lookup, before the check.
 
-An `owns_scoping` action is the exception. `capability!` yields nil and returns
-without lookup, `before_authorize`, or `authorize!`. The handler owns scoping,
-and the block still runs with a nil recording. A GET whose effective role is
-later `:edit` keeps grant lookup. A flat index or create returns a nil
-recording. An endpoint with `scope_id: false` or no recording id also returns
-a nil recording, after `endpoint!` calls `access_grant.authorize!` on the grant
+An `owns_scoping` read is the exception. `capability!` yields nil and returns
+without lookup, `before_authorize`, or `authorize!`. An `owns_scoping` write
+skips lookup and `before_authorize`, then authorizes the grant anchor the
+same way an unscoped endpoint does. The handler owns scoping, and the block
+still runs with a nil recording. A GET whose effective role is later `:edit`
+keeps grant lookup. A flat index or create returns a nil recording. An
+endpoint with `scope_id: false` or no recording id also returns a nil
+recording, after `endpoint!` calls `access_grant.authorize!` on the grant
 anchor. The role is that endpoint's `authorization_role`. `show`, `update`,
 `destroy`, capability actions, and id-scoped endpoints without `owns_scoping`
 load through `ScopedRecording.find!` and `authorize!`. The role is `:view` for
@@ -1577,7 +1581,7 @@ rejects it on other actions. The declaration is rejected on a GET, with
 `required_role: :view`, and with `owns_scoping`. Dispatch checks the endpoint
 role again before the lookup.
 
-`owns_scoping: true` skips the lookup and `authorize!` for a GET or built-in index or show whose effective role is still `:view`, and for a write. Dispatch checks the effective role again, so a later edit role on a GET scopes the id. Support uses the opt-out for public help pages and for ticket writes keyed by SupportTicket id. On a write the handler must load the recording and call `authorize!`.
+`owns_scoping: true` skips the lookup and `authorize!` for a GET or built-in index or show whose effective role is still `:view`. An id write skips lookup and still authorizes the grant through Accessible. Dispatch checks the effective role again, so a later edit role on a GET scopes the id. Nested relationship writes and `destroy` still raise `ConfigurationError`. Support uses the opt-out for public help pages and for ticket writes keyed by SupportTicket id. On a write the handler must load the recording.
 
 OpenAPI and Scalar list these routes under the `Endpoints` tag.
 

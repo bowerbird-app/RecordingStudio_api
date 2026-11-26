@@ -144,6 +144,19 @@ class ApiV1RelationshipResourceHandlersTest < ActionDispatch::IntegrationTest
     assert RecordingStudio::Recording.exists?(@folder_recording.id)
   end
 
+  test "a nested write handler rejects owns_scoping" do
+    RecordingStudioApi.register_resource_handler("Folder", :update, owns_scoping: true, handler: lambda { |_context|
+      { json: { handled: "update" }, status: :ok }
+    })
+
+    error = assert_raises(RecordingStudioApi::ConfigurationError) do
+      patch "/recording_studio_api/api/v1/workspaces/#{@root_recording.id}/folders/#{@folder_recording.id}",
+            params: { name: "Owned nested" },
+            headers: authorization_headers
+    end
+    assert_includes error.message, "owns_scoping is only allowed on a read action"
+  end
+
   test "a nested write handler requires edit on the parent and an unregistered route still does" do
     view_user = create_user
     view_root, view_access = create_access_recording_for(user: view_user, role: :view)

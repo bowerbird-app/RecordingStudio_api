@@ -47,11 +47,27 @@ module RecordingStudioApi
       true
     end
 
-    def skip_grant_lookup?(owns_scoping, http_verb: nil, required_role: nil, action_name: nil)
-      return false unless owns_scoping
-      return real_read?(http_verb: http_verb, required_role: required_role, action_name: action_name) if read_shape?(http_verb, action_name)
+    def assert_read_opt_out!(name:, http_verb: nil, required_role: nil, action_name: nil, api: :public)
+      return if read_opt_out?(action_name: action_name, http_verb: http_verb, required_role: required_role, api: api)
 
-      true
+      raise ConfigurationError, "owns_scoping is only allowed on a read action for #{name}"
+    end
+
+    def read_opt_out?(action_name:, http_verb:, required_role:, api:)
+      name = action_name&.to_s
+      return name == "update" || real_read?(action_name: name, http_verb: http_verb, required_role: required_role || resource_role(name)) if name.present? && RESOURCE_ROLES.key?(name)
+
+      if name.present?
+        action = RecordingStudioApi.capability_action(name, api: api)
+        verb = action ? action.http_verb : http_verb
+        role = required_role || action&.required_role
+        action_name = action&.name || name
+        return true if real_read?(http_verb: verb, required_role: role, action_name: action_name)
+
+        return %i[post patch put].include?(verb&.to_sym) && (role.blank? || edit_or_higher?(role))
+      end
+
+      real_read?(http_verb: http_verb, required_role: required_role, action_name: action_name)
     end
 
     def trashed_semantics(value, name:)
@@ -128,31 +144,15 @@ module RecordingStudioApi
     end
 
     def resource_opt_out?(owns_scoping, action_name)
-      name = action_name.to_s
-      if RESOURCE_ROLES.key?(name)
-        return skip_grant_lookup?(
-          owns_scoping,
-          http_verb: RESOURCE_VERBS.fetch(name),
-          required_role: resource_role(name),
-          action_name: name
-        )
-      end
-
-      skip_grant_lookup?(owns_scoping, action_name: name)
+      owns_scoping && real_read?(action_name: action_name, required_role: resource_role(action_name))
     end
 
     def endpoint_opt_out?(endpoint)
-      skip_grant_lookup?(
-        endpoint.owns_scoping?,
-        http_verb: endpoint.http_verb,
-        required_role: endpoint.authorization_role,
-        action_name: endpoint.name
-      )
+      endpoint.owns_scoping? && real_read?(http_verb: endpoint.http_verb, required_role: endpoint.authorization_role)
     end
 
-    def read_shape?(http_verb, action_name)
-      name = action_name&.to_s
-      (name.present? && READ_ACTIONS.include?(name)) || http_verb&.to_sym == :get
+    def dispatch_read?(action:, role:)
+      real_read?(http_verb: action.http_verb, required_role: role, action_name: action.name)
     end
   end
 end

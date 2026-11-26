@@ -274,6 +274,9 @@ module RecordingStudioApi
         end
 
         def nested_handler_targets(operation_name, registration)
+          write_opt_out = registration&.owns_scoping? && !RecordingStudioApi::HandlerScope.resource_opt_out?(registration.owns_scoping?, operation_name)
+          raise RecordingStudioApi::ConfigurationError, "owns_scoping is only allowed on a read action for #{operation_name}" if write_opt_out
+
           if RecordingStudioApi::HandlerScope.resource_opt_out?(registration&.owns_scoping?, operation_name)
             assert_direct_child_endpoint!(operation_name, declared_parent_relationship)
             return [nil, nil]

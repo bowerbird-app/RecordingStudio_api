@@ -305,6 +305,21 @@ class ApiV1RegisteredHandlerScopeTest < ActionDispatch::IntegrationTest
     assert_response :forbidden
     assert_equal unauthorized_role_message(:edit), JSON.parse(response.body).dig("error", "message")
     assert_equal calls_after_owned, @calls.size
+
+    destroy_write = assert_raises(RecordingStudioApi::ConfigurationError) do
+      RecordingStudioApi.register_resource_handler("Page", :destroy, owns_scoping: true, handler: probe("destroy"))
+    end
+    unscoped_write = assert_raises(RecordingStudioApi::ConfigurationError) do
+      RecordingStudioApi.register_endpoint(
+        :write_public,
+        http_verb: :post,
+        path: "public-pages",
+        owns_scoping: true,
+        handler: ->(_context) { {} }
+      )
+    end
+    assert_includes destroy_write.message, "owns_scoping is only allowed on a read action"
+    assert_includes unscoped_write.message, "owns_scoping is only allowed on a read action"
   end
 
   test "a nested index scopes the route parent and a flat create leaves the body parent id" do
@@ -542,7 +557,7 @@ class ApiV1RegisteredHandlerScopeTest < ActionDispatch::IntegrationTest
     assert_empty @calls
   end
 
-  test "a post endpoint can require view and a post with owns_scoping skips grant lookup" do
+  test "a post endpoint can require view and a post read cannot opt out of scoping" do
     view_headers, view_page = view_client
     RecordingStudioApi.register_endpoint(
       :search_page,
@@ -568,21 +583,17 @@ class ApiV1RegisteredHandlerScopeTest < ActionDispatch::IntegrationTest
     assert_response :forbidden
     assert_equal 1, @calls.size
 
-    RecordingStudio.enable_capability(:echoable, on: "Page")
-    RecordingStudioApi.register_capability_action(
-      :search,
-      capability: :echoable,
-      http_verb: :post,
-      required_role: :view,
-      owns_scoping: true,
-      handler: ->(context) { { id: context.id } },
-      serializer: ->(result) { result }
-    )
-    RecordingStudioApi.register_recordable_type_api("Page", capability_actions: %i[search])
-
-    post "/recording_studio_api/api/v1/pages/#{view_page.id}/actions/search", headers: view_headers
-    assert_response :success
-    assert_equal view_page.id.to_s, JSON.parse(response.body).fetch("id")
+    view_opt_out = assert_raises(RecordingStudioApi::ConfigurationError) do
+      RecordingStudioApi.register_capability_action(
+        :search,
+        capability: :echoable,
+        http_verb: :post,
+        required_role: :view,
+        owns_scoping: true,
+        handler: ->(_context) { {} }
+      )
+    end
+    assert_includes view_opt_out.message, "owns_scoping is only allowed on a read action"
   end
 
   test "a later edit role revokes owns_scoping before the handler runs" do

@@ -140,6 +140,10 @@ module RecordingStudioApi
         owns_scoping: owns_scoping
       )
       HandlerScope.assert_include_trashed!(name: name, http_verb: http_verb, action_name: trashed_action_name, trashed_semantics: trashed_semantics) if include_trashed
+      return unless owns_scoping
+
+      write_by_id = scopes_recording? && %i[post patch put].include?(http_verb) && HandlerScope.edit_or_higher?(authorization_role)
+      HandlerScope.assert_read_opt_out!(name: name, http_verb: http_verb, required_role: authorization_role) unless write_by_id
     end
 
     def resolve_recording_scope!

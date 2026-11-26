@@ -62,6 +62,7 @@ module RecordingStudioApi
         )
       end
       HandlerScope.assert_include_trashed!(name: label, action_name: action_name, api: api, trashed_semantics: trashed_semantics) if include_trashed
+      HandlerScope.assert_read_opt_out!(name: label, action_name: action_name, api: api) if owns_scoping
 
       @handlers[[type_name, action_name]] = ResourceHandlerRegistration.new(
         handler: handler,
