@@ -947,12 +947,14 @@ not add a second purge route.
 Pass `include_trashed: true` on `register_resource_handler` when the action
 must see a trashed recording. The default lookup is kept recordings only.
 
-Pass `owns_scoping: true` only for a GET, or for built-in index or show, whose
-effective role is `:view`. Registration rejects the flag on a write, including
-a POST whose `required_role` is `:view`. Dispatch checks the effective role
-again. Support uses this for public published help pages. The handler then
-owns scoping, and this gem does not call `authorize!` for that action. There
-is no write opt-out.
+Pass `owns_scoping: true` when the handler owns lookup for the route id.
+A GET, or built-in index or show, whose effective role is `:view` skips grant
+lookup and `authorize!`. A write (`update`, a POST capability action, a PATCH
+endpoint) uses that same skip. Dispatch checks the effective role again, so a
+later `:edit` role on a GET keeps grant lookup. Support uses this for public
+help pages and for ticket writes keyed by SupportTicket id. The handler then
+owns scoping. On a write it must load the recording and call `authorize!` with
+the write role.
 
 Pass `include_trashed: true` for a read, for built-in restore or destroy, or
 with `trashed_semantics: :restore` or `:destroy`. Registration rejects it on
@@ -1030,15 +1032,16 @@ It raises `UnsupportedActionError` only when `authorize!` would succeed. When
 the token would get 403, that 403 is the response. A missing recording is 404
 from the lookup, before the check.
 
-An `owns_scoping` read is the exception. `capability!` yields nil and returns
+An `owns_scoping` action is the exception. `capability!` yields nil and returns
 without lookup, `before_authorize`, or `authorize!`. The handler owns scoping,
-and the block still runs with a nil recording. A flat index or create returns
-a nil recording. An endpoint with `scope_id: false` or no recording id also
-returns a nil recording, after `endpoint!` calls `access_grant.authorize!` on
-the grant anchor. The role is that endpoint's `authorization_role`. `show`,
-`update`, `destroy`, capability actions, and id-scoped endpoints load through
-`ScopedRecording.find!` and `authorize!`. The role is `:view` for index, show,
-and GET, and `:edit` otherwise, unless `required_role:` or
+and the block still runs with a nil recording. A GET whose effective role is
+later `:edit` keeps grant lookup. A flat index or create returns a nil
+recording. An endpoint with `scope_id: false` or no recording id also returns
+a nil recording, after `endpoint!` calls `access_grant.authorize!` on the grant
+anchor. The role is that endpoint's `authorization_role`. `show`, `update`,
+`destroy`, capability actions, and id-scoped endpoints without `owns_scoping`
+load through `ScopedRecording.find!` and `authorize!`. The role is `:view` for
+index, show, and GET, and `:edit` otherwise, unless `required_role:` or
 `capability_action_role_for` says otherwise.
 `include_trashed` and `trashed_semantics` go through
 `HandlerScope.dispatch_include_trashed?`. A blank id on a scoped path raises
@@ -1574,7 +1577,7 @@ rejects it on other actions. The declaration is rejected on a GET, with
 `required_role: :view`, and with `owns_scoping`. Dispatch checks the endpoint
 role again before the lookup.
 
-`owns_scoping: true` skips the lookup and `authorize!` only while the action is still a GET, or a built-in index or show, and the effective role is still `:view`. `required_role: :view` on POST is not enough. Dispatch checks the effective role again, so a later edit role scopes the id. Support uses the opt-out for public published help pages. There is no write opt-out.
+`owns_scoping: true` skips the lookup and `authorize!` for a GET or built-in index or show whose effective role is still `:view`, and for a write. Dispatch checks the effective role again, so a later edit role on a GET scopes the id. Support uses the opt-out for public help pages and for ticket writes keyed by SupportTicket id. On a write the handler must load the recording and call `authorize!`.
 
 OpenAPI and Scalar list these routes under the `Endpoints` tag.
 

@@ -39,6 +39,16 @@ class HandlerGuardTest < ActiveSupport::TestCase
     assert_nil_guard guard_resource(grant, registration, :show, " ")
   end
 
+  test "an owns_scoping resource write returns a nil recording" do
+    grant, page = open_grant(:edit)
+    foreign = foreign_page
+    registration = register_handler("Page", :update, owns_scoping: true)
+
+    assert_nil_guard guard_resource(grant, registration, :update, page.id)
+    assert_nil_guard guard_resource(grant, registration, :update, foreign.id)
+    assert_nil_guard guard_resource(grant, registration, :update, page.recordable_id)
+  end
+
   test "show allows view and update requires edit" do
     view_grant, page = open_grant(:view)
     edit_grant, edit_page = open_grant(:edit)
@@ -97,6 +107,21 @@ class HandlerGuardTest < ActiveSupport::TestCase
     destroy = register_handler("Page", :destroy)
 
     assert_missing { guard_resource(grant, destroy, :destroy, page.id) }
+  end
+
+  test "an owns_scoping capability write returns a nil recording" do
+    grant, page = open_grant(:edit)
+    foreign = foreign_page
+    action = register_action(:echo, http_verb: :post, required_role: :edit, owns_scoping: true)
+    yielded = []
+
+    result = guard_capability(grant, action, page.recordable_id) do |recording|
+      yielded << recording
+    end
+
+    assert_nil_guard result
+    assert_equal [nil], yielded
+    assert_nil_guard guard_capability(grant, action, foreign.id)
   end
 
   test "an owns_scoping capability read returns nil until the effective role is edit" do
@@ -314,6 +339,22 @@ class HandlerGuardTest < ActiveSupport::TestCase
 
     assert_nil_guard guard_endpoint(grant, endpoint, foreign.id)
     assert_nil_guard guard_endpoint(grant, endpoint, nil)
+  end
+
+  test "an owns_scoping endpoint write returns a nil recording" do
+    grant, page = open_grant(:edit)
+    foreign = foreign_page
+    endpoint = register_endpoint(
+      :write_owned,
+      http_verb: :patch,
+      path: "owned-pages/:id",
+      recordable_type: "Page",
+      owns_scoping: true
+    )
+
+    assert_nil_guard guard_endpoint(grant, endpoint, page.id)
+    assert_nil_guard guard_endpoint(grant, endpoint, foreign.id)
+    assert_nil_guard guard_endpoint(grant, endpoint, page.recordable_id)
   end
 
   test "an id scoped endpoint allows view on get and requires edit on patch" do

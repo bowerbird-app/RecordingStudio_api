@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.23.1] - 2026-11-26
+
+### Added
+- `owns_scoping: true` is allowed on a write (`update`, a POST capability action, a PATCH endpoint). Dispatch skips grant lookup the same way a view GET already does, so the handler receives the raw id. A GET whose effective role is later `:edit` still uses grant lookup. Reads are unchanged.
+
+### Upgrade notes
+- Bump to `1.23.1`. No migration.
+- Pass `owns_scoping: true` on a write whose URL id is not the grant-scoped recording id, such as a Support ticket recordable id. The handler must load that recording and call `access_grant.authorize!` with the write role. An unowned id should 404 from the handler. A token without that role should 403.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.23.0] - 2026-11-26
 
 ### Fixed
@@ -1771,7 +1781,10 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.7...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.23.1...HEAD
+[1.23.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.23.0...v1.23.1
+[1.23.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.22.0...v1.23.0
+[1.22.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.7...v1.22.0
 [1.21.7]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.6...v1.21.7
 [1.21.6]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.5...v1.21.6
 [1.21.5]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.4...v1.21.5

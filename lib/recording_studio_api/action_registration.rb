@@ -82,7 +82,6 @@ module RecordingStudioApi
         owns_scoping: owns_scoping
       )
       HandlerScope.assert_include_trashed!(name: name, http_verb: http_verb, action_name: name, trashed_semantics: trashed_semantics) if include_trashed
-      HandlerScope.assert_read_opt_out!(name: name, http_verb: http_verb, required_role: required_role, action_name: name) if owns_scoping
     end
 
     def read_action?

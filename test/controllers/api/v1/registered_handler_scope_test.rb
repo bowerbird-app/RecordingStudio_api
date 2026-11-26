@@ -204,9 +204,10 @@ class ApiV1RegisteredHandlerScopeTest < ActionDispatch::IntegrationTest
     assert_equal @page_recording.id, @calls.last[:recording_id]
   end
 
-  test "owns_scoping on a read action runs for another root and a write action is rejected" do
+  test "owns_scoping on a read action runs for another root and a write resolves an owned id" do
     RecordingStudioApi.register_resource_handler("Page", :show, owns_scoping: true, handler: probe("show"))
-    enable_echo
+    RecordingStudioApi.register_resource_handler("Page", :update, owns_scoping: true, handler: owned_write("update"))
+    RecordingStudio.enable_capability(:echoable, on: "Page")
     RecordingStudioApi.register_capability_action(
       :published,
       capability: :echoable,
@@ -216,7 +217,15 @@ class ApiV1RegisteredHandlerScopeTest < ActionDispatch::IntegrationTest
       handler: ->(context) { { recording_id: context.recording&.id, id: context.id } },
       serializer: ->(result) { result }
     )
-    RecordingStudioApi.register_recordable_type_api("Page", capability_actions: %i[published])
+    RecordingStudioApi.register_capability_action(
+      :echo,
+      capability: :echoable,
+      http_verb: :post,
+      owns_scoping: true,
+      handler: owned_capability_write("echo"),
+      serializer: ->(result) { result }
+    )
+    RecordingStudioApi.register_recordable_type_api("Page", capability_actions: %i[published echo])
     RecordingStudioApi.register_endpoint(
       :public_page,
       http_verb: :get,
@@ -224,6 +233,14 @@ class ApiV1RegisteredHandlerScopeTest < ActionDispatch::IntegrationTest
       recordable_type: "Page",
       owns_scoping: true,
       handler: endpoint_probe("public")
+    )
+    RecordingStudioApi.register_endpoint(
+      :write_owned,
+      http_verb: :patch,
+      path: "owned-pages/:id",
+      recordable_type: "Page",
+      owns_scoping: true,
+      handler: owned_endpoint_write("owned")
     )
 
     get "/recording_studio_api/api/v1/pages/#{@foreign_page.id}", headers: headers
@@ -241,30 +258,53 @@ class ApiV1RegisteredHandlerScopeTest < ActionDispatch::IntegrationTest
     assert_nil @calls.last[:recording_id]
     assert_equal @foreign_page.id.to_s, @calls.last[:params_id]
 
-    page_update = assert_raises(RecordingStudioApi::ConfigurationError) do
-      RecordingStudioApi.register_resource_handler("Page", :update, owns_scoping: true, handler: probe("update"))
-    end
-    echo_write = assert_raises(RecordingStudioApi::ConfigurationError) do
-      RecordingStudioApi.register_capability_action(
-        :echo,
-        capability: :echoable,
-        http_verb: :post,
-        owns_scoping: true,
-        handler: ->(_context) { {} }
-      )
-    end
-    endpoint_write = assert_raises(RecordingStudioApi::ConfigurationError) do
-      RecordingStudioApi.register_endpoint(
-        :write_public,
-        http_verb: :post,
-        path: "public-pages",
-        owns_scoping: true,
-        handler: ->(_context) { {} }
-      )
-    end
-    assert_includes page_update.message, "owns_scoping is only allowed on a read action"
-    assert_includes echo_write.message, "owns_scoping is only allowed on a read action"
-    assert_includes endpoint_write.message, "owns_scoping is only allowed on a read action"
+    patch "/recording_studio_api/api/v1/pages/#{@page_recording.recordable_id}",
+          params: { title: "Owned" },
+          as: :json,
+          headers: headers
+    assert_response :success
+    assert_equal "update", @calls.last[:name]
+    assert_equal @page_recording.id, @calls.last[:recording_id]
+
+    post "/recording_studio_api/api/v1/pages/#{@page_recording.recordable_id}/actions/echo", headers: headers
+    assert_response :success
+    assert_equal @page_recording.id, JSON.parse(response.body).fetch("recording_id")
+
+    patch "/recording_studio_api/api/v1/owned-pages/#{@page_recording.recordable_id}",
+          params: { title: "Owned" },
+          as: :json,
+          headers: headers
+    assert_response :success
+    assert_equal @page_recording.id, @calls.last[:recording_id]
+
+    calls_after_owned = @calls.size
+    patch "/recording_studio_api/api/v1/pages/#{@foreign_page.recordable_id}",
+          params: { title: "Nope" },
+          as: :json,
+          headers: headers
+    assert_response :not_found
+    assert_equal api_scope_missing_message("Page"), JSON.parse(response.body).dig("error", "message")
+    assert_equal calls_after_owned, @calls.size
+
+    post "/recording_studio_api/api/v1/pages/#{@foreign_page.id}/actions/echo", headers: headers
+    assert_response :not_found
+    assert_equal calls_after_owned, @calls.size
+
+    patch "/recording_studio_api/api/v1/owned-pages/#{SecureRandom.uuid}",
+          params: { title: "Nope" },
+          as: :json,
+          headers: headers
+    assert_response :not_found
+    assert_equal calls_after_owned, @calls.size
+
+    view_headers, view_page = view_client
+    patch "/recording_studio_api/api/v1/pages/#{view_page.recordable_id}",
+          params: { title: "Nope" },
+          as: :json,
+          headers: view_headers
+    assert_response :forbidden
+    assert_equal unauthorized_role_message(:edit), JSON.parse(response.body).dig("error", "message")
+    assert_equal calls_after_owned, @calls.size
   end
 
   test "a nested index scopes the route parent and a flat create leaves the body parent id" do
@@ -502,7 +542,7 @@ class ApiV1RegisteredHandlerScopeTest < ActionDispatch::IntegrationTest
     assert_empty @calls
   end
 
-  test "a post endpoint can require view and a post read cannot opt out of scoping" do
+  test "a post endpoint can require view and a post with owns_scoping skips grant lookup" do
     view_headers, view_page = view_client
     RecordingStudioApi.register_endpoint(
       :search_page,
@@ -528,17 +568,21 @@ class ApiV1RegisteredHandlerScopeTest < ActionDispatch::IntegrationTest
     assert_response :forbidden
     assert_equal 1, @calls.size
 
-    view_opt_out = assert_raises(RecordingStudioApi::ConfigurationError) do
-      RecordingStudioApi.register_capability_action(
-        :search,
-        capability: :echoable,
-        http_verb: :post,
-        required_role: :view,
-        owns_scoping: true,
-        handler: ->(_context) { {} }
-      )
-    end
-    assert_includes view_opt_out.message, "owns_scoping is only allowed on a read action"
+    RecordingStudio.enable_capability(:echoable, on: "Page")
+    RecordingStudioApi.register_capability_action(
+      :search,
+      capability: :echoable,
+      http_verb: :post,
+      required_role: :view,
+      owns_scoping: true,
+      handler: ->(context) { { id: context.id } },
+      serializer: ->(result) { result }
+    )
+    RecordingStudioApi.register_recordable_type_api("Page", capability_actions: %i[search])
+
+    post "/recording_studio_api/api/v1/pages/#{view_page.id}/actions/search", headers: view_headers
+    assert_response :success
+    assert_equal view_page.id.to_s, JSON.parse(response.body).fetch("id")
   end
 
   test "a later edit role revokes owns_scoping before the handler runs" do
@@ -872,6 +916,61 @@ class ApiV1RegisteredHandlerScopeTest < ActionDispatch::IntegrationTest
 
   def headers
     { "Authorization" => "Bearer #{@access_token}" }
+  end
+
+  def owned_write(name)
+    lambda do |context|
+      recording = owned_recording!(context)
+      context.access_grant.authorize!(recording: recording, role: :edit)
+      @calls << {
+        name: name,
+        id: context.id,
+        recording_id: recording.id
+      }
+      { json: { handled: name, recording_id: recording.id }, status: :ok }
+    end
+  end
+
+  def owned_capability_write(name)
+    lambda do |context|
+      recording = owned_recording!(context)
+      context.access_grant.authorize!(recording: recording, role: :edit)
+      @calls << { name: name, recording_id: recording.id, id: context.id }
+      { recording_id: recording.id }
+    end
+  end
+
+  def owned_endpoint_write(name)
+    lambda do |context|
+      recording = owned_recording!(context)
+      context.access_grant.authorize!(recording: recording, role: :edit)
+      @calls << { name: name, recording_id: recording.id, params_id: context.params[:id] }
+      { handled: name, recording_id: recording.id }
+    end
+  end
+
+  def owned_recording!(context)
+    id = member_id_for(context)
+    raise RecordingStudioApi::NotFoundError, api_scope_missing_message("Page") if id.blank?
+
+    type = context.respond_to?(:recordable_type) && context.recordable_type.present? ? context.recordable_type.to_s : "Page"
+    recording = RecordingStudio::Recording.unscoped.find_by(id: id)
+    recording ||= RecordingStudio::Recording.unscoped.find_by(recordable_type: type, recordable_id: id)
+    missing = api_scope_missing_message("Page")
+    raise RecordingStudioApi::NotFoundError, missing if recording.nil? || recording.recordable_type != type
+
+    owner = context.access_grant.owner
+    visible = owner.present? && RecordingStudioAccessible.authorized?(actor: owner, recording: recording, role: :view)
+    raise RecordingStudioApi::NotFoundError, missing unless visible
+
+    recording
+  end
+
+  def member_id_for(context)
+    return context.id if context.respond_to?(:id) && context.id.present?
+    return unless context.respond_to?(:params)
+
+    context.params[:id].presence || context.params["id"]
   end
 
   def probe(name)

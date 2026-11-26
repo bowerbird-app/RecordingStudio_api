@@ -21,9 +21,15 @@ module RecordingStudioApi
 
       def capability!(access_grant:, api_client:, recordable_type:, action:, id:, registration:, before_authorize: nil)
         source = registration || action
-        # An owns_scoping read yields nil and returns. The handler owns scoping.
+        # An owns_scoping action yields nil and returns. The handler owns scoping.
         # Lookup, before_authorize, and authorize! do not run. The block still runs.
-        if source.owns_scoping? && dispatch_read?(action, recording: nil, api_client:, access_grant:)
+        # A GET whose effective role is no longer :view keeps grant lookup.
+        if source.owns_scoping? && HandlerScope.skip_grant_lookup?(
+          true,
+          http_verb: action.http_verb,
+          required_role: action_role(action, recording: nil, api_client:, access_grant:),
+          action_name: action.name
+        )
           yield nil if block_given?
           return empty_result
         end
@@ -81,13 +87,6 @@ module RecordingStudioApi
         include_trashed?(
           source,
           role: action_role(action, recording: candidate, api_client:, access_grant:)
-        )
-      end
-
-      def dispatch_read?(action, recording:, api_client:, access_grant:)
-        HandlerScope.dispatch_read?(
-          action: action,
-          role: action_role(action, recording:, api_client:, access_grant:)
         )
       end
 
