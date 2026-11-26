@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.23.0] - 2026-11-26
 
 ### Fixed
-- A user OAuth token (`authorization_code`) now authorizes as the signed-in user. `AccessGrant#actor` and `#owner` are `authorized_by` when that record is present. `authorize!` takes the lower of the token's grant role and `RecordingStudioAccessible.role_for` on that user. Writes use the user as the event actor and keep the API client as `impersonator`. `client_credentials` and API keys with no `authorized_by` are unchanged.
+- A user OAuth token (`authorization_code`) now authorizes as the signed-in user. `AccessGrant#actor` and `#owner` are `authorized_by` when that record is present. If the token still has an `oauth_authorization` and `authorized_by` is missing, those principals stay blank and the write is refused. `authorize!` takes the lower of the token's grant role and `RecordingStudioAccessible.role_for` on that user. Writes use the user as the event actor and keep the API client as `impersonator`. `client_credentials` and API keys with no `authorized_by` are unchanged.
 
 ### Upgrade notes
 - Bump to `1.23.0`. No migration.

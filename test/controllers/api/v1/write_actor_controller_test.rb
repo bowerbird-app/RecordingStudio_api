@@ -115,6 +115,92 @@ class ApiV1WriteActorControllerTest < ActionDispatch::IntegrationTest
     assert_nil event.metadata["authorized_by_type"]
   end
 
+  test "a delegated token whose user was deleted is refused" do
+    manager = create_user(email: "deleted-http-manager@example.com")
+    root, = create_access_recording_for(user: manager, role: :admin)
+    editor = create_user(email: "deleted-http-editor@example.com")
+    grant_or_bootstrap_access!(recording: root, actor: editor, role: :edit)
+    folder = create_page_recording(root_recording: root).parent_recording
+    app = RecordingStudioApi::ApiClient.create!(name: "HTTP deleted user app", api_key: "public", owner: manager)
+    app_access = grant_or_bootstrap_access!(recording: root, actor: app, role: :admin)
+    oauth_app = RecordingStudioOauth::OauthClient.find(app.id)
+    token = user_oauth_token(
+      access_recording: app_access,
+      manager: editor,
+      api_client: oauth_app,
+      authorization: DeletedUserAuthorization.new(editor)
+    )
+    install_accessible_edit_write_policy!
+    editor.destroy!
+
+    patch "/recording_studio_api/api/v1/folders/#{folder.id}",
+          params: { name: "Write after the user was deleted" },
+          headers: { "Authorization" => "Bearer #{token}" }
+
+    assert_not_equal 200, response.status
+    assert_not_equal "Write after the user was deleted", folder.reload.recordable.name
+    assert_nil latest_update_event(folder)
+  end
+
+  test "a delegated token honors a role downgrade after it was issued" do
+    manager = create_user(email: "downgrade-http-manager@example.com")
+    root, = create_access_recording_for(user: manager, role: :admin)
+    editor = create_user(email: "downgrade-http-editor@example.com")
+    grant_or_bootstrap_access!(recording: root, actor: editor, role: :edit)
+    folder = create_page_recording(root_recording: root).parent_recording
+    app = RecordingStudioApi::ApiClient.create!(name: "HTTP downgrade app", api_key: "public", owner: manager)
+    app_access = grant_or_bootstrap_access!(recording: root, actor: app, role: :admin)
+    oauth_app = RecordingStudioOauth::OauthClient.find(app.id)
+    token = user_oauth_token(access_recording: app_access, manager: editor, api_client: oauth_app)
+    install_accessible_edit_write_policy!
+    other = create_user(email: "downgrade-http-other@example.com")
+    grant_or_bootstrap_access!(recording: root, actor: other, role: :admin)
+    downgraded = RecordingStudioAccessible.grant_access(
+      recording: root,
+      actor: editor,
+      role: :view,
+      manager_actor: other
+    )
+    assert downgraded.success?
+
+    patch "/recording_studio_api/api/v1/folders/#{folder.id}",
+          params: { name: "Write after a role downgrade" },
+          headers: { "Authorization" => "Bearer #{token}" }
+
+    assert_response :forbidden
+    assert_equal unauthorized_role_message(:edit), JSON.parse(response.body).dig("error", "message")
+    assert_not_equal "Write after a role downgrade", folder.reload.recordable.name
+    assert_nil latest_update_event(folder)
+  end
+
+  test "a delegated token is refused after the user's access is revoked" do
+    manager = create_user(email: "revoke-http-manager@example.com")
+    root, = create_access_recording_for(user: manager, role: :admin)
+    editor = create_user(email: "revoke-http-editor@example.com")
+    editor_access = grant_or_bootstrap_access!(recording: root, actor: editor, role: :edit)
+    folder = create_page_recording(root_recording: root).parent_recording
+    app = RecordingStudioApi::ApiClient.create!(name: "HTTP revoke app", api_key: "public", owner: manager)
+    app_access = grant_or_bootstrap_access!(recording: root, actor: app, role: :admin)
+    oauth_app = RecordingStudioOauth::OauthClient.find(app.id)
+    token = user_oauth_token(access_recording: app_access, manager: editor, api_client: oauth_app)
+    install_accessible_edit_write_policy!
+    revoked = RecordingStudioAccessible::Services::RevokeRecordingAccess.call(
+      recording: root,
+      access_recording: editor_access,
+      manager_actor: manager,
+      allow_last_admin_removal: true
+    )
+    assert revoked.success?
+
+    patch "/recording_studio_api/api/v1/folders/#{folder.id}",
+          params: { name: "Write after revoke" },
+          headers: { "Authorization" => "Bearer #{token}" }
+
+    refute_equal 200, response.status
+    assert_not_equal "Write after revoke", folder.reload.recordable.name
+    assert_nil latest_update_event(folder)
+  end
+
   private
 
   def install_accessible_edit_write_policy!
@@ -130,8 +216,8 @@ class ApiV1WriteActorControllerTest < ActionDispatch::IntegrationTest
     RecordingStudioAccessible.authorized?(actor: actor, recording: target, role: :edit)
   end
 
-  def user_oauth_token(access_recording:, manager:, api_client: @oauth_client)
-    authorization = Struct.new(:manager_actor).new(manager)
+  def user_oauth_token(access_recording:, manager:, api_client: @oauth_client, authorization: nil)
+    authorization ||= Struct.new(:manager_actor).new(manager)
     credential = UserChannelCredential.new(
       api_client: api_client,
       access_recording: access_recording,
@@ -181,5 +267,15 @@ class ApiV1WriteActorControllerTest < ActionDispatch::IntegrationTest
     end
 
     def revoke_tokens_on_expiry!(*); end
+  end
+
+  class DeletedUserAuthorization
+    def initialize(user)
+      @id = user.id
+    end
+
+    def manager_actor
+      User.find_by(id: @id)
+    end
   end
 end

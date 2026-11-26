@@ -3,6 +3,10 @@
 module RecordingStudioApi
   # A token sees the owner's live access, limited to the grant anchor.
   # On a user OAuth token, that owner is `authorized_by`.
+  # When the credential still has an `oauth_authorization` and `authorized_by`
+  # is missing, actor and owner stay blank so `authorize!` refuses.
+  # `client_credentials` and API keys without an `oauth_authorization` still
+  # fall back to the access actor and `api_client.owner`.
   # `authorize!` uses the lower of the grant role and
   # `RecordingStudioAccessible.role_for` on the recording being checked.
   class AccessGrant
@@ -27,6 +31,8 @@ module RecordingStudioApi
     end
 
     def actor
+      return authorized_by if oauth_authorization?
+
       authorized_by.presence || (access.actor if access.respond_to?(:actor))
     end
 
@@ -41,7 +47,11 @@ module RecordingStudioApi
     def owner
       return @owner if defined?(@owner)
 
-      @owner = authorized_by.presence || owner_from_client || owner_from_actor
+      @owner = if oauth_authorization?
+                 authorized_by
+               else
+                 authorized_by.presence || owner_from_client || owner_from_actor
+               end
     end
 
     def accessible_recordings(include_trashed: false, scope: nil)
@@ -72,6 +82,10 @@ module RecordingStudioApi
       return AuthorizedBy.actor_for(credential: credential) if @authorized_by_source.equal?(AuthorizedBy::OMITTED)
 
       @authorized_by_source
+    end
+
+    def oauth_authorization?
+      credential.respond_to?(:oauth_authorization) && credential.oauth_authorization.present?
     end
 
     def owner_from_client
