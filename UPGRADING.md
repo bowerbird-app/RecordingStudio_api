@@ -1,5 +1,14 @@
 # Upgrading RecordingStudioApi
 
+## Upgrading to 1.24.1
+
+Custom resource creates require edit on the grant parent. No migration.
+
+1. Bump the host gem to `1.24.1`. Gemspec ranges stay the same.
+2. `HandlerGuard.resource!` authorizes a custom `:create` handler, or a handler with `creates: true`, with `access_grant.authorize!(recording: access_grant.scope_recording, role: :edit)` through `authorize_recording!`. A view-only token is HTTP 403 with `This action needs a grant with the edit role or higher.` The handler does not run. Built-in create still authorizes the chosen parent recording and is unchanged.
+3. Nested relationship creates already authorized `:edit` on the URL parent. Capability actions still use their `required_role`.
+4. Compare [v1.24.0...v1.24.1](https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.24.0...v1.24.1).
+
 ## Upgrading to 1.24.0
 
 Id writes can pass `owns_scoping: true`. No migration. Reads stay as they were in 1.23.0.

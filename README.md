@@ -1040,8 +1040,11 @@ without lookup, `before_authorize`, or `authorize!`. An `owns_scoping` write
 skips lookup and `before_authorize`, then authorizes the grant anchor the
 same way an unscoped endpoint does. The handler owns scoping, and the block
 still runs with a nil recording. A GET whose effective role is later `:edit`
-keeps grant lookup. A flat index or create returns a nil recording. An
-endpoint with `scope_id: false` or no recording id also returns a nil
+keeps grant lookup. A flat index returns a nil recording. A custom create
+(`:create` or `creates: true`) authorizes `:edit` on the grant parent
+(`access_grant.scope_recording`) through `authorize_recording!`, then
+returns a nil recording. A view-only token is 403 before the handler runs.
+An endpoint with `scope_id: false` or no recording id also returns a nil
 recording, after `endpoint!` calls `access_grant.authorize!` on the grant
 anchor. The role is that endpoint's `authorization_role`. `show`, `update`,
 `destroy`, capability actions, and id-scoped endpoints without `owns_scoping`

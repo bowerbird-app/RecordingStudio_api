@@ -17,16 +17,34 @@ class HandlerGuardTest < ActiveSupport::TestCase
     Current.actor = nil if defined?(Current)
   end
 
-  test "flat index and create return a nil recording" do
+  test "flat index returns a nil recording" do
     grant, page = open_grant(:view)
     foreign = foreign_page
     index = register_handler("Page", :index)
-    create = register_handler("Page", :create)
 
     assert_nil_guard guard_resource(grant, index, :index, foreign.id)
     assert_nil_guard guard_resource(grant, index, :index, nil)
+    assert_nil_guard guard_resource(grant, index, :index, page.id)
+  end
+
+  test "a view grant is refused on a custom create" do
+    view_grant, page = open_grant(:view)
+    create = register_handler("Page", :create)
+    attach = register_handler("Page", :attach, creates: true)
+
+    assert_forbidden { guard_resource(view_grant, create, :create, page.id) }
+    assert_forbidden { guard_resource(view_grant, create, :create, "") }
+    assert_forbidden { guard_resource(view_grant, attach, :attach, page.id) }
+  end
+
+  test "an edit grant authorizes a custom create and returns a nil recording" do
+    grant, page = open_grant(:edit)
+    create = register_handler("Page", :create)
+    attach = register_handler("Page", :attach, creates: true)
+
     assert_nil_guard guard_resource(grant, create, :create, page.id)
     assert_nil_guard guard_resource(grant, create, :create, "")
+    assert_nil_guard guard_resource(grant, attach, :attach, page.id)
   end
 
   test "an owns_scoping resource read returns a nil recording" do

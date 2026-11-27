@@ -4,7 +4,7 @@ A non-root create requires `parent_id` in the body. Pass an option when the serv
 
 The documentation catalog sets `parent` to `"server"` on that create endpoint. The generated OpenAPI operation sets `x-parent` to `"server"`. Both leave `parent_id` out of the create request schema. A client that still sends `parent_id` is ignored. The value does not change the parent, and it is left out of the idempotency fingerprint.
 
-The resolved parent is loaded again from the client's accessible recordings and must belong to the grant's root. A parent outside that scope is HTTP 404 `not_found`. Handler authorization is unchanged. The handler still calls `access_grant.authorize!` or Accessible.
+The resolved parent is loaded again from the client's accessible recordings and must belong to the grant's root. A parent outside that scope is HTTP 404 `not_found`. Built-in create authorizes `:edit` on that parent. A custom create handler is authorized the same way an `owns_scoping` write is: `HandlerGuard.resource!` calls `authorize_recording!` for `:edit` on `access_grant.scope_recording` before the handler runs. A view-only token is HTTP 403. The handler may still call `access_grant.authorize!` on a more specific parent.
 
 ## Built-in create
 

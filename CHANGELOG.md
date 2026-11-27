@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.24.1] - 2026-11-27
+
+### Fixed
+- A custom resource create (`register_resource_handler` for `:create`, or `creates: true`) now requires Accessible `:edit` on the grant parent before the handler runs. `HandlerGuard.resource!` calls `authorize_recording!` with `HandlerScope.resource_role(:create)` on `access_grant.scope_recording`, the same `access_grant.authorize!` path an `owns_scoping` write uses. A view-only delegated token is HTTP 403 with `This action needs a grant with the edit role or higher.` and the handler does not run. Built-in create is unchanged and still authorizes `:edit` on the chosen parent recording.
+
+### Upgrade notes
+- Bump to `1.24.1`. No migration.
+- Custom create handlers that previously ran for a view token are now refused at the guard. Handlers that already required edit keep that check.
+- See [UPGRADING.md](UPGRADING.md).
+
 ## [1.24.0] - 2026-11-26
 
 ### Added
@@ -1781,7 +1791,8 @@ relationship migration steps.
 ### Removed
 - Built-in mobile OAuth authorization-code, PKCE, and refresh-token support; host applications can integrate external bearer-token authenticators instead
 
-[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.24.0...HEAD
+[Unreleased]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.24.1...HEAD
+[1.24.1]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.24.0...v1.24.1
 [1.24.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.23.0...v1.24.0
 [1.23.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.22.0...v1.23.0
 [1.22.0]: https://github.com/bowerbird-app/RecordingStudio_api/compare/v1.21.7...v1.22.0

@@ -10,6 +10,15 @@ module RecordingStudioApi
     class << self
       def resource!(access_grant:, recordable_type:, action_name:, id:, registration:)
         action = action_name.to_sym
+        if action == :create || registration.creates?
+          authorize_recording!(
+            access_grant,
+            access_grant.scope_recording,
+            HandlerScope.resource_role(:create),
+            false
+          )
+          return empty_result
+        end
         return empty_result if HandlerScope.resource_opt_out?(registration.owns_scoping?, action) || !SCOPED_RESOURCE_ACTIONS.include?(action)
 
         role = HandlerScope.resource_role(action)

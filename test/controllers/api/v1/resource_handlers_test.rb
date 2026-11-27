@@ -109,6 +109,60 @@ class ApiV1ResourceHandlersTest < ActionDispatch::IntegrationTest
     assert_equal folder_parent_id, @folder_recording.reload.parent_recording_id
   end
 
+  test "a view token is refused on a custom create and writes nothing" do
+    view_user = create_user
+    view_root, view_access = create_access_recording_for(user: view_user, role: :view)
+    view_folder = create_page_recording(root_recording: view_root).parent_recording
+    view_token = issue_oauth_access_token_for(access_recording: view_access, name: "View create token")
+    headers = { "Authorization" => "Bearer #{view_token}" }
+    RecordingStudioApi.register_resource_handler("Page", :create, handler: lambda { |_context|
+      Page.create!(title: "Should not be written")
+      { json: { handled: "create" }, status: :created }
+    })
+
+    assert_no_difference("Page.count") do
+      post "/recording_studio_api/api/v1/pages", params: {
+        parent_id: view_folder.id,
+        title: "View token page"
+      }, headers: headers
+    end
+    assert_response :forbidden
+    assert_equal unauthorized_role_message(:edit), JSON.parse(response.body).dig("error", "message")
+    refute Page.exists?(title: "Should not be written")
+  end
+
+  test "an edit token runs a custom create" do
+    RecordingStudioApi.register_resource_handler("Page", :create, handler: lambda { |_context|
+      { json: { handled: "create" }, status: :created }
+    })
+
+    assert_no_difference("Page.count") do
+      post "/recording_studio_api/api/v1/pages", params: {
+        parent_id: @folder_recording.id,
+        title: "Edit token page"
+      }, headers: authorization_headers
+    end
+    assert_response :created
+    assert_equal "create", JSON.parse(response.body).fetch("handled")
+  end
+
+  test "a view token is still refused on a standard create" do
+    view_user = create_user
+    view_root, view_access = create_access_recording_for(user: view_user, role: :view)
+    view_folder = create_page_recording(root_recording: view_root).parent_recording
+    view_token = issue_oauth_access_token_for(access_recording: view_access, name: "View standard create")
+    headers = { "Authorization" => "Bearer #{view_token}" }
+
+    assert_no_difference("Page.count") do
+      post "/recording_studio_api/api/v1/pages", params: {
+        parent_id: view_folder.id,
+        title: "Blocked standard page"
+      }, headers: headers
+    end
+    assert_response :forbidden
+    assert_equal unauthorized_role_message(:edit), JSON.parse(response.body).dig("error", "message")
+  end
+
   test "a per-type handler and the shared handler both check the required role" do
     view_user = create_user
     view_root, view_access = create_access_recording_for(user: view_user, role: :view)
